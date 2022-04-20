@@ -101,6 +101,8 @@
   <div>musician ant</div>
   <div>ugly ant</div>
   <div>female ant</div>
+  <div>carpenter ant</div>
+  <div>fire ant</div>
   <div>male ant</div>
   <div>ant but its a bee</div>
   <div>engineer ant</div>
