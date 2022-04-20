@@ -5,3 +5,7 @@ Here at [typesofants.com](http://typesofants.com), we love the open-source natur
 ## Style
 
 Two spaces == one tab
+
+## Issues
+
+Everything worth considering must be marked as `bug`. Naturally.
