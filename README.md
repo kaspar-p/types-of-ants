@@ -30,7 +30,6 @@
   <div>wet ant</div>
   <div>pale yellow ant</div>
   <div>white ant</div>
-  <div>cum colored ant</div>
   <div>light blue ant</div>
   <div>home builder ant</div>
   <div>dark gray ant</div>
