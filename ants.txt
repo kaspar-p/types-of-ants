@@ -25,6 +25,7 @@ seafoam green ant
 sunset orange ant
 brown ant
 wet ant
+dead ant
 pale yellow ant
 white ant
 light blue ant
