@@ -9,11 +9,49 @@
       name="description"
       content="An informative site about ants, created by kaspar poland."
     />
+    <script>
+      let handling = false;
+      function handleNewAnt() {
+        const form = document.getElementById("form");
+        const thanksText = document.createElement("div");
+        thanksText.innerText = "thanks!";
+
+        const text = document.getElementById("new-ant").value;
+        if (!handling) {
+          // Send the request
+          fetch("https://www.kasparpoland.com/api/new-ant", {
+            method: "POST",
+            body: text,
+          });
+
+          // Handle thanks text
+          form.appendChild(thanksText);
+          handling = true;
+          setTimeout(() => {
+            form.removeChild(thanksText);
+            handling = false;
+          }, 1000);
+        }
+      }
+    </script>
     <title>types of ants</title>
   </head>
   <body>
     <h1>types of ants</h1>
-    <div style="column-count: 4">
+    <div
+      id="form"
+      style="display: flex; flex-direction: row; margin-bottom: 15px"
+    >
+      <div style="margin-right: 5px">have new ant suggestion?</div>
+      <input id="new-ant" />
+      <button
+        onclick="handleNewAnt();"
+        style="margin-left: 10px; margin-right: 10px"
+      >
+        submit ant suggestion
+      </button>
+    </div>
+    <div id="ant-filler" style="column-count: 4">
       <div>red ant</div>
       <div>black ant</div>
       <div>green ant</div>
