@@ -1,6 +1,6 @@
-# types-of-ants
+# types of ants
 
-<div style="column-count: 4;">
+<div>
   <div>red ant</div>
   <div>black ant</div>
   <div>green ant</div>
@@ -125,4 +125,4 @@
   <div>canadian ant</div>
   <div>american ant</div>
   <div>aunt</div>
-  </div>
+</div>
