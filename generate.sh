@@ -1,0 +1,2 @@
+python3 generate/generate_page.py
+python3 generate/generate_readme.py

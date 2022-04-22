@@ -27,7 +27,6 @@
   <div>seafoam green ant</div>
   <div>sunset orange ant</div>
   <div>brown ant</div>
-  <div>poop brown ant</div>
   <div>wet ant</div>
   <div>pale yellow ant</div>
   <div>white ant</div>
