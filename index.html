@@ -10,28 +10,55 @@
       content="An informative site about ants, created by kaspar poland."
     />
     <script>
+      const develop = false;
       let handling = false;
-      function handleNewAnt() {
+
+      async function handleNewAnt() {
         const form = document.getElementById("form");
         const thanksText = document.createElement("div");
-        thanksText.innerText = "thanks!";
 
-        const text = document.getElementById("new-ant").value;
+        const input = document.getElementById("new-ant");
         if (!handling) {
-          // Send the request
-          fetch("https://www.kasparpoland.com/api/new-ant", {
-            method: "POST",
-            body: text,
-          });
+          if (!isValid(input.value)) {
+            thanksText.innerText = "invalid suggestion!";
+          } else {
+            // Send the request
+            const url = develop
+              ? "http://localhost:3000"
+              : "https://kasparpoland.com";
+
+            await fetch(`${url}/api/new-ant`, {
+              method: "POST",
+              body: input.value,
+            })
+              .then((response) => {
+                if (response.status === 200) {
+                  thanks.innerText = "thanks!";
+                }
+              })
+              .catch((error) => {
+                thanksText.innerText =
+                  "error encountered, suggestion not processed!";
+              });
+          }
 
           // Handle thanks text
           form.appendChild(thanksText);
           handling = true;
+          input.value = "";
           setTimeout(() => {
             form.removeChild(thanksText);
             handling = false;
-          }, 1000);
+          }, 2000);
         }
+      }
+
+      function isValid(text) {
+        if (text.length > 2 && text.length < 20) {
+          return true;
+        }
+
+        return false;
       }
     </script>
     <title>types of ants</title>

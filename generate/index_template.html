@@ -27,17 +27,19 @@
               ? "http://localhost:3000"
               : "https://kasparpoland.com";
 
-            const response = await fetch(`${url}/api/new-ant`, {
+            await fetch(`${url}/api/new-ant`, {
               method: "POST",
               body: input.value,
-            });
-
-            if (response.status === 200) {
-              thanksText.innerText = "thanks!";
-            } else {
-              thanksText.innerText =
-                "error encountered, suggestion not processed!";
-            }
+            })
+              .then((response) => {
+                if (response.status === 200) {
+                  thanks.innerText = "thanks!";
+                }
+              })
+              .catch((error) => {
+                thanksText.innerText =
+                  "error encountered, suggestion not processed!";
+              });
           }
 
           // Handle thanks text

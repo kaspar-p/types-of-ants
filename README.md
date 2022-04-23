@@ -28,6 +28,7 @@
   <div>sunset orange ant</div>
   <div>brown ant</div>
   <div>wet ant</div>
+  <div>dead ant</div>
   <div>pale yellow ant</div>
   <div>white ant</div>
   <div>light blue ant</div>
