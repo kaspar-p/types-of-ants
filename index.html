@@ -16,6 +16,13 @@
       async function handleNewAnt() {
         const form = document.getElementById("form");
         const thanksText = document.createElement("div");
+        form.appendChild(thanksText);
+
+        let counter = 0;
+        const dotInterval = setInterval(() => {
+          thanksText.innerText = ".".repeat(counter % 5);
+          counter++;
+        }, 100);
 
         const input = document.getElementById("new-ant");
         if (!handling) {
@@ -32,19 +39,20 @@
               body: input.value,
             })
               .then((response) => {
+                clearInterval(dotInterval);
                 if (response.status === 200) {
                   thanksText.innerText = "thanks!";
                 }
               })
               .catch((error) => {
                 console.log(error);
+                clearInterval(dotInterval);
                 thanksText.innerText =
                   "error encountered, suggestion not processed!";
               });
           }
 
           // Handle thanks text
-          form.appendChild(thanksText);
           handling = true;
           input.value = "";
           setTimeout(() => {
