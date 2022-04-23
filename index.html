@@ -33,10 +33,11 @@
             })
               .then((response) => {
                 if (response.status === 200) {
-                  thanks.innerText = "thanks!";
+                  thanksText.innerText = "thanks!";
                 }
               })
               .catch((error) => {
+                console.log(error);
                 thanksText.innerText =
                   "error encountered, suggestion not processed!";
               });
