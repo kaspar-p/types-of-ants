@@ -36,6 +36,7 @@
   <div>dark gray ant</div>
   <div>light gray ant</div>
   <div>mint green ant</div>
+  <div>ant that's built different</div>
   <div>violet ant</div>
   <div>eggshell ant</div>
   <div>salmon ant</div>
@@ -44,6 +45,8 @@
   <div>pink ant</div>
   <div>hot pink ant</div>
   <div>coral ant</div>
+  <div>pope ant</div>
+  <div>broad shouldered ant</div>
   <div>cream ant</div>
   <div>orchid ant</div>
   <div>tomato ant</div>
@@ -51,6 +54,7 @@
   <div>turquoise ant</div>
   <div>titanium white ant</div>
   <div>cadmium yellow ant</div>
+  <div>really cute ant</div>
   <div>vermillion ant</div>
   <div>ants you can't see</div>
   <div>flesh colored ant</div>
@@ -80,11 +84,13 @@
   <div>olmec ant</div>
   <div>mexican ant</div>
   <div>imperialist ant</div>
+  <div>rhino ant</div>
   <div>bantu ant</div>
   <div>mayan ant</div>
   <div>missourian ant</div>
   <div>sioux ant</div>
   <div>southern ant</div>
+  <div>bullet ant</div>
   <div>samoan ant</div>
   <div>polynesian ant</div>
   <div>artist ant</div>
@@ -95,6 +101,9 @@
   <div>polish ant</div>
   <div>hedgehog ant</div>
   <div>tibetan ant</div>
+  <div>old ant</div>
+  <div>baby ant</div>
+  <div>middle aged ant</div>
   <div>antarctican ant</div>
   <div>cold ant</div>
   <div>hot ant</div>
@@ -104,6 +113,10 @@
   <div>male ant</div>
   <div>ant but its a bee</div>
   <div>engineer ant</div>
+  <div>politician ant</div>
+  <div>skinny ant</div>
+  <div>really fat ant</div>
+  <div>ant but its on fire</div>
   <div>mathematician ant</div>
   <div>plumber ant</div>
   <div>teacher ant</div>
@@ -116,6 +129,7 @@
   <div>rich ant</div>
   <div>poor ant</div>
   <div>nice ant</div>
+  <div>ant but its underwater</div>
   <div>beautiful ant</div>
   <div>queen ant</div>
   <div>ant in a band</div>
