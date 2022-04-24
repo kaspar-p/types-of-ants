@@ -33,6 +33,7 @@ home builder ant
 dark gray ant
 light gray ant
 mint green ant
+ant that's built different
 violet ant
 eggshell ant
 salmon ant
@@ -41,6 +42,8 @@ clear ant
 pink ant
 hot pink ant
 coral ant
+pope ant
+broad shouldered ant
 cream ant
 orchid ant
 tomato ant
@@ -48,6 +51,7 @@ lilac ant
 turquoise ant
 titanium white ant
 cadmium yellow ant
+really cute ant
 vermillion ant
 ants you can't see
 flesh colored ant
@@ -77,11 +81,13 @@ small ant
 olmec ant
 mexican ant
 imperialist ant
+rhino ant
 bantu ant
 mayan ant
 missourian ant
 sioux ant
 southern ant
+bullet ant
 samoan ant
 polynesian ant
 artist ant
@@ -92,6 +98,9 @@ slavic ant
 polish ant
 hedgehog ant
 tibetan ant
+old ant
+baby ant
+middle aged ant
 antarctican ant
 cold ant
 hot ant
@@ -101,6 +110,10 @@ female ant
 male ant
 ant but its a bee
 engineer ant
+politician ant
+skinny ant
+really fat ant
+ant but its on fire
 mathematician ant
 plumber ant
 teacher ant
@@ -113,6 +126,7 @@ academic ant
 rich ant
 poor ant
 nice ant
+ant but its underwater
 beautiful ant
 queen ant
 ant in a band
