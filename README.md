@@ -19,6 +19,7 @@
   <div>navy blue ant</div>
   <div>indigo ant</div>
   <div>rainbow ant</div>
+  <div>cranberry picker ant</div>
   <div>gold ant</div>
   <div>silver ant</div>
   <div>bronze ant</div>
