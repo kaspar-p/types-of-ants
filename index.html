@@ -18,17 +18,17 @@
         const thanksText = document.createElement("div");
         form.appendChild(thanksText);
 
-        let counter = 0;
-        const dotInterval = setInterval(() => {
-          thanksText.innerText = ".".repeat(counter % 5);
-          counter++;
-        }, 100);
-
         const input = document.getElementById("new-ant");
         if (!handling) {
           if (!isValid(input.value)) {
             thanksText.innerText = "invalid suggestion!";
           } else {
+            let counter = 0;
+            const dotInterval = setInterval(() => {
+              thanksText.innerText = ".".repeat(counter % 5);
+              counter++;
+            }, 100);
+
             // Send the request
             const url = develop
               ? "http://localhost:3000"
@@ -52,7 +52,7 @@
               });
           }
 
-          // Handle thanks text
+          // Make text appear and clear input
           handling = true;
           input.value = "";
           setTimeout(() => {
