@@ -16,6 +16,7 @@ forest green ant
 navy blue ant
 indigo ant
 rainbow ant
+cranberry picker ant
 gold ant
 silver ant
 bronze ant
