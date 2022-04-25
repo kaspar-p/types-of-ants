@@ -68,6 +68,7 @@
   <div>prussian blue ant</div>
   <div>scarlet ant</div>
   <div>african ant</div>
+  <div>daddy ant</div>
   <div>azerbaijani ant</div>
   <div>austrian ant</div>
   <div>apache ant</div>
@@ -89,6 +90,7 @@
   <div>bantu ant</div>
   <div>mayan ant</div>
   <div>missourian ant</div>
+  <div>phantom</div>
   <div>sioux ant</div>
   <div>southern ant</div>
   <div>bullet ant</div>
@@ -98,6 +100,7 @@
   <div>scottish ant</div>
   <div>ant but its a fish</div>
   <div>slovak ant</div>
+  <div>ant man</div>
   <div>slavic ant</div>
   <div>polish ant</div>
   <div>hedgehog ant</div>
