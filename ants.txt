@@ -65,6 +65,7 @@ peach ant
 prussian blue ant
 scarlet ant
 african ant
+daddy ant
 azerbaijani ant
 austrian ant
 apache ant
@@ -86,6 +87,7 @@ rhino ant
 bantu ant
 mayan ant
 missourian ant
+phantom
 sioux ant
 southern ant
 bullet ant
@@ -95,6 +97,7 @@ artist ant
 scottish ant
 ant but its a fish
 slovak ant
+ant man
 slavic ant
 polish ant
 hedgehog ant
