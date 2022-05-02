@@ -77,6 +77,7 @@
   <div>east asian ant</div>
   <div>siberian ant</div>
   <div>arabian ant</div>
+  <div>superhero ant</div>
   <div>eastern steppes ant</div>
   <div>belarusian ant</div>
   <div>french ant</div>
