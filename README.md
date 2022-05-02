@@ -34,6 +34,7 @@
   <div>white ant</div>
   <div>light blue ant</div>
   <div>home builder ant</div>
+  <div>purple ant</div>
   <div>dark gray ant</div>
   <div>light gray ant</div>
   <div>mint green ant</div>
