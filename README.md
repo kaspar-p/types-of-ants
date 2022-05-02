@@ -90,6 +90,7 @@
   <div>rhino ant</div>
   <div>bantu ant</div>
   <div>mayan ant</div>
+  <div>ant but its smushed</div>
   <div>missourian ant</div>
   <div>phantom</div>
   <div>sioux ant</div>
@@ -146,6 +147,6 @@
   <div>ant but its a bus</div>
   <div>anteatereater ant</div>
   <div>canadian ant</div>
-  <div>american ant</div>
+  <div>americants</div>
   <div>aunt</div>
 </div>
