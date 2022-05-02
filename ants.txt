@@ -31,6 +31,7 @@ pale yellow ant
 white ant
 light blue ant
 home builder ant
+purple ant
 dark gray ant
 light gray ant
 mint green ant
