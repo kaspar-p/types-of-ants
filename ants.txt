@@ -59,6 +59,7 @@ flesh colored ant
 ghost ant
 olive ant
 sky blue ant
+rust red ant
 aquamarine ant
 azure ant
 peach ant
@@ -100,6 +101,7 @@ slovak ant
 ant man
 slavic ant
 polish ant
+party ant
 hedgehog ant
 tibetan ant
 old ant
@@ -117,12 +119,14 @@ ant but its a bee
 engineer ant
 politician ant
 skinny ant
+ant but two more legs (spider)
 really fat ant
 ant but its on fire
 mathematician ant
 plumber ant
 teacher ant
 student ant
+martian ant
 child ant
 parent ant
 grandparent ant

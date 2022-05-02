@@ -62,6 +62,7 @@
   <div>ghost ant</div>
   <div>olive ant</div>
   <div>sky blue ant</div>
+  <div>rust red ant</div>
   <div>aquamarine ant</div>
   <div>azure ant</div>
   <div>peach ant</div>
@@ -103,6 +104,7 @@
   <div>ant man</div>
   <div>slavic ant</div>
   <div>polish ant</div>
+  <div>party ant</div>
   <div>hedgehog ant</div>
   <div>tibetan ant</div>
   <div>old ant</div>
@@ -120,12 +122,14 @@
   <div>engineer ant</div>
   <div>politician ant</div>
   <div>skinny ant</div>
+  <div>ant but two more legs (spider)</div>
   <div>really fat ant</div>
   <div>ant but its on fire</div>
   <div>mathematician ant</div>
   <div>plumber ant</div>
   <div>teacher ant</div>
   <div>student ant</div>
+  <div>martian ant</div>
   <div>child ant</div>
   <div>parent ant</div>
   <div>grandparent ant</div>
