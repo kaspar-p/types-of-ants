@@ -74,6 +74,7 @@ australian ant
 east asian ant
 siberian ant
 arabian ant
+superhero ant
 eastern steppes ant
 belarusian ant
 french ant
