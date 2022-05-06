@@ -1,6 +1,7 @@
 """
     Generate the HTML page for displaying TYPES OF ANTS based on ants.txt
 """
+import os
 
 TAB_AMOUNT = 2
 
@@ -11,17 +12,44 @@ def main():
     template = open("generate/index_template.html", "r")
 
     TAB = " " * TAB_AMOUNT
+    last_ants_change_git_hash = os.popen(
+        'git log --follow -n 1 --pretty=format:"%h" --date=short ants.txt'
+    ).readlines().pop()
+
+    last_ants_change_git_date = os.popen(
+        'git log --follow -n 1 --pretty=format:"%ad" --date=short ants.txt'
+    ).readlines().pop()
+
+    get_ants_changelist_command = f'git diff {last_ants_change_git_hash}^..HEAD --no-ext-diff --unified=0 --exit-code -a --no-prefix -- ants.txt | egrep "^\+" | cut -c2-'
+    ant_changelist = os.popen(get_ants_changelist_command).readlines()[1:]
+    ant_changelist = [line.strip() for line in ant_changelist]
 
     for template_line in template.readlines():
+        # Inject contents of ants.txt
         if (
             template_line.strip()
             == '<div id="ant-filler" style="column-count: 4"></div>'
         ):
-            html.write(f'{TAB*2}<div id="ant-filler" style="column-count: 4">\n')
+            html.write(
+                f'{TAB*2}<div id="ant-filler" style="column-count: 4">\n')
             for ant_line in ants.readlines():
                 type_of_ant = ant_line.strip()
                 html.write(f"{TAB*3}<div>{type_of_ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
+        # Inject banner title
+        elif template_line.strip() == '<div>{amt} newly discovered ants ({date}):</div>':
+            html.write(
+                f"<div>{len(ant_changelist)} newly discovered ants ({last_ants_change_git_date}):</div>"
+            )
+        # Inject banner contents
+        elif template_line.strip() == '<div id="scroll-text"></div>':
+            html.write(f'{TAB*5}<div id="scroll-text">\n')
+            for _ in range(50):
+                for ant in ant_changelist:
+                    spaces_amt = max([10, 100 // len(ant_changelist)])
+                    html.write(f"{ant}{'&nbsp;' * spaces_amt}")
+            html.write(f"{TAB*5}</div>\n")
+
         else:
             html.write(template_line)
 
