@@ -17,7 +17,7 @@ def main():
     ).readlines().pop()
 
     last_ants_change_git_date = os.popen(
-        'git log --follow -n 1 --pretty=format:"%ad" --date=short ants.txt'
+        'git log --follow -n 1 --pretty=format:"%ad" --date=format:"%B %d, %Y" ants.txt'
     ).readlines().pop()
 
     get_ants_changelist_command = f'git diff {last_ants_change_git_hash}^..HEAD --no-ext-diff --unified=0 --exit-code -a --no-prefix -- ants.txt | egrep "^\+" | cut -c2-'
@@ -37,9 +37,9 @@ def main():
                 html.write(f"{TAB*3}<div>{type_of_ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
         # Inject banner title
-        elif template_line.strip() == '<div>{amt} newly discovered ants ({date}):</div>':
+        elif template_line.strip() == '<div>discovered {amt} new ants on {date}:</div>':
             html.write(
-                f"<div>{len(ant_changelist)} newly discovered ants ({last_ants_change_git_date}):</div>"
+                f"<div>discovered {len(ant_changelist)} new ants on {last_ants_change_git_date}:</div>"
             )
         # Inject banner contents
         elif template_line.strip() == '<div id="scroll-text"></div>':
