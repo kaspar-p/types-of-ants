@@ -33,7 +33,8 @@ def main():
 
     get_ants_changelist_command = f'git diff {last_ants_change_git_hash}^..HEAD --no-ext-diff --unified=0 --exit-code -a --no-prefix -- ants.txt | egrep "^\+" | cut -c2-'
     ant_changelist = os.popen(get_ants_changelist_command).readlines()[1:]
-    ant_changelist = [line.strip() for line in ant_changelist]
+    ant_changelist = [apply_ant_rule(ant_line.strip())
+                      for ant_line in ant_changelist]
 
     for template_line in template:
         # Inject contents of ants.txt
@@ -61,7 +62,6 @@ def main():
             for _ in range(50):
                 for ant in ant_changelist:
                     spaces_amt = max([10, 100 // len(ant_changelist)])
-                    ant = apply_ant_rule(ant)
                     html.write(f"{ant}{'&nbsp;' * spaces_amt}")
             html.write(f"{TAB*5}</div>\n")
         else:
