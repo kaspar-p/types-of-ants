@@ -14,9 +14,13 @@ def apply_ant_rule(ant: str) -> str:
 
 
 def main():
-    ants = open("ants.txt", "r")
+    ants_f = open("ants.txt", "r")
+    ants = [apply_ant_rule(ant.strip())
+            for ant in ants_f.readlines()
+            ]
     html = open("index.html", "w")
-    template = open("generate/index_template.html", "r")
+    template_f = open("generate/index_template.html", "r")
+    template = template_f.readlines()
 
     TAB = " " * TAB_AMOUNT
     last_ants_change_git_hash = os.popen(
@@ -31,7 +35,7 @@ def main():
     ant_changelist = os.popen(get_ants_changelist_command).readlines()[1:]
     ant_changelist = [line.strip() for line in ant_changelist]
 
-    for template_line in template.readlines():
+    for template_line in template:
         # Inject contents of ants.txt
         if (
             template_line.strip()
@@ -39,15 +43,13 @@ def main():
         ):
             html.write(
                 f'{TAB*2}<div id="ant-filler" style="column-count: 4">\n')
-            for ant_line in ants.readlines():
-                type_of_ant = ant_line.strip()
-                ant = apply_ant_rule(type_of_ant)
+            for ant in ants:
                 html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
         # Inject ant amount
         elif template_line.strip() == '<h2>ants discovered to date: {amount}</h2>':
             html.write(
-                f'<h2>ants discovered to date: {len(ants.readlines())}</h2>')
+                f'<h2>ants discovered to date: {len(ants)}</h2>')
         # Inject banner title
         elif template_line.strip() == '<div>discovered {amt} new ants on {date}:</div>':
             html.write(
@@ -62,12 +64,12 @@ def main():
                     ant = apply_ant_rule(ant)
                     html.write(f"{ant}{'&nbsp;' * spaces_amt}")
             html.write(f"{TAB*5}</div>\n")
-
         else:
             html.write(template_line)
 
     html.close()
-    ants.close()
+    template_f.close()
+    ants_f.close()
 
 
 if __name__ == "__main__":
