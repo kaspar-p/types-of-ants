@@ -44,6 +44,10 @@ def main():
                 ant = apply_ant_rule(type_of_ant)
                 html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
+        # Inject ant amount
+        elif template_line.strip() == '<h2>ants discovered to date: {amount}</h2>':
+            html.write(
+                f'<h2>ants discovered to date: {len(ants.readlines())}</h2>')
         # Inject banner title
         elif template_line.strip() == '<div>discovered {amt} new ants on {date}:</div>':
             html.write(
