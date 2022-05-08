@@ -31,6 +31,9 @@ def main():
         'git log --follow -n 1 --pretty=format:"%ad" --date=format:"%B %d, %Y" ants.txt'
     ).readlines().pop()
 
+    commit_history_length = int(
+        os.popen('git rev-list --count HEAD').readlines().pop())
+
     get_ants_changelist_command = f'git diff {last_ants_change_git_hash}^..HEAD --no-ext-diff --unified=0 --exit-code -a --no-prefix -- ants.txt | egrep "^\+" | cut -c2-'
     ant_changelist = os.popen(get_ants_changelist_command).readlines()[1:]
     ant_changelist = [apply_ant_rule(ant_line.strip())
@@ -47,6 +50,9 @@ def main():
             for ant in ants:
                 html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
+        # Inject version number
+        elif template_line.strip() == "v{amt}:":
+            html.write(f"v{commit_history_length}: ")
         # Inject ant amount header
         elif template_line.strip() == '<h2>ants discovered to date: {amount}</h2>':
             html.write(
