@@ -6,6 +6,13 @@ import os
 TAB_AMOUNT = 2
 
 
+def apply_ant_rule(ant: str) -> str:
+    if "6krill" in ant:
+        return '<a href="http://6krill.com">6krill ant</a>'
+
+    return ant
+
+
 def main():
     ants = open("ants.txt", "r")
     html = open("index.html", "w")
@@ -34,7 +41,8 @@ def main():
                 f'{TAB*2}<div id="ant-filler" style="column-count: 4">\n')
             for ant_line in ants.readlines():
                 type_of_ant = ant_line.strip()
-                html.write(f"{TAB*3}<div>{type_of_ant}</div>\n")
+                ant = apply_ant_rule(type_of_ant)
+                html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
         # Inject banner title
         elif template_line.strip() == '<div>discovered {amt} new ants on {date}:</div>':
@@ -47,6 +55,7 @@ def main():
             for _ in range(50):
                 for ant in ant_changelist:
                     spaces_amt = max([10, 100 // len(ant_changelist)])
+                    ant = apply_ant_rule(ant)
                     html.write(f"{ant}{'&nbsp;' * spaces_amt}")
             html.write(f"{TAB*5}</div>\n")
 

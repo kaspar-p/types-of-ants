@@ -13,7 +13,11 @@ def main():
     readme.write("<div>\n")
     for ant_line in ants.readlines():
         type_of_ant = ant_line.strip()
-        readme.write(f"{' ' * TAB_AMOUNT}<div>{type_of_ant}</div>\n")
+        if "6krill" in type_of_ant:
+            readme.write(
+                f'{" "*TAB_AMOUNT}<div><a href="http://6krill.com">6krill ant</a></div>')
+        else:
+            readme.write(f"{' ' * TAB_AMOUNT}<div>{type_of_ant}</div>\n")
     readme.write("</div>\n")
 
     ants.close()
