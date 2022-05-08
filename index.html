@@ -95,11 +95,11 @@
               return response.json();
             })
             .then(json => {
-              const { status, msg } = json;
-              if (status === 200) {
-                responseText.innerText = "thanks!";
-              } else if (status === 500 && msg === "exists") {
+              const { status, msg, userExists } = json;
+              if (status === 200 && userExists) {
                 responseText.innerText = "you're already subscribed!";
+              } else if (status === 200) {
+                responseText.innerText = "thanks!";
               } else {
                 throw new Error(json);
               }
