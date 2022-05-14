@@ -10,7 +10,6 @@ def apply_ant_rule(ant: str) -> str:
     if "6krill" in ant:
         return '<a href="http://6krill.com">6krill ant</a>'
     if ant == "ant tm":
-        print(f"Ant is '{ant}'")
         return "ant&trade;"
 
     return ant
