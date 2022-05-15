@@ -144,7 +144,7 @@
   <div>ant in the circus</div>
   <div>east asian ant</div>
   <div>siberian ant</div>
-  <div>big ant who sets up all the foot heists</div>
+  <div>ant who sets up all the food heists</div>
   <div>googler ant</div>
   <div>arabian ant</div>
   <div>kenyan ant</div>
@@ -195,7 +195,7 @@
   <div>bullet ant</div>
   <div>politically charged ant</div>
   <div>florida ant</div>
-  <div>ant bu he jokin'</div>
+  <div>ant but he jokin'</div>
   <div>mean ant</div>
   <div>ant but he's not nice</div>
   <div>nice ant</div>
