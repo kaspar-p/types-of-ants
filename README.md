@@ -25,6 +25,9 @@
   <div>ant who remembered your birthday</div>
   <div>platinum blond ant</div>
   <div>space gray ant</div>
+  <div>ant who is a huge baseball fan</div>
+  <div>ant with anger issues</div>
+  <div>ant cowboy (yeehaw)</div>
   <div>forest green ant</div>
   <div>navy blue ant</div>
   <div>politically active ant</div>
@@ -34,11 +37,13 @@
   <div>indigo ant</div>
   <div>rainbow ant</div>
   <div>cranberry picker ant</div>
+  <div>ant cowgirl (yeehaw)</div>
   <div>gold ant</div>
   <div>silver ant</div>
   <div>bronze ant</div>
   <div>antisocial ant</div>
   <div>rouge ant</div>
+  <div>ant that doesn't think before it acts</div>
   <div>ant in a spider web</div>
   <div>crimson ant</div>
   <div>seafoam green ant</div>
@@ -60,7 +65,7 @@
   <div>ant that's built different</div>
   <div>violet ant</div>
   <div>eggshell ant</div>
-  <div>ant on a hike (where's he goin)</div>
+  <div>ant on a hike (where's it goin)</div>
   <div>salmon ant</div>
   <div>cake batter eating ant</div>
   <div>maroon ant</div>
@@ -153,113 +158,161 @@
   <div>superhero ant</div>
   <div>eastern steppes ant</div>
   <div>ballerina ant</div>
+  <div>scantinavian</div>
   <div>ukrainian ant</div>
   <div>ant with stinky feet</div>
   <div>belarusian ant</div>
   <div>hot dog! ant</div>
   <div>spicy ant</div>
+  <div>victoria day ant (day off)</div>
   <div>ant with roommates</div>
   <div>antelope</div>
   <div>ant on the can</div>
   <div>french ant</div>
   <div>ashamed ant</div>
+  <div>ant who is bored at work</div>
   <div>swedish ant</div>
-  <div>ant but he's really short</div>
+  <div>ant but it's really short</div>
   <div>inuit ant</div>
   <div>antstronaut</div>
   <div>ant who never left the nest</div>
   <div>aztec ant</div>
   <div>small ant</div>
   <div>reluctant ant</div>
+  <div>desperate ant</div>
   <div>ant that would dump me if i was a pisces</div>
   <div>olmec ant</div>
   <div>mexican ant</div>
+  <div>self aware ant</div>
   <div>imperialist ant</div>
   <div>rhino ant</div>
-  <div></div>
+  <div>harvester ant</div>
   <div>fiscally responsible ant</div>
   <div>generic ant</div>
   <div>specific ant</div>
+  <div>fire ant</div>
   <div>normal ant</div>
   <div>bantu ant</div>
   <div>swiftie ant</div>
   <div>mayan ant</div>
+  <div>dunn dolphin ant</div>
   <div>ant but its smushed</div>
   <div>missourian ant</div>
   <div>zombie ant</div>
   <div>phantom</div>
   <div>sioux ant</div>
   <div>southern ant</div>
+  <div>ants whose chakras are unbalanced</div>
+  <div>germant</div>
   <div>emotionally mature ant</div>
   <div>healthy ant</div>
   <div>bullet ant</div>
   <div>politically charged ant</div>
   <div>florida ant</div>
+  <div>ant that goes marching two by two</div>
+  <div>ant who needs 3 pairs of pants for his 6 legs</div>
   <div>ant but he jokin'</div>
+  <div>antonio</div>
   <div>mean ant</div>
-  <div>ant but he's not nice</div>
+  <div>ant but it's not nice</div>
   <div>nice ant</div>
   <div>antisocial ant</div>
+  <div>astrology ant</div>
   <div>samoan ant</div>
   <div>ant who is a taxi</div>
+  <div>boomer ant</div>
+  <div>zoomer ant</div>
+  <div>millennial ant</div>
+  <div>a thousand ants</div>
+  <div>half an ant</div>
+  <div>3.5 ants (rollerblade accident)</div>
   <div>gamer ant</div>
   <div>polynesian ant</div>
   <div>aphid farmer ant</div>
   <div>artist ant</div>
+  <div>fluid dynamic ant</div>
   <div>scottish ant</div>
   <div>ant in a taxi</div>
+  <div>jesus ant</div>
   <div>ant who housed your burger</div>
   <div>ant but its a fish</div>
   <div>slovak ant</div>
   <div>ant man</div>
+  <div>funky ant</div>
+  <div>groovy ant</div>
+  <div>geometer ant (he schemin')</div>
   <div>ant in the dark</div>
   <div>ant on a hangglider</div>
   <div>slavic ant</div>
   <div>polish ant</div>
   <div>hipster ant</div>
   <div>ant playing the trumpet</div>
+  <div>elmo ant</div>
+  <div>kendrick lamar ant (new album)</div>
+  <div>harry styles ant (new album)</div>
   <div>ant who wants your lunch</div>
   <div>party ant</div>
   <div>ant who can't catch a break</div>
   <div>hedgehog ant</div>
+  <div>wanter white</div>
   <div>caffeinated ant</div>
   <div>tibetan ant</div>
   <div>ant who swears he is 6 foot</div>
+  <div>ant who can't get a job</div>
+  <div>ant with good posture</div>
   <div>old ant</div>
   <div>ant that would date me if i was a worm</div>
   <div>baby ant</div>
+  <div>antcestors</div>
   <div>cobbler ant</div>
   <div>vegan ant</div>
   <div>designer ant</div>
   <div>moth ant</div>
+  <div>ant who thinks pineapple belongs on pizza</div>
+  <div>ant who hopes he will be happy one day</div>
+  <div>ant who questions his existence</div>
+  <div>ant who wonders if it's all worth it</div>
   <div>ant in a hat</div>
   <div>middle aged ant</div>
+  <div>british ant (vile)</div>
   <div>virtual ant</div>
   <div>unloved ant</div>
   <div>influencer ant</div>
+  <div>ant who will always be scarred</div>
+  <div>ant who will never be the same again</div>
   <div>and</div>
   <div>antarctican ant</div>
   <div>cold ant</div>
   <div>hot ant</div>
+  <div>united states v. ant (real court case)</div>
   <div>musician ant</div>
-  <div>ant whose in trouble for bringing poisoned food to the nest</div>
+  <div>ant who's in trouble for bringing poisoned food to the nest</div>
   <div>valorant</div>
   <div>ugly ant</div>
   <div>female ant</div>
   <div>male ant</div>
+  <div>tatted up ant</div>
+  <div>pregnant</div>
+  <div>ant that's not ready to be a parent</div>
   <div>ant but its a bee</div>
   <div>engineer ant</div>
   <div>politician ant</div>
   <div>dishwasher ant</div>
+  <div>5'12" ant (he is really 5'9")</div>
   <div>skinny ant</div>
   <div>ant but two more legs (spider)</div>
   <div>really fat ant</div>
   <div>ant but its on fire</div>
   <div>mathematician ant</div>
+  <div>cursed ant</div>
+  <div>hant</div>
+  <div>crocodile president supporter ant</div>
   <div>plumber ant</div>
   <div>daytime tv host ant</div>
   <div>teacher ant</div>
   <div>ceo ant</div>
+  <div>father figure ant</div>
+  <div>ant who's been in a coma for weeks</div>
   <div>dr. ant</div>
   <div>ant on a stick</div>
   <div>student ant</div>
@@ -273,12 +326,14 @@
   <div>ant on vacation</div>
   <div>ant tm</div>
   <div>ant with a big antenna</div>
-  <div>ant but he's really long</div>
+  <div>ant but it's really long</div>
   <div>main character ant</div>
   <div>grandparent ant</div>
   <div>historian ant</div>
   <div>academic ant</div>
   <div>rich ant</div>
+  <div>mamant</div>
+  <div>papant</div>
   <div>war veteran ant</div>
   <div>dejected ant</div>
   <div>quiet ant</div>
@@ -289,6 +344,7 @@
   <div>nice ant</div>
   <div>proletariat ant</div>
   <div>bourgeoisie ant</div>
+  <div>antoinette (cake enjoyer)</div>
   <div>revolutionary ant</div>
   <div>ant but its underwater</div>
   <div>bedtime ant (snuggles you)</div>
