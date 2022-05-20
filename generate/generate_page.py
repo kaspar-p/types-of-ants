@@ -45,10 +45,10 @@ def main():
         # Inject contents of ants.txt
         if (
             template_line.strip()
-            == '<div id="ant-filler" style="column-count: 4"></div>'
+            == '<div id="ant-filler"></div>'
         ):
             html.write(
-                f'{TAB*2}<div id="ant-filler" style="column-count: 4">\n')
+                f'{TAB*2}<div id="ant-filler">\n')
             for ant in ants:
                 html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
@@ -69,7 +69,7 @@ def main():
             html.write(f'{TAB*5}<div id="scroll-text">\n')
             for _ in range(50):
                 for ant in ant_changelist:
-                    spaces_amt = max([10, 100 // len(ant_changelist)])
+                    spaces_amt = 10
                     html.write(f"{ant}{'&nbsp;' * spaces_amt}")
             html.write(f"{TAB*5}</div>\n")
         else:
