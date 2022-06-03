@@ -10,6 +10,12 @@
       content="An informative site about ants, created by kaspar poland."
     />
     <style>
+      *,
+      *::before,
+      *::after {
+        position: relative;
+      }
+
       body {
         overflow-x: hidden;
       }
@@ -25,6 +31,13 @@
         border-radius: 5px; 
         padding: 10px; 
         padding-right: 0
+      }
+
+      .banner-ant {
+        display: inline-block;
+        white-space: nowrap;
+        padding-left: 15px;
+        padding-right: 15px;
       }
 
       .form-form {
@@ -55,13 +68,15 @@
 
       #scroll-container {
         overflow: hidden;
-        white-space: nowrap;
       }
 
-      #scroll-container > * {
-        display: inline-block;
-        margin-right: 50px;
-        animation: title calc(5s * 100) infinite linear;
+      #scroll-helper-wrapper {
+        align-items: center;
+        display: flex;
+        left: 0px;
+        transform: translateZ(0);
+        transition-property: left;
+        transition-timing-function: linear;
       }
 
       #ant-filler {
@@ -73,11 +88,6 @@
       #ant-filler > div {
         padding-top: 5px;
         padding-bottom: 5px;
-      }
-
-      @keyframes title {
-        0% {transform: translateX(0);}
-        100% {transform: translateX(calc(-500px * 100));}
       }
 
       @media (min-width: 768px) {
@@ -104,6 +114,83 @@
         }
       }
     </style>
+    <script>
+      const bannerId = "scroll-container"
+      const helperWrapperId = "scroll-helper-wrapper";
+      const pxPerSecond = 100;
+
+      function setUpElements() {
+        const banner = document.getElementById(bannerId);
+        const currentHelperWrapper = document.getElementById(helperWrapperId);
+        
+        if (currentHelperWrapper) {
+          const clones = currentHelperWrapper.querySelectorAll("[data-clone]");
+          Array.prototype.forEach.call(clones, clone => clone.remove());
+        
+          const childrenCount = currentHelperWrapper.children.length;
+          for (let i = 0; i < childrenCount; i++) {
+            banner.appendChild(currentHelperWrapper.children[0]);
+          }
+          currentHelperWrapper.remove();
+        }
+
+        const bannerWidth = banner.getBoundingClientRect().width;
+        const widestChild = Math.max(...Array.prototype.map.call(banner.children, (child) => child.getBoundingClientRect().width));
+        const minWidthToCoverBanner = bannerWidth + widestChild;
+        const childrenWidth = Array.prototype.reduce.call(banner.children, (total, child) => total + child.getBoundingClientRect().width, 0);
+        let currentWidth = childrenWidth;
+
+        do {
+          // Continue to add children, doubling, until width is reached
+          Array.prototype.forEach.call(banner.children, child => {
+            const clone = child.cloneNode();
+            clone.setAttribute("aria-hidden", true);
+            clone.dataset.clone = true;
+            clone.innerText = child.innerText;
+            banner.appendChild(clone);
+          });
+          currentWidth += childrenWidth;
+        } while (currentWidth < minWidthToCoverBanner);
+
+        const transitionWrapperHelper = document.createElement("div");
+        transitionWrapperHelper.id = helperWrapperId;
+
+        const childrenCount = banner.children.length;
+        for (let i = 0; i < childrenCount; i++) {
+          transitionWrapperHelper.appendChild(banner.children[0]);
+        }
+        banner.appendChild(transitionWrapperHelper);
+        transitionWrapperHelper.dataset.childrenWidth = childrenWidth;
+      }
+
+      function scrollBanner() {
+        const banner = document.getElementById(bannerId);
+        const helperWrapper = document.getElementById(helperWrapperId);
+        const childrenWidth = helperWrapper.dataset.childrenWidth;
+        const offsetLeft = helperWrapper.offsetLeft;
+
+        console.log(offsetLeft);
+
+        if (offsetLeft <= Math.ceil(-1 * childrenWidth)) {
+          helperWrapper.style.transitionDuration = "0s";
+          helperWrapper.style.left = "0px";
+          helperWrapper.style.removeProperty("transition-duration");
+        } else if (helperWrapper.style.left === "" || helperWrapper.style.left === "0px") {
+          window.setTimeout(() => {
+            helperWrapper.style.transitionDuration = ((childrenWidth / pxPerSecond).toFixed()) + "s";
+            helperWrapper.style.left = (-1 * childrenWidth) + "px"
+          }, 0);
+        }
+
+        window.requestAnimationFrame(scrollBanner);
+      }
+
+      window.addEventListener("load", () => {
+        setUpElements();
+        scrollBanner();
+        window.addEventListener("resize", setUpElements);
+      });
+    </script>
     <script>
       const develop = false;
       const isHandling = {
@@ -290,9 +377,7 @@
     </div>
     <div id="banner">
       <div>discovered {amt} new ants on {date}:</div>
-      <div id="scroll-container">
-        <div id="scroll-text"></div>
-      </div>
+      <div id="scroll-container"></div>
     </div>
     <div id="ant-filler"></div>
   </body>
