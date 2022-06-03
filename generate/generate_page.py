@@ -52,9 +52,10 @@ def main():
             for ant in ants:
                 html.write(f"{TAB*3}<div>{ant}</div>\n")
             html.write(f"{TAB*2}</div>\n")
-        # Inject version number
-        elif template_line.strip() == "v{amt}:":
-            html.write(f"v{commit_history_length}: ")
+        # Inject version number into the main title
+        elif template_line.strip() == '<h1>types of ants <span style="font-size: 12pt;">v{amt}</span></h1>':
+            html.write(
+                f'{TAB*2}<h1>types of ants <span style="font-size: 12pt;">v{commit_history_length}</span></h1>\n')
         # Inject ant amount header
         elif template_line.strip() == '<h2>ants discovered to date: {amount}</h2>':
             html.write(
@@ -62,15 +63,15 @@ def main():
         # Inject banner title
         elif template_line.strip() == '<div>discovered {amt} new ants on {date}:</div>':
             html.write(
-                f"<div>discovered {len(ant_changelist)} new ants on {last_ants_change_git_date}:</div>"
+                f"{TAB*2}<div>discovered {len(ant_changelist)} new ants on {last_ants_change_git_date}:</div>\n"
             )
         # Inject banner contents
         elif template_line.strip() == '<div id="scroll-text"></div>':
-            html.write(f'{TAB*5}<div id="scroll-text">\n')
+            html.write(f'{TAB*4}<div id="scroll-text">\n')
             for _ in range(50):
                 for ant in ant_changelist:
                     spaces_amt = 10
-                    html.write(f"{ant}{'&nbsp;' * spaces_amt}")
+                    html.write(f"{TAB*5}{ant}{'&nbsp;' * spaces_amt}\n")
             html.write(f"{TAB*5}</div>\n")
         else:
             html.write(template_line)
