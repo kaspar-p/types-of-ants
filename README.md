@@ -420,7 +420,7 @@
   <div>tourist ant</div>
   <div>ant on vacation</div>
   <div>crusader ant</div>
-  <div>ant tm</div>
+  <div>ant&trade;</div>
   <div>ant with a big antenna</div>
   <div>ant but it's really long</div>
   <div>main character ant</div>
@@ -442,7 +442,8 @@
   <div>ant that's gonna do some rapping</div>
   <div>stogey ant (arnold)</div>
   <div>loud ant</div>
-  <div><a href="http://6krill.com">6krill ant</a></div>  <div>chillaxed ant</div>
+  <div><a href="http://6krill.com">[6krill] ant</a></div>
+  <div>chillaxed ant</div>
   <div>ant in the womb</div>
   <div>poor ant</div>
   <div>ant disguised as a termite because it has body issues</div>
