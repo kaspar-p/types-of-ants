@@ -3,7 +3,7 @@
 """
 import os
 
-from lib import TAB_AMOUNT, apply_ant_rule
+from lib import TAB, apply_ant_rule
 
 
 def main():
@@ -15,7 +15,6 @@ def main():
     template_f = open("generate/index_template.html", "r")
     template = template_f.readlines()
 
-    TAB = " " * TAB_AMOUNT
     last_ants_change_git_hash = os.popen(
         'git log --follow -n 1 --pretty=format:"%h" --date=short ants.txt'
     ).readlines().pop()

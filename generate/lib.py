@@ -3,6 +3,7 @@ and in the generation of the index.html page.
 """
 
 TAB_AMOUNT = 2
+TAB = ' ' * TAB_AMOUNT
 
 
 def apply_ant_rule(ant: str) -> str:

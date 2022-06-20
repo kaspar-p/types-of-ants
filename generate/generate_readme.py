@@ -2,7 +2,7 @@
     Generate the README.md document for displaying TYPES OF ANTS based on ants.txt
 """
 
-from lib import TAB_AMOUNT, apply_ant_rule
+from lib import TAB, apply_ant_rule
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     readme.write("<div>\n")
     for ant_line in ants.readlines():
         type_of_ant = apply_ant_rule(ant_line.strip())
-        readme.write(f"{' ' * TAB_AMOUNT}<div>{type_of_ant}</div>\n")
+        readme.write(f"{TAB}<div>{type_of_ant}</div>\n")
     readme.write("</div>\n")
 
     ants.close()
