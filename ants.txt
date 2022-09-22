@@ -49,7 +49,6 @@ ant cowgirl (yeehaw)
 gold ant
 silver ant
 bronze ant
-sad ant
 ant on its period
 adam ant eve
 antisocial ant

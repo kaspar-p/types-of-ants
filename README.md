@@ -52,7 +52,6 @@
   <div>gold ant</div>
   <div>silver ant</div>
   <div>bronze ant</div>
-  <div>sad ant</div>
   <div>ant on its period</div>
   <div>adam ant eve</div>
   <div>antisocial ant</div>
