@@ -3,10 +3,12 @@
 These are the things that need to happen for v1.1 to launch.
 
 **General**
+
 - [ ] Configure the Bazel monorepo
 - [ ] Create a postgres database and allow remote connections, but not all (how to determine which?)
 
 **ant-on-the-web**
+
 - [ ] Self-host the site on the Raspberry Pi
   - [ ] Configure port forwarding
   - [ ] Create webserver using nginx
@@ -41,6 +43,7 @@ These are the things that need to happen for v1.1 to launch.
   - [ ] Write tests!
 
 **ant-just-checking-in**
+
 - [ ] Create the package in rust
 - [ ] Set up the CRON job for every 5 minutes
 - [ ] Create the `curl -L <domain>` tests to make sure the HTTPS requests are 200 OK
@@ -49,6 +52,7 @@ These are the things that need to happen for v1.1 to launch.
 - [ ] Write more complicated tests
 
 **ant-building-projects**
+
 - [ ] Create the package in rust
 - [ ] Create the webserver
   - [ ] Configure the /update route

@@ -1,12 +1,14 @@
 # Database
 
 The database will be a PostgreSQL or MySQL relational database. It will have the following databases:
+
 - prod
 - beta
 
 The prod and beta databases will be identical in structure, just the data within them will be different.
 
 The tables will be:
+
 - `tests` will be a static table, each row corresponding to a test and its label.
 - `test-status` will contain the data pertaining to passing/failing tests.
 - `deployments` will contain the data pertaining to the deployment of projects.
@@ -23,6 +25,7 @@ project     varchar(50) # The unique project ID for which project this test is t
 ```
 
 ## `test-status` (added to every 5 minutes on tests running)
+
 ```sql
 test        varchar(50) # The type of test that is currently running. Corresponds to a key in the 'tests' table.
 test-id     varchar(50) # Randomized test id
@@ -32,6 +35,7 @@ status      bool        # The pass/fail status of the test
 ```
 
 ## `projects` (static)
+
 ```sql
 project         varchar(50)   # The unique project ID
 project-label   varchar(50)   # The human-readable label for the project
@@ -40,12 +44,14 @@ semver          varchar(50)   # The semver "X.Y.Z" version of the project, curre
 ```
 
 ## `deployment-steps` (added only when new deployment steps are created)
+
 ```sql
 step        varchar(50) # The unique step ID
 step-label  varchar(50) # A human-readable label for the step, like "prod", "beta", or "build"
 ```
 
 ## `deployments` (added to whenever new deployments happen)
+
 ```sql
 project     varchar(50) # The project ID for the project getting updated
 step        varchar(50) # The unique step ID of this step that's happening
@@ -57,6 +63,7 @@ status      varchar(50) # The deployment status ("SUCCESS", "IN PROGRESS", "FAIL
 ```
 
 ## `suggestions`
+
 ```sql
 user        varchar(50)   # The user ID of the user that submitted the suggestion
 suggestion  varchar(256)  # The content of the suggestion
@@ -65,6 +72,7 @@ status      varchar(50)   # The status of this suggestion: LIVE, DECLINED, DEPRE
 ```
 
 ## `users`
+
 ```sql
 id      varchar(50)   # The unique user ID
 name    varchar(50)   # The username for the user
