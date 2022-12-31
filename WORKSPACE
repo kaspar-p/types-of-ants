@@ -1,6 +1,3 @@
-#
-# Rust rules
-#
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 #
@@ -29,10 +26,21 @@ http_archive(
 )
 
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
+load("@rules_rust//tools/rust_analyzer:deps.bzl", "rust_analyzer_dependencies")
+
+rust_analyzer_dependencies()
 
 rules_rust_dependencies()
 
 rust_register_toolchains()
+
+#
+# Cargo Raze (for Rust)
+#
+# Load the dependencies for ant-just-checking-in, make sure gen-workspace-prefix is not set in the Cargo.toml
+load("//ant-just-checking-in/cargo:crates.bzl", "raze_fetch_remote_crates")
+
+raze_fetch_remote_crates()
 
 #
 # Go rules
