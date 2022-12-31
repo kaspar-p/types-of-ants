@@ -1,0 +1,27 @@
+[package]
+name = "compile_with_bazel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cronjob = "0.4.17"
+postgres = "0.19.4"
+reqwest = { version = "0.11.13", features = ["blocking"] }
+
+[[bin]]
+name = "ant-just-checking-in"
+path = "src/main.rs"
+
+[package.metadata.raze]
+workspace_path = "//ant-just-checking-in/cargo"
+package_aliases_dir = "cargo"
+targets = [
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+]
+genmode = "Remote"
+
+[package.metadata.raze.crates.reqwest.'0.11.13']
+additional_flags = [
+    "--cfg=blocking",
+]
