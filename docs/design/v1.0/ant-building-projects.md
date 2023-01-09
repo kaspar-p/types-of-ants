@@ -25,20 +25,20 @@ There will be three servers. One is a deployment server, really an orchestrator.
 
 When that event gets done and the binary is built for project X, the build server tells the deployment server it is finished. The deployment server then tells the third type of server, the replacement servers. They are lightweight webservers running on each machine, just listening for a "hey, there is a new binary for project X you should use" message from the deployment server. Once that message is received, they stop the project X process, and start another.
 
-### Deployment server
+#### Deployment server
 
 The responsibilities of the deployment server include:
 - Listen for new versions in any of the registered projects
 - Tell the build server that project X has a new version
 - Once the build server is finished building project X, give some fraction of the machines running project X 
 
-### Build server
+#### Build server
 
 - Listen for a "start building project X" message from the deployment server
 - Start building project X
 - Once it is finished building (or had an error), tell the deployment server
 
-### Children servers
+#### Children servers
 
 The responsibilities of the children servers include:
 - Listen for the deployment server to tell it to download a new binary
