@@ -8,23 +8,15 @@ The goals are put here for two reasons: as an excuse to learn the technology, an
 
 There are many processes that businesses running to make money would never want their customers (or competing businesses) to see. These include things like deployment schedules for software, versioning info, architecture diagrams and documents, currently passing or failing tests, the number of servers they have and their status, and others. 
 
-The goal of v1.0 is for typesofants.org to be a full end-to-end service, but show all of those things off, as a part of the development process.
+The goal of v1.0 is for typesofants.org to be a full end-to-end service, but show all of those things off, as a part of the development process. The parts that make that up are:
 
-The things I want to show off should be paths off the main site. Currently, only the main site (/) is a path. The paths I want will be:
-
-- The main site (`typesofants.org`)
-- Suggestions (`typesofants.org/suggestions`)
-- Test suite passing/failing statuses (`typesofants.org/tests`)
-- Software deployments (`typesofants.org/deployments`)
-- Blog (`typesofants.org/blog`)
-- Contact me/Information page (`typesofants.org/info`)
-- Provisoning information (`typesofants.org/provisioning`)
-- [maybe] Read-only database and query submitter (`typesofants.org/data`)
-
-Beyond the website, there are other best-practices that real applications use that typesofants.org should have. In short snippets:
-
-- Users should be able to go to `typesofants.org/provisioning` and download an executable that allows their computer to act as a web server node for the front end, like a node in a CDN. This is a fun level of interactivity for technical users. The logging could be made fun, too.
-- Users should be able to see every deployment, onto every machine, and its status. That dashboard should just be public. This includes tests passing/failing.
+- Somewhere for the user to see submitted suggestions
+- The passing/failing tests for everything (main site, database, etc.)
+- The current software deployments
+- A blog
+- Contact me information
+- Somewhere for the users to see how many machines are doing what. How many load balancers, how many web nodes, and more. They should also be able to download an executable that allows users to become a web node for typesofants.org, if they want.
+- Allow the users to run SQL queries against a read-only version of the database.
 
 ## High-level Architecture
 
@@ -32,7 +24,7 @@ The architecture of typesofants.org will be much different than it is right now.
 
 ### Repository
 
-Everything regarding this project will stay in this Github repository, exactly the same. The structure of the repo will change dramatically. There are at least three separate packages, each will be a top-level directory.
+Everything regarding this project will stay in this Github repository, exactly the same. The structure of the repo will change dramatically. There are some separate packages, each will be a top-level directory.
 
 ### Website
 
@@ -63,3 +55,14 @@ The deployments will really be a glorified event-based worker. New events in the
 Ashley had the good idea of having a little graphic of an ant building, so the name is going to be `ant-building-projects`. That's the top-level directory, too.
 
 Details on the structure and architecture of `ant-building-projects` will be included in a separate design doc.
+
+### Load Balancing
+
+I'm unsure if this is a part of the website or not. It seems to me like it isn't, and that in a best-case scenario, the load balancers are different, CPU-optimized machines, while the webservers can be anything. 
+
+The name of this service is not yet known, candidates are:
+- `ant-balancing`, `balancing-ant`
+- `ant-with-first-contact`, `first-contact-ant`, `doorman-ant`
+- `ant-routing`, `ant-rerouting`
+
+Details of the structure and architecture of the load balancing software will be included in a separate design doc.
