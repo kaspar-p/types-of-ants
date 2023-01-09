@@ -1,0 +1,20 @@
+# ant-building-projects
+
+The deployment and building software.
+
+## Requirements
+
+It needs to be able to know if a project has changed. This can either be a push or pull method. Push would require the existence of an API, and pull would require some sort of CRON job cycle.
+
+It then needs to pull the new changes, rebuild the project, stop the current program, and restart the program.
+
+Building the project will be handled by the build system, like Bazel. Everything else is straightforward.
+
+Deployment data will also need to be logged, to show on /deployments. Each step of the deployment will need to emit that data. The data includes:
+
+- Timestamp of the start of the step
+- Timestamp of the end of the step
+- The version that it is upgrading from
+- The version it is upgrading to
+- The machine that it is deploying onto
+- The project that is currently being deployed
