@@ -68,7 +68,7 @@ Ashley had the good idea of having a little graphic of an ant building, so the n
 
 Details on the structure and architecture of `ant-building-projects` will be included in a separate design doc.
 
-### Load Balancing
+### [probably omitted] Load Balancing
 
 I'm unsure if this is a part of the website or not. It seems to me like it isn't, and that in a best-case scenario, the load balancers are different, CPU-optimized machines, while the webservers can be anything. 
 
