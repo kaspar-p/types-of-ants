@@ -20,7 +20,19 @@ The goal of v1.0 is for typesofants.org to be a full end-to-end service, but sho
 
 ## High-level Architecture
 
-The architecture of typesofants.org will be much different than it is right now. Currently, it's a single static HTML site, hosted through Github Pages.
+The architecture of typesofants.org will be very different to what it is now. Currently, it's a single static HTML site, hosted through Github Pages.
+
+There will be three major pieces to typesofants.org. The main website, some monitoring software, and some deployment software. The website will be the same, having paths and pages for most of the goals mentioned above. The main website will be self-hosted.
+
+One of the larger pieces missing in the current architecture, though, is any sort of continuous monitoring and testing. There will be a process that is essentially just a CRON job, running in an interval. Every time it runs, it's going to run a suite of integration tests on the site. Each test will emit some pass/fail data (along with other data), and that data can be used to determine if the site is up or not, or which features aren't working right.
+
+Another piece of software that will be useful once the website is self-hosted is some deployment/building software. Essentially, this is just a listener that waits for new versions of projects to be pushed. Once new versions **are** available, it builds those new versions into their corresponding binaries, stops the current process, and restarts the process with the new binary.
+
+This continuous integration will allow automated changes to reach production, without very much manual testing.
+
+Though a load-balancer may be helpful in the future, it is omitted because typesofants.org isn't that big, yet.
+
+## Details
 
 ### Repository
 
