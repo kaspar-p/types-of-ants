@@ -430,6 +430,8 @@
   <div>valorant</div>
   <div>ugly ant</div>
   <div>female ant</div>
+  <div>carpenter ant</div>
+  <div>fire ant</div>
   <div>male ant</div>
   <div>tatted up ant</div>
   <div>3 inch ant (average)</div>
