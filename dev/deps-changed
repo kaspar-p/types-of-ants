@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Run this file to regenerate rust-project.json at the root!
+# Steps:
+# Run `cargo add <crate name>`
+# Add dependency into rust file with `use`
+# Add dependency into Bazel BUILD file with `deps`
+# Run `cargo generate-lockfile`
+# Run `cargo raze`

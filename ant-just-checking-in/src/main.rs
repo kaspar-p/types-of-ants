@@ -1,20 +1,21 @@
-mod emit;
+mod db;
+mod test;
+mod tests;
 
+use crate::db::Database;
 use cronjob::CronJob;
-use emit::emit_data;
-use reqwest;
+
+const MODE: &str = "beta";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let connection_string = format!("postgresql://postgres:1234@localhost:5432/{}", MODE);
+    let connection_pool = db::connect(connection_string);
+
     // Create the `CronJob` object.
     let mut cron: CronJob = CronJob::new("Test Cron", move |_name: &str| -> () {
-        let urls: Vec<&str> = vec![
-            "http://typesofants.org",
-            "http://www.typesofants.org",
-            "http://6krill.com",
-        ];
-        let client = reqwest::blocking::Client::new();
-
-        on_cron(urls, &client);
+        on_cron(&Database {
+            connection: connection_pool.clone().get().unwrap(),
+        });
     });
 
     // Run every 10 seconds
@@ -27,9 +28,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // Our cronjob handler.
-fn on_cron(urls: Vec<&str>, client: &reqwest::blocking::Client) -> () {
-    for url in urls {
-        let res = client.get(url).send();
-        emit_data(url, res.unwrap());
-    }
+fn on_cron(database: &Database) -> () {
+    // Collect all tests
+    let tests = test::get_all_tests(database);
+    tests();
+
+    // Check if the tests are not yet in the DB
+    // Put all tests into the DB, with UUID if they don't already have one
+    // Call each test on a list of projects.
+
+    // For each project, do every test
+    // for url in urls {
+    //     let res = client.get(url).send();
+    //     emit_data(url, res.unwrap());
+    // }
 }

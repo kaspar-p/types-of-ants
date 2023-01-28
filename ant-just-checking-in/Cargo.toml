@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chrono = "0.4.23"
 cronjob = "0.4.17"
-postgres = "0.19.4"
+postgres = { version = "0.19.4", features = ["with-chrono-0_4"] }
+r2d2 = "0.8.10"
+r2d2_postgres = "0.18.1"
 reqwest = { version = "0.11.13", features = ["blocking"] }
-
+# uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+ 
 [[bin]]
 name = "ant-just-checking-in"
 path = "src/main.rs"
@@ -25,3 +29,10 @@ genmode = "Remote"
 additional_flags = [
     "--cfg=blocking",
 ]
+
+# [package.metadata.raze.crates.uuid.'1.2.2']
+# additional_flags = [
+#     "--cfg=v4",
+#     "--cfg=fast-rng",
+#     "--cfg=macro-diagnostics",
+# ]

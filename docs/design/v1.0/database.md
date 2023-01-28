@@ -7,75 +7,104 @@ The database will be a PostgreSQL or MySQL relational database. It will have the
 
 The prod and beta databases will be identical in structure, just the data within them will be different.
 
-The tables will be:
-
-- `tests` will be a static table, each row corresponding to a test and its label.
-- `test-status` will contain the data pertaining to passing/failing tests.
-- `deployments` will contain the data pertaining to the deployment of projects.
-- `projects` will be a static table, each row corresponding to a project and its current version, location on the machine, and more. This is like a mini version of a registry service.
-- `suggestions` will contain the user-suggested suggestions.
-- `users` will contain user data, since that is going to be a typesofants.org v1.0 requirement.
-
-## `tests` (only changes when tests are added or removed)
+## `test_types` (only changes when tests are added or removed)
 
 ```sql
-test        varchar(50) # The unique test ID
-test-label  varchar(50) # The human-readable label for the test
-project     varchar(50) # The unique project ID for which project this test is testing
+create table test_types (
+  test      serial primary key,                        -- The unique test ID
+  label     varchar not null,                          -- The human-readable label for the test
+  project   foreign key references projects(project),  -- The unique project ID for which project this test is testing
+);
 ```
 
-## `test-status` (added to every 5 minutes on tests running)
+## `tests` (added to every 5 minutes on tests running)
 
 ```sql
-test        varchar(50) # The type of test that is currently running. Corresponds to a key in the 'tests' table.
-test-id     varchar(50) # Randomized test id
-start-date  Date        # A timestamp for the beginning of the test
-end-date    Date        # A timestamp for the end of the test
-status      bool        # The pass/fail status of the test
+create table tests (
+  test_id  serial primary key                      -- Unique test id
+  test     foreign key references test_types(test) -- The type of test that is currently running. Corresponds to a key in the 'test-types' table.
+  start    datetime with time zone                 -- A datetime for the beginning of the test
+  end      datetime with time zone                 -- A datetime for the end of the test
+  status   boolean                                 -- The pass/fail status of the test
+);
 ```
 
-## `projects` (static)
+## `projects` (changed when new projects are added)
 
 ```sql
-project         varchar(50)   # The unique project ID
-project-label   varchar(50)   # The human-readable label for the project
-root-directory  varchar(256)  # The root directory of the project, where the project is run from. This is where it will delete from and replace.
-semver          varchar(50)   # The semver "X.Y.Z" version of the project, currently
+create table projects (
+  project         serial primary key,  -- The unique project ID
+  label           varchar not null,    -- The human-readable label for the project
+  current_semver  varchar not null,    -- The semver "X.Y.Z" version of the project, currently
+)
 ```
 
-## `deployment-steps` (added only when new deployment steps are created)
+## `machines` (the machines currently running any software, changes made manually)
 
 ```sql
-step        varchar(50) # The unique step ID
-step-label  varchar(50) # A human-readable label for the step, like "prod", "beta", or "build"
+create table machines (
+  machine       serial primary key, -- The unique machine ID
+  label         varchar not null,   -- A human-readable label for the machine, like "Kaspar's Raspberry Pi"
+)
+```
+
+## `project_instances` (the current status of the projects on each machine)
+
+```sql
+create table project_instances (
+  id        serial primary key.                        -- A unique ID for this project instance, on this machine
+  project   foreign key references projects(project),  -- The project that is currently running
+  machine   foreign key references machines(machine),  -- The machine the project is currently running on
+  filepath  varchar not null,                          -- The path to the executable of that project, currently running
+  semver    varchar not null,                          -- The "X.Y.Z" semantic version of the project currently running
+)
+```
+
+## `deployment_steps` (added only when new deployment steps are created)
+
+```sql
+create table deployment_steps (
+  step    serial primary key  -- The unique step ID
+  label   varchar not null    -- A human-readable label for the step, like "prod", "beta", or "build"
+)
 ```
 
 ## `deployments` (added to whenever new deployments happen)
 
 ```sql
-project     varchar(50) # The project ID for the project getting updated
-step        varchar(50) # The unique step ID of this step that's happening
-from-semver varchar(50) # The version that we are updating FROM
-to-semver   varchar(50) # The version that we are updating TO
-begin-date  timestamp   # The time of the beginning of the deployment step
-end-date    timestamp   # The time of the end of the deployment step
-status      varchar(50) # The deployment status ("SUCCESS", "IN PROGRESS", "FAILED")
+create type deployment_status as enum ('SUCCESS', 'IN PROGRESS', 'FAILED');
+create table deployments (
+  id          serial primary key,
+  project     foreign key references projects(project),       -- The project ID for the project getting updated
+  step        foreign key references deployment_steps(step),  -- The unique step ID of this step that happened
+  from_semver varchar not null,                               -- The version that we are updating FROM
+  to_semver   varchar not null,                               -- The version that we are updating TO
+  start       datetime with time zone not null,               -- The time of the beginning of the deployment step
+  end         datetime with time zone not null,               -- The time of the end of the deployment step
+  status      deployment_status not null,                     -- The deployment status ("SUCCESS", "IN PROGRESS", "FAILED")
+);
 ```
 
 ## `suggestions`
 
 ```sql
-user        varchar(50)   # The user ID of the user that submitted the suggestion
-suggestion  varchar(256)  # The content of the suggestion
-time        timestamp     # When the suggestion was submitted
-status      varchar(50)   # The status of this suggestion: LIVE, DECLINED, DEPRECATED, UNSEEN
+create type suggestion_status as enum ('LIVE', 'DECLINED', 'DEPRECATED', 'UNSEEN');
+create table suggestions (
+  id          serial primary key,               -- Unique suggestion id
+  user        foreign key references users(id), -- The user ID of the user that submitted the suggestion
+  suggestion  varchar not null,                 -- The content of the suggestion
+  submitted   datetime with time zone not null, -- When the suggestion was submitted
+  status      suggestion_status not null,       -- The status of this suggestion: "LIVE", "DECLINED", "DEPRECATED", "UNSEEN"
+)
 ```
 
 ## `users`
 
 ```sql
-id      varchar(50)   # The unique user ID
-name    varchar(50)   # The username for the user
-email   varchar(256)  # The email of the user
-joined  timestamp     # The time that the user signed up
+create table users (
+  id      serial primary key,                             -- The unique user ID
+  name    varchar not null,                               -- The username for the user
+  email   varchar not null,                               -- The email of the user
+  joined  datetime with time zone not null default now(), -- The time that the user signed up
+)
 ```
