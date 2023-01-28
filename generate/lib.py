@@ -20,5 +20,7 @@ def apply_ant_rule(ant: str) -> str:
         return '<a href="http://6krill.com">[6krill] ant</a>'
     if ant == "ant tm":
         return "ant&trade;"
+    if ant == "ant that would love to work at amazon but now they actually work at amazon :)":
+        return '<a href="https://www.linkedin.com/in/kaspar-p">ant that would love to work at amazon but now they actually work at amazon :)</a>'
 
     return ant

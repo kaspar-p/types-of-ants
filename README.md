@@ -95,7 +95,7 @@
   <div>mint green ant</div>
   <div>ant enjoying a shower beer</div>
   <div>ant turning 21</div>
-  <div>and wearing a scarf</div>
+  <div>ant wearing a scarf</div>
   <div>ant that wants to go to a pumpkin patch</div>
   <div>ant with ants in its pants</div>
   <div>diabetic ant</div>
@@ -325,7 +325,7 @@
   <div>bullet ant</div>
   <div>ant that's bad (morally)</div>
   <div>politically charged ant</div>
-  <div>ant that would love to work at amazon but now they actually work at amazon :)</div>
+  <div><a href="https://www.linkedin.com/in/kaspar-p">ant that would love to work at amazon but now they actually work at amazon :)</a></div>
   <div>"ant"</div>
   <div>florida ant</div>
   <div>ant that goes marching two by two</div>
@@ -418,7 +418,7 @@
   <div>ant in the vents</div>
   <div>cobbler ant</div>
   <div>ant that left their gf at the airport</div>
-  <div>and that left their gf in the cold of toronto</div>
+  <div>ant that left their gf in the cold of toronto</div>
   <div>vegan ant</div>
   <div>designer ant</div>
   <div>very inspiring ant</div>
@@ -504,7 +504,7 @@
   <div>teacher ant</div>
   <div>ceo ant</div>
   <div>father figure ant</div>
-  <div>and with one pair of pants for its back legs only</div>
+  <div>ant with one pair of pants for its back legs only</div>
   <div>ant who's been in a coma for weeks</div>
   <div>dr. ant</div>
   <div>ants that sell ant spray to kill other ants</div>
