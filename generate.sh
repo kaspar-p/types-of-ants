@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cp README.md README_OLD.md
 cp index.html index_OLD.html
 
