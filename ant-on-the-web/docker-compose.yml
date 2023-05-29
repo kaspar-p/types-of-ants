@@ -13,10 +13,10 @@ services:
       - ./data/nginx:/etc/nginx/conf.d
       - ./data/certbot/conf:/etc/letsencrypt
       - ./data/certbot/www:/var/www/certbot
-  # certbot:
-  #   image: certbot/certbot
-  #   container_name: certbot
-  #   volumes:
-  #     - ./data/certbot/conf:/etc/letsencrypt
-  #     - ./data/certbot/www:/var/www/certbot
-  #   command: certonly --webroot -w /var/www/certbot --force-renewal --email kaspar78@mouco.com -d beta.typesofants.org --agree-tos
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --force-renewal --email kaspar78@mouco.com -d beta.typesofants.org --agree-tos
