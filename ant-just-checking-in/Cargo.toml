@@ -1,38 +1,19 @@
 [package]
-name = "compile_with_bazel"
+name = "ant-just-checking-in"
 version = "0.1.0"
 edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = "0.4.23"
 cronjob = "0.4.17"
-postgres = { version = "0.19.4", features = ["with-chrono-0_4"] }
-r2d2 = "0.8.10"
-r2d2_postgres = "0.18.1"
+futures-util = "0.3.28"
 reqwest = { version = "0.11.13", features = ["blocking"] }
-# uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+tokio = { version = "1.28.2", features=["rt", "macros"] }
+tokio-cron-scheduler = "0.9.4"
+tokio-postgres = { version = "0.7.8", features = ["with-chrono-0_4"]}
  
 [[bin]]
 name = "ant-just-checking-in"
 path = "src/main.rs"
-
-[package.metadata.raze]
-workspace_path = "//ant-just-checking-in/cargo"
-package_aliases_dir = "cargo"
-targets = [
-    "x86_64-apple-darwin",
-    "x86_64-unknown-linux-gnu",
-]
-genmode = "Remote"
-
-[package.metadata.raze.crates.reqwest.'0.11.13']
-additional_flags = [
-    "--cfg=blocking",
-]
-
-# [package.metadata.raze.crates.uuid.'1.2.2']
-# additional_flags = [
-#     "--cfg=v4",
-#     "--cfg=fast-rng",
-#     "--cfg=macro-diagnostics",
-# ]

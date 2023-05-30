@@ -2,44 +2,67 @@ mod db;
 mod test;
 mod tests;
 
-use crate::db::Database;
-use cronjob::CronJob;
+use std::{sync::Arc, thread, time::Duration};
 
-const MODE: &str = "beta";
+use crate::{db::Database, tests::ping::StatusData};
+use tokio_cron_scheduler::{Job, JobScheduler};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let connection_string = format!("postgresql://postgres:1234@localhost:5432/{}", MODE);
-    let connection_pool = db::connect(connection_string);
+#[tokio::main]
+async fn main() -> Result<(), tokio_postgres::Error> {
+    let database: Database = db::connect().await?;
+    let arc_db = Arc::new(database);
 
     // Create the `CronJob` object.
-    let mut cron: CronJob = CronJob::new("Test Cron", move |_name: &str| -> () {
-        on_cron(&Database {
-            connection: connection_pool.clone().get().unwrap(),
-        });
-    });
+    let schedule: JobScheduler = match JobScheduler::new().await {
+        Ok(s) => s,
+        Err(e) => panic!("Creating job scheduler failed {}", e),
+    };
 
-    // Run every 10 seconds
-    cron.seconds("*/10");
+    let async_job = Job::new_async("1/5 * * * * * *", move |_, _| {
+        let db = arc_db.clone();
+        Box::pin(async move {
+            on_cron(db).await;
+        })
+    })
+    .expect("String parsing failed for cron schedule!");
+
+    schedule
+        .add(async_job)
+        .await
+        .expect("Creating cron job failed!");
 
     // Start the cronjob.
-    cron.start_job();
+    println!("Creating cron job...");
+    schedule
+        .start()
+        .await
+        .expect("Starting cron scheduling failed!");
 
-    return Ok(());
+    loop {
+        thread::sleep(Duration::from_millis(100));
+    }
 }
 
 // Our cronjob handler.
-fn on_cron(database: &Database) -> () {
+async fn on_cron(database: Arc<Database>) -> () {
+    println!("Testing...");
+
     // Collect all tests
-    let tests = test::get_all_tests(database);
-    tests();
+    let tests = test::get_all_tests();
 
-    // Check if the tests are not yet in the DB
-    // Put all tests into the DB, with UUID if they don't already have one
-    // Call each test on a list of projects.
+    let mut metrics: Vec<StatusData> = Vec::new();
+    for test in tests {
+        metrics.extend(test.await);
+    }
 
-    // For each project, do every test
-    // for url in urls {
-    //     let res = client.get(url).send();
-    //     emit_data(url, res.unwrap());
-    // }
+    for metric in metrics.as_slice() {
+        println!("{:?}", metric);
+    }
+
+    // TODO: Insert into the database here!
+    let result = database.insert_status_data(metrics).await;
+    match result {
+        Err(e) => println!("Inserting data failed {}", e),
+        Ok(_) => println!("Test iteration succeeded!"),
+    }
 }
