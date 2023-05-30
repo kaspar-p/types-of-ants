@@ -1,0 +1,5 @@
+{
+  "project": "ant-on-the-web",
+  "version": "1.0.0",
+  "entry": "docker-compose build && docker-compose up"
+}
