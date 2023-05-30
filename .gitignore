@@ -2,3 +2,6 @@
 **/__pycache__
 bazel-*
 rust-project.json
+
+# secrets
+.env.local
