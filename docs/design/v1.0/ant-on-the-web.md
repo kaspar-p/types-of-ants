@@ -14,7 +14,7 @@ The valid routes for the website will be:
 - Software deployments (`typesofants.org/deployments`)
 - Blog (`typesofants.org/blog`)
 - Contact me/Information page (`typesofants.org/info`)
-- Provisoning information (`typesofants.org/provisioning`)
+- Provisioning and host information (`typesofants.org/hosts`)
 - [maybe] Read-only database and query submitter (`typesofants.org/data`)
 
 ## Architecture

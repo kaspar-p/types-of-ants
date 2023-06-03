@@ -24,7 +24,7 @@ impl Database {
 pub async fn connect() -> Result<Database, Error> {
     let db_name = "typesofants";
     let user = "typesofants";
-    let pw = "";
+    let pw = ""; // Add password here!
 
     let connection_string = format!("postgresql://{}:{}@localhost:7000/{}", user, pw, db_name);
     let (client, connection) = tokio_postgres::connect(connection_string.as_str(), NoTls).await?;
