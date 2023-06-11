@@ -1,10 +1,10 @@
 [global]
 address = "0.0.0.0"
-port = "3499"
+port = 3499
 
 [development]
 address = "0.0.0.0"
-port = "3501"
+port = 3501
 
 # [global.tls]
 # key = "/etc/letsencrypt/live/beta.typesofants.org/privkey.pem"
