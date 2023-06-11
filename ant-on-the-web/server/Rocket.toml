@@ -1,9 +1,9 @@
 [global]
-address = "0.0.0.0"
+address = "::"
 port = 3499
 
 [development]
-address = "0.0.0.0"
+address = "::"
 port = 3501
 
 # [global.tls]
