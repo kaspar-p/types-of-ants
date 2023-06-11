@@ -1,2 +1,2 @@
-data/certbot/*
-!data/certbot/.gitkeep
+reverse-proxy/data/certbot/*
+!reverse-proxy/data/certbot/.gitkeep

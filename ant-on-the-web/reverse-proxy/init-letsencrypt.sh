@@ -8,6 +8,7 @@ fi
 domains=(beta.typesofants.org)
 rsa_key_size=4096
 data_path="./data/certbot"
+nginx_service_name='reverse_proxy'
 email="kaspar78@mouco.com" # Adding a valid address is strongly recommended
 staging=0 # Set to 1 if you're testing your setup to avoid hitting request limits
 
@@ -29,6 +30,9 @@ fi
 
 echo "### Creating dummy certificate for $domains ..."
 path="/etc/letsencrypt/live/$domains"
+mkdir -p $path
+touch "$path/privkey.pem"
+touch "$path/fullchain.pem"
 mkdir -p "$data_path/conf/live/$domains"
 docker-compose run --rm --entrypoint "\
   openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1\
@@ -39,7 +43,7 @@ echo
 
 
 echo "### Starting nginx ..."
-docker-compose up --force-recreate -d nginx
+docker-compose up --force-recreate -d "$nginx_service_name"
 echo
 
 echo "### Deleting dummy certificate for $domains ..."
@@ -77,4 +81,4 @@ docker-compose run --rm --entrypoint "\
 echo
 
 echo "### Reloading nginx ..."
-docker-compose exec nginx nginx -s reload
+docker-compose exec "$nginx_service_name" nginx -s reload
