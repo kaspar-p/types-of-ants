@@ -6,6 +6,6 @@ port = 3499
 address = "::"
 port = 3501
 
-# [global.tls]
-# key = "/etc/letsencrypt/live/beta.typesofants.org/privkey.pem"
-# certs = "/etc/letsencrypt/live/beta.typesofants.org/fullchain.pem"
+[global.tls]
+key = "/etc/letsencrypt/live/beta.typesofants.org/privkey.pem"
+certs = "/etc/letsencrypt/live/beta.typesofants.org/fullchain.pem"
