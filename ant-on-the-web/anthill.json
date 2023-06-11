@@ -1,5 +1,12 @@
 {
   "project": "ant-on-the-web",
   "version": "1.0.0",
-  "entry": "docker-compose build && docker-compose up"
+  "entries": {
+    "build-nginx": "docker-compose build",
+    "build-rocket": "cd server && cargo build",
+    "build": "anthill build-nginx && anthill build-rocket",
+    "run-nginx": "docker-compose up -d reverse_proxy",
+    "run-rocket": "cd server && cargo run",
+    "run": "anthill run-nginx && anthill run-rocket"
+  }
 }
