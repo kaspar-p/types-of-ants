@@ -1,22 +1,22 @@
 version: "3"
 services:
-  nginx:
-    container_name: beta
+  reverse_proxy:
+    container_name: beta_reverse_proxy
     build:
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: ./reverse-proxy/Dockerfile
     command: '/bin/sh -c ''while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"'''
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./data/nginx:/etc/nginx/conf.d
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
+      - ./reverse-proxy/data/nginx:/etc/nginx/conf.d
+      - ./reverse-proxy/data/certbot/conf:/etc/letsencrypt
+      - ./reverse-proxy/data/certbot/www:/var/www/certbot
   certbot:
     image: certbot/certbot
     container_name: certbot
     volumes:
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
+      - ./reverse-proxy/data/certbot/conf:/etc/letsencrypt
+      - ./reverse-proxy/data/certbot/www:/var/www/certbot
     command: certonly --webroot -w /var/www/certbot --force-renewal --email kaspar78@mouco.com -d beta.typesofants.org --agree-tos
