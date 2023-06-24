@@ -145,7 +145,9 @@ create table favorite (
   user_id uuid not null, -- The user who favorited the ant
   ant_id uuid not null, -- The ant that got favorited
   favorited_at timestamp with time zone not null default now(), -- When the favorite happened
-  primary key (user_id, ant_id)
+  primary key (user_id, ant_id),
+  constraint fk_user foreign key (user_id) references registered_user(user_id),
+  constraint fk_ant foreign key (ant_id) references ant(ant_id)
 )
 
 drop type if exists ant_suggestion_status cascade;
