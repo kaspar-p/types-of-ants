@@ -10,9 +10,11 @@
     { "ant": "black ant", "legacy": true },
     { "ant": "green ant", "legacy": true },
     { "ant": "gummy ant", "legacy": true },
-    { "ant": "ant eating dinner" },
+    {
+      "ant": "ant eating dinner",
+      "suggestedContent": "ant eating dinner (gaming later)"
+    },
     { "ant": "blue ant", "legacy": true },
-    { "ant": "ant that would love to work for amazon :)" },
     { "ant": "yellow ant", "legacy": true },
     { "ant": "orange ant", "legacy": true },
     { "ant": "teal ant" },
@@ -78,10 +80,16 @@
     { "ant": "cranberry picker ant", "suggestedContent": "cranberry picker" },
     { "ant": "ant cowgirl (yeehaw)" },
     { "ant": "gold ant", "legacy": true },
-    { "ant": "daydrinking ant" },
+    {
+      "ant": "daydrinking ant",
+      "suggestedContent": "daydrinking ant (morning mimosas)"
+    },
     { "ant": "silver ant", "legacy": true },
     { "ant": "bronze ant", "legacy": true },
-    { "ant": "ant who didn't get an ants wrapped" },
+    {
+      "ant": "ant who didn't get an ants wrapped",
+      "suggestedContent": "ant who didnt get an ants wrapped"
+    },
     { "ant": "ant on its period" },
     { "ant": "adam ant eve" },
     { "ant": "antisocial ant" },
@@ -107,7 +115,10 @@
     {
       "ant": "ant who's been trying to contact you about your car's extended warranty"
     },
-    { "ant": "ant.org (please i want it so bad)" },
+    {
+      "ant": "ant.org (please i want it so bad)",
+      "suggestedContent": "ant.org"
+    },
     { "ant": "seafoam green ant", "legacy": true },
     { "ant": "sunset orange ant", "legacy": true },
     { "ant": "brown ant", "legacy": true },
@@ -138,7 +149,10 @@
     { "ant": "malding ant" },
     { "ant": "home builder ant", "legacy": true },
     { "ant": "ant in a bit of a jam" },
-    { "ant": "ant going to college (first gen)" },
+    {
+      "ant": "ant going to college (first gen)",
+      "suggestedContent": "ant going to college (first gen!)"
+    },
     { "ant": "ant eating jam" },
     { "ant": "ant who missed his family photos" },
     { "ant": "purple ant", "legacy": true },
@@ -153,7 +167,10 @@
     { "ant": "ant turning 21" },
     { "ant": "ant in deutschland" },
     { "ant": "ant wearing a scarf" },
-    { "ant": "ant that wants to go to a pumpkin patch" },
+    {
+      "ant": "ant that wants to go to a pumpkin patch",
+      "suggestedContent": "ant that wants to go to the pumpkin patch"
+    },
     { "ant": "ant with ants in its pants" },
     { "ant": "ant that narrowly avoided being run over (grateful)" },
     { "ant": "diabetic ant" },
@@ -200,14 +217,20 @@
     { "ant": "antifa" },
     { "ant": "infant", "suggestedContent": "infANT" },
     { "ant": "gym bro ant" },
-    { "ant": "byzantine (constantinople)" },
+    {
+      "ant": "byzantine (constantinople)",
+      "suggestedContent": "byzantine (in Constantinople)"
+    },
     { "ant": "tomato ant", "legacy": true },
     { "ant": "larvae", "suggestedContent": "Larva" },
     { "ant": "lilac ant", "legacy": true },
     { "ant": "tyrant" },
     { "ant": "ant taking a nap", "suggestedContent": "napping ant" },
     { "ant": "racket ant" },
-    { "ant": "ant that forgot to take the trash out" },
+    {
+      "ant": "ant that forgot to take the trash out",
+      "suggestedContent": "ant that didn't take the trash out (he forgor)"
+    },
     { "ant": "muslim ant", "legacy": true },
     { "ant": "ant that got hurt (ow)" },
     { "ant": "ant in the wrong place at the wrong time" },
@@ -230,27 +253,42 @@
     { "ant": "picnic invader", "suggestedContent": "picnic invader " },
     { "ant": "lawyer ant" },
     { "ant": "ant carrying a leaf" },
-    { "ant": "ant who loves a spider but their love is forbidden" },
+    {
+      "ant": "ant who loves a spider but their love is forbidden",
+      "suggestedContent": "ant who loves a spider but the love is forbidden"
+    },
     { "ant": "vermilion ant", "legacy": true },
     { "ant": "irresponsible ant" },
     { "ant": "ant who misses her" },
     { "ant": "ants you can't see", "legacy": true },
     { "ant": "flesh colored ant", "legacy": true },
     { "ant": "ant on a log" },
-    { "ant": "ant visiting toronto (kyle ant)" },
+    {
+      "ant": "ant visiting toronto (kyle ant)",
+      "suggestedContent": "ant visiting toronto (listens to drake)"
+    },
     { "ant": "ghost ant", "legacy": true },
     { "ant": "olive ant", "legacy": true },
-    { "ant": "ant who has no idea my shower doesn't have crumbs" },
+    {
+      "ant": "ant who has no idea my shower doesn't have crumbs",
+      "suggestedContent": "ant who doesn't know there's no food in my shower"
+    },
     { "ant": "wild ant" },
     { "ant": "tamed ant" },
     { "ant": "ant in a zoo", "suggestedContent": "ant in the zoo" },
-    { "ant": "ant at the raptors game (overpaid for beer)" },
+    {
+      "ant": "ant at the raptors game (overpaid for beer)",
+      "suggestedContent": "ant at a raptors game ($12 beer)"
+    },
     { "ant": "ant that keeps on trying" },
     { "ant": "ant drowning in a single droplet of water" },
     { "ant": "married ant" },
     { "ant": "single ant", "legacy": true },
     { "ant": "ant with daddy issues" },
-    { "ant": "ant playing handball (european)" },
+    {
+      "ant": "ant playing handball (european)",
+      "suggestedContent": "ant playing handball, a real sport"
+    },
     { "ant": "sky blue ant", "legacy": true },
     {
       "ant": "ant that put cosmos out of business",
@@ -280,7 +318,10 @@
     { "ant": "ant carrying another ant" },
     { "ant": "peach ant", "legacy": true },
     { "ant": "prussian blue ant", "legacy": true },
-    { "ant": "ant with a bedtime beer" },
+    {
+      "ant": "ant with a bedtime beer",
+      "suggestedContent": "ant having a bed-time beer"
+    },
     { "ant": "arsonist ant" },
     { "ant": "frightened ant" },
     { "ant": "hungwy ant", "legacy": true },
@@ -308,7 +349,7 @@
     { "ant": "bass player ant", "suggestedContent": "Bass player ant" },
     {
       "ant": "ant that is a know-it-all",
-      "suggestedContent": "ant who knows it all (know it all ant)"
+      "suggestedContent": "ant that is a know it all"
     },
     { "ant": "ant in a hat" },
     { "ant": "ant that is secretly in love with its best friend" },
@@ -332,7 +373,7 @@
     { "ant": "australian ant", "legacy": true },
     { "ant": "ant in the circus" },
     { "ant": "east asian ant" },
-    { "ant": "scary flying ant" },
+    { "ant": "scary flying ant", "suggestedContent": "Scary flying ant" },
     { "ant": "siberian ant", "legacy": true },
     { "ant": "tired ant" },
     {
@@ -374,22 +415,34 @@
       "ant": "ant but it's a dolphin but it's also dead",
       "suggestedContent": "dead dolphin ant"
     },
-    { "ant": "ant that is soo one shot" },
+    {
+      "ant": "ant that is soo one shot",
+      "suggestedContent": "ant that is so one shot dude"
+    },
     { "ant": "antelope" },
     { "ant": "ant on the can" },
     { "ant": "french ant", "legacy": true },
-    { "ant": "reformed ant (stole your lunch, won't do it again)" },
+    {
+      "ant": "reformed ant (stole your lunch, won't do it again)",
+      "suggestedContent": "reformed ant (sike, he's gonna steal your lunch)"
+    },
     { "ant": "unattentive ant" },
     { "ant": "ant that found out they're canadian" },
     { "ant": "ashamed ant" },
-    { "ant": "ant that got dress-coded (spaghetti straps)" },
+    {
+      "ant": "ant that got dress-coded (spaghetti straps)",
+      "suggestedContent": "ant that got dress coded (spaghetti straps)"
+    },
     { "ant": "ant on a mental health journey" },
     { "ant": "ant that likes stranger things" },
     { "ant": "ant who is bored at work" },
     { "ant": "ant doing long distance (sad ant)" },
     { "ant": "ant on a plane" },
     { "ant": "schizo ant (lots of friends)" },
-    { "ant": "csc324 lab 2 ant (memory commemoration)" },
+    {
+      "ant": "csc324 lab 2 ant (memory commemoration)",
+      "suggestedContent": "csc324 lab2 ant"
+    },
     { "ant": "lunar new year ant" },
     { "ant": "swedish ant", "legacy": true },
     {
@@ -406,7 +459,10 @@
       "suggestedContent": "ant but he's really short"
     },
     { "ant": "ant that misses kaspar" },
-    { "ant": "ant that spent too much money at the club" },
+    {
+      "ant": "ant that spent too much money at the club",
+      "suggestedContent": "ant that spent too much at the club (bank account empty)"
+    },
     { "ant": "infertile ant" },
     { "ant": "ant that is not improving" },
     { "ant": "ant who knows it all (know it all ant)" },
@@ -421,7 +477,10 @@
     { "ant": "f1 ant (max verstappant)" },
     { "ant": "ant listening to music" },
     { "ant": "desperate ant", "suggestedContent": "Desperate ant" },
-    { "ant": "million dollar ant (chump change)" },
+    {
+      "ant": "million dollar ant (chump change)",
+      "suggestedContent": "million dollar ant"
+    },
     { "ant": "flight attendant", "suggestedContent": "flight atendant" },
     { "ant": "ant selling wares" },
     { "ant": "anglo-saxon ant", "legacy": true },
@@ -433,14 +492,13 @@
     },
     { "ant": "mexican ant", "legacy": true },
     { "ant": "ant marrying canadian ant for the visa" },
-    { "ant": "self aware ant" },
     { "ant": "imperialist ant", "legacy": true },
     {
       "ant": "ant so long it looks weird",
       "tweeted": true,
       "tweetedAt": "2023-06-22T02:41:26.185Z"
     },
-    { "ant": "ant that is about to graduate (indimidated by the world)" },
+    { "ant": "ant that is about to graduate (intimidated by the world)" },
     { "ant": "rhino ant", "suggestedContent": "rhino" },
     { "ant": "sickly ant" },
     { "ant": "harvester ant" },
@@ -450,7 +508,10 @@
     { "ant": "fiscally responsible ant" },
     { "ant": "generic ant" },
     { "ant": "specific ant" },
-    { "ant": "ming dynasty ant (got me acting unwise)" },
+    {
+      "ant": "ming dynasty ant (got me acting unwise)",
+      "suggestedContent": "ming dynasty ant"
+    },
     { "ant": "fire ant" },
     { "ant": "normal ant" },
     { "ant": "bantu ant", "legacy": true },
@@ -468,8 +529,11 @@
     { "ant": "zombie ant" },
     { "ant": "phantom" },
     { "ant": "sioux ant", "legacy": true },
-    { "ant": "ant with the weight of the world on its back" },
-    { "ant": "ant emoji" },
+    {
+      "ant": "ant with the weight of the world on its back",
+      "suggestedContent": "ant with the weight of the world on its back (dead)"
+    },
+    { "ant": "ant emoji", "suggestedContent": "🐜 emoji" },
     { "ant": "mutant" },
     {
       "ant": "antic (ant up to no good)",
@@ -532,7 +596,10 @@
       "suggestedContent": "ant with no knees"
     },
     { "ant": "ant who is a taxi" },
-    { "ant": "male manipulator ant" },
+    {
+      "ant": "male manipulator ant",
+      "suggestedContent": "male manipulator ant (listens to the smiths)"
+    },
     { "ant": "boomer ant" },
     { "ant": "ant who approves the ant suggestions" },
     { "ant": "zoomer ant" },
@@ -571,7 +638,7 @@
     { "ant": "deprecated ant" },
     { "ant": "ant man" },
     { "ant": "ant that creates contemporary art" },
-    { "ant": "mac ant" },
+    { "ant": "mac ant", "legacy": true },
     { "ant": "ant crossing the rubicon" },
     { "ant": "funky ant" },
     {
@@ -587,7 +654,10 @@
     { "ant": "ant in the dark" },
     { "ant": "ant on a hangglider", "suggestedContent": "ant on a hanglider" },
     { "ant": "slavic ant", "legacy": true },
-    { "ant": "ant who has a bone to pick with you" },
+    {
+      "ant": "ant that has a bone to pick with you",
+      "suggestedContent": "ant who has a bone to pick with you"
+    },
     {
       "ant": "ant that keeps making piles in your backyard",
       "suggestedContent": "and that keeps making piles in your backyard"
@@ -597,7 +667,7 @@
       "suggestedContent": "polish ant (its the 1940's and his life is about to be turned upside down)"
     },
     { "ant": "hipster ant", "suggestedContent": "Hipster ant" },
-    { "ant": "ant playing the trumpet", "suggestedContent": "trumpeteer ant" },
+    { "ant": "ant playing the trumpet", "suggestedContent": "trumpeter ant" },
     { "ant": "elmo ant" },
     { "ant": "ant who forgot to take his meds" },
     { "ant": "kendrick lamar ant (new album)" },
@@ -607,7 +677,10 @@
     },
     { "ant": "caged ant" },
     { "ant": "ant who wants your lunch" },
-    { "ant": "arsonist ant in a library (time of its life)" },
+    {
+      "ant": "arsonist ant in a library (time of its life)",
+      "suggestedContent": "arsonist ant in a library"
+    },
     { "ant": "party ant" },
     { "ant": "ant that games even though it makes him sad" },
     { "ant": "ant who can't catch a break" },
@@ -629,12 +702,15 @@
     },
     { "ant": "ant who can't get a job", "suggestedContent": "go get a job" },
     { "ant": "ant with good posture" },
-    { "ant": "extant (the filesystem)" },
+    {
+      "ant": "extant (the filesystem)",
+      "suggestedContent": "ext(ant) like the file system"
+    },
     { "ant": "ant with a cancelled project" },
     { "ant": "old ant", "legacy": true },
     { "ant": "ant that would date me if i was a worm" },
     { "ant": "ant that supplies ideas for this website" },
-    { "ant": "ant that smokes" },
+    { "ant": "ant that smokes", "suggestedContent": "ant smoking weed" },
     { "ant": "baby ant", "legacy": true },
     { "ant": "ant with only 5 legs" },
     { "ant": "antcestors" },
@@ -642,16 +718,28 @@
       "ant": "ant in the vents",
       "suggestedContent": "amogus ant not sussy OH SHIT ANT IN THE VENTS"
     },
-    { "ant": "ant that be getting up mad early for more time to be a hater" },
+    {
+      "ant": "ant that be getting up mad early for more time to be a hater",
+      "suggestedContent": "ant that be getting up mad early so he can have more time to be a hater"
+    },
     { "ant": "cobbler ant" },
     { "ant": "ant that left their gf at the airport" },
-    { "ant": "ant that left their gf in the cold of toronto" },
+    {
+      "ant": "ant that left their gf in the cold of toronto",
+      "suggestedContent": "ant that left his girlfriend in the Cold of Toronto"
+    },
     { "ant": "vegan ant" },
     { "ant": "designer ant" },
     { "ant": "very inspiring ant", "suggestedContent": "a very inspiring ant" },
-    { "ant": "ant that wants another beer after coming back from the bars" },
+    {
+      "ant": "ant that wants another beer after coming back from the bars",
+      "suggestedContent": "ant that keeps drinking after coming back from the bars"
+    },
     { "ant": "lightheaded ant" },
-    { "ant": "ant immune to the haters" },
+    {
+      "ant": "ant immune to the haters",
+      "suggestedContent": "ant that's immune to the haters"
+    },
     { "ant": "ant with a clean fade" },
     { "ant": "ant with no valentine" },
     { "ant": "opp ant" },
@@ -681,7 +769,10 @@
     { "ant": "virtual ant" },
     { "ant": "ant making the deals" },
     { "ant": "unloved ant" },
-    { "ant": "ant that doesn't play cs anymore" },
+    {
+      "ant": "ant that doesn't play cs anymore",
+      "suggestedContent": "ant that doesn't play cs anymore (braindead ant)"
+    },
     { "ant": "influencer ant" },
     {
       "ant": "ant who's grinding ($)",
@@ -719,7 +810,10 @@
     { "ant": "3 inch ant (average)", "suggestedContent": "a 3 inch ant" },
     { "ant": "ant in a colony (colonialism)" },
     { "ant": "pregnant" },
-    { "ant": "ant gaming on the down low (watch over what)" },
+    {
+      "ant": "ant gaming on the down low (watch over what)",
+      "suggestedContent": "ant gaming on the down low (watch over what?)"
+    },
     {
       "ant": "ant that's not ready to be a parent",
       "suggestedContent": "not ready for parenthood ant"
@@ -729,7 +823,10 @@
     { "ant": "elephant", "suggestedContent": "Elephant" },
     { "ant": "girl ant on girl ant twitter" },
     { "ant": "slapped silly ant" },
-    { "ant": "self-aware ant", "suggestedContent": "self aware ant" },
+    {
+      "ant": "self-aware ant",
+      "suggestedContent": "self aware ant"
+    },
     { "ant": "ant in a uhaul" },
     { "ant": "politician ant", "legacy": true },
     { "ant": "dishwasher ant" },
@@ -754,11 +851,15 @@
     { "ant": "gen x ant", "legacy": true },
     { "ant": "zoomer ant" },
     { "ant": "ant with plot armor" },
-    { "ant": "ant that will definitely pay back that loan" },
+    {
+      "ant": "ant that will definitely pay back that loan",
+      "suggestedContent": "ant that will definitely pay you back for that $500 loan you gave him"
+    },
     { "ant": "really fat ant", "suggestedContent": "really fat" },
     { "ant": "ant but its on fire", "suggestedContent": "on fire" },
     {
-      "ant": "ant with some strong opinions on armenia and what happened there"
+      "ant": "ant with some strong opinions on armenia and what happened there",
+      "suggestedContent": "ant with some strong opinions on Armenia"
     },
     {
       "ant": "ant who is gentrifying senior citizens' homes",
@@ -772,7 +873,10 @@
       "ant": "ant with a beer addiction",
       "suggestedContent": "ant with a beer addiction (true)"
     },
-    { "ant": "frat boy ant" },
+    {
+      "ant": "frat boy ant",
+      "suggestedContent": "frat boy ant (don't convict him, he's a great swimmer)"
+    },
     { "ant": "antom of the opera" },
     { "ant": "plumber ant", "legacy": true },
     { "ant": "crybaby ant" },
@@ -793,7 +897,7 @@
     { "ant": "ant on a stick" },
     { "ant": "en passant" },
     { "ant": "student ant", "legacy": true },
-    { "ant": "tattoed ant" },
+    { "ant": "tattooed ant" },
     { "ant": "skewed ant" },
     { "ant": "freudian ant" },
     { "ant": "widdle ant", "suggestedContent": "juwst a widdle ant" },
@@ -802,7 +906,10 @@
       "suggestedContent": "ant who wants to be your friend"
     },
     { "ant": "martian ant" },
-    { "ant": "ant that plays terrible games over and over again (insane)" },
+    {
+      "ant": "ant that plays terrible games over and over again (insane)",
+      "suggestedContent": "ant that plays terrible games over and over (insane)"
+    },
     { "ant": "austro-hungarian ant", "legacy": true },
     { "ant": "adamant" },
     { "ant": "windows ant", "legacy": true },
@@ -812,7 +919,10 @@
     { "ant": "ant jemima" },
     { "ant": "parent ant", "legacy": true },
     { "ant": "tourist ant" },
-    { "ant": "ant who hasn't slept in weeks" },
+    {
+      "ant": "ant who hasn't slept in weeks",
+      "suggestedContent": "ant who hasnt slept in weeks"
+    },
     { "ant": "ant on vacation" },
     { "ant": "crusader ant" },
     { "ant": "ant tm", "suggestedContent": "ant™" },
@@ -895,7 +1005,10 @@
       "suggestedContent": "news correspondent ant"
     },
     { "ant": "ant not looking forward to its future" },
-    { "ant": "ant on top of the cn tower (tourist ant)" },
+    {
+      "ant": "ant on top of the cn tower (tourist ant)",
+      "suggestedContent": "ant on top of the cn tower (streetcars look like ants)"
+    },
     { "ant": "ant in a band", "legacy": true },
     { "ant": "ant that started the yearly minecraft server" },
     { "ant": "ant on a bus", "legacy": true },

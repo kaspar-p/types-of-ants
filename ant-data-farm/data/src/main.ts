@@ -287,7 +287,7 @@ function formatAntsWithReleases(
     .join("\n");
 }
 
-function main() {
+function writeSqlFiles() {
   const { acceptedAnts: acceptedAntsWithoutReleases, declinedAnts } =
     getAllDeclinedAndAcceptedAnts();
 
@@ -331,6 +331,58 @@ function main() {
   fs.writeFileSync("./sql_output/release.sql", sqlFor_release, {
     encoding: "utf-8",
   });
+}
+
+function checkIntegrity() {
+  console.log("Running...");
+  const legacyAnts = getAllLegacyAnts();
+  console.log("Got all legacy ants!");
+  const { acceptedAnts, declinedAnts } = getAllDeclinedAndAcceptedAnts();
+  console.log("Got all accepted and declined ants!");
+  const siteAnts: Set<string> = new Set(
+    getSiteData().ants.map((ant) => ant.ant)
+  );
+  acceptedAnts.forEach((ant) => {
+    const acceptedAnt = getSiteAntFromContent(ant.antContent);
+    if (!acceptedAnt) {
+      throw new Error(
+        `Accepted ant '${ant.antContent}' not found as site ant!`
+      );
+    } else {
+      siteAnts.delete(ant.antContent);
+      siteAnts.delete(ant.originalSuggestionContent);
+    }
+  });
+
+  legacyAnts.forEach((ant) => {
+    const siteAntContent = getSiteAntFromContent(ant.antContent);
+    if (!siteAntContent) {
+      throw new Error(
+        `Legacy ant '${ant.antContent}' not found as site ant content!`
+      );
+    } else {
+      siteAnts.delete(ant.antContent);
+      siteAnts.delete(ant.originalSuggestionContent);
+    }
+
+    const siteAntOriginal = getSiteAntFromContent(
+      ant.originalSuggestionContent
+    );
+    if (!siteAntOriginal) {
+      throw new Error(
+        `Legacy ant '${ant.antContent}' not found as site ant original!`
+      );
+    } else {
+      siteAnts.delete(ant.antContent);
+      siteAnts.delete(ant.originalSuggestionContent);
+    }
+  });
+
+  console.log("Finished: ", siteAnts.size, Array.from(siteAnts));
+}
+
+function main() {
+  writeSqlFiles();
 }
 
 main();
