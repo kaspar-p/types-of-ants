@@ -16,10 +16,11 @@ function toSqlDate(date: string): string {
   return new Date(date).toISOString().slice(0, 19).replace("T", " ");
 }
 
-function antId(antContent: string, createdAt: string) {
+function antId(originalSuggestionContent: string, createdAt: string) {
+  const sanitized = sanitizeForSql(originalSuggestionContent);
   return (
     `(select ant_id from ant where ` +
-    `suggested_content = '${sanitizeForSql(antContent)}'` +
+    `suggested_content = '${sanitized}'` +
     " and " +
     `created_at = '${toSqlDate(createdAt)}')`
   );
@@ -57,7 +58,8 @@ export function antTweetedSql(
       throw new Error("tweetedAt was null for: " + ant.antContent);
     }
     const timestamp = toSqlDate(ant.tweetedAt);
-    return `(${antId(ant.antContent, ant.createdAt)}, '${timestamp}')`;
+    const ant_id = antId(ant.originalSuggestionContent, ant.createdAt);
+    return `(${ant_id}, '${timestamp}')`;
   }
 
   const rows = ants
@@ -74,7 +76,7 @@ ${rows}
 
 export function declinedToSql(ants: DeclinedAnt[]): string {
   function singleRow(ant: DeclinedAnt): string {
-    const ant_id = `${antId(ant.originalSuggestionContent, ant.createdAt)}`;
+    const ant_id = antId(ant.originalSuggestionContent, ant.createdAt);
     const user_id = userId("kaspar");
     return `(${ant_id}, ${user_id}, '${toSqlDate(ant.closedAt)}')`;
   }
@@ -119,7 +121,7 @@ export function antReleaseSql(
   function singleRow(
     ant: LegacyAntWithRelease | AcceptedAntWithRelease
   ): string {
-    const ant_id = antId(ant.antContent, ant.createdAt);
+    const ant_id = antId(ant.originalSuggestionContent, ant.createdAt);
     const content = sanitizeForSql(ant.antContent);
     return `(${ant_id}, ${ant.release}, '${content}', ${ant.ordering})`;
   }

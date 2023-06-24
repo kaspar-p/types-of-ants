@@ -1,5 +1,6 @@
 import { SiteData, getSiteData, getRawData, RawData } from "./parse";
 import { execSync } from "child_process";
+import fs from "fs";
 import {
   antReleaseSql,
   antTweetedSql,
@@ -304,17 +305,32 @@ function main() {
     ...legacyAnts,
     ...declinedAnts,
   ];
-  const sqlFor_ant = antsToSql([
+  const siteAnts: (LegacyAntWithRelease | AcceptedAntWithRelease)[] = [
     ...acceptedAnts,
     ...legacyAnts,
-    ...declinedAnts,
-  ]);
-  const sqlFor_ant_tweeted = antTweetedSql([...acceptedAnts, ...legacyAnts]);
-  const sqlFor_ant_declined = declinedToSql(declinedAnts);
-  const sqlFor_ant_release = antReleaseSql([...acceptedAnts, ...legacyAnts]);
-  const sqlFor_release = releaseSql([...acceptedAnts, ...legacyAnts]);
+  ];
+  const sqlFor_ant = antsToSql(allAnts);
+  fs.writeFileSync("./sql_output/ant.sql", sqlFor_ant, { encoding: "utf-8" });
 
-  console.log(sqlFor_release);
+  const sqlFor_ant_tweeted = antTweetedSql(siteAnts);
+  fs.writeFileSync("./sql_output/ant_tweeted.sql", sqlFor_ant_tweeted, {
+    encoding: "utf-8",
+  });
+
+  const sqlFor_ant_declined = declinedToSql(declinedAnts);
+  fs.writeFileSync("./sql_output/ant_declined.sql", sqlFor_ant_declined, {
+    encoding: "utf-8",
+  });
+
+  const sqlFor_ant_release = antReleaseSql(siteAnts);
+  fs.writeFileSync("./sql_output/ant_release.sql", sqlFor_ant_release, {
+    encoding: "utf-8",
+  });
+
+  const sqlFor_release = releaseSql(siteAnts);
+  fs.writeFileSync("./sql_output/release.sql", sqlFor_release, {
+    encoding: "utf-8",
+  });
 }
 
 main();

@@ -1,4 +1,4 @@
-import jsonRaw from "../data/raw_issues_json.json";
+import jsonRaw from "../data/raw_issues_6_24.json";
 import jsonSite from "../data/raw_site_data.json";
 import { z } from "zod";
 
@@ -22,12 +22,16 @@ export function getSiteData(): SiteData {
 
 const rawSchema = z.array(
   z.object({
-    title: z.string(),
+    title: z.string().transform((title) => {
+      return title.replace(/’/g, "'");
+    }),
     state: z.union([z.literal("OPEN"), z.literal("CLOSED")]),
     createdAt: z.string(),
     closed: z.boolean(),
     closedAt: z.union([z.string(), z.null()]),
-    body: z.string(),
+    body: z.string().transform((title) => {
+      return title.replace(/’/g, "'");
+    }),
     labels: z.array(
       z.object({
         name: z.string(),
@@ -37,21 +41,6 @@ const rawSchema = z.array(
 );
 export type RawData = z.infer<typeof rawSchema>;
 export function getRawData(): RawData {
-  const rawSchema = z.array(
-    z.object({
-      title: z.string(),
-      state: z.union([z.literal("OPEN"), z.literal("CLOSED")]),
-      createdAt: z.string(),
-      closed: z.boolean(),
-      closedAt: z.union([z.string(), z.null()]),
-      body: z.string(),
-      labels: z.array(
-        z.object({
-          name: z.string(),
-        })
-      ),
-    })
-  );
   return rawSchema.parse(jsonRaw);
 }
 

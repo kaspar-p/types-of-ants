@@ -68,6 +68,5 @@ insert into release (release_number, release_label)
     (66, 'v66'),
     (67, 'v67'),
     (68, 'v68'),
-    (69, 'v69'),
-    (70, 'v70')
+    (69, 'v69')
 ;
