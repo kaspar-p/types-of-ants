@@ -4,4 +4,7 @@ bazel-*
 rust-project.json
 
 # secrets
-.env.local
+.env*
+
+# Added by cargo
+/target

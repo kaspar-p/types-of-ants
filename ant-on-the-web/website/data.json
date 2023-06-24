@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "ants": [
-    { "ant": "red ant" },
+    { "ant": "red ant", "tweeted": true },
     { "ant": "black ant" },
     { "ant": "green ant" },
     { "ant": "gummy ant" },

@@ -4,7 +4,9 @@
   "entries": {
     "build-nginx": "docker-compose build",
     "build-rocket": "cd server && cargo build",
-    "build": "anthill build-nginx && anthill build-rocket",
+    "build-website": "cd website && npm run build",
+    "copy-website-to-server": "cp -R website/out/* server/static",
+    "build": "anthill build-nginx && anthill build-rocket && anthill build-website && anthill copy-website-to-server",
     "run-nginx": "docker-compose up -d reverse_proxy",
     "run-rocket": "cd server && cargo run",
     "run": "anthill run-nginx && anthill run-rocket"
