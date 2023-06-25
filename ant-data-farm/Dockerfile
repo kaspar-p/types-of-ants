@@ -1,3 +1,3 @@
 FROM postgres
 
-COPY bootstrap.sql /docker-entrypoint-initdb.d/bootstrap.sql
+COPY data/sql/bootstrap.sql /docker-entrypoint-initdb.d/bootstrap.sql

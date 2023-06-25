@@ -36,6 +36,7 @@ export type LegacyAntWithRelease = LegacyAnt & {
 export type LegacyAnt = {
   ordering: number;
   antContent: string;
+  closedAt: string /* Same as createdAt */;
   createdAt: string;
   tweeted: boolean;
   tweetedAt: string | null;
@@ -158,7 +159,12 @@ function getEarliestCommitDate(antContent: string): Date {
   const singleCommitDate: string = execSync(formatSingleCommit(commitId))
     .toString("utf-8")
     .trim();
-  return new Date(singleCommitDate);
+  const d = new Date(singleCommitDate);
+  if (!singleCommitDate || !d)
+    throw new Error(
+      "Parsing single commit date broke: " + singleCommitDate + " and " + d
+    );
+  return d;
 }
 
 type WithReleases = {
@@ -169,12 +175,14 @@ function assignReleasesToAnts(
   acceptedAnts: AcceptedAnt[],
   legacyAnts: LegacyAnt[]
 ): WithReleases {
-  const uniqueCommitDays: Record<string, (AcceptedAnt | LegacyAnt)[]> = {};
+  const uniqueCommitDays: Record<string, number> = {};
   [...acceptedAnts, ...legacyAnts].forEach((ant: AcceptedAnt | LegacyAnt) => {
-    const dateString = new Date(ant.createdAt).toDateString();
-    if (!(dateString in uniqueCommitDays)) uniqueCommitDays[dateString] = [];
-    uniqueCommitDays[dateString].push(ant);
+    const dateString = new Date(ant.closedAt).toDateString();
+    if (!dateString) throw new Error(ant.antContent + dateString);
+    if (!(dateString in uniqueCommitDays)) uniqueCommitDays[dateString] = 0;
+    uniqueCommitDays[dateString] += 1;
   });
+  console.log(Object.keys(uniqueCommitDays));
 
   const dateToReleaseNumber: Record<string, number> = {};
   Object.keys(uniqueCommitDays)
@@ -189,11 +197,11 @@ function assignReleasesToAnts(
   return {
     acceptedAnts: acceptedAnts.map((ant) => ({
       ...ant,
-      release: dateToReleaseNumber[new Date(ant.createdAt).toDateString()],
+      release: dateToReleaseNumber[new Date(ant.closedAt).toDateString()],
     })),
     legacyAnts: legacyAnts.map((ant) => ({
       ...ant,
-      release: dateToReleaseNumber[new Date(ant.createdAt).toDateString()],
+      release: dateToReleaseNumber[new Date(ant.closedAt).toDateString()],
     })),
   };
 }
@@ -201,20 +209,23 @@ function assignReleasesToAnts(
 function getAllLegacyAnts(): LegacyAnt[] {
   const siteData = getSiteData();
   // Get the ants marked as legacy
-  const legacy: LegacyAnt[] = siteData.ants
-    .filter((ant) => ant.legacy)
-    .map((ant) => {
-      return {
-        antContent: ant.ant,
-        tweeted: ant.tweeted ?? false,
-        tweetedAt: ant.tweetedAt ?? null,
-        originalSuggestionContent: ant.ant,
-        ordering: hashCode(ant.ant),
-        createdAt: getEarliestCommitDate(ant.ant).toISOString(),
-      };
-    });
-
-  return dedupe(legacy, "antContent");
+  return dedupe(
+    siteData.ants
+      .filter((ant) => ant.legacy)
+      .map((ant) => {
+        const commitTimestamp = getEarliestCommitDate(ant.ant).toISOString();
+        return {
+          antContent: ant.ant,
+          tweeted: ant.tweeted ?? false,
+          tweetedAt: ant.tweetedAt ?? null,
+          originalSuggestionContent: ant.ant,
+          ordering: hashCode(ant.ant),
+          createdAt: commitTimestamp,
+          closedAt: commitTimestamp,
+        };
+      }),
+    "antContent"
+  );
 }
 
 function getAllDeclinedAndAcceptedAnts(): {
