@@ -637,7 +637,11 @@
     { "ant": "lumpy ant" },
     { "ant": "deprecated ant" },
     { "ant": "ant man" },
-    { "ant": "ant that creates contemporary art" },
+    {
+      "ant": "ant that creates contemporary art",
+      "tweeted": true,
+      "tweetedAt": "2023-06-25T02:18:00.186Z"
+    },
     { "ant": "mac ant", "legacy": true },
     { "ant": "ant crossing the rubicon" },
     { "ant": "funky ant" },

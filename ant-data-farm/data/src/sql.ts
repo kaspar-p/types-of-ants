@@ -34,7 +34,7 @@ export function antsToSql(ants: AntMetadata[]): string {
     const { createdAt, originalSuggestionContent } = ant;
     const content = sanitizeForSql(originalSuggestionContent);
     const date = toSqlDate(createdAt);
-    return `('${content}', ${userId("nobody")}, ${date})`;
+    return `('${content}', ${userId("nobody")}, '${date}')`;
   }
 
   const rows = ants

@@ -85,7 +85,7 @@ function hashCode(str: string): number {
     hash = (hash << 5) - hash + chr;
     hash |= 0; // Convert to 32bit integer
   }
-  return hash >>> 0;
+  return (hash >>> 0) % (Math.pow(2, 31) - 1);
 }
 
 function createMetadataFromSiteAnt(

@@ -137,32 +137,8 @@ values
   ((select user_id from registered_user where user_name = 'kaspar'), 'kaspar78@mouco.com'),
   ((select user_id from registered_user where user_name = 'kaspar'), 'polandkaspar78@gmail.com'),
   ((select user_id from registered_user where user_name = 'kaspar'), 'kaspar@typesofants.org'),
-  ((select user_id from registered_user where user_name = 'nobody'), 'nobody@typesofants.org'),
+  ((select user_id from registered_user where user_name = 'nobody'), 'nobody@typesofants.org')
 ;
-
-drop table if exists favorite cascade;
-create table favorite (
-  user_id uuid not null, -- The user who favorited the ant
-  ant_id uuid not null, -- The ant that got favorited
-  favorited_at timestamp with time zone not null default now(), -- When the favorite happened
-  primary key (user_id, ant_id),
-  constraint fk_user foreign key (user_id) references registered_user(user_id),
-  constraint fk_ant foreign key (ant_id) references ant(ant_id)
-)
-
-drop type if exists ant_suggestion_status cascade;
-create type ant_suggestion_status as enum ('UNRELEASED', 'RELEASED', 'DECLINED');
-
--- drop table if exists ant_event_history cascade;
--- create table ant_event_history (
---   ant_id uuid not null, -- The ID of the ant that the event happened to
---   event_user_id uuid not null, -- The user that did the event
---   ant_suggestion_status ant_suggestion_status not null, -- The status of the event
---   event_occurred timestamp with time zone not null default now(), -- When the event occurred
---   primary key (ant_id, event_occurred)
---   constraint fk_user foreign key (event_user_id) references registered_user(user_id),
---   constraint fk_ant foreign key (ant_id) references ant(ant_id)
--- );
 
 drop table if exists ant cascade;
 create table ant (
@@ -173,10 +149,20 @@ create table ant (
   constraint fk_user foreign key (ant_user_id) references registered_user(user_id)
 );
 
+drop table if exists favorite cascade;
+create table favorite (
+  user_id uuid not null, -- The user who favorited the ant
+  ant_id uuid not null, -- The ant that got favorited
+  favorited_at timestamp with time zone not null default now(), -- When the favorite happened
+  primary key (user_id, ant_id),
+  constraint fk_user foreign key (user_id) references registered_user(user_id),
+  constraint fk_ant foreign key (ant_id) references ant(ant_id)
+);
+
 drop table if exists ant_tweeted cascade;
 create table ant_tweeted (
   ant_id uuid not null, -- The ant that got tweeted
-  tweeted_at timestamp with time zone not null default now, -- When the ant got tweeted
+  tweeted_at timestamp with time zone not null default now(), -- When the ant got tweeted
   primary key (ant_id, tweeted_at),
   constraint fk_ant foreign key (ant_id) references ant(ant_id)
 );
@@ -203,7 +189,7 @@ create table ant_release (
   ant_content varchar(255) not null, -- The content of the suggestion, on release. This may differ from the original suggestion.
   ant_id uuid not null, -- The ant that was released in this version
   constraint fk_ant foreign key (ant_id) references ant(ant_id),
-  constraint fk_release foreign key (release_number) references release(release_number);
+  constraint fk_release foreign key (release_number) references release(release_number),
   primary key (release_number, ant_id)
 );
 
