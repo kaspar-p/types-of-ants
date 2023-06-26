@@ -1,5 +1,5 @@
 import jsonRaw from "../data/raw_issues_6_24.json";
-import jsonSite from "../data/raw_site_data.json";
+import jsonSite from "../data/site_data.json";
 import { z } from "zod";
 
 const siteSchema = z.object({

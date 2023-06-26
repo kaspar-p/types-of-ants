@@ -640,7 +640,7 @@
     {
       "ant": "ant that creates contemporary art",
       "tweeted": true,
-      "tweetedAt": "2023-06-25T02:18:00.186Z"
+      "tweetedAt": "2023-06-24T12:18:00.186Z"
     },
     { "ant": "mac ant", "legacy": true },
     { "ant": "ant crossing the rubicon" },
@@ -907,6 +907,8 @@
     { "ant": "widdle ant", "suggestedContent": "juwst a widdle ant" },
     {
       "ant": "ant who just wants to be your friend",
+      "tweeted": true,
+      "tweetedAt": "2023-06-25T15:27:00.378Z",
       "suggestedContent": "ant who wants to be your friend"
     },
     { "ant": "martian ant" },

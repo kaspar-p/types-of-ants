@@ -182,7 +182,6 @@ function assignReleasesToAnts(
     if (!(dateString in uniqueCommitDays)) uniqueCommitDays[dateString] = 0;
     uniqueCommitDays[dateString] += 1;
   });
-  console.log(Object.keys(uniqueCommitDays));
 
   const dateToReleaseNumber: Record<string, number> = {};
   Object.keys(uniqueCommitDays)
@@ -299,12 +298,10 @@ function formatAntsWithReleases(
 }
 
 function writeSqlFiles() {
+  console.log("Writing to SQL files...");
+
   const { acceptedAnts: acceptedAntsWithoutReleases, declinedAnts } =
     getAllDeclinedAndAcceptedAnts();
-
-  // console.log("LEGACY ANTS: \n", formatAnts(legacyAnts), legacyAnts.length);
-  // console.log("ACCEPTED ANTS: \n", formatAnts(acceptedAnts), acceptedAnts.length);
-  // console.log("DECLINED ANTS: \n", formatAnts(declinedAnts), declinedAnts.length);
 
   const { acceptedAnts, legacyAnts } = assignReleasesToAnts(
     acceptedAntsWithoutReleases,
@@ -321,27 +318,29 @@ function writeSqlFiles() {
     ...legacyAnts,
   ];
   const sqlFor_ant = antsToSql(allAnts);
-  fs.writeFileSync("./sql_output/ant.sql", sqlFor_ant, { encoding: "utf-8" });
+  fs.writeFileSync("./sql/ant.sql", sqlFor_ant, { encoding: "utf-8" });
 
   const sqlFor_ant_tweeted = antTweetedSql(siteAnts);
-  fs.writeFileSync("./sql_output/ant_tweeted.sql", sqlFor_ant_tweeted, {
+  fs.writeFileSync("./sql/ant_tweeted.sql", sqlFor_ant_tweeted, {
     encoding: "utf-8",
   });
 
   const sqlFor_ant_declined = declinedToSql(declinedAnts);
-  fs.writeFileSync("./sql_output/ant_declined.sql", sqlFor_ant_declined, {
+  fs.writeFileSync("./sql/ant_declined.sql", sqlFor_ant_declined, {
     encoding: "utf-8",
   });
 
   const sqlFor_ant_release = antReleaseSql(siteAnts);
-  fs.writeFileSync("./sql_output/ant_release.sql", sqlFor_ant_release, {
+  fs.writeFileSync("./sql/ant_release.sql", sqlFor_ant_release, {
     encoding: "utf-8",
   });
 
   const sqlFor_release = releaseSql(siteAnts);
-  fs.writeFileSync("./sql_output/release.sql", sqlFor_release, {
+  fs.writeFileSync("./sql/release.sql", sqlFor_release, {
     encoding: "utf-8",
   });
+
+  console.log("Finished!");
 }
 
 function checkIntegrity() {
