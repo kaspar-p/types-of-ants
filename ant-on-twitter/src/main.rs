@@ -85,7 +85,7 @@ async fn main() {
 
     scheduler
         .add(
-            Job::new_async("1/5 * * * * *", |_, __| {
+            Job::new_async("0 0 18 * * *", |_, __| {
                 Box::pin(async move {
                     cron_tweet().await;
                 })
