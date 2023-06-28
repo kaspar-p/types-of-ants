@@ -1,7 +1,16 @@
+use std::time::Duration;
+
+use ant_data_farm::ants::Tweeted;
+use ant_data_farm::{ants::Ant, connect};
+use rand::seq::SliceRandom;
+use tokio_cron_scheduler::{Job, JobScheduler};
 use twitter_v2::authorization::Oauth1aToken;
 use twitter_v2::TwitterApi;
 
-async fn post_tweet(client: TwitterApi<Oauth1aToken>, ant_content: String) -> () {
+async fn post_tweet(
+    client: TwitterApi<Oauth1aToken>,
+    ant_content: String,
+) -> Option<twitter_v2::Tweet> {
     client
         .post_tweet()
         .text(ant_content)
@@ -9,12 +18,9 @@ async fn post_tweet(client: TwitterApi<Oauth1aToken>, ant_content: String) -> ()
         .await
         .unwrap_or_else(|e| panic!("Error sending tweet: {}", e))
         .into_data()
-        .expect("The tweet was tweeted");
 }
 
-#[tokio::main]
-async fn main() {
-    dotenv::dotenv().unwrap_or_else(|e| panic!("Environment error: {}", e));
+async fn cron_tweet() {
     let consumer_key = dotenv::var("TWITTER_API_CONSUMER_KEY").unwrap();
     let consumer_secret = dotenv::var("TWITTER_API_CONSUMER_SECRET").unwrap();
     let access_token = dotenv::var("TWITTER_API_ACCESS_TOKEN").unwrap();
@@ -27,21 +33,63 @@ async fn main() {
         access_token_secret,
     );
 
+    let dao = connect().await;
+
+    let random_ant: Ant = {
+        let read_ants = dao.ants.read().await;
+        let ants = read_ants
+            .get_all_ants()
+            .iter()
+            .filter(|&ant| ant.tweeted == Tweeted::NotTweeted)
+            .map(|&x| x.clone())
+            .collect::<Vec<Ant>>();
+        ants.choose(&mut rand::thread_rng())
+            .unwrap_or_else(|| panic!("Failed to get a random choice!"))
+            .clone()
+            .to_owned()
+    };
+
     let client = TwitterApi::new(token);
 
-    let should_tweet = false;
-    if should_tweet {
-        post_tweet(client, "ant who's grinding ($)".to_owned()).await;
+    println!("Tweeting with ant: {:?}", random_ant);
+    let res = post_tweet(client, random_ant.ant_name).await;
+    if res.is_none() {
+        panic!("Failed to tweet!");
     }
 
-    // let auth: Oauth2Token = serde_json::from_str(&stored_oauth2_token)?;
-    // let my_followers = TwitterApi::new(auth)
-    //     .with_user_ctx()
-    //     .await?
-    //     .get_my_followers()
-    //     .user_fields([UserField::Username])
-    //     .max_results(20)
-    //     .send()
-    //     .await?
-    //     .into_data();
+    dao.ants
+        .write()
+        .await
+        .add_ant_tweet(random_ant.ant_id)
+        .await;
+}
+
+#[tokio::main]
+async fn main() {
+    dotenv::dotenv().unwrap_or_else(|e| panic!("Environment error: {}", e));
+    let mut scheduler = JobScheduler::new().await.unwrap();
+
+    scheduler
+        .add(
+            Job::new_async("0 0 18 * * *", |_, __| {
+                Box::pin(async move {
+                    cron_tweet().await;
+                })
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Start the scheduler
+    scheduler.start().await.unwrap();
+
+    loop {
+        let sleep_time: Duration = scheduler
+            .time_till_next_job()
+            .await
+            .unwrap_or(Some(Duration::from_secs(10)))
+            .unwrap_or(Duration::from_secs(10));
+        tokio::time::sleep(sleep_time).await;
+    }
 }
