@@ -7,20 +7,9 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use twitter_v2::authorization::Oauth1aToken;
 use twitter_v2::TwitterApi;
 
-async fn post_tweet(
-    client: TwitterApi<Oauth1aToken>,
-    ant_content: String,
-) -> Option<twitter_v2::Tweet> {
-    client
-        .post_tweet()
-        .text(ant_content)
-        .send()
-        .await
-        .unwrap_or_else(|e| panic!("Error sending tweet: {}", e))
-        .into_data()
-}
+async fn post_tweet(ant_content: String) -> Option<twitter_v2::Tweet> {
+    println!("Tweeting with ant: {}", ant_content);
 
-async fn cron_tweet() {
     let consumer_key = dotenv::var("TWITTER_API_CONSUMER_KEY").unwrap();
     let consumer_secret = dotenv::var("TWITTER_API_CONSUMER_SECRET").unwrap();
     let access_token = dotenv::var("TWITTER_API_ACCESS_TOKEN").unwrap();
@@ -33,6 +22,17 @@ async fn cron_tweet() {
         access_token_secret,
     );
 
+    let client = TwitterApi::new(token);
+    client
+        .post_tweet()
+        .text(ant_content)
+        .send()
+        .await
+        .unwrap_or_else(|e| panic!("Error sending tweet: {}", e))
+        .into_data()
+}
+
+async fn cron_tweet() {
     let dao = connect().await;
 
     let random_ant: Ant = {
@@ -49,10 +49,7 @@ async fn cron_tweet() {
             .to_owned()
     };
 
-    let client = TwitterApi::new(token);
-
-    println!("Tweeting with ant: {:?}", random_ant);
-    let res = post_tweet(client, random_ant.ant_name).await;
+    let res = post_tweet(random_ant.ant_name).await;
     if res.is_none() {
         panic!("Failed to tweet!");
     }
