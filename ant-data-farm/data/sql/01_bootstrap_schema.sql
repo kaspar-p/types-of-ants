@@ -1,6 +1,6 @@
 BEGIN;
 
-drop schema typesofants cascade;
+drop schema if exists typesofants cascade;
 create schema if not exists typesofants;
 set SEARCH_PATH to typesofants;
 
