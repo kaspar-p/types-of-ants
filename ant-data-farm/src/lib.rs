@@ -50,7 +50,7 @@ pub async fn connect_port(port: u16) -> Dao {
 pub async fn connect() -> Dao {
     let pool = database_connection(None)
         .await
-        .unwrap_or_else(|e| panic!("Failed to get environment variable: {}", e));
+        .unwrap_or_else(|e| panic!("Failed to get environment variable: {e}"));
 
     debug!("Initializing data access layer...");
     Dao::new(pool).await
