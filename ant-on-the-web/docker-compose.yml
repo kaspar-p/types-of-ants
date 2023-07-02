@@ -11,7 +11,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./reverse-proxy/data/nginx:/etc/nginx/conf.d
+      - ./reverse-proxy/data/nginx/conf:/etc/nginx/conf.d
+      - ./revers-proxy/data/nginx/site:/etc/nginx/html
       - ./reverse-proxy/data/certbot/conf:/etc/letsencrypt
       - ./reverse-proxy/data/certbot/www:/var/www/certbot
     network_mode: "host"
