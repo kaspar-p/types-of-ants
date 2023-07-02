@@ -1,14 +1,16 @@
 mod util;
 
-use ant_data_farm::{ants::Tweeted, connect_port, DaoTrait};
+use ant_data_farm::{ants::Tweeted, connect_port, Dao, DaoTrait};
 use chrono::Duration;
-use util::test_fixture;
+use testcontainers::{clients::Cli, images::generic::GenericImage, Container};
+use util::{logging, test_fixture, TestFixture};
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn more_than_500_ants() {
     let fixture = test_fixture().await;
-    let port = fixture.client.run(fixture.image).get_host_port_ipv4(5432);
+    let container = fixture.docker.run(fixture.image);
+    let port = container.get_host_port_ipv4(5432);
     let dao = connect_port(port).await;
 
     let ants = dao.ants.read().await;
@@ -18,9 +20,10 @@ async fn more_than_500_ants() {
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn add_tweeted() {
+async fn add_tweeted(logging: &()) {
     let fixture = test_fixture().await;
-    let port = fixture.client.run(fixture.image).get_host_port_ipv4(5432);
+    let container = fixture.docker.run(fixture.image);
+    let port = container.get_host_port_ipv4(5432);
     let dao = connect_port(port).await;
 
     let ant_id = {

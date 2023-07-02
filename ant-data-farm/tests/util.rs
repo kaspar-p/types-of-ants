@@ -1,11 +1,10 @@
-use ant_data_farm::{connect, Dao};
 use rstest::*;
 use std::process::Command;
 use testcontainers::{clients::Cli, images::generic::GenericImage};
 
 #[fixture]
 #[once]
-fn logging() -> () {
+pub fn logging() -> () {
     std::env::set_var("RUST_LOG", "ant_data_farm=debug,glimmer=debug");
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
@@ -13,7 +12,7 @@ fn logging() -> () {
 }
 
 pub struct TestFixture {
-    pub client: Box<Cli>,
+    pub docker: Cli,
     pub image: GenericImage,
 }
 
@@ -48,10 +47,7 @@ pub async fn test_fixture() -> TestFixture {
             message: "database system is ready to accept connections".to_owned(),
         });
 
-    let docker = Box::new(Cli::docker());
+    let docker = Cli::docker();
 
-    return TestFixture {
-        client: docker,
-        image,
-    };
+    return TestFixture { docker, image };
 }
