@@ -4,7 +4,7 @@ use ant_data_farm::{ants::Ant, connect};
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{debug, info, Level};
+use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use twitter_v2::authorization::Oauth1aToken;
 use twitter_v2::TwitterApi;
@@ -30,7 +30,7 @@ async fn post_tweet(ant_content: String) -> Option<twitter_v2::Tweet> {
         .text(ant_content)
         .send()
         .await
-        .unwrap_or_else(|e| panic!("Error sending tweet: {}", e))
+        .unwrap_or_else(|e| panic!("Error sending tweet: {e}"))
         .into_data()
 }
 
@@ -50,15 +50,12 @@ async fn cron_tweet() {
             .collect::<Vec<Ant>>();
         ants.choose(&mut rand::thread_rng())
             .unwrap_or_else(|| panic!("Failed to get a random choice!"))
-            .clone()
-            .to_owned()
+            .clone().clone()
     };
 
     info!("Tweeting...");
     let res = post_tweet(random_ant.ant_name).await;
-    if res.is_none() {
-        panic!("Failed to tweet!");
-    }
+    assert!(res.is_some(), "Failed to tweet!");
 
     info!("Saving result to DB...");
     dao.ants
@@ -83,7 +80,7 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    dotenv::dotenv().unwrap_or_else(|e| panic!("Environment error: {}", e));
+    dotenv::dotenv().unwrap_or_else(|e| panic!("Environment error: {e}"));
     let mut scheduler = JobScheduler::new().await.unwrap();
 
     scheduler

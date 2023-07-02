@@ -71,7 +71,7 @@ impl DaoTrait<Ant> for AntsDao {
                 &[],
             )
             .await
-            .unwrap_or_else(|e| panic!("Getting ant data failed: {}", e));
+            .unwrap_or_else(|e| panic!("Getting ant data failed: {e}"));
 
         let released_ants = futures::future::join_all(released_ant_rows.iter().map(|row| async {
             Ant {
@@ -87,7 +87,7 @@ impl DaoTrait<Ant> for AntsDao {
         .await;
 
         for ant in released_ants {
-            ants.insert(ant.ant_id.clone(), ant.ant_name.clone(), Box::new(ant));
+            ants.insert(ant.ant_id, ant.ant_name.clone(), Box::new(ant));
         }
 
         AntsDao { database: db, ants }
@@ -98,7 +98,7 @@ impl DaoTrait<Ant> for AntsDao {
         self.ants
             .values()
             .into_iter()
-            .map(|x| x.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect::<Vec<&Ant>>()
     }
 
@@ -107,19 +107,19 @@ impl DaoTrait<Ant> for AntsDao {
     }
 
     async fn get_one_by_id(&self, ant_id: &AntId) -> Option<&Ant> {
-        Some(self.ants.get_key1(&ant_id)?.as_ref())
+        Some(self.ants.get_key1(ant_id)?.as_ref())
     }
 
     async fn get_one_by_id_mut(&mut self, ant_id: &AntId) -> Option<&mut Ant> {
-        let ant = self.ants.get_mut_key1(&ant_id)?;
+        let ant = self.ants.get_mut_key1(ant_id)?;
         Some(ant.as_mut())
     }
 
-    async fn get_one_by_name(&self, ant_name: &String) -> Option<&Ant> {
+    async fn get_one_by_name(&self, ant_name: &str) -> Option<&Ant> {
         Some(self.ants.get_key2(ant_name)?.as_ref())
     }
 
-    async fn get_one_by_name_mut(&mut self, ant_name: &String) -> Option<&mut Ant> {
+    async fn get_one_by_name_mut(&mut self, ant_name: &str) -> Option<&mut Ant> {
         Some(self.ants.get_mut_key2(ant_name)?.as_mut())
     }
 }

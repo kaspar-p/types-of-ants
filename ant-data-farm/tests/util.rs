@@ -1,4 +1,4 @@
-use rstest::*;
+use rstest::fixture;
 use std::process::Command;
 use testcontainers::{clients::Cli, images::generic::GenericImage};
 
@@ -16,7 +16,7 @@ pub struct TestFixture {
     pub image: GenericImage,
 }
 
-pub async fn test_fixture() -> TestFixture {
+#[must_use] pub fn test_fixture() -> TestFixture {
     let cwd: String = dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!");
     let db_name = dotenv::var("DB_PG_NAME").expect("DB_PG_NAME environment variable!");
     let user = dotenv::var("DB_PG_USER").expect("DB_PG_USER environment variable!");
@@ -49,5 +49,5 @@ pub async fn test_fixture() -> TestFixture {
 
     let docker = Cli::docker();
 
-    return TestFixture { docker, image };
+    TestFixture { docker, image }
 }

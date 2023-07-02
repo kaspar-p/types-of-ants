@@ -38,11 +38,7 @@ impl DaoTrait<Host> for HostsDao {
             .collect::<Vec<Host>>();
 
         for host in found_hosts {
-            hosts.insert(
-                host.host_id.clone(),
-                host.host_label.clone(),
-                Box::new(host),
-            );
+            hosts.insert(host.host_id, host.host_label.clone(), Box::new(host));
         }
 
         HostsDao {
@@ -54,14 +50,14 @@ impl DaoTrait<Host> for HostsDao {
     async fn get_all(&self) -> Vec<&Host> {
         self.hosts
             .values()
-            .map(|x| x.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect::<Vec<&Host>>()
     }
 
     async fn get_all_mut(&mut self) -> Vec<&mut Host> {
         self.hosts
             .values_mut()
-            .map(|x| x.as_mut())
+            .map(std::convert::AsMut::as_mut)
             .collect::<Vec<&mut Host>>()
     }
 
@@ -73,11 +69,11 @@ impl DaoTrait<Host> for HostsDao {
         Some(self.hosts.get_mut_key1(host_id)?.as_mut())
     }
 
-    async fn get_one_by_name(&self, host_name: &String) -> Option<&Host> {
+    async fn get_one_by_name(&self, host_name: &str) -> Option<&Host> {
         Some(self.hosts.get_key2(host_name)?.as_ref())
     }
 
-    async fn get_one_by_name_mut(&mut self, host_name: &String) -> Option<&mut Host> {
+    async fn get_one_by_name_mut(&mut self, host_name: &str) -> Option<&mut Host> {
         Some(self.hosts.get_mut_key2(host_name)?.as_mut())
     }
 }

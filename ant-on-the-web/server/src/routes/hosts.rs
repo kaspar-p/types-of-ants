@@ -1,5 +1,5 @@
 use crate::{
-    middleware::fallback::fallback,
+    middleware,
     types::{DaoRouter, DaoState},
 };
 use ant_data_farm::{hosts::HostId, DaoTrait};
@@ -20,7 +20,7 @@ async fn host(Path(host_id): Path<Uuid>, State(dao): DaoState) -> impl IntoRespo
     match host {
         None => (
             StatusCode::NOT_FOUND,
-            Json(format!("Host with ID '{}' not found!", host_id)).into_response(),
+            Json(format!("Host with ID '{host_id}' not found!")).into_response(),
         ),
         Some(host) => (StatusCode::OK, Json(host).into_response()),
     }
@@ -41,10 +41,6 @@ pub fn router() -> DaoRouter {
         .route_with_tsr("/list-all", get(list_all))
         .route_with_tsr("/register-host", post(register_host))
         .fallback(|| async {
-            fallback(vec![
-                "GET /host/:host-id",
-                "GET /list-all",
-                "POST /register-host",
-            ])
+            middleware::fallback(&["GET /host/:host-id", "GET /list-all", "POST /register-host"])
         })
 }

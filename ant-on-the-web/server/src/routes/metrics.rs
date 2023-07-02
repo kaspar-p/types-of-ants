@@ -3,7 +3,7 @@ use axum::{extract::State, routing::post, Router};
 use axum_extra::routing::RouterExt;
 use std::sync::Arc;
 
-async fn expand_ant(State(dao): State<Arc<Dao>>) -> &'static str {
+async fn expand_ant(State(_dao): State<Arc<Dao>>) -> &'static str {
     "Expanded the ant!!"
 }
 

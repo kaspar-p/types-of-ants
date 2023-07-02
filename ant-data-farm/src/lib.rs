@@ -3,7 +3,7 @@ mod types;
 
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
-use dotenv;
+
 use tokio_postgres::NoTls;
 use tracing::debug;
 
@@ -19,7 +19,7 @@ async fn database_connection(
     let port = port.unwrap_or(7000);
 
     if let Err(e) = dotenv::dotenv() {
-        panic!("Failed to load environment variables: {}", e);
+        panic!("Failed to load environment variables: {e}");
     }
 
     let db_name = dotenv::var("DB_PG_NAME")?;
@@ -41,7 +41,7 @@ async fn database_connection(
 pub async fn connect_port(port: u16) -> Dao {
     let pool = database_connection(Some(port))
         .await
-        .unwrap_or_else(|e| panic!("Failed to get environment variable: {}", e));
+        .unwrap_or_else(|e| panic!("Failed to get environment variable: {e}"));
 
     debug!("Initializing data access layer...");
     Dao::new(pool).await

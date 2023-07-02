@@ -56,24 +56,20 @@ impl DaoTrait<User> for UsersDao {
         let users_list = future::join_all(rows.iter().map(|row| {
             let user_id: UserId = row.get("user_id");
             let in_db = db.clone();
-            return async move {
+            async move {
                 User {
                     user_id: row.get("user_id"),
                     username: row.get("user_name"),
                     joined: row.get("user_joined"),
                     emails: construct_emails_for_user(in_db, user_id).await,
                 }
-            };
+            }
         }))
         .await;
 
         let mut users = DHashMap::<UserId, String, Box<User>>::new();
         for user in users_list {
-            users.insert(
-                user.user_id.clone(),
-                user.username.clone(),
-                Box::new(user.clone()),
-            );
+            users.insert(user.user_id, user.username.clone(), Box::new(user.clone()));
         }
 
         UsersDao {
@@ -90,25 +86,25 @@ impl DaoTrait<User> for UsersDao {
         Some(self.users.get_mut_key1(user_id)?)
     }
 
-    async fn get_one_by_name(&self, user_name: &String) -> Option<&User> {
+    async fn get_one_by_name(&self, user_name: &str) -> Option<&User> {
         Some(self.users.get_key2(user_name)?)
     }
 
-    async fn get_one_by_name_mut(&mut self, user_name: &String) -> Option<&mut User> {
+    async fn get_one_by_name_mut(&mut self, user_name: &str) -> Option<&mut User> {
         Some(self.users.get_mut_key2(user_name)?)
     }
 
     async fn get_all(&self) -> Vec<&User> {
         self.users
             .values()
-            .map(|x| x.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect::<Vec<&User>>()
     }
 
     async fn get_all_mut(&mut self) -> Vec<&mut User> {
         self.users
             .values_mut()
-            .map(|x| x.as_mut())
+            .map(std::convert::AsMut::as_mut)
             .collect::<Vec<&mut User>>()
     }
 }
@@ -123,7 +119,7 @@ impl UsersDao {
                 &[&username],
             )
             .await
-            .unwrap_or_else(|e| panic!("Failed to create user: {}", e));
+            .unwrap_or_else(|e| panic!("Failed to create user: {e}"));
 
         let user_id: Uuid = self
             .database
@@ -145,7 +141,7 @@ impl UsersDao {
         });
 
         self.users
-            .insert(user.user_id.clone(), user.username.clone(), user.to_owned());
+            .insert(user.user_id, user.username.clone(), user.clone());
 
         return Some(self.users.get_key1(&user.user_id)?.as_ref());
     }
@@ -177,6 +173,6 @@ impl UsersDao {
         user.emails.push(email);
 
         debug!("All users: {:?}", user);
-        return Some(user);
+        Some(user)
     }
 }

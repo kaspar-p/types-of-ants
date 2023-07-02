@@ -1,5 +1,5 @@
 use crate::{
-    middleware::fallback,
+    middleware,
     types::{DaoRouter, DaoState},
 };
 use ant_data_farm::{users::User, DaoTrait};
@@ -14,7 +14,7 @@ use axum_extra::routing::RouterExt;
 use serde::Deserialize;
 use tracing::debug;
 
-async fn create_user(State(dao): DaoState) -> impl IntoResponse {
+async fn create_user(State(_dao): DaoState) -> impl IntoResponse {
     (StatusCode::OK, Json("User created!"))
 }
 
@@ -30,14 +30,10 @@ async fn add_anonymous_email(
 
     let nobody_user: Option<User> = {
         let users = dao.users.read().await;
-        match users
-            .get_one_by_name(&String::from("nobody"))
+        users
+            .get_one_by_name("nobody")
             .await
-            .to_owned()
-        {
-            None => None,
-            Some(user) => Some(user.to_owned()),
-        }
+            .map(std::clone::Clone::clone)
     };
     if nobody_user.is_none() {
         return (StatusCode::INTERNAL_SERVER_ERROR, "Failed attaching email!");
@@ -47,10 +43,10 @@ async fn add_anonymous_email(
     let user: Option<&User> = user_write
         .add_email_to_user(nobody_user.unwrap().user_id, email)
         .await;
-    return match user {
+    match user {
         None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed attaching email!"),
         Some(_) => (StatusCode::OK, "Subscribed!"),
-    };
+    }
 }
 
 async fn get_user_by_name(
@@ -78,7 +74,7 @@ pub fn router() -> DaoRouter {
         .route_with_tsr("/user", post(create_user))
         .route_with_tsr("/user/:user-name", get(get_user_by_name))
         .fallback(|| async {
-            fallback::fallback(vec![
+            middleware::fallback(&[
                 "POST /user",
                 "POST /user/:user-name",
                 "POST /subscribe-newsletter",

@@ -2,7 +2,6 @@ mod middleware;
 mod routes;
 mod types;
 
-use crate::middleware::fallback::fallback;
 use ant_data_farm::connect;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
@@ -16,7 +15,7 @@ use tower_http::{
     services::ServeDir,
     trace::TraceLayer,
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +35,7 @@ async fn main() {
         .allow_headers([CONTENT_TYPE]);
 
     debug!("Setting up database connection pool...");
-    let dao = Arc::new(connect(None).await);
+    let dao = Arc::new(connect().await);
 
     debug!("Initializing API routes...");
     let api_routes = Router::new()
@@ -48,10 +47,10 @@ async fn main() {
         .nest("/deployments", routes::deployments::router())
         .with_state(dao)
         .layer(axum::middleware::from_fn(
-            middleware::print::print_request_response,
+            middleware::print_request_response,
         ))
         .fallback(|| async {
-            fallback(vec![
+            middleware::fallback(&[
                 "/ants",
                 "/users",
                 "/hosts",
@@ -63,7 +62,7 @@ async fn main() {
 
     debug!("Initializing site routes...");
     let app = Router::new()
-        .route("/ping", get(ping))
+        .route("/ping", get(|| async { ping() }))
         .nest("/api", api_routes)
         // Marking the main filesystem as fallback allows wrong paths like
         // /api/something to still hit the /api router fallback()
@@ -82,6 +81,7 @@ async fn main() {
         .unwrap();
 }
 
-async fn ping() -> &'static str {
-    return "pong";
+fn ping() -> &'static str {
+    info!("Got ping, responding with pong!");
+    "pong"
 }

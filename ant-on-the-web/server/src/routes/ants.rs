@@ -1,12 +1,8 @@
 use crate::{
-    middleware::fallback,
+    middleware,
     types::{DaoRouter, DaoState},
 };
-use ant_data_farm::{
-    ants::{Ant, AntId},
-    users::UserId,
-    DaoTrait,
-};
+use ant_data_farm::{ants::Ant, users::UserId, DaoTrait};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -51,7 +47,7 @@ async fn latest_ants(State(dao): DaoState) -> impl IntoResponse {
     let current_release_ants = all_ants
         .iter()
         .filter(|ant| ant.released == latest_release)
-        .map(|ant| ant.to_owned())
+        .map(std::clone::Clone::clone)
         .collect::<Vec<Ant>>();
 
     (
@@ -69,7 +65,7 @@ struct Suggestion {
     pub user_id: Option<String>,
     pub suggestion_content: String,
 }
-// #[axum_macros::debug_handler]
+
 async fn make_suggestion(
     State(dao): DaoState,
     Json(suggestion): Json<Suggestion>,
@@ -79,29 +75,25 @@ async fn make_suggestion(
     let mut ants = dao.ants.write().await;
 
     let o_user = match &suggestion.user_id {
-        None => users.get_one_by_name(&String::from("nobody")).await,
+        None => users.get_one_by_name("nobody").await,
         Some(u) => {
             users
                 .get_one_by_id(&UserId(Uuid::parse_str(u).unwrap()))
                 .await
         }
     };
+
     if o_user.is_none() {
         if suggestion.user_id.is_some() {
             return (
                 StatusCode::NOT_FOUND,
-                Json(format!(
-                    "NOT_FOUND" // "There was no user with ID: {:?}",
-                                // suggestion.user_id
-                ))
-                .into_response(),
-            );
-        } else {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Unable to process ant suggestion!").into_response(),
+                Json("NOT_FOUND".to_string()).into_response(),
             );
         }
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("Unable to process ant suggestion!").into_response(),
+        );
     }
 
     let user = o_user.unwrap();
@@ -116,10 +108,10 @@ async fn make_suggestion(
         );
     }
 
-    return (
+    (
         StatusCode::OK,
         Json("Added suggestion, thanks!").into_response(),
-    );
+    )
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -156,12 +148,12 @@ pub fn router() -> DaoRouter {
         .route_with_tsr("/latest-ants", get(latest_ants))
         .route_with_tsr("/all-ants", get(all_ants))
         .fallback(|| async {
-            return fallback::fallback(vec![
+            middleware::fallback(&[
                 "GET /latest-ants",
                 "GET /all-ants",
                 "GET /latest-release",
                 "POST /suggest",
                 "POST /tweet",
-            ]);
+            ])
         })
 }

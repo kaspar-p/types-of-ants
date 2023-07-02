@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::StatusCode;
 
-const URLS: &'static [&'static str] = &[
+const URLS: &[&str] = &[
     "http://typesofants.org",
     "https://typesofants.org",
     "http://beta.typesofants.org",
@@ -24,10 +24,10 @@ pub struct StatusData {
 impl StatusData {
     pub fn to_test_sql_row(&self, test_id: i32) -> String {
         let healthy_boolean = if self.healthy { "TRUE" } else { "FALSE" };
-        return format!(
+        format!(
             "({}, '{}', '{}', '{}')",
             test_id, self.start_timestamp, self.end_timestamp, healthy_boolean
-        );
+        )
     }
 }
 
@@ -90,7 +90,7 @@ pub async fn ping_test() -> Vec<StatusData> {
     let mut metrics: Vec<StatusData> = Vec::new();
     for url in URLS {
         let start_timestamp = std::time::SystemTime::now().into();
-        let response = client.get(url.to_string()).send().await;
+        let response = client.get((*url).to_string()).send().await;
         let metric = match response {
             Err(err) => construct_err(url, err, start_timestamp),
             Ok(res) => construct_data(url, res, start_timestamp),
@@ -99,5 +99,5 @@ pub async fn ping_test() -> Vec<StatusData> {
         metrics.push(metric);
     }
 
-    return metrics;
+    metrics
 }

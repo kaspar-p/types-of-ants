@@ -26,11 +26,11 @@ pub async fn connect() -> Result<Database, Error> {
     let user = "typesofants";
     let pw = ""; // Add password here!
 
-    let connection_string = format!("postgresql://{}:{}@localhost:7000/{}", user, pw, db_name);
+    let connection_string = format!("postgresql://{user}:{pw}@localhost:7000/{db_name}");
     let (client, connection) = tokio_postgres::connect(connection_string.as_str(), NoTls).await?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
+            eprintln!("connection error: {e}");
         }
     });
 
@@ -47,5 +47,5 @@ pub async fn connect() -> Result<Database, Error> {
         );
     }
 
-    return Ok(Database { client });
+    Ok(Database { client })
 }

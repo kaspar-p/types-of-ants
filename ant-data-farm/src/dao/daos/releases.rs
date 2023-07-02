@@ -30,6 +30,6 @@ impl ReleasesDao {
     }
 
     pub async fn get_latest_release(&self) -> i32 {
-        return self.latest_release;
+        self.latest_release
     }
 }

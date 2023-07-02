@@ -21,7 +21,7 @@ impl Dao {
         let db_con: Database = pool
             .get_owned()
             .await
-            .unwrap_or_else(|e| panic!("Failed to get a connection from pool: {}", e));
+            .unwrap_or_else(|e| panic!("Failed to get a connection from pool: {e}"));
 
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
 
@@ -30,11 +30,6 @@ impl Dao {
         let hosts = RwLock::new(HostsDao::new(database.clone()).await);
         let users = RwLock::new(UsersDao::new(database.clone()).await);
 
-        Dao {
-            ants,
-            releases,
-            hosts,
-            users,
-        }
+        Dao { ants, releases, users, hosts }
     }
 }

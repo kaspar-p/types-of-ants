@@ -1,14 +1,14 @@
 mod util;
 
-use ant_data_farm::{ants::Tweeted, connect_port, Dao, DaoTrait};
+use ant_data_farm::{ants::Tweeted, connect_port, DaoTrait};
 use chrono::Duration;
-use testcontainers::{clients::Cli, images::generic::GenericImage, Container};
-use util::{logging, test_fixture, TestFixture};
+
+use util::{logging, test_fixture};
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn more_than_500_ants() {
-    let fixture = test_fixture().await;
+    let fixture = test_fixture();
     let container = fixture.docker.run(fixture.image);
     let port = container.get_host_port_ipv4(5432);
     let dao = connect_port(port).await;
@@ -18,10 +18,10 @@ async fn more_than_500_ants() {
     assert!(all_ants.len() >= 500);
 }
 
-#[rstest::rstest]
+#[rstest::rstest(logging as _logging)]
 #[tokio::test(flavor = "multi_thread")]
-async fn add_tweeted(logging: &()) {
-    let fixture = test_fixture().await;
+async fn add_tweeted(_logging: &()) {
+    let fixture = test_fixture();
     let container = fixture.docker.run(fixture.image);
     let port = container.get_host_port_ipv4(5432);
     let dao = connect_port(port).await;
@@ -34,7 +34,7 @@ async fn add_tweeted(logging: &()) {
     let mut ants = dao.ants.write().await;
     let ant = ants.add_ant_tweet(&ant_id).await.unwrap();
     // let ant = ants.get_one_by_id(&ant_id).await.unwrap();
-    println!("{:#?}", ant);
+    println!("{ant:#?}");
     match ant.tweeted {
         Tweeted::NotTweeted => panic!("Ant should have tweeted!"),
         Tweeted::Tweeted(time) => assert!(time

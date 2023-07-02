@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 async fn host_status(
     Path(host_name): Path<String>,
-    State(dao): State<Arc<Dao>>,
+    State(_dao): State<Arc<Dao>>,
 ) -> impl IntoResponse {
     (
         StatusCode::OK,

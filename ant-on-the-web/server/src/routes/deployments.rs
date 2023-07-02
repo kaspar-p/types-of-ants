@@ -3,8 +3,8 @@ use axum::{extract::State, routing::get, Router};
 use axum_extra::routing::RouterExt;
 use std::sync::Arc;
 
-async fn in_progress_deployments(State(dao): State<Arc<Dao>>) -> &'static str {
-    return "deployment in progress!";
+async fn in_progress_deployments(State(_dao): State<Arc<Dao>>) -> &'static str {
+    "deployment in progress!"
 }
 
 pub fn router() -> Router<Arc<Dao>> {

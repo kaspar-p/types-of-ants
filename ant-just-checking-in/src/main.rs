@@ -15,7 +15,7 @@ async fn main() -> Result<(), tokio_postgres::Error> {
     // Create the `CronJob` object.
     let schedule: JobScheduler = match JobScheduler::new().await {
         Ok(s) => s,
-        Err(e) => panic!("Creating job scheduler failed {}", e),
+        Err(e) => panic!("Creating job scheduler failed {e}"),
     };
 
     let async_job = Job::new_async("1/5 * * * * * *", move |_, _| {
@@ -44,7 +44,7 @@ async fn main() -> Result<(), tokio_postgres::Error> {
 }
 
 // Our cronjob handler.
-async fn on_cron(database: Arc<Database>) -> () {
+async fn on_cron(database: Arc<Database>) {
     println!("Testing...");
 
     // Collect all tests
@@ -56,13 +56,13 @@ async fn on_cron(database: Arc<Database>) -> () {
     }
 
     for metric in metrics.as_slice() {
-        println!("{:?}", metric);
+        println!("{metric:?}");
     }
 
     // TODO: Insert into the database here!
     let result = database.insert_status_data(metrics).await;
     match result {
-        Err(e) => println!("Inserting data failed {}", e),
+        Err(e) => println!("Inserting data failed {e}"),
         Ok(_) => println!("Test iteration succeeded!"),
     }
 }
