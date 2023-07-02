@@ -25,7 +25,20 @@ export default function Home() {
 
   const error = allAntsError ?? releaseNumberError;
   if (error || !releaseNumber || !allAnts) {
-    return <div>Encountered error: {JSON.stringify(error)}</div>;
+    return (
+      <div>
+        Encountered error: {JSON.stringify(error)}
+        <div>
+          Error happened in{" "}
+          {allAntsError
+            ? "allAnts"
+            : releaseNumberError
+            ? "releaseNumber"
+            : "none"}{" "}
+          request
+        </div>
+      </div>
+    );
   }
 
   const loading = allAntsLoading || releaseNumberLoading;

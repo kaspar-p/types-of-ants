@@ -16,6 +16,7 @@ async function constructPost<Q extends Query>(
   inputData: Q["inputDataSchema"]
 ): Promise<{ success: boolean }> {
   const { endpoint, inputDataSchema } = query;
+  console.log("POST: ", query.endpoint);
 
   const input = inputDataSchema.parse(inputData);
   const response = await fetch(`http://localhost:3499${endpoint}`, {
