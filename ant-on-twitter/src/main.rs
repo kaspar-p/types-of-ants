@@ -1,9 +1,10 @@
 use ant_data_farm::ants::Tweeted;
+use ant_data_farm::DaoTrait;
 use ant_data_farm::{ants::Ant, connect};
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{info, Level};
+use tracing::{debug, info, Level};
 use tracing_subscriber::FmtSubscriber;
 use twitter_v2::authorization::Oauth1aToken;
 use twitter_v2::TwitterApi;
@@ -41,7 +42,8 @@ async fn cron_tweet() {
     let random_ant: Ant = {
         let read_ants = dao.ants.read().await;
         let ants = read_ants
-            .get_all_ants()
+            .get_all()
+            .await
             .iter()
             .filter(|&ant| ant.tweeted == Tweeted::NotTweeted)
             .map(|&x| x.clone())
@@ -62,8 +64,9 @@ async fn cron_tweet() {
     dao.ants
         .write()
         .await
-        .add_ant_tweet(random_ant.ant_id)
+        .add_ant_tweet(&random_ant.ant_id)
         .await;
+    info!("Cron tasks done, exiting...");
 }
 
 #[tokio::main]
@@ -85,7 +88,8 @@ async fn main() {
 
     scheduler
         .add(
-            Job::new_async("0 0 18 * * *", |_, __| {
+            // 6pm MST is midnight UTC
+            Job::new_async("0 0 0 * * *", |_, __| {
                 Box::pin(async move {
                     cron_tweet().await;
                 })
@@ -104,6 +108,7 @@ async fn main() {
             .await
             .unwrap_or(Some(Duration::from_secs(10)))
             .unwrap_or(Duration::from_secs(10));
+        info!("Sleeping for {} seconds!", sleep_time.as_secs());
         tokio::time::sleep(sleep_time).await;
     }
 }
