@@ -1,3 +1,4 @@
+import { suggestAnt } from "@/server/posts";
 import { FormEvent } from "react";
 
 export function useActions() {
@@ -63,9 +64,8 @@ export function useActions() {
       }, 100);
 
       // Send the request
-      const url = develop
-        ? "http://localhost:3000"
-        : "https://www.kasparpoland.com";
+      const url = "http://localhost:3499";
+      action.req;
 
       await fetch(`${url}/${endpoint}`, {
         method: "POST",
@@ -139,6 +139,7 @@ export function useActions() {
     newAnt: {
       containerID: "new-ant-form-container",
       replaceChildID: "new-ant-replacer",
+      request: suggestAnt,
       inputID: "new-ant",
       validator: newAntIsValid,
       handling: "newAnt",
@@ -147,6 +148,7 @@ export function useActions() {
     newsletter: {
       containerID: "newsletter-form-container",
       replaceChildID: "newsletter-replacer",
+      request: suggestAnt,
       inputID: "newsletter",
       validator: newsletterIsValid,
       handling: "newsletter",

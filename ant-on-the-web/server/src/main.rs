@@ -1,49 +1,30 @@
-mod dao;
-mod lib;
+mod middleware;
 mod routes;
+mod types;
 
+use crate::middleware::fallback::fallback;
+use ant_data_farm::connect;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
+    routing::get,
     Router,
 };
-use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
-use dao::dao::Dao;
-use dotenv;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::Mutex;
-use tokio_postgres::NoTls;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
     services::ServeDir,
     trace::TraceLayer,
 };
-
-async fn database_connection() -> Result<Pool<PostgresConnectionManager<NoTls>>, dotenv::Error> {
-    if let Err(e) = dotenv::dotenv() {
-        panic!("Failed to load environment variables: {}", e);
-    }
-
-    let db_port = dotenv::var("DB_PG_PORT")?;
-    let db_name = dotenv::var("DB_PG_NAME")?;
-    let user = dotenv::var("DB_PG_USER")?;
-    let pw = dotenv::var("DB_PG_PASSWORD")?;
-
-    let connection_string = format!(
-        "postgresql://{}:{}@localhost:{}/{}",
-        user, pw, db_port, db_name
-    );
-
-    let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls).unwrap();
-    let pool: Pool<PostgresConnectionManager<NoTls>> =
-        Pool::builder().build(manager).await.unwrap();
-
-    Ok(pool)
-}
+use tracing::debug;
 
 #[tokio::main]
 async fn main() {
+    std::env::set_var(
+        "RUST_LOG",
+        "ant_on_the_web=debug,glimmer=debug,tower_http=debug",
+    );
+
     // initialize tracing
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
@@ -54,33 +35,53 @@ async fn main() {
         .allow_origin(Any)
         .allow_headers([CONTENT_TYPE]);
 
-    println!("Setting up database connection pool...");
-    let pool = database_connection()
-        .await
-        .unwrap_or_else(|e| panic!("Failed to get environment variable: {}", e));
+    debug!("Setting up database connection pool...");
+    let dao = Arc::new(connect(None).await);
 
-    println!("Initializing data access layer...");
-    let dao = Arc::new(Dao::new(pool).await);
-
-    let app = Router::new()
-        .nest("/api/ants", routes::ants::router())
-        .nest("/api/users", routes::users::router())
-        .nest("/api/tests", routes::tests::router())
-        .nest("/api/metrics", routes::metrics::router())
-        .nest("/api/deployments", routes::deployments::router())
-        .nest("/api/hosts", routes::hosts::router())
+    debug!("Initializing API routes...");
+    let api_routes = Router::new()
+        .nest("/ants", routes::ants::router())
+        .nest("/users", routes::users::router())
+        .nest("/hosts", routes::hosts::router())
+        .nest("/tests", routes::tests::router())
+        .nest("/metrics", routes::metrics::router())
+        .nest("/deployments", routes::deployments::router())
         .with_state(dao)
+        .layer(axum::middleware::from_fn(
+            middleware::print::print_request_response,
+        ))
+        .fallback(|| async {
+            fallback(vec![
+                "/ants",
+                "/users",
+                "/hosts",
+                "/tests",
+                "/metrics",
+                "/deployments",
+            ])
+        });
+
+    debug!("Initializing site routes...");
+    let app = Router::new()
+        .route("/ping", get(ping))
+        .nest("/api", api_routes)
+        // Marking the main filesystem as fallback allows wrong paths like
+        // /api/something to still hit the /api router fallback()
+        .fallback_service(ServeDir::new("static"))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(cors),
-        )
-        .nest_service("/", ServeDir::new("static"));
+        );
 
-    println!("Starting server...");
+    debug!("Starting server...");
     let addr = SocketAddr::from(([127, 0, 0, 1], 3499));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn ping() -> &'static str {
+    return "pong";
 }

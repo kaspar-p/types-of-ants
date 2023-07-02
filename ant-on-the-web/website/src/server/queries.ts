@@ -9,6 +9,12 @@ type QueryMetadata = {
 };
 
 const queries = {
+  getReleaseNumber: {
+    name: "getReleaseNumber",
+    endpoint: "/api/ants/current-release",
+    schema: z.number(),
+    transformer: (data: number) => data,
+  },
   getLatestAnts: {
     name: "getLatestAnts",
     endpoint: "/api/ants/latest-ants",
@@ -53,3 +59,4 @@ async function constructQuery<Q extends Query>(
 
 export const getLatestAnts = () => constructQuery(queries.getLatestAnts);
 export const getAllAnts = () => constructQuery(queries.getAllAnts);
+export const getReleaseNumber = () => constructQuery(queries.getReleaseNumber);

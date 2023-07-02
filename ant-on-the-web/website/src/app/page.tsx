@@ -6,7 +6,7 @@ import { escapeAnt } from "../utils/utils";
 import { useActions } from "../utils/useActions";
 import data from "../../data.json";
 import { useQuery, Response } from "../utils/useQuery";
-import { getAllAnts } from "../queries";
+import { getAllAnts, getReleaseNumber } from "../server/queries";
 
 export default function Home() {
   const { actions, handle } = useActions();
@@ -17,16 +17,26 @@ export default function Home() {
     err: allAntsError,
   } = useQuery(getAllAnts);
 
-  const versionNumber = 97;
-  const antAmount = data.ants.length;
-  const date = new Date().toLocaleDateString();
+  const {
+    res: releaseNumber,
+    loading: releaseNumberLoading,
+    err: releaseNumberError,
+  } = useQuery(getReleaseNumber);
+
+  const error = allAntsError ?? releaseNumberError;
+  if (error || !releaseNumber || !allAnts) {
+    return <div>Encountered error: {JSON.stringify(error)}</div>;
+  }
+
+  const loading = allAntsLoading || releaseNumberLoading;
+  if (loading) return <div>Sit tight...</div>;
 
   return (
     <div style={{ padding: "20px", fontFamily: "serif" }}>
       <h1>
-        types of ants <span style={{ fontSize: "12pt" }}>v{versionNumber}</span>
+        types of ants <span style={{ fontSize: "12pt" }}>v{releaseNumber}</span>
       </h1>
-      <h2>ants discovered to date: {antAmount}</h2>{" "}
+      <h2>ants discovered to date: {allAnts.ants.length}</h2>{" "}
       <h3>
         <a href="https://www.github.com/kaspar-p/types-of-ants">
           check out the code on github
@@ -78,11 +88,9 @@ export default function Home() {
       </div>
       <AntBanner />
       <div id="ant-filler">
-        {allAntsLoading
-          ? "Loading..."
-          : allAntsError || !allAnts
-          ? "ERROR"
-          : allAnts.ants.map((ant, i) => <div key={i}>{escapeAnt(ant)}</div>)}
+        {allAnts.ants.map((ant, i) => (
+          <div key={i}>{escapeAnt(ant)}</div>
+        ))}
       </div>
     </div>
   );

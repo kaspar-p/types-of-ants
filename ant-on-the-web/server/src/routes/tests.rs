@@ -1,14 +1,13 @@
-use crate::dao::dao::Dao;
+use ant_data_farm::Dao;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use axum_extra::routing::RouterExt;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 async fn host_status(
     Path(host_name): Path<String>,
@@ -24,5 +23,5 @@ async fn host_status(
 }
 
 pub fn router() -> Router<Arc<Dao>> {
-    Router::new().route("/host-status/:host-id-or-name", get(host_status))
+    Router::new().route_with_tsr("/host-status/:host-id-or-name", get(host_status))
 }

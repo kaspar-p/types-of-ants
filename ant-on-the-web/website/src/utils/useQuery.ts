@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 export type Result<T, E> = { loading: boolean; res?: T; err?: E };
 export type Response<T> = { success: boolean; data?: T };
 
-export function useQuery<T, E>(
+export function useQuery<T, E = Error>(
   fn: () => Promise<{ success: boolean; data?: T }>
 ): Result<T, E> {
   const [res, setRes] = useState<T>();

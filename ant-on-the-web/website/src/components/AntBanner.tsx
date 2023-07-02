@@ -1,7 +1,7 @@
 import React from "react";
 import Marquee from "react-fast-marquee";
 import { useQuery } from "@/utils/useQuery";
-import { getLatestAnts } from "../queries";
+import { getLatestAnts } from "../server/queries";
 
 const defaultAnts = [
   "silly ant",
