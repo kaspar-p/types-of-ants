@@ -27,7 +27,7 @@ const queries = {
       ants: { ant_id: string; ant_name: string }[];
     }): { date: Date; ants: string[] } => {
       return {
-        date: new Date(data.date),
+        date: new Date(data.date * 1000),
         ants: data.ants.map((ant) => ant.ant_name),
       };
     },

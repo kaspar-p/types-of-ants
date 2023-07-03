@@ -28,6 +28,30 @@ async fn add_anonymous_email(
 ) -> impl IntoResponse {
     debug!("Subscribing with email {}", email.as_str());
 
+    let exists = {
+        let users = dao.users.read().await;
+        users
+            .get_one_by_name("nobody")
+            .await
+            .map(|u| u.emails.contains(&email))
+    };
+    match exists {
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json("Failed to validate uniqueness").into_response(),
+            )
+        }
+        Some(email_exists) => {
+            if email_exists {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(format!("Email '{email}' is already subscribed!")).into_response(),
+                );
+            }
+        }
+    }
+
     let nobody_user: Option<User> = {
         let users = dao.users.read().await;
         users
@@ -36,16 +60,26 @@ async fn add_anonymous_email(
             .map(std::clone::Clone::clone)
     };
     if nobody_user.is_none() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Failed attaching email!");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("Failed attaching email!").into_response(),
+        );
     }
 
     let mut user_write = dao.users.write().await;
     let user: Option<&User> = user_write
         .add_email_to_user(nobody_user.unwrap().user_id, email)
         .await;
+
     match user {
-        None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed attaching email!"),
-        Some(_) => (StatusCode::OK, "Subscribed!"),
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("Failed attaching email!".to_owned()).into_response(),
+        ),
+        Some(_) => (
+            StatusCode::OK,
+            Json("Subscribed!".to_owned()).into_response(),
+        ),
     }
 }
 

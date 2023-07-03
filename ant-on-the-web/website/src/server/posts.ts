@@ -7,13 +7,19 @@ const posts = {
       suggestion_content: z.string(),
     }),
   },
+  newsletterSignup: {
+    endpoint: "/api/users/subscribe-newsletter",
+    inputDataSchema: z.object({
+      email: z.string(),
+    }),
+  },
 };
 
 type Query = (typeof posts)[keyof typeof posts];
 
 async function constructPost<Q extends Query>(
   query: Q,
-  inputData: Q["inputDataSchema"]
+  inputData: z.infer<Q["inputDataSchema"]>
 ): Promise<{ success: boolean }> {
   const { endpoint, inputDataSchema } = query;
   console.log("POST: ", query.endpoint);
@@ -21,10 +27,19 @@ async function constructPost<Q extends Query>(
   const input = inputDataSchema.parse(inputData);
   const response = await fetch(`http://localhost:3499${endpoint}`, {
     method: "POST",
+    headers: {
+      "Content-type": "application/json",
+    },
     body: JSON.stringify(input),
   });
-  const rawData = await response.json();
-  console.log("GOT RESPONSE: ", rawData);
+  console.log("GOT RESPONSE: ", response);
+  try {
+    const rawData = await response.json();
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+  console.log("GOT DATA: ", {});
   if (response.status >= 300) return { success: false };
   return {
     success: true,
@@ -32,5 +47,8 @@ async function constructPost<Q extends Query>(
 }
 
 export const suggestAnt = (
-  inputData: typeof posts.suggestAnt.inputDataSchema
+  inputData: z.infer<typeof posts.suggestAnt.inputDataSchema>
 ) => constructPost(posts.suggestAnt, inputData);
+export const newsletterSignup = (
+  inputData: z.infer<typeof posts.newsletterSignup.inputDataSchema>
+) => constructPost(posts.newsletterSignup, inputData);

@@ -4,9 +4,10 @@ import React from "react";
 import { AntBanner } from "../components/AntBanner";
 import { escapeAnt } from "../utils/utils";
 import { useActions } from "../utils/useActions";
-import data from "../../data.json";
 import { useQuery, Response } from "../utils/useQuery";
 import { getAllAnts, getReleaseNumber } from "../server/queries";
+import { SuggestionBox } from "../components/SuggestionBox";
+import { NewsletterBox } from "@/components/NewsletterBox";
 
 export default function Home() {
   const { actions, handle } = useActions();
@@ -64,40 +65,8 @@ export default function Home() {
           alignSelf: "center",
         }}
       >
-        <div id="new-ant-form-container">
-          <div className="form-label">have any new ant suggestions?</div>
-          <form
-            className="form-form"
-            id="new-ant-form"
-            autoComplete="off"
-            onSubmit={(e) => handle(e, actions.newAnt)}
-          >
-            <input className="form-text" id="new-ant" type="text" />
-            <input
-              type="submit"
-              className="form-submit"
-              value="submit ant suggestion"
-            />
-          </form>
-          <div className="replacer" id="new-ant-replacer"></div>
-        </div>
-        <div id="newsletter-form-container">
-          <div className="form-label">interested in monthly ant emails?</div>
-          <form
-            className="form-form"
-            id="newsletter-form"
-            autoComplete="off"
-            onSubmit={(e) => handle(e, actions.newsletter)}
-          >
-            <input className="form-text" id="newsletter" type="text" />
-            <input
-              className="form-submit"
-              type="submit"
-              value="join monthly newsletter"
-            />
-          </form>
-          <div className="replacer" id="newsletter-replacer"></div>
-        </div>
+        <SuggestionBox />
+        <NewsletterBox />
       </div>
       <AntBanner />
       <div id="ant-filler">

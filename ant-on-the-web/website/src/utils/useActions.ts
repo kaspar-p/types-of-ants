@@ -65,7 +65,6 @@ export function useActions() {
 
       // Send the request
       const url = "http://localhost:3499";
-      action.req;
 
       await fetch(`${url}/${endpoint}`, {
         method: "POST",
