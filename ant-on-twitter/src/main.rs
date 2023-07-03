@@ -50,7 +50,7 @@ async fn cron_tweet() {
             .collect::<Vec<Ant>>();
         ants.choose(&mut rand::thread_rng())
             .unwrap_or_else(|| panic!("Failed to get a random choice!"))
-            .clone().clone()
+            .clone()
     };
 
     info!("Tweeting...");
@@ -100,12 +100,14 @@ async fn main() {
     scheduler.start().await.unwrap();
 
     loop {
-        let sleep_time: Duration = scheduler
+        let max_time: Duration = scheduler
             .time_till_next_job()
             .await
             .unwrap_or(Some(Duration::from_secs(10)))
             .unwrap_or(Duration::from_secs(10));
+        let sleep_time = std::cmp::min(max_time, Duration::from_secs(1000));
         info!("Sleeping for {} seconds!", sleep_time.as_secs());
+
         tokio::time::sleep(sleep_time).await;
     }
 }
