@@ -27,10 +27,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ant-building-projects"
-version = "0.1.0"
-
-[[package]]
 name = "ant-data-farm"
 version = "0.1.0"
 dependencies = [

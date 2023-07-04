@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "ant-data-farm", 
-  "ant-building-projects", 
+  # "ant-building-projects", 
   "ant-just-checking-in",
   "ant-on-the-web/server",
   "ant-on-twitter"
