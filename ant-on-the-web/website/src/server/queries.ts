@@ -1,23 +1,17 @@
 import { Response } from "@/utils/useQuery";
 import { z } from "zod";
-
-type QueryMetadata = {
-  name: string;
-  endpoint: string;
-  schema: z.ZodSchema extends z.ZodSchema<infer T> ? z.ZodSchema<T> : never;
-  transformer: (data: any) => any;
-};
+import { getEndpoint } from "./lib";
 
 const queries = {
   getReleaseNumber: {
     name: "getReleaseNumber",
-    endpoint: "/api/ants/latest-release",
+    path: "/api/ants/latest-release",
     schema: z.number(),
     transformer: (data: number) => data,
   },
   getLatestAnts: {
     name: "getLatestAnts",
-    endpoint: "/api/ants/latest-ants",
+    path: "/api/ants/latest-ants",
     schema: z.object({
       date: z.number(),
       ants: z.array(z.object({ ant_id: z.string(), ant_name: z.string() })),
@@ -34,7 +28,7 @@ const queries = {
   },
   getAllAnts: {
     name: "getAllAnts",
-    endpoint: "/api/ants/all-ants",
+    path: "/api/ants/all-ants",
     schema: z.object({
       ants: z.array(z.object({ ant_id: z.string(), ant_name: z.string() })),
     }),
@@ -52,10 +46,11 @@ type QueryRet<Q extends Query> = ReturnType<Q["transformer"]>;
 async function constructQuery<Q extends Query>(
   query: Q
 ): Promise<Response<QueryRet<Q>>> {
-  const { endpoint, schema, transformer } = query;
-  console.log("GET: ", query.endpoint);
+  const { path, schema, transformer } = query;
+  console.log("GET: ", query.path);
 
-  const response = await fetch(`http://localhost:3499${endpoint}`);
+  const endpoint = getEndpoint(query.path);
+  const response = await fetch(endpoint);
   const rawData = await response.json();
   console.log("GOT DATA: ", rawData, "AND RESPONSE", response);
   if (response.status >= 300) return { success: false };

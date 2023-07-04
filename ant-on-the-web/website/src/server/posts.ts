@@ -1,14 +1,15 @@
 import { z } from "zod";
+import { getEndpoint } from "./lib";
 
 const posts = {
   suggestAnt: {
-    endpoint: "/api/ants/suggest",
+    path: "/api/ants/suggest",
     inputDataSchema: z.object({
       suggestion_content: z.string(),
     }),
   },
   newsletterSignup: {
-    endpoint: "/api/users/subscribe-newsletter",
+    path: "/api/users/subscribe-newsletter",
     inputDataSchema: z.object({
       email: z.string(),
     }),
@@ -21,11 +22,12 @@ async function constructPost<Q extends Query>(
   query: Q,
   inputData: z.infer<Q["inputDataSchema"]>
 ): Promise<{ success: boolean }> {
-  const { endpoint, inputDataSchema } = query;
-  console.log("POST: ", query.endpoint);
+  const { path, inputDataSchema } = query;
+  console.log("POST: ", query.path);
 
   const input = inputDataSchema.parse(inputData);
-  const response = await fetch(`http://localhost:3499${endpoint}`, {
+  const endpoint = getEndpoint(path);
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-type": "application/json",
@@ -34,12 +36,12 @@ async function constructPost<Q extends Query>(
   });
   console.log("GOT RESPONSE: ", response);
   try {
-    const rawData = await response.json();
+    await response.json();
   } catch (e) {
     console.error(e);
     throw e;
   }
-  console.log("GOT DATA: ", {});
+
   if (response.status >= 300) return { success: false };
   return {
     success: true,

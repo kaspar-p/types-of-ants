@@ -3,15 +3,12 @@
 import React from "react";
 import { AntBanner } from "../components/AntBanner";
 import { escapeAnt } from "../utils/utils";
-import { useActions } from "../utils/useActions";
-import { useQuery, Response } from "../utils/useQuery";
+import { useQuery } from "../utils/useQuery";
 import { getAllAnts, getReleaseNumber } from "../server/queries";
 import { SuggestionBox } from "../components/SuggestionBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
 
 export default function Home() {
-  const { actions, handle } = useActions();
-
   const {
     res: allAnts,
     loading: allAntsLoading,

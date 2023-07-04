@@ -1,5 +1,5 @@
 import { newsletterSignup } from "@/server/posts";
-import { useHandle } from "@/utils/useActions_v2";
+import { useHandle } from "@/utils/useHandle";
 import { useState } from "react";
 
 function validator(text: string): { msg: string; valid: boolean } {

@@ -2,7 +2,7 @@
 
 import React, { FormEvent, useState } from "react";
 import { suggestAnt } from "../server/posts";
-import { useHandle } from "@/utils/useActions_v2";
+import { useHandle } from "@/utils/useHandle";
 
 function validator(text: string): { valid: boolean; msg: string } {
   let msg = "";
