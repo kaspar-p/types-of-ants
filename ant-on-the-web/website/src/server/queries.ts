@@ -1,20 +1,26 @@
-import { Response } from "@/utils/useQuery";
 import { z } from "zod";
 import { getEndpoint } from "./lib";
+
+const antsSchema = z.array(
+  z.object({ ant_id: z.string(), ant_name: z.string(), created_at: z.string() })
+);
+export type Ants = z.infer<typeof antsSchema>;
 
 const queries = {
   getReleaseNumber: {
     name: "getReleaseNumber",
     path: "/api/ants/latest-release",
     schema: z.number(),
-    transformer: (data: number) => data,
+    transformer: (data: number): number => {
+      return data;
+    },
   },
   getLatestAnts: {
     name: "getLatestAnts",
     path: "/api/ants/latest-ants",
     schema: z.object({
       date: z.number(),
-      ants: z.array(z.object({ ant_id: z.string(), ant_name: z.string() })),
+      ants: antsSchema,
     }),
     transformer: (data: {
       date: number;
@@ -26,48 +32,56 @@ const queries = {
       };
     },
   },
-  getAllAnts: {
-    name: "getAllAnts",
-    path: "/api/ants/all-ants",
-    schema: z.object({
-      ants: z.array(z.object({ ant_id: z.string(), ant_name: z.string() })),
-    }),
-    transformer: (data: {
-      ants: { ant_id: string; ant_name: string }[];
-    }): { ants: string[] } => ({
-      ants: data.ants.map((ant) => ant.ant_name),
+  getUnseenAnts: {
+    name: "getUnseenAntsPaginated",
+    path: "/api/ants/unreleased-ants",
+    queryParams: ["page"],
+    schema: z.object({ ants: antsSchema }),
+    transformer: (data: Ants): Ants => {
+      return data;
+    },
+  },
+  getReleasedAnts: {
+    name: "getReleasedAnts",
+    path: "/api/ants/released-ants",
+    queryParams: ["page"],
+    schema: z.object({ ants: antsSchema }),
+    transformer: (data: Ants): { ants: string[] } => ({
+      ants: data.map((ant) => ant.ant_name),
     }),
   },
 } as const;
 
 type Query = (typeof queries)[keyof typeof queries];
 type QueryRet<Q extends Query> = ReturnType<Q["transformer"]>;
+type QueryParams<Q extends Query> = Q extends { queryParams: any }
+  ? { [x in Q["queryParams"][number]]: unknown }
+  : undefined;
 
 async function constructQuery<Q extends Query>(
-  query: Q
-): Promise<Response<QueryRet<Q>>> {
-  const { path, schema, transformer } = query;
-  console.log("GET: ", query.path);
-
+  query: Q,
+  inputData?: QueryParams<Q>
+): Promise<ReturnType<Q["transformer"]>> {
   const endpoint = getEndpoint(query.path);
-  const response = await fetch(endpoint);
-  const rawData = await response.json();
-  console.log("GOT DATA: ", rawData, "AND RESPONSE", response);
-  if (response.status >= 300) return { success: false };
-  const result = schema.safeParse(rawData);
-  if (!result.success) {
-    console.log("FAILED", result.error);
-    return { success: false };
+  if ("queryParams" in query && inputData !== undefined) {
+    for (const param of query.queryParams) {
+      endpoint.searchParams.set(
+        param,
+        encodeURIComponent(JSON.stringify(inputData[param]))
+      );
+    }
   }
+  console.log("GET: ", endpoint);
 
-  const data = result.data as any;
-
-  return {
-    success: true,
-    data: transformer(data) as any,
-  };
+  const data = await (await fetch(endpoint)).json();
+  console.log("GOT DATA: ", data);
+  const transformedData = query.transformer(data);
+  return transformedData as any as QueryRet<Q>;
 }
 
 export const getLatestAnts = () => constructQuery(queries.getLatestAnts);
-export const getAllAnts = () => constructQuery(queries.getAllAnts);
+export const getReleasedAnts = (page: number) =>
+  constructQuery(queries.getReleasedAnts, { page });
+export const getUnseenAnts = (page: number) =>
+  constructQuery(queries.getUnseenAnts, { page });
 export const getReleaseNumber = () => constructQuery(queries.getReleaseNumber);

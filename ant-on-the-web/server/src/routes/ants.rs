@@ -2,9 +2,13 @@ use crate::{
     middleware,
     types::{DaoRouter, DaoState},
 };
-use ant_data_farm::{ants::Ant, users::UserId, DaoTrait};
+use ant_data_farm::{
+    ants::{Ant, AntStatus},
+    users::UserId,
+    DaoTrait,
+};
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -15,14 +19,105 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
-struct AllAntsResponse {
-    ants: Vec<Ant>,
-}
+const PAGE_SIZE: usize = 1_000_usize;
+
 async fn all_ants(State(dao): DaoState) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(dao.ants.read().await.get_all().await).into_response(),
+    )
+}
+
+#[derive(Serialize, Deserialize)]
+struct Pagination {
+    page: usize,
+}
+async fn unreleased_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
     let ants = dao.ants.read().await;
-    let all_ants = ants.get_all().await.iter().map(|&x| x.clone()).collect();
-    (StatusCode::OK, Json(AllAntsResponse { ants: all_ants }))
+
+    let mut unreleased_ants = ants
+        .get_all()
+        .await
+        .iter()
+        .filter_map(|&ant| match ant.status {
+            AntStatus::Unreleased => Some(ant),
+            _ => None,
+        })
+        .collect::<Vec<&Ant>>();
+    unreleased_ants.sort();
+    unreleased_ants.reverse();
+
+    let ants_page = unreleased_ants.chunks(PAGE_SIZE).nth(query.page);
+    match ants_page {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(format!("No page {} exists!", query.page)).into_response(),
+            )
+        }
+        Some(unreleased_ants) => {
+            return (StatusCode::OK, Json(unreleased_ants).into_response());
+        }
+    }
+}
+
+async fn declined_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
+    let ants = dao.ants.read().await;
+
+    let declined_ants = ants
+        .get_all()
+        .await
+        .iter()
+        .filter_map(|&ant| match ant.status {
+            AntStatus::Released(_) => Some(ant),
+            _ => None,
+        })
+        .collect::<Vec<&Ant>>();
+
+    let ants_page = declined_ants.chunks(PAGE_SIZE).nth(query.page);
+    match ants_page {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(format!("No page {} exists!", query.page)).into_response(),
+            )
+        }
+        Some(released_ants) => {
+            return (StatusCode::OK, Json(released_ants).into_response());
+        }
+    }
+}
+
+async fn released_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
+    let ants = dao.ants.read().await;
+
+    let released_ants = ants
+        .get_all()
+        .await
+        .iter()
+        .filter_map(|&ant| match ant.status {
+            AntStatus::Released(_) => Some(ant),
+            _ => None,
+        })
+        .collect::<Vec<&Ant>>();
+
+    let ants_page = released_ants.chunks(PAGE_SIZE).nth(query.page);
+    match ants_page {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(format!("No page {} exists!", query.page)).into_response(),
+            )
+        }
+        Some(released_ants) => {
+            return (StatusCode::OK, Json(released_ants).into_response());
+        }
+    }
+}
+
+async fn latest_release(State(dao): DaoState) -> impl IntoResponse {
+    let release = dao.releases.read().await.get_latest_release().await;
+    (StatusCode::OK, Json(release))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,12 +127,6 @@ struct LatestAntsResponse {
     release: i32,
     ants: Vec<Ant>,
 }
-
-async fn latest_release(State(dao): DaoState) -> impl IntoResponse {
-    let release = dao.releases.read().await.get_latest_release().await;
-    (StatusCode::OK, Json(release))
-}
-
 async fn latest_ants(State(dao): DaoState) -> impl IntoResponse {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
@@ -46,7 +135,10 @@ async fn latest_ants(State(dao): DaoState) -> impl IntoResponse {
     let latest_release = releases.get_latest_release().await;
     let current_release_ants = all_ants
         .iter()
-        .filter(|ant| ant.released == latest_release)
+        .filter(|ant| match ant.status {
+            AntStatus::Released(n) => n == latest_release,
+            _ => false,
+        })
         .map(std::clone::Clone::clone)
         .collect::<Vec<Ant>>();
 
@@ -142,18 +234,24 @@ async fn make_suggestion(
 
 pub fn router() -> DaoRouter {
     Router::new()
+        .route_with_tsr("/latest-ants", get(latest_ants))
+        .route_with_tsr("/unreleased-ants", get(unreleased_ants))
+        .route_with_tsr("/released-ants", get(released_ants))
+        .route_with_tsr("/declined-ants", get(declined_ants))
+        .route_with_tsr("/all-ants", get(all_ants))
+        .route_with_tsr("/latest-release", get(latest_release))
         .route_with_tsr("/suggest", post(make_suggestion))
         // .route_with_tsr("/tweet", post(tweet))
-        .route_with_tsr("/latest-release", get(latest_release))
-        .route_with_tsr("/latest-ants", get(latest_ants))
-        .route_with_tsr("/all-ants", get(all_ants))
         .fallback(|| async {
             middleware::fallback(&[
                 "GET /latest-ants",
+                "GET /unreleased-ants",
+                "GET /released-ants",
+                "GET /declined-ants",
                 "GET /all-ants",
                 "GET /latest-release",
                 "POST /suggest",
-                "POST /tweet",
+                // "POST /tweet",
             ])
         })
 }

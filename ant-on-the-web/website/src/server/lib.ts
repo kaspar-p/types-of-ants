@@ -14,8 +14,8 @@ function generateBaseUrl() {
 }
 
 // TODO: Find a better solution for dev/beta/prod machines
-export function getEndpoint(path: string) {
+export function getEndpoint(path: string): URL {
   const baseUrl = generateBaseUrl();
   if (path[0] !== "/") path = "/" + path;
-  return baseUrl + path;
+  return new URL(baseUrl + path);
 }

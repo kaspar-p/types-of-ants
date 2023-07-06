@@ -1,7 +1,8 @@
 import React from "react";
 import Marquee from "react-fast-marquee";
-import { useQuery } from "@/utils/useQuery";
 import { getLatestAnts } from "../server/queries";
+import { useQuery } from "@tanstack/react-query";
+import { errorOr } from "./UnhappyPath";
 
 function formatDate(d: Date): string {
   const months = [
@@ -23,13 +24,12 @@ function formatDate(d: Date): string {
 
 type AntBannerProps = {};
 export function AntBanner(props: AntBannerProps) {
-  const {
-    res: latestAnts,
-    loading: latestAntsLoading,
-    err: latestAntsError,
-  } = useQuery(getLatestAnts);
+  const { isLoading, isError, data } = useQuery({
+    queryKey: ["bannerAnts"],
+    queryFn: getLatestAnts,
+  });
 
-  return (
+  return errorOr(isLoading, isError, { bannerAnts: data }, ({ bannerAnts }) => (
     <div
       className="block w-full pr-0"
       style={{
@@ -38,34 +38,28 @@ export function AntBanner(props: AntBannerProps) {
         padding: "12px",
       }}
     >
-      {latestAntsLoading ? (
-        "Loading..."
-      ) : latestAntsError || !latestAnts ? (
-        "ERROR"
-      ) : (
-        <>
-          <div>
-            discovered {latestAnts.ants.length} new ants on{" "}
-            {formatDate(latestAnts.date)}:
-          </div>
-          <Marquee
-            autoFill
-            pauseOnHover
-            speed={75}
-            className="items-center flex justify-between"
-          >
-            {latestAnts.ants.map((ant, i) => (
-              <div
-                key={i}
-                className="inline-block whitespace-nowrap pr-4 pl-4"
-                style={{ paddingRight: "15px", paddingLeft: "15px" }}
-              >
-                {ant}
-              </div>
-            ))}
-          </Marquee>
-        </>
-      )}
+      <>
+        <div>
+          discovered {bannerAnts.ants.length} new ants on{" "}
+          {formatDate(bannerAnts.date)}:
+        </div>
+        <Marquee
+          autoFill
+          pauseOnHover
+          speed={75}
+          className="items-center flex justify-between"
+        >
+          {bannerAnts.ants.map((ant, i) => (
+            <div
+              key={i}
+              className="inline-block whitespace-nowrap pr-4 pl-4"
+              style={{ paddingRight: "15px", paddingLeft: "15px" }}
+            >
+              {ant}
+            </div>
+          ))}
+        </Marquee>
+      </>
     </div>
-  );
+  ));
 }
