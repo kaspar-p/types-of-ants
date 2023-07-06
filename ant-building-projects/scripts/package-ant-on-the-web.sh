@@ -2,12 +2,10 @@
 # From: https://medium.com/swlh/compiling-rust-for-raspberry-pi-arm-922b55dbb050
 
 # The build script to start the server with the right website content in it
-readonly TARGET_HOST=pi@192.169.10.162
 readonly TARGET_ARCH=armv7-unknown-linux-musleabihf
-readonly TARGET_PATH=/home/pi/ant-on-the-web
 
-readonly TEMP_DIR=ant-building-projects/temp
-readonly DEST_DIR=ant-building-projects/tars
+readonly TEMP_DIR=$ANTHILL_ROOT/ant-building-projects/temp
+readonly DEST_DIR=$ANTHILL_ROOT/ant-building-projects/tars
 
 mkdir -p $TEMP_DIR
 mkdir -p $DEST_DIR
@@ -36,5 +34,9 @@ cd ../..
 cp ./target/$TARGET_ARCH/release/ant-on-the-web $TEMP_DIR/ant-on-the-web
 
 # Package ant-on-the-web
-tar -cf artifact-ant-on-the-web.tar $TEMP_DIR
-mv artifact-ant-on-the-web.tar $DEST_DIR/artifact-ant-on-the-web.tar
+readonly ARTIFACT_NAME=artifact-ant-on-the-web.tar
+tar -cf $ARTIFACT_NAME $TEMP_DIR
+mv $ARTIFACT_NAME $DEST_DIR/$ARTIFACT_NAME
+
+# Add the new tarfile for staging
+git add $DEST_DIR/$ARTIFACT_NAME

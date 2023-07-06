@@ -23,27 +23,39 @@ use tracing::debug;
 //     pub status: SuggestionStatus,
 // }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AntStatus {
     Unreleased,
     Released(i32),
     Declined,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]
 pub enum Tweeted {
     NotTweeted,
     Tweeted(DateTime<Utc>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Ant {
     pub ant_id: AntId,
     pub ant_name: String,
     pub created_at: DateTime<Utc>,
     pub created_by: UserId,
     pub tweeted: Tweeted,
-    pub released: i32, // status: AntStatus
+    pub status: AntStatus,
+}
+
+impl PartialOrd for Ant {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        return self.created_at.partial_cmp(&other.created_at);
+    }
+}
+
+impl Ord for Ant {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        return self.created_at.cmp(&other.created_at);
+    }
 }
 
 pub struct AntsDao {
@@ -61,27 +73,58 @@ impl DaoTrait<Ant> for AntsDao {
             .await
             .query(
                 "select 
-                    ant_release.ant_id, 
-                    ant_content, 
-                    release_number, 
-                    created_at, 
-                    ant_user_id 
-                from ant_release join ant 
-                    on ant_release.ant_id = ant.ant_id",
+                    ant.ant_id, 
+                    ant.suggested_content,
+                    ant_release.ant_content, 
+                    ant_release.release_number, 
+                    ant.created_at,
+                    ant.ant_user_id,
+                    ant_declined.ant_declined_at,
+                    ant_tweeted.tweeted_at
+                from 
+                    ant left join ant_release on ant.ant_id = ant_release.ant_id
+                        left join ant_declined on ant.ant_id = ant_declined.ant_id
+                        left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                ",
                 &[],
             )
             .await
             .unwrap_or_else(|e| panic!("Getting ant data failed: {e}"));
 
         let released_ants = futures::future::join_all(released_ant_rows.iter().map(|row| async {
+            let tweeted_at: Option<DateTime<Utc>> = row.get("tweeted_at");
+            let ant_content: Option<String> = row.get("ant_content");
+            let declined_at: Option<DateTime<Utc>> = row.get("ant_declined_at");
+
+            let status = {
+                if ant_content.is_some() {
+                    AntStatus::Released(row.get("release_number"))
+                } else if declined_at.is_some() {
+                    AntStatus::Declined
+                } else {
+                    AntStatus::Unreleased
+                }
+            };
+
+            let tweeted_status = if tweeted_at.is_some() {
+                Tweeted::Tweeted(row.get("tweeted_at"))
+            } else {
+                Tweeted::NotTweeted
+            };
+
+            let content: String = if let Some(name) = row.get("ant_content") {
+                name
+            } else {
+                row.get("suggested_content")
+            };
+
             Ant {
                 ant_id: row.get("ant_id"),
-                ant_name: row.get("ant_content"),
+                ant_name: content,
                 created_at: row.get("created_at"),
                 created_by: row.get("ant_user_id"),
-                released: row.get("release_number"),
-                tweeted: Tweeted::NotTweeted,
-                // status: construct_ant_status(db.clone(), row.get("ant_id")).await,
+                status,
+                tweeted: tweeted_status,
             }
         }))
         .await;
@@ -156,19 +199,34 @@ impl AntsDao {
         ant_suggestion_content: String,
         user_id: UserId,
     ) -> Result<(), tokio_postgres::Error> {
+        let ant = Ant {
+            ant_id: AntId(uuid::Uuid::new_v4()),
+            ant_name: ant_suggestion_content,
+            created_at: chrono::offset::Utc::now(),
+            created_by: user_id,
+            tweeted: Tweeted::NotTweeted,
+            status: AntStatus::Unreleased,
+        };
+
         let changed = self
             .database
             .lock()
             .await
             .execute(
-                "insert into ant (suggested_content, ant_user_id) values ($1, $2::uuid) limit 1",
-                &[&ant_suggestion_content, &user_id.0],
+                "insert into ant (ant_id, suggested_content, ant_user_id) values ($1::uuid, $2, $3::uuid) limit 1",
+                &[&ant.ant_id.0, &ant.ant_name, &ant.created_by.0],
             )
             .await;
-        match changed {
-            Err(e) => Result::Err(e),
-            Ok(_) => Ok(()),
+        if let Err(e) = changed {
+            return Result::Err(e);
         }
+
+        self.ants.insert(
+            ant.ant_id.clone(),
+            ant.ant_name.clone(),
+            Box::new(ant.clone()),
+        );
+        Ok(())
     }
 }
 

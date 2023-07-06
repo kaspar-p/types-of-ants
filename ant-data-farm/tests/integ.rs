@@ -14,7 +14,7 @@ async fn more_than_500_ants() {
     let dao = connect_port(port).await;
 
     let ants = dao.ants.read().await;
-    let all_ants = ants.get_all().await;
+    let all_ants = ants.get_all_released().await;
     assert!(all_ants.len() >= 500);
 }
 

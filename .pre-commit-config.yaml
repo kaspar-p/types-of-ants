@@ -1,0 +1,7 @@
+repos:
+  - repo: local
+    hooks:
+      - id: build-deployment-artifacts
+        name: build-deployment-artifacts
+        entry: bash -c 'ANTHILL_ROOT=$(pwd) ./ant-building-projects/scripts/package.sh'
+        language: system
