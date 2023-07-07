@@ -18,7 +18,12 @@ mkdir -p $TEMP_DIR
 mkdir -p $DEST_DIR
 
 # Build the website
-cd ant-on-the-web/website && npm run build
+cd ant-on-the-web/website
+mv .env.local .env.local-temp
+echo "NEXT_PUBLIC_ENVIRONMENT=beta" >> .env.local
+npm run build
+rm -rf .env.local
+mv .env.local-temp .env.local
 cd ../..
 
 # Move the output of the website into static directory
