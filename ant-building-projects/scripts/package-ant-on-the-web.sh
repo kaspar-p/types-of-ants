@@ -7,20 +7,22 @@ readonly TARGET_ARCH=armv7-unknown-linux-musleabihf
 readonly TEMP_DIR=$ANTHILL_ROOT/ant-building-projects/temp
 readonly DEST_DIR=$ANTHILL_ROOT/ant-building-projects/tars
 
-mkdir -p $TEMP_DIR
-mkdir -p $DEST_DIR
-
-cwd="$(basename $(pwd))"
-if [[ "$cwd" != "types-of-ants" ]]; then
-  echo "ERROR: This script needs to be run from types-of-ants/ directory, the root of the project!"
+if [[ -z $ANTHILL_ROOT ]]; then
+  echo "No \$ANTHILL_ROOT variable defined! Needs to be the root of the git repository!"
   exit 1
 fi
+
+cd $ANTHILL_ROOT
+
+mkdir -p $TEMP_DIR
+mkdir -p $DEST_DIR
 
 # Build the website
 cd ant-on-the-web/website && npm run build
 cd ../..
 
 # Move the output of the website into static directory
+mkdir -p $TEMP_DIR/static
 cp -R ant-on-the-web/website/out/* "$TEMP_DIR/static"
 
 # Compile
@@ -35,7 +37,9 @@ cp ./target/$TARGET_ARCH/release/ant-on-the-web $TEMP_DIR/ant-on-the-web
 
 # Package ant-on-the-web
 readonly ARTIFACT_NAME=artifact-ant-on-the-web.tar
-tar -cf $ARTIFACT_NAME $TEMP_DIR
+cd $TEMP_DIR
+cd ..
+tar -czf $ARTIFACT_NAME temp .
 mv $ARTIFACT_NAME $DEST_DIR/$ARTIFACT_NAME
 
 # Add the new tarfile for staging

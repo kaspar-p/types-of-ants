@@ -1,6 +1,10 @@
 repos:
   - repo: local
     hooks:
+      - id: install-pre-commit-hooks
+        name: install-pre-commit-hooks
+        entry: bash -c 'pre-commit install'
+        language: system
       - id: build-deployment-artifacts
         name: build-deployment-artifacts
         entry: bash -c 'ANTHILL_ROOT=$(pwd) ./ant-building-projects/scripts/package.sh'
