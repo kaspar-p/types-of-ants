@@ -39,8 +39,7 @@ cp ./target/$TARGET_ARCH/release/ant-on-the-web $TEMP_DIR/ant-on-the-web
 readonly ARTIFACT_NAME=artifact-ant-on-the-web.tar
 cd $TEMP_DIR
 cd ..
-tar -czf $ARTIFACT_NAME temp .
-mv $ARTIFACT_NAME $DEST_DIR/$ARTIFACT_NAME
+tar -czf $DEST_DIR/$ARTIFACT_NAME -C temp .
 
 # Add the new tarfile for staging
 git add $DEST_DIR/$ARTIFACT_NAME
