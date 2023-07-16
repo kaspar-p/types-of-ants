@@ -3,9 +3,9 @@ repos:
     hooks:
       - id: install-pre-commit-hooks
         name: install-pre-commit-hooks
-        entry: bash -c 'pre-commit install'
+        entry: bash -c 'pre-commit install -f'
         language: system
-      - id: build-deployment-artifacts
-        name: build-deployment-artifacts
-        entry: bash -c 'ANTHILL_ROOT=$(pwd) ./ant-building-projects/scripts/package.sh'
-        language: system
+      # - id: build-deployment-artifacts
+      #   name: build-deployment-artifacts
+      #   entry: bash -c 'ANTHILL_ROOT=$(pwd) ./ant-building-projects/scripts/package.sh'
+      #   language: system

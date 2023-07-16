@@ -21,16 +21,17 @@ Deployment data will also need to be logged, to show on /deployments. Each step 
 
 ### Option 1 (most complicated)
 
-There will be three servers. One is a deployment server, really an orchestrator. It is constantly listening to new versions of projects. When it hears that project X has a new version published (in git), it tells the build server. The build server then puts "build project X" into its queue. 
+There will be three servers. One is a deployment server, really an orchestrator. It is constantly listening to new versions of projects. When it hears that project X has a new version published (in git), it tells the build server. The build server then puts "build project X" into its queue.
 
 When that event gets done and the binary is built for project X, the build server tells the deployment server it is finished. The deployment server then tells the third type of server, the replacement servers. They are lightweight webservers running on each machine, just listening for a "hey, there is a new binary for project X you should use" message from the deployment server. Once that message is received, they stop the project X process, and start another.
 
 #### Deployment server
 
 The responsibilities of the deployment server include:
+
 - Listen for new versions in any of the registered projects
 - Tell the build server that project X has a new version
-- Once the build server is finished building project X, give some fraction of the machines running project X 
+- Once the build server is finished building project X, give some fraction of the machines running project X
 
 #### Build server
 
@@ -41,6 +42,7 @@ The responsibilities of the deployment server include:
 #### Children servers
 
 The responsibilities of the children servers include:
+
 - Listen for the deployment server to tell it to download a new binary
 - Download that binary
 - Find the previous process that that project corresponds to (from the database)
@@ -53,7 +55,7 @@ There are two servers. One is a deployment server and build server together, but
 
 ### Option 3 (least complicated)
 
-There is a single process. On every machine running software, there is a single process that handles listening for versionings, building, and replacing of processes. 
+There is a single process. On every machine running software, there is a single process that handles listening for versionings, building, and replacing of processes.
 
 That is, the child is really just a web server listening for calls from the central builder server.
 

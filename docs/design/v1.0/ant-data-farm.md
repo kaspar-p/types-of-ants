@@ -1,10 +1,5 @@
-# Database
+# ant-data-farm
 
-The database will be a PostgreSQL or MySQL relational database. It will have the following databases:
+The database is called `ant-data-farm`. There will, for now, be a single database in which everything is kept. This makes testing a little bit harder, but deployments a little bit easier. Since everything is running on the same machine anyway, this is fine.
 
-- prod
-- beta
-
-The prod and beta databases will be identical in structure, just the data within them will be different.
-
-See the `ant-data-farm/bootstrap.sql` file for the most modern schema.
+The schema go crazy.

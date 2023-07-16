@@ -1,2 +1,2 @@
-reverse-proxy/data/certbot/*
-!reverse-proxy/data/certbot/.gitkeep
+target
+static
