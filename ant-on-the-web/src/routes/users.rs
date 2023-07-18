@@ -13,10 +13,7 @@ use axum::{
 use axum_extra::routing::RouterExt;
 use serde::Deserialize;
 use tracing::debug;
-
-async fn create_user(State(_dao): DaoState) -> impl IntoResponse {
-    (StatusCode::OK, Json("User created!"))
-}
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 struct EmailRequest {
@@ -102,14 +99,118 @@ async fn get_user_by_name(
     }
 }
 
+#[derive(Deserialize)]
+struct LoginRequest {
+    // The user can pass either a username, or phone number,
+    // or email, all of which are unique to them
+    pub unique_key: String,
+    pub cookie: Uuid,
+}
+async fn login(State(dao): DaoState, Json(login_request): Json<LoginRequest>) -> impl IntoResponse {
+    let users = dao.users.read().await;
+    let from_email = users.get_one_by_email(&login_request.unique_key).await;
+    let from_phone_number = users
+        .get_one_by_phone_number(&login_request.unique_key)
+        .await;
+    let from_username = users.get_one_by_name(&login_request.unique_key).await;
+
+    let all_some = [from_email, from_phone_number, from_username]
+        .iter()
+        .fold(true, |acc, &u| acc && u.is_some());
+    if !all_some {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json("No user exists with that username, phone number, or email!").into_response(),
+        );
+    }
+
+    let all_same =
+        [from_email, from_phone_number, from_username]
+            .iter()
+            .fold(from_email, |acc, &u| {
+                if let (Some(prev), Some(current)) = (acc, u) {
+                    if current == prev {
+                        return Some(current);
+                    }
+                }
+                return None;
+            });
+
+    // Check the cookie is valid for that user. If it is, allow them through. If not, do two-factor
+
+    match all_same {
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("ERROR: encountered error parsing user data").into_response(),
+        ),
+        Some(u) => (
+            StatusCode::OK,
+            Json("Found user, logging you in!").into_response(), // TODO: give the user a cookie to save!
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct SignupRequest {
+    pub username: String,
+    pub email: String,
+    pub phone_number: String,
+}
+async fn signup(
+    State(dao): DaoState,
+    Json(signup_request): Json<SignupRequest>,
+) -> impl IntoResponse {
+    let read_users = dao.users.read().await;
+
+    // Check if the user already exists
+    let by_username = read_users
+        .get_one_by_name(signup_request.username.as_str())
+        .await;
+    let by_email = read_users
+        .get_one_by_email(signup_request.email.as_str())
+        .await;
+    let by_phone_number = read_users
+        .get_one_by_phone_number(signup_request.phone_number.as_str())
+        .await;
+    for user in [by_username, by_email, by_phone_number] {
+        if user.is_some() {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(format!("A user with that data already exists!")).into_response(),
+            );
+        }
+    }
+
+    let mut write_users = dao.users.write().await;
+    let user = write_users
+        .create_user(
+            signup_request.username,
+            signup_request.phone_number,
+            vec![signup_request.email],
+        )
+        .await;
+
+    match user {
+        Some(_) => (
+            StatusCode::OK,
+            Json("Signup request accepted!").into_response(),
+        ),
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("ERROR: Signup request failed!").into_response(),
+        ),
+    }
+}
+
 pub fn router() -> DaoRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
-        .route_with_tsr("/user", post(create_user))
+        .route_with_tsr("/signup", post(signup))
+        .route_with_tsr("/login", post(login))
         .route_with_tsr("/user/:user-name", get(get_user_by_name))
         .fallback(|| async {
             middleware::fallback(&[
-                "POST /user",
+                "POST /signup",
                 "POST /user/:user-name",
                 "POST /subscribe-newsletter",
             ])

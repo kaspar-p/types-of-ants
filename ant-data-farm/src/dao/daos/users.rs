@@ -12,10 +12,11 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct Email(String);
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {
     pub user_id: UserId,
     pub username: String,
+    pub phone_number: String,
     pub emails: Vec<String>,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub joined: DateTime<Utc>,
@@ -47,7 +48,7 @@ impl DaoTrait<User> for UsersDao {
             .lock()
             .await
             .query(
-                "select user_id, user_name, user_joined from registered_user;",
+                "select user_id, user_name, user_phone_number, user_joined from registered_user;",
                 &[],
             )
             .await
@@ -60,6 +61,7 @@ impl DaoTrait<User> for UsersDao {
                 User {
                     user_id: row.get("user_id"),
                     username: row.get("user_name"),
+                    phone_number: row.get("user_phone_number"),
                     joined: row.get("user_joined"),
                     emails: construct_emails_for_user(in_db, user_id).await,
                 }
@@ -110,21 +112,26 @@ impl DaoTrait<User> for UsersDao {
 }
 
 impl UsersDao {
-    pub async fn create_user(&mut self, username: String, emails: Vec<String>) -> Option<&User> {
-        self.database
-            .lock()
-            .await
-            .query(
-                "insert into registered_user (user_name) values ($1);",
-                &[&username],
-            )
-            .await
-            .unwrap_or_else(|e| panic!("Failed to create user: {e}"));
+    pub async fn create_user(
+        &mut self,
+        username: String,
+        phone_number: String,
+        emails: Vec<String>,
+    ) -> Option<&User> {
+        let mut db = self.database.lock().await;
+        let t = db.transaction().await.unwrap();
 
-        let user_id: Uuid = self
-            .database
-            .lock()
-            .await
+        t.query(
+            "
+        insert into registered_user 
+            (user_name, user_phone_number)
+        values ($1, $2);",
+            &[&username, &phone_number],
+        )
+        .await
+        .unwrap_or_else(|e| panic!("Failed to create user: {e}"));
+
+        let user_id: Uuid = t
             .query(
                 "select user_id from registered_user where user_name = $1",
                 &[&username],
@@ -133,17 +140,44 @@ impl UsersDao {
             .unwrap_or_else(|_| panic!("Creating user failed!"))[0]
             .get("user_id");
 
+        let mut query = String::from(
+            "
+        insert into registered_user_email
+            (user_id, user_email)
+        values
+        ",
+        );
+        query.push_str(
+            emails
+                .iter()
+                .map(|e| format!("({user_id}, {e})"))
+                .collect::<Vec<String>>()
+                .join(",\n")
+                .as_str(),
+        );
+        query.push_str(";");
+
+        if let Err(e) = t.execute(&query, &[]).await {
+            debug!("Email insert failed: {e}");
+            t.rollback().await.expect("rollback failed");
+            return None;
+        }
+
         let user = Box::new(User {
             username,
             emails,
+            phone_number,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
         });
 
         self.users
-            .insert(user.user_id, user.username.clone(), user.clone());
+            .insert(user.user_id, user.username.clone(), user.clone())?
+            .ok()?;
+        let user = self.users.get_key1(&user.user_id)?.as_ref();
+        t.commit().await.ok()?;
 
-        return Some(self.users.get_key1(&user.user_id)?.as_ref());
+        return Some(user);
     }
 
     pub async fn add_email_to_user(&mut self, user_id: UserId, email: String) -> Option<&User> {
@@ -174,5 +208,21 @@ impl UsersDao {
 
         debug!("All users: {:?}", user);
         Some(user)
+    }
+
+    pub async fn get_one_by_email(&self, email: &str) -> Option<&User> {
+        self.get_all()
+            .await
+            .iter()
+            .map(|&user| user)
+            .find(|&user| user.emails.contains(&String::from(email)))
+    }
+
+    pub async fn get_one_by_phone_number(&self, phone_number: &str) -> Option<&User> {
+        self.get_all()
+            .await
+            .iter()
+            .map(|&user| user)
+            .find(|&user| user.phone_number == phone_number)
     }
 }

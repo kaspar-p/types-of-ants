@@ -30,6 +30,11 @@ impl Dao {
         let hosts = RwLock::new(HostsDao::new(database.clone()).await);
         let users = RwLock::new(UsersDao::new(database.clone()).await);
 
-        Dao { ants, releases, users, hosts }
+        Dao {
+            ants,
+            releases,
+            users,
+            hosts,
+        }
     }
 }

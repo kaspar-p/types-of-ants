@@ -18,6 +18,8 @@ type HeaderProps = {
 };
 export function Header({ children }: HeaderProps) {
   const [page, setPage] = useState(0);
+  const [loggedIn, setLoggedIn] = useState(false);
+
   const { push } = useRouter();
 
   const allAntsResult = useQuery({
@@ -35,26 +37,34 @@ export function Header({ children }: HeaderProps) {
     [allAntsResult.isError, releaseNumberResult.isError],
     { allAnts: allAntsResult.data, releaseNumber: releaseNumberResult.data },
     ({ allAnts, releaseNumber }) => (
-      <div style={{ padding: "20px", fontFamily: "serif" }}>
-        <h1 className="title">
-          types of ants{" "}
-          <span style={{ fontSize: "12pt" }}>v{releaseNumber}</span>
-        </h1>
-        <h2 className="title">
+      <div className="p-5" style={{ fontFamily: "serif" }}>
+        <div className="flex flex-row align-center justify-center">
+          <h1 className="mb-0 pb-5">
+            types of ants <span className="text-sm">v{releaseNumber}</span>
+          </h1>
+        </div>
+        <h2 className="text-center m-0">
           ants discovered to date: {allAnts.ants.length}
-        </h2>{" "}
-        <h3 className="title w-full flex flex-row space-x-2 align-center justify-center">
-          <button onClick={() => push("/")}>home</button>
-          <button onClick={() => push("/feed")}>feed</button>
-          <button onClick={() => push("/info")}>contact me</button>
-          <button
-            onClick={() =>
-              push("https://www.github.com/kaspar-p/types-of-ants")
-            }
-          >
-            read the code
-          </button>
-        </h3>
+        </h2>
+        <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
+          <div className="text-center flex flex-row space-x-2 align-center">
+            {loggedIn ? (
+              <button onClick={() => push("/profile")}>profile</button>
+            ) : (
+              <button onClick={() => push("/login")}>log in or signup</button>
+            )}
+            <button onClick={() => push("/")}>home</button>
+            <button onClick={() => push("/feed")}>feed</button>
+            <button onClick={() => push("/info")}>contact me</button>
+            <button
+              onClick={() =>
+                push("https://www.github.com/kaspar-p/types-of-ants")
+              }
+            >
+              read the code
+            </button>
+          </div>
+        </div>
         {children}
       </div>
     )

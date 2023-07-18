@@ -1,6 +1,7 @@
 use rstest::fixture;
 use std::process::Command;
 use testcontainers::{clients::Cli, images::generic::GenericImage};
+use tracing::{debug, info};
 
 #[fixture]
 #[once]
@@ -16,7 +17,8 @@ pub struct TestFixture {
     pub image: GenericImage,
 }
 
-#[must_use] pub fn test_fixture() -> TestFixture {
+#[must_use]
+pub fn test_fixture() -> TestFixture {
     let cwd: String = dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!");
     let db_name = dotenv::var("DB_PG_NAME").expect("DB_PG_NAME environment variable!");
     let user = dotenv::var("DB_PG_USER").expect("DB_PG_USER environment variable!");
@@ -28,12 +30,12 @@ pub struct TestFixture {
         .arg("--file")
         .arg(&format!("{cwd}/ant-data-farm.dockerfile"))
         .arg("--force-rm")
-        // .arg(format!("-p {}:5432", db_port))
         .arg("--tag")
         .arg("ant-data-farm:latest")
         .arg(".")
         .output()
         .expect("Building the ant-data-farm docker image worked!");
+    debug!("Built docker image!");
     if !output.status.success() {
         eprintln!("stderr: {}", String::from_utf8(output.stderr).unwrap());
         panic!("Unable to build ant-data-farm:latest");

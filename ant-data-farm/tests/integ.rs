@@ -1,8 +1,12 @@
 mod util;
 
-use ant_data_farm::{ants::Tweeted, connect_port, DaoTrait};
+use ant_data_farm::{
+    ants::{AntStatus, Tweeted},
+    connect_port, DaoTrait,
+};
 use chrono::Duration;
 
+use tracing::debug;
 use util::{logging, test_fixture};
 
 #[rstest::rstest]
@@ -23,6 +27,7 @@ async fn more_than_500_ants() {
 async fn add_tweeted(_logging: &()) {
     let fixture = test_fixture();
     let container = fixture.docker.run(fixture.image);
+    debug!("Ran fixture!");
     let port = container.get_host_port_ipv4(5432);
     let dao = connect_port(port).await;
 
@@ -31,14 +36,27 @@ async fn add_tweeted(_logging: &()) {
         ants.get_all().await.last().unwrap().ant_id
     };
 
-    let mut ants = dao.ants.write().await;
-    let ant = ants.add_ant_tweet(&ant_id).await.unwrap();
-    // let ant = ants.get_one_by_id(&ant_id).await.unwrap();
-    println!("{ant:#?}");
-    match ant.tweeted {
-        Tweeted::NotTweeted => panic!("Ant should have tweeted!"),
-        Tweeted::Tweeted(time) => assert!(time
-            .signed_duration_since(chrono::offset::Utc::now())
-            .le(&Duration::seconds(10))),
+    {
+        let mut write_ants = dao.ants.write().await;
+        let ant = write_ants.add_ant_tweet(&ant_id).await.unwrap();
+        println!("{ant:#?}");
+        match &ant.tweeted {
+            Tweeted::NotTweeted => panic!("Ant should have tweeted!"),
+            Tweeted::Tweeted(time) => assert!(time
+                .signed_duration_since(chrono::offset::Utc::now())
+                .le(&Duration::seconds(10))),
+        }
+    }
+
+    let ants = dao.ants.read().await;
+    let found_ant = ants.get_one_by_id(&ant_id).await;
+    match found_ant {
+        None => panic!("Failed to get ant again!"),
+        Some(found_ant) => match &found_ant.tweeted {
+            Tweeted::NotTweeted => panic!("Ant should have tweeted!"),
+            Tweeted::Tweeted(time) => assert!(time
+                .signed_duration_since(chrono::offset::Utc::now())
+                .le(&Duration::seconds(10))),
+        },
     }
 }

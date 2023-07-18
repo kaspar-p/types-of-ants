@@ -194,6 +194,18 @@ impl AntsDao {
         Some(ant)
     }
 
+    pub async fn get_all_released(&self) -> Vec<&Ant> {
+        self.get_all()
+            .await
+            .iter()
+            .filter(|&&ant| match ant.status {
+                AntStatus::Released(_) => true,
+                _ => false,
+            })
+            .map(|&ant| ant)
+            .collect::<Vec<&Ant>>()
+    }
+
     pub async fn add_unreleased_ant(
         &mut self,
         ant_suggestion_content: String,
