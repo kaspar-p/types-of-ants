@@ -2,10 +2,13 @@
 
 All data regarding ant suggestions and its associated metadata.
 
-## `GET /all-ants`
-
-Get all ants and their associated metadata. Paginated for all users except the typesofants.org service account.
-
-## `GET /latest-ants`
-
-Get the ants only from the latest ant release.
+1. `POST /ListAllAnts`
+   1. Get all ants and their associated metadata.
+1. `POST /ListAntsWithStatus`
+   1. Get all ants with a certain status.
+1. `POST /ListLatestAnts`
+   1. Get all of the ants that were a part of the latest release.
+1. `POST /SuggestAnt`
+   1. Suggest a new ant. Is suggested into the `unreleased` category of ants.
+1. `POST /GetLatestRelease`
+   1. Returns the latest release number.

@@ -42,7 +42,7 @@ async fn cron_tweet() {
     let random_ant: Ant = {
         let read_ants = dao.ants.read().await;
         let ants = read_ants
-            .get_all()
+            .get_all_released()
             .await
             .iter()
             .filter(|&ant| ant.tweeted == Tweeted::NotTweeted)
