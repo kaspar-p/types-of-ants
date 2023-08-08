@@ -1,3 +1,4 @@
+mod clients;
 mod middleware;
 mod routes;
 mod types;
@@ -5,9 +6,10 @@ mod types;
 use ant_data_farm::connect;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
-    routing::get,
+    routing::{get, post},
     Router,
 };
+use axum_extra::routing::RouterExt;
 use std::{net::SocketAddr, sync::Arc};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -40,6 +42,7 @@ async fn main() {
     debug!("Initializing API routes...");
     let api_routes = Router::new()
         .nest("/ants", routes::ants::router())
+        // .nest("/msg", routes::msg::router())
         .nest("/users", routes::users::router())
         .nest("/hosts", routes::hosts::router())
         .nest("/tests", routes::tests::router())
@@ -62,7 +65,6 @@ async fn main() {
 
     debug!("Initializing site routes...");
     let app = Router::new()
-        .route("/ping", get(|| async { ping() }))
         .nest("/api", api_routes)
         // Marking the main filesystem as fallback allows wrong paths like
         // /api/something to still hit the /api router fallback()
@@ -73,15 +75,11 @@ async fn main() {
                 .layer(cors),
         );
 
-    debug!("Starting server...");
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3499));
+    let port: u16 = 3499;
+    debug!("Starting server on port {port}...");
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-fn ping() -> &'static str {
-    info!("Got ping, responding with pong!");
-    "pong"
 }

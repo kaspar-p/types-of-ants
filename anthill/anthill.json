@@ -1,8 +1,10 @@
 {
   "project": "anthill",
   "version": "1.0.0",
-  "entries": {
-    "build": "cargo build",
-    "run": "cargo run"
-  }
+  "artifacts": [
+    {
+      "name": "anthill",
+      "kind": "rust-bin"
+    }
+  ]
 }

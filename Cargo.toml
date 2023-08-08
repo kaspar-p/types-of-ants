@@ -4,5 +4,8 @@ members = [
   "ant-just-checking-in",
   "ant-on-the-web",
   "ant-who-tweets",
-  "ant-host-agent"
+  "ant-host-agent",
+  "ant-metadata",
+  "ant-owning-artifacts",
+  "anthill"
 ]

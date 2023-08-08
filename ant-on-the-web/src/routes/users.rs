@@ -151,12 +151,50 @@ async fn login(State(dao): DaoState, Json(login_request): Json<LoginRequest>) ->
 }
 
 #[derive(Deserialize)]
+struct VerificationCode(String);
+
+#[derive(Deserialize)]
+struct SignupVerificationRequest {
+    pub username: String,
+    pub email: String,
+    pub phone_number: String,
+    pub phone_verification: VerificationCode,
+    pub email_verification: VerificationCode,
+}
+async fn signup_verification(
+    State(dao): DaoState,
+    Json(signup_verification_request): Json<SignupVerificationRequest>,
+) -> impl IntoResponse {
+    todo!("Verify that the verification codes sent are correct!");
+
+    let mut write_users = dao.users.write().await;
+    let user = write_users
+        .create_user(
+            signup_verification_request.username,
+            signup_verification_request.phone_number,
+            vec![signup_verification_request.email],
+        )
+        .await;
+
+    match user {
+        Some(_) => (
+            StatusCode::OK,
+            Json("Signup request accepted!").into_response(),
+        ),
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("ERROR: Signup request failed!").into_response(),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
 struct SignupRequest {
     pub username: String,
     pub email: String,
     pub phone_number: String,
 }
-async fn signup(
+async fn signup_request(
     State(dao): DaoState,
     Json(signup_request): Json<SignupRequest>,
 ) -> impl IntoResponse {
@@ -181,31 +219,18 @@ async fn signup(
         }
     }
 
-    let mut write_users = dao.users.write().await;
-    let user = write_users
-        .create_user(
-            signup_request.username,
-            signup_request.phone_number,
-            vec![signup_request.email],
-        )
-        .await;
-
-    match user {
-        Some(_) => (
-            StatusCode::OK,
-            Json("Signup request accepted!").into_response(),
-        ),
-        None => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("ERROR: Signup request failed!").into_response(),
-        ),
-    }
+    todo!(
+        "Send verification codes to the user!
+    1. Instantiate a twilio client here and call it
+    2. Instantiate an email client and call it!"
+    );
 }
 
 pub fn router() -> DaoRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
-        .route_with_tsr("/signup", post(signup))
+        .route_with_tsr("/signup-request", post(signup_request))
+        .route_with_tsr("/signup-verification", post(signup_verification))
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/user/:user-name", get(get_user_by_name))
         .fallback(|| async {

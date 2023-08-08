@@ -1,12 +1,19 @@
+mod common;
+mod procs;
+mod routes;
+
 use axum::{
+    extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method},
-    routing::get,
+    routing::{get, post},
     Router,
 };
+use routes::{kill_project, launch_project, ping};
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
+use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{debug, info};
+use tracing::debug;
 
 #[tokio::main]
 async fn main() {
@@ -27,24 +34,29 @@ async fn main() {
         .allow_headers([CONTENT_TYPE]);
 
     debug!("Initializing API routes...");
-    let app = Router::new().route("/ping", get(health_check)).layer(
-        ServiceBuilder::new()
-            .layer(TraceLayer::new_for_http())
-            .layer(cors),
-    );
+    let app = Router::new()
+        .route("/ping", get(ping).post(ping))
+        .route("/kill_project", post(kill_project))
+        .route("/launch_project", post(launch_project))
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(
+            100 * 1024 * 1024, /* 100mb */
+        ))
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(cors),
+        );
 
     debug!("Starting server...");
-
-    let port = dotenv::var("HOST_AGENT_PORT").unwrap_or(String::from("4499"));
+    let port = dotenv::var("HOST_AGENT_PORT")
+        .unwrap_or(String::from("4499"))
+        .parse::<u16>()
+        .expect("HOST_AGENT_PORT environment variable needs to be a valid port!");
     debug!("Starting host agent on port {port}");
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3499));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-async fn health_check() -> &'static str {
-    info!("Got health, responding with 'healthy ant'!");
-    "healthy ant"
 }

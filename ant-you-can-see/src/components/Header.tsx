@@ -43,15 +43,15 @@ export function Header({ children }: HeaderProps) {
             types of ants <span className="text-sm">v{releaseNumber}</span>
           </h1>
         </div>
-        <h2 className="text-center m-0">
+        <h3 className="text-center m-0">
           ants discovered to date: {allAnts.ants.length}
-        </h2>
+        </h3>
         <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
           <div className="text-center flex flex-row space-x-2 align-center">
             {loggedIn ? (
               <button onClick={() => push("/profile")}>profile</button>
             ) : (
-              <button onClick={() => push("/login")}>log in or signup</button>
+              <button onClick={() => push("/login")}>log in / signup</button>
             )}
             <button onClick={() => push("/")}>home</button>
             <button onClick={() => push("/feed")}>feed</button>

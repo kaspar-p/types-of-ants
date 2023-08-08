@@ -1,5 +1,4 @@
 use ant_data_farm::ants::Tweeted;
-use ant_data_farm::DaoTrait;
 use ant_data_farm::{ants::Ant, connect};
 use rand::seq::SliceRandom;
 use std::time::Duration;

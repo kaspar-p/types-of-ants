@@ -1,0 +1,17 @@
+[package]
+name = "anthill"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+semver = { version = "1.0.18", features = ["serde"] }
+ant-metadata = { path = "../ant-metadata" }
+serde = "1.0.174"
+serde_json = "1.0.103"
+tracing = "0.1.37"
+cargo = "0.72.1"
+command-macros = "0.2.9"
+tokio = { version = "1.29.1", features = ["tokio-macros", "full"] }
+anyhow = "1.0.72"
