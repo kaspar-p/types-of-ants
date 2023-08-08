@@ -99,7 +99,7 @@
   <div>ant with an ego</div>
   <div>white ant</div>
   <div>ant that created this website</div>
-  <div>ant on twitter! @typesofants</div>
+  <div>ant on twitter! <a href="https://twitter.com/typesofants">@typesofants</a></div>
   <div>light blue ant</div>
   <div>ant just going through the motions</div>
   <div>malding ant</div>
@@ -261,7 +261,7 @@
   <div>ant that is a know-it-all</div>
   <div>ant who gave up</div>
   <div>ant in a hat</div>
-  <div>mouco ant</div>
+  <div><a href="https://www.mouco.com">mouco ant</a></div>
   <div>ant that is secretly in love with its best friend</div>
   <div>ant with pipes</div>
   <div>ant who isn't depressed so much as sentient</div>
