@@ -6,4 +6,4 @@ go build
 cd ..
 
 # Move the binary to the top level
-mv ./cli/add
+mv cli/add add
