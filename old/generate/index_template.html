@@ -115,9 +115,12 @@
       }
     </style>
     <script>
+      if (window.location.href.match("http://www.typesofants.org")) window.location.protocol='https:'
+    </script>
+    <script>
       const bannerId = "scroll-container"
       const helperWrapperId = "scroll-helper-wrapper";
-      const pxPerSecond = 100;
+      const pxPerSecond = 75;
 
       function setUpElements() {
         const banner = document.getElementById(bannerId);

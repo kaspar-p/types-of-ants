@@ -9,3 +9,21 @@ rust-project.json
 
 # Added by cargo
 /target
+.DS_Store
+
+./cli/add
+
+# v1.0 compatibility
+*.env
+run/
+target/
+
+# projects
+ant-just-checking-in/
+ant-host-agent/
+ant-you-can-see/
+ant-who-tweets/
+ant-on-the-web/
+ant-data-farm/
+ant-gateway/
+ant-building-projects/
