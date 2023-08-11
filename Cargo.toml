@@ -1,11 +1,11 @@
 [workspace]
 members = [
-  "ant-data-farm", 
-  "ant-just-checking-in",
-  "ant-on-the-web",
-  "ant-who-tweets",
-  "ant-host-agent",
-  "ant-metadata",
-  "ant-owning-artifacts",
-  "anthill"
+  "projects/ant-data-farm", 
+  "projects/ant-just-checking-in",
+  "projects/ant-on-the-web/website",
+  "projects/ant-who-tweets",
+  "projects/ant-host-agent",
+  "projects/ant-metadata",
+  "projects/ant-owning-artifacts",
+  "projects/anthill"
 ]
