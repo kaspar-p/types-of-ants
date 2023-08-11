@@ -115,7 +115,6 @@ drop table if exists registered_user cascade;
 create table registered_user (
   user_id uuid unique primary key default gen_random_uuid(), -- The unique user ID
   user_name varchar(255) unique not null, -- The username for the user
-  user_phone_number varchar(20) unique not null,
   user_joined timestamp with time zone not null default now() -- The time that the user signed up
 );
 
@@ -129,8 +128,8 @@ create table registered_user_email (
 
 insert into registered_user (user_name, user_phone_number)
 values
-  ('kaspar', '9704812142'),
-  ('nobody', '0000000000')
+  ('kaspar'),
+  ('nobody')
 ;
 
 insert into registered_user_email (user_id, user_email)
