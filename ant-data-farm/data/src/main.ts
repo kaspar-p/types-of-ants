@@ -1,6 +1,5 @@
 import { SiteData, getSiteData, getRawData, RawData } from "./parse";
-import { execSync } from "child_process";
-import fs from "fs";
+import { exec as _exec } from "child_process";
 import {
   antReleaseSql,
   antTweetedSql,
@@ -8,6 +7,11 @@ import {
   declinedToSql,
   releaseSql,
 } from "./sql";
+import { checkIntegrity } from "./integrity";
+import * as fs from "fs-extra";
+import * as util from "util";
+
+const exec = util.promisify(_exec);
 
 export type UnseenAnt = {
   originalSuggestionContent: string;
@@ -58,7 +62,7 @@ export type SiteAntMetadata = {
 };
 
 // Content is either 'ant' or 'suggestedContent'
-const siteData = getSiteData();
+const siteData = getSiteData("./data/site_data.json");
 const forwardMap = new Map<string, SiteAntMetadata>();
 const backwardMap = new Map<string, SiteAntMetadata>();
 siteData.ants.forEach((ant) => {
@@ -68,7 +72,9 @@ siteData.ants.forEach((ant) => {
   }
 });
 
-function getSiteAntFromContent(content: string): SiteAntMetadata | undefined {
+export function getSiteAntFromContent(
+  content: string
+): SiteAntMetadata | undefined {
   const fromForward = forwardMap.get(content);
   if (fromForward) return fromForward;
   const fromBackward = backwardMap.get(content);
@@ -112,8 +118,8 @@ function parseTitleForAntContent(title: string): string | undefined {
   return antContent;
 }
 
-function getAllUnseenAnts(): UnseenAnt[] {
-  const rawData = getRawData();
+async function getAllUnseenAnts(dataFilePath: string): Promise<UnseenAnt[]> {
+  const rawData = await getRawData(dataFilePath);
 
   const unseenAnts: UnseenAnt[] = [];
   rawData.forEach((issue) => {
@@ -144,21 +150,21 @@ const formatSingleCommit = (gitCommitId: string) => {
   return `git log -n 1 '${gitCommitId}' --format=%cd`;
 };
 
-function getEarliestCommitDate(antContent: string): Date {
+async function getEarliestCommitDate(antContent: string): Promise<Date> {
   if (!antContent) throw new Error("Passed nothing!");
-  const lastCommitLine: string = execSync(getCommitsAntWasPresent(antContent))
-    .toString("utf-8")
-    .trim();
+  const lastCommitLine: string = (
+    await exec(getCommitsAntWasPresent(antContent))
+  ).stdout.trim();
   if (!lastCommitLine)
     throw new Error("Content was never seen?: " + antContent);
-  const commitId: string = execSync(getCommitIdFromOneline(lastCommitLine))
-    .toString("utf-8")
-    .trim();
+  const commitId: string = (
+    await exec(getCommitIdFromOneline(lastCommitLine))
+  ).stdout.trim();
   if (!commitId)
     throw new Error("The parsing line didn't work?: " + antContent);
-  const singleCommitDate: string = execSync(formatSingleCommit(commitId))
-    .toString("utf-8")
-    .trim();
+  const singleCommitDate: string = (
+    await exec(formatSingleCommit(commitId))
+  ).stdout.trim();
   const d = new Date(singleCommitDate);
   if (!singleCommitDate || !d)
     throw new Error(
@@ -205,33 +211,39 @@ function assignReleasesToAnts(
   };
 }
 
-function getAllLegacyAnts(): LegacyAnt[] {
-  const siteData = getSiteData();
+export async function getAllLegacyAnts(
+  siteDataPath: string
+): Promise<LegacyAnt[]> {
+  const siteData = getSiteData(siteDataPath);
   // Get the ants marked as legacy
-  return dedupe(
-    siteData.ants
-      .filter((ant) => ant.legacy)
-      .map((ant) => {
-        const commitTimestamp = getEarliestCommitDate(ant.ant).toISOString();
-        return {
-          antContent: ant.ant,
-          tweeted: ant.tweeted ?? false,
-          tweetedAt: ant.tweetedAt ?? null,
-          originalSuggestionContent: ant.ant,
-          ordering: hashCode(ant.ant),
-          createdAt: commitTimestamp,
-          closedAt: commitTimestamp,
-        };
-      }),
-    "antContent"
-  );
+  const legacyAntPromises = siteData.ants
+    .filter((ant) => ant.legacy)
+    .map(async (ant) => {
+      const commitTimestamp = (
+        await getEarliestCommitDate(ant.ant)
+      ).toISOString();
+      console.log(ant.ant);
+      return {
+        antContent: ant.ant,
+        tweeted: ant.tweeted ?? false,
+        tweetedAt: ant.tweetedAt ?? null,
+        originalSuggestionContent: ant.ant,
+        ordering: hashCode(ant.ant),
+        createdAt: commitTimestamp,
+        closedAt: commitTimestamp,
+      };
+    });
+  let legacyAnts = await Promise.all(legacyAntPromises);
+  return dedupe(legacyAnts, "antContent");
 }
 
-function getAllDeclinedAndAcceptedAnts(): {
+export async function getAllDeclinedAndAcceptedAnts(
+  dataFilePath: string
+): Promise<{
   declinedAnts: DeclinedAnt[];
   acceptedAnts: AcceptedAnt[];
-} {
-  const rawData = getRawData();
+}> {
+  const rawData = await getRawData(dataFilePath);
 
   const declinedAnts: DeclinedAnt[] = [];
   const acceptedAnts: AcceptedAnt[] = [];
@@ -271,6 +283,7 @@ function getAllDeclinedAndAcceptedAnts(): {
 }
 
 function dedupe<T, K extends string>(arr: Record<K, unknown>[], key: K): T[] {
+  console.log("d");
   const m = new Map();
   for (const x of arr) {
     m.set(x[key], x);
@@ -297,15 +310,15 @@ function formatAntsWithReleases(
     .join("\n");
 }
 
-function writeSqlFiles() {
-  console.log("Writing to SQL files...");
+async function writeSqlFiles(siteDataFile: string, rawDataFile: string) {
+  console.log("Getting ants...");
 
   const { acceptedAnts: acceptedAntsWithoutReleases, declinedAnts } =
-    getAllDeclinedAndAcceptedAnts();
+    await getAllDeclinedAndAcceptedAnts(rawDataFile);
 
   const { acceptedAnts, legacyAnts } = assignReleasesToAnts(
     acceptedAntsWithoutReleases,
-    getAllLegacyAnts()
+    await getAllLegacyAnts(siteDataFile)
   );
 
   const allAnts: AntMetadata[] = [
@@ -318,81 +331,41 @@ function writeSqlFiles() {
     ...legacyAnts,
   ];
   const sqlFor_ant = antsToSql(allAnts);
-  fs.writeFileSync("./sql/ant.sql", sqlFor_ant, { encoding: "utf-8" });
+
+  const dir = "./out";
+  await fs.mkdir(dir, { recursive: true });
+
+  console.log("Writing to SQL files...");
+  fs.writeFileSync("./out/ant.sql", sqlFor_ant, { encoding: "utf-8" });
 
   const sqlFor_ant_tweeted = antTweetedSql(siteAnts);
-  fs.writeFileSync("./sql/ant_tweeted.sql", sqlFor_ant_tweeted, {
+  fs.writeFileSync("./out/ant_tweeted.sql", sqlFor_ant_tweeted, {
     encoding: "utf-8",
   });
 
   const sqlFor_ant_declined = declinedToSql(declinedAnts);
-  fs.writeFileSync("./sql/ant_declined.sql", sqlFor_ant_declined, {
+  fs.writeFileSync("./out/ant_declined.sql", sqlFor_ant_declined, {
     encoding: "utf-8",
   });
 
   const sqlFor_ant_release = antReleaseSql(siteAnts);
-  fs.writeFileSync("./sql/ant_release.sql", sqlFor_ant_release, {
+  fs.writeFileSync("./out/ant_release.sql", sqlFor_ant_release, {
     encoding: "utf-8",
   });
 
   const sqlFor_release = releaseSql(siteAnts);
-  fs.writeFileSync("./sql/release.sql", sqlFor_release, {
+  fs.writeFileSync("./out/release.sql", sqlFor_release, {
     encoding: "utf-8",
   });
 
   console.log("Finished!");
 }
 
-function checkIntegrity() {
-  console.log("Running...");
-  const legacyAnts = getAllLegacyAnts();
-  console.log("Got all legacy ants!");
-  const { acceptedAnts, declinedAnts } = getAllDeclinedAndAcceptedAnts();
-  console.log("Got all accepted and declined ants!");
-  const siteAnts: Set<string> = new Set(
-    getSiteData().ants.map((ant) => ant.ant)
-  );
-  acceptedAnts.forEach((ant) => {
-    const acceptedAnt = getSiteAntFromContent(ant.antContent);
-    if (!acceptedAnt) {
-      throw new Error(
-        `Accepted ant '${ant.antContent}' not found as site ant!`
-      );
-    } else {
-      siteAnts.delete(ant.antContent);
-      siteAnts.delete(ant.originalSuggestionContent);
-    }
-  });
-
-  legacyAnts.forEach((ant) => {
-    const siteAntContent = getSiteAntFromContent(ant.antContent);
-    if (!siteAntContent) {
-      throw new Error(
-        `Legacy ant '${ant.antContent}' not found as site ant content!`
-      );
-    } else {
-      siteAnts.delete(ant.antContent);
-      siteAnts.delete(ant.originalSuggestionContent);
-    }
-
-    const siteAntOriginal = getSiteAntFromContent(
-      ant.originalSuggestionContent
-    );
-    if (!siteAntOriginal) {
-      throw new Error(
-        `Legacy ant '${ant.antContent}' not found as site ant original!`
-      );
-    } else {
-      siteAnts.delete(ant.antContent);
-      siteAnts.delete(ant.originalSuggestionContent);
-    }
-  });
-
-  console.log("Finished: ", siteAnts.size, Array.from(siteAnts));
-}
-
-function main() {
-  writeSqlFiles();
+async function main() {
+  const rawData = "./data/raw_issues_8_10_2023.json";
+  const siteData = "./data/site_data.json";
+  // await checkIntegrity(siteData, rawData);
+  // await writeSqlFiles(siteData, rawData);
 }
 
 main();

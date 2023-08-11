@@ -1,6 +1,5 @@
-import jsonRaw from "../data/raw_issues_6_24.json";
-import jsonSite from "../data/site_data.json";
 import { z } from "zod";
+import * as fs from "fs-extra";
 
 const siteSchema = z.object({
   version: z.string(),
@@ -16,8 +15,12 @@ const siteSchema = z.object({
 });
 
 export type SiteData = z.infer<typeof siteSchema>;
-export function getSiteData(): SiteData {
-  return siteSchema.parse(jsonSite);
+export function getSiteData(siteDataPath: string): SiteData {
+  const content = fs.readFileSync(siteDataPath, {
+    encoding: "utf-8",
+  });
+  const jsonRaw = JSON.parse(content);
+  return siteSchema.parse(jsonRaw);
 }
 
 const rawSchema = z.array(
@@ -40,7 +43,9 @@ const rawSchema = z.array(
   })
 );
 export type RawData = z.infer<typeof rawSchema>;
-export function getRawData(): RawData {
+export async function getRawData(jsonFilePath: string): Promise<RawData> {
+  const content = await fs.readFile(jsonFilePath, { encoding: "utf8" });
+  const jsonRaw = JSON.parse(content);
   return rawSchema.parse(jsonRaw);
 }
 
