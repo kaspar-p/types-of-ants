@@ -46,12 +46,16 @@ impl Into<reqwest::Body> for Architecture {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Project {
+    AntBuildingProjects,
+    AntDataFarm,
+    AntGateway,
+    AntHostAgent,
+    AntJustCheckingIn,
+    AntMetadata,
     AntOnTheWeb,
     AntOwningArtifacts,
-    AntHostAgent,
-    AntGateway,
-    AntDataFarm,
     AntWhoTweets,
+    Anthill,
 }
 
 impl Into<reqwest::Body> for Project {
@@ -64,23 +68,36 @@ impl FromStr for Project {
     type Err = ();
     fn from_str(input: &str) -> Result<Project, Self::Err> {
         match input {
+            "ant-building-projects" => Ok(Project::AntBuildingProjects),
+            "AntBuildingProjects" => Ok(Project::AntBuildingProjects),
+
+            "ant-data-farm" => Ok(Project::AntDataFarm),
+            "AntDataFarm" => Ok(Project::AntDataFarm),
+
+            "ant-gateway" => Ok(Project::AntGateway),
+            "AntGateway" => Ok(Project::AntGateway),
+
+            "ant-host-agent" => Ok(Project::AntHostAgent),
+            "AntHostAgent" => Ok(Project::AntHostAgent),
+
+            "ant-just-checking-in" => Ok(Project::AntJustCheckingIn),
+            "AntJustCheckingIn" => Ok(Project::AntJustCheckingIn),
+
+            "ant-metadata" => Ok(Project::AntMetadata),
+            "AntOnTheWeb" => Ok(Project::AntMetadata),
+
             "ant-on-the-web" => Ok(Project::AntOnTheWeb),
             "AntOnTheWeb" => Ok(Project::AntOnTheWeb),
 
             "ant-owning-artifacts" => Ok(Project::AntOwningArtifacts),
             "AntOwningArtifacts" => Ok(Project::AntOwningArtifacts),
 
-            "ant-host-agent" => Ok(Project::AntHostAgent),
-            "AntHostAgent" => Ok(Project::AntHostAgent),
-
-            "ant-gateway" => Ok(Project::AntGateway),
-            "AntGateway" => Ok(Project::AntGateway),
-
-            "ant-data-farm" => Ok(Project::AntDataFarm),
-            "AntDataFarm" => Ok(Project::AntDataFarm),
-
             "ant-who-tweets" => Ok(Project::AntWhoTweets),
             "AntWhoTweets" => Ok(Project::AntWhoTweets),
+
+            "anthill" => Ok(Project::Anthill),
+            "Anthill" => Ok(Project::Anthill),
+
             _ => Err(()),
         }
     }
@@ -89,12 +106,16 @@ impl FromStr for Project {
 impl Project {
     pub fn as_str(&self) -> &'static str {
         match self {
+            Project::AntBuildingProjects => "ant-building-projects",
+            Project::AntDataFarm => "ant-data-farm",
+            Project::AntGateway => "ant-gateway",
+            Project::AntHostAgent => "ant-host-agent",
+            Project::AntJustCheckingIn => "ant-just-checking-in",
+            Project::AntMetadata => "ant-metadata",
             Project::AntOnTheWeb => "ant-on-the-web",
             Project::AntOwningArtifacts => "ant-owning-artifacts",
-            Project::AntGateway => "ant-gateway",
-            Project::AntDataFarm => "ant-data-farm",
             Project::AntWhoTweets => "ant-who-tweets",
-            Project::AntHostAgent => "ant-host-agent",
+            Project::Anthill => "anthill",
         }
     }
 }

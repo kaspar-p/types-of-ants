@@ -126,7 +126,7 @@ create table registered_user_email (
   constraint fk_email foreign key (user_id) references registered_user(user_id)
 );
 
-insert into registered_user (user_name, user_phone_number)
+insert into registered_user (user_name)
 values
   ('kaspar'),
   ('nobody')

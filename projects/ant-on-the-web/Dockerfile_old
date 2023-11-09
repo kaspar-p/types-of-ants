@@ -1,0 +1,29 @@
+FROM rust:1.66.0 AS build
+WORKDIR /usr/src
+
+# Download the target for static linking.
+RUN rustup target add x86_64-unknown-linux-musl
+
+FROM ant-data-farm
+RUN USER=root cargo new ant-data-farm
+WORKDIR /usr/src/ant-data-farm
+COPY ../ant-data-farm/Cargo.toml ../ant-data-farm/Cargo.lock ./
+RUN cargo build --release
+
+# Create a dummy project and build the app's dependencies.
+# If the Cargo.toml or Cargo.lock files have not changed,
+# we can use the docker build cache and skip these (typically slow) steps.
+WORKDIR /usr/src/ant-on-the-web
+RUN USER=root cargo new ant-on-the-web
+COPY server/Cargo.toml server/Cargo.lock ./
+RUN cargo build --release
+
+# Copy the source and build the application.
+COPY server/src ./src
+RUN cargo install --target x86_64-unknown-linux-musl --path .
+
+# Copy the statically-linked binary into a scratch container.
+FROM scratch
+COPY --from=build /usr/local/cargo/bin/ant-on-the-web .
+USER 1000
+CMD ["./ant-on-the-web"]

@@ -13,23 +13,52 @@ pub use crate::dao::daos::ants;
 pub use crate::dao::daos::hosts;
 pub use crate::dao::daos::users;
 
+#[derive(Debug, Clone)]
+pub struct DatabaseCredentials {
+    pub database_name: String,
+    pub database_user: String,
+    pub database_password: String,
+}
+
+fn get_credentials_from_env() -> Result<DatabaseCredentials, dotenv::Error> {
+    dotenv::dotenv()?;
+    Ok(DatabaseCredentials {
+        database_name: dotenv::var("DB_PG_NAME")?,
+        database_user: dotenv::var("DB_PG_USER")?,
+        database_password: dotenv::var("DB_PG_PASSWORD")?,
+    })
+}
+
+fn get_port_from_env() -> Option<u16> {
+    dotenv::dotenv().ok()?;
+    dotenv::var("DB_PG_PORT").ok()?.parse::<u16>().ok()
+}
+
+fn get_host_from_env() -> Option<String> {
+    dotenv::dotenv().ok()?;
+    dotenv::var("DB_HOST").ok()
+}
+
 async fn database_connection(
-    port: Option<u16>,
+    config: DatabaseConfig,
 ) -> Result<Pool<PostgresConnectionManager<NoTls>>, dotenv::Error> {
-    if let Err(e) = dotenv::dotenv() {
-        panic!("Failed to load environment variables: {e}");
-    }
+    let port = config
+        .port
+        .unwrap_or(get_port_from_env().unwrap_or(7000))
+        .clone();
+    let db_creds = config.creds.unwrap_or_else(|| {
+        get_credentials_from_env()
+            .expect("Credentials not explicitly passed in must be in the environment!")
+    });
 
-    let env_port = dotenv::var("DB_PG_PORT")?;
-    let port = port.unwrap_or(env_port.parse::<u16>().unwrap());
-
-    let db_name = dotenv::var("DB_PG_NAME")?;
-    let user = dotenv::var("DB_PG_USER")?;
-    let pw = dotenv::var("DB_PG_PASSWORD")?;
+    // TODO: find out a more dynamic way of getting the IP of a host
+    let host = config
+        .host
+        .unwrap_or_else(|| get_host_from_env().unwrap_or("localhost".to_owned()));
 
     let connection_string = format!(
-        "postgresql://{}:{}@localhost:{}/{}",
-        user, pw, port, db_name
+        "postgresql://{}:{}@{}:{}/{}",
+        db_creds.database_user, db_creds.database_password, host, port, db_creds.database_name
     );
 
     debug!("Connecting to database at port {port}...");
@@ -40,8 +69,20 @@ async fn database_connection(
     Ok(pool)
 }
 
-async fn internal_connect(port: Option<u16>) -> Dao {
-    let pool = database_connection(port)
+#[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    pub port: Option<u16>,
+    /// The credentials to connect to the database.
+    /// If omitted, tries to get credentials from $DB_PG_NAME, DB_PG_PASSWORD,
+    /// and DB_PG_USER environment variables
+    pub creds: Option<DatabaseCredentials>,
+    /// The IP-address host of the database.
+    /// If omitted, checks for a $DB_HOST variable, then tries localhost.
+    pub host: Option<String>,
+}
+
+async fn internal_connect(config: DatabaseConfig) -> Dao {
+    let pool = database_connection(config)
         .await
         .unwrap_or_else(|e| panic!("Failed to get environment variable: {e}"));
 
@@ -51,10 +92,15 @@ async fn internal_connect(port: Option<u16>) -> Dao {
     return dao;
 }
 
-pub async fn connect_port(port: u16) -> Dao {
-    internal_connect(Some(port)).await
+pub async fn connect() -> Dao {
+    internal_connect(DatabaseConfig {
+        port: None,
+        creds: None,
+        host: None,
+    })
+    .await
 }
 
-pub async fn connect() -> Dao {
-    internal_connect(None).await
+pub async fn connect_config(config: DatabaseConfig) -> Dao {
+    internal_connect(config).await
 }

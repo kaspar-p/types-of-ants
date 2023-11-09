@@ -2,7 +2,7 @@
 members = [
   "projects/ant-data-farm", 
   "projects/ant-just-checking-in",
-  "projects/ant-on-the-web/website",
+  "projects/ant-on-the-web/server",
   "projects/ant-who-tweets",
   "projects/ant-host-agent",
   "projects/ant-metadata",
