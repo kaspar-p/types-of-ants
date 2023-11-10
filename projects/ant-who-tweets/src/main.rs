@@ -2,7 +2,6 @@ use ant_data_farm::ants::Ant;
 use ant_data_farm::ants::Tweeted;
 use ant_data_farm::{DatabaseConfig, DatabaseCredentials};
 use chrono::Timelike;
-use chrono::{DateTime, Local};
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -124,9 +123,22 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let mut scheduler = JobScheduler::new().await.unwrap();
 
-    let real_diff = chrono::offset::Utc::now().hour() - chrono::offset::Local::now().hour();
+    let local = chrono::offset::Local::now().hour();
+    let utc = chrono::offset::Utc::now().hour();
+    let real_diff: u32 = {
+        if utc > local {
+            utc - local
+        } else {
+            (24 + utc) - local
+        }
+    };
     let expected_diff = 6;
     let hour_offset = expected_diff - real_diff;
+
+    info!(
+        "Starting up! Local hours: {}, UTC hours: {}, hour to tweet: {}",
+        local, utc, hour_offset
+    );
 
     scheduler
         .add(
@@ -151,7 +163,11 @@ async fn main() {
             .unwrap_or(Some(Duration::from_secs(10)))
             .unwrap_or(Duration::from_secs(10));
         let sleep_time = std::cmp::min(max_time, Duration::from_secs(1000));
-        info!("Sleeping for {} seconds!", sleep_time.as_secs());
+        info!(
+            "Saw {} seconds until next job, sleeping for {} seconds!",
+            max_time.as_secs(),
+            sleep_time.as_secs()
+        );
 
         tokio::time::sleep(sleep_time).await;
     }
