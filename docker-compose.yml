@@ -20,6 +20,8 @@ services:
     ports:
       - "7000:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
     env_file: ./.env.db
+    environment:
+      PGDATA: /var/lib/postgresql/data/
     secrets:
       - database_creds
 secrets:
