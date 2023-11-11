@@ -22,6 +22,8 @@ services:
     env_file: ./.env.db
     environment:
       PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - ./projects/ant-data-farm/database-files:/var/lib/postgresql/data
     secrets:
       - database_creds
 secrets:
