@@ -41,7 +41,9 @@ async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<tw
 async fn cron_tweet() -> () {
     info!("Starting cron...");
     let config: Config = get_config().expect("Getting config failed!");
-    let dao = ant_data_farm::connect_config(config.database).await;
+    let dao = ant_data_farm::connect_config(config.database)
+        .await
+        .unwrap();
 
     info!("Getting random ant choice...");
     let random_ant: Ant = {
@@ -139,6 +141,8 @@ async fn main() {
         "Starting up! Local hours: {}, UTC hours: {}, hour to tweet: {}",
         local, utc, hour_offset
     );
+
+    cron_tweet().await;
 
     scheduler
         .add(

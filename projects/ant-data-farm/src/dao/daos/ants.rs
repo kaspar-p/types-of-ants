@@ -64,8 +64,8 @@ pub struct AntsDao {
 }
 
 #[async_trait::async_trait]
-impl DaoTrait<Ant> for AntsDao {
-    async fn new(db: Arc<Mutex<Database>>) -> AntsDao {
+impl DaoTrait<AntsDao, Ant> for AntsDao {
+    async fn new(db: Arc<Mutex<Database>>) -> Result<AntsDao, anyhow::Error> {
         let mut ants = DHashMap::<AntId, String, Box<Ant>>::new();
 
         let released_ant_rows = db
@@ -88,8 +88,7 @@ impl DaoTrait<Ant> for AntsDao {
                 ",
                 &[],
             )
-            .await
-            .unwrap_or_else(|e| panic!("Getting ant data failed: {e}"));
+            .await?;
 
         let released_ants = futures::future::join_all(released_ant_rows.iter().map(|row| async {
             let tweeted_at: Option<DateTime<Utc>> = row.get("tweeted_at");
@@ -133,7 +132,7 @@ impl DaoTrait<Ant> for AntsDao {
             ants.insert(ant.ant_id, ant.ant_name.clone(), Box::new(ant));
         }
 
-        AntsDao { database: db, ants }
+        Ok(AntsDao { database: db, ants })
     }
 
     // Read

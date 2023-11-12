@@ -16,3 +16,4 @@ tracing-subscriber = "0.3.17"
 tracing-appender = "0.2.2"
 ant-data-farm = { path = "../ant-data-farm" }
 chrono = "0.4.31"
+anyhow = "1.0.75"

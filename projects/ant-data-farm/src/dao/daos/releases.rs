@@ -8,7 +8,7 @@ pub struct ReleasesDao {
 }
 
 impl ReleasesDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> ReleasesDao {
+    pub async fn new(db: Arc<Mutex<Database>>) -> Result<ReleasesDao, anyhow::Error> {
         let rows = db
             .lock()
             .await
@@ -16,17 +16,13 @@ impl ReleasesDao {
                 "select max(release_number) as latest_release from release limit 1",
                 &[],
             )
-            .await
-            .expect("Release number to return");
-        let latest_release: i32 = rows
-            .last()
-            .expect("There was at least one row")
-            .get("latest_release");
+            .await?;
+        let latest_release: i32 = rows.last().expect("had last").get("latest_release");
 
-        ReleasesDao {
+        Ok(ReleasesDao {
             latest_release,
             database: db,
-        }
+        })
     }
 
     pub async fn get_latest_release(&self) -> i32 {

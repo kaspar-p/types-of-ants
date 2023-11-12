@@ -19,16 +19,15 @@ pub struct HostsDao {
 }
 
 #[async_trait]
-impl DaoTrait<Host> for HostsDao {
-    async fn new(db: Arc<Mutex<Database>>) -> HostsDao {
+impl DaoTrait<HostsDao, Host> for HostsDao {
+    async fn new(db: Arc<Mutex<Database>>) -> Result<HostsDao, anyhow::Error> {
         let mut hosts = DHashMap::<HostId, String, Box<Host>>::new();
 
         let found_hosts = db
             .lock()
             .await
             .query("select host_id, host_label, host_location from host;", &[])
-            .await
-            .unwrap_or_else(|_| panic!("Fetching host data failed!"))
+            .await?
             .iter()
             .map(|row| Host {
                 host_id: row.get("host_id"),
@@ -41,10 +40,10 @@ impl DaoTrait<Host> for HostsDao {
             hosts.insert(host.host_id, host.host_label.clone(), Box::new(host));
         }
 
-        HostsDao {
+        Ok(HostsDao {
             database: db,
             hosts,
-        }
+        })
     }
 
     async fn get_all(&self) -> Vec<&Host> {

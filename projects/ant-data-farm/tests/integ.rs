@@ -1,9 +1,6 @@
 mod util;
 
-use ant_data_farm::{
-    ants::{AntStatus, Tweeted},
-    connect_port, DaoTrait,
-};
+use ant_data_farm::{ants::Tweeted, connect_config, DaoTrait, DatabaseConfig};
 use chrono::Duration;
 
 use tracing::debug;
@@ -15,7 +12,13 @@ async fn more_than_500_ants() {
     let fixture = test_fixture();
     let container = fixture.docker.run(fixture.image);
     let port = container.get_host_port_ipv4(5432);
-    let dao = connect_port(port).await;
+    let dao = connect_config(DatabaseConfig {
+        port: Some(port),
+        creds: None,
+        host: None,
+    })
+    .await
+    .expect("Connected!");
 
     let ants = dao.ants.read().await;
     let all_ants = ants.get_all_released().await;
@@ -29,7 +32,13 @@ async fn add_tweeted(_logging: &()) {
     let container = fixture.docker.run(fixture.image);
     debug!("Ran fixture!");
     let port = container.get_host_port_ipv4(5432);
-    let dao = connect_port(port).await;
+    let dao = connect_config(DatabaseConfig {
+        port: Some(port),
+        creds: None,
+        host: None,
+    })
+    .await
+    .expect("Connected!");
 
     let ant_id = {
         let ants = dao.ants.read().await;

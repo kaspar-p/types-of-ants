@@ -42,8 +42,8 @@ pub struct UsersDao {
 }
 
 #[async_trait::async_trait]
-impl DaoTrait<User> for UsersDao {
-    async fn new(db: Arc<Mutex<Database>>) -> UsersDao {
+impl DaoTrait<UsersDao, User> for UsersDao {
+    async fn new(db: Arc<Mutex<Database>>) -> Result<UsersDao, anyhow::Error> {
         let rows = db
             .lock()
             .await
@@ -51,8 +51,7 @@ impl DaoTrait<User> for UsersDao {
                 "select user_id, user_name, user_phone_number, user_joined from registered_user;",
                 &[],
             )
-            .await
-            .unwrap_or_else(|_| panic!("Fetching user data failed!"));
+            .await?;
 
         let users_list = future::join_all(rows.iter().map(|row| {
             let user_id: UserId = row.get("user_id");
@@ -74,10 +73,10 @@ impl DaoTrait<User> for UsersDao {
             users.insert(user.user_id, user.username.clone(), Box::new(user.clone()));
         }
 
-        UsersDao {
+        Ok(UsersDao {
             database: db,
             users,
-        }
+        })
     }
 
     async fn get_one_by_id(&self, user_id: &UserId) -> Option<&User> {

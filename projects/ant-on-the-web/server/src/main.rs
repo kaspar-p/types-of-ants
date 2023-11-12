@@ -37,7 +37,7 @@ async fn main() {
         .allow_headers([CONTENT_TYPE]);
 
     debug!("Setting up database connection pool...");
-    let dao = Arc::new(connect().await);
+    let dao = Arc::new(connect().await.expect("Connected to db!"));
 
     debug!("Initializing API routes...");
     let api_routes = Router::new()

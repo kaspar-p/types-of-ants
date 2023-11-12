@@ -81,7 +81,7 @@ pub struct DatabaseConfig {
     pub host: Option<String>,
 }
 
-async fn internal_connect(config: DatabaseConfig) -> Dao {
+async fn internal_connect(config: DatabaseConfig) -> Result<Dao, anyhow::Error> {
     let pool = database_connection(config)
         .await
         .unwrap_or_else(|e| panic!("Failed to get environment variable: {e}"));
@@ -92,7 +92,7 @@ async fn internal_connect(config: DatabaseConfig) -> Dao {
     return dao;
 }
 
-pub async fn connect() -> Dao {
+pub async fn connect() -> Result<Dao, anyhow::Error> {
     internal_connect(DatabaseConfig {
         port: None,
         creds: None,
@@ -101,6 +101,6 @@ pub async fn connect() -> Dao {
     .await
 }
 
-pub async fn connect_config(config: DatabaseConfig) -> Dao {
+pub async fn connect_config(config: DatabaseConfig) -> Result<Dao, anyhow::Error> {
     internal_connect(config).await
 }
