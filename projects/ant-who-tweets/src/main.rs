@@ -5,6 +5,7 @@ use chrono::Timelike;
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
+use tracing::error;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use twitter_v2::authorization::Oauth1aToken;
@@ -41,9 +42,14 @@ async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<tw
 async fn cron_tweet() -> () {
     info!("Starting cron...");
     let config: Config = get_config().expect("Getting config failed!");
-    let dao = ant_data_farm::connect_config(config.database)
-        .await
-        .unwrap();
+    let dao = match ant_data_farm::connect_config(config.database).await {
+        Err(e) => {
+            error!("Failed to initialize database: {}", e);
+            error!("Ending CRON early!");
+            return;
+        }
+        Ok(dao) => dao,
+    };
 
     info!("Getting random ant choice...");
     let random_ant: Ant = {
@@ -141,8 +147,6 @@ async fn main() {
         "Starting up! Local hours: {}, UTC hours: {}, hour to tweet: {}",
         local, utc, hour_offset
     );
-
-    cron_tweet().await;
 
     scheduler
         .add(

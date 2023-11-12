@@ -6,6 +6,7 @@ use bb8_postgres::PostgresConnectionManager;
 
 use tokio_postgres::NoTls;
 use tracing::debug;
+use tracing::info;
 
 pub use crate::dao::dao::Dao;
 pub use crate::dao::dao_trait::DaoTrait;
@@ -82,13 +83,9 @@ pub struct DatabaseConfig {
 }
 
 async fn internal_connect(config: DatabaseConfig) -> Result<Dao, anyhow::Error> {
-    let pool = database_connection(config)
-        .await
-        .unwrap_or_else(|e| panic!("Failed to get environment variable: {e}"));
-
-    debug!("Initializing data access layer...");
+    let pool = database_connection(config).await?;
+    info!("Initializing data access layer...");
     let dao = Dao::new(pool).await;
-    debug!("Data access layer initialized!");
     return dao;
 }
 
