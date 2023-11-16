@@ -165,18 +165,6 @@ async fn main() {
     scheduler.start().await.unwrap();
 
     loop {
-        let max_time: Duration = scheduler
-            .time_till_next_job()
-            .await
-            .unwrap_or(Some(Duration::from_secs(10)))
-            .unwrap_or(Duration::from_secs(10));
-        let sleep_time = std::cmp::min(max_time, Duration::from_secs(1000));
-        info!(
-            "Saw {} seconds until next job, sleeping for {} seconds!",
-            max_time.as_secs(),
-            sleep_time.as_secs()
-        );
-
-        tokio::time::sleep(sleep_time).await;
+        tokio::time::sleep(Duration::from_secs(1800)).await;
     }
 }
