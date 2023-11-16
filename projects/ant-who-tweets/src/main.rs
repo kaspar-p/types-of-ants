@@ -129,7 +129,7 @@ async fn main() {
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    let mut scheduler = JobScheduler::new().await.unwrap();
+    let scheduler = JobScheduler::new().await.unwrap();
 
     let local = chrono::offset::Local::now().hour();
     let utc = chrono::offset::Utc::now().hour();
