@@ -40,8 +40,10 @@ async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<tw
 }
 
 async fn cron_tweet() -> () {
-    info!("Starting cron...");
+    info!("Starting cron_tweet()...");
     let config: Config = get_config().expect("Getting config failed!");
+
+    info!("Beginning database connection...");
     let dao = match ant_data_farm::connect_config(config.database).await {
         Err(e) => {
             error!("Failed to initialize database: {}", e);
@@ -153,6 +155,7 @@ async fn main() {
             // 6pm MST is midnight UTC
             Job::new_async(format!("0 0 {} * * *", hour_offset).as_str(), |_, __| {
                 Box::pin(async move {
+                    info!("Entering cron_tweet()...");
                     cron_tweet().await;
                 })
             })
@@ -165,6 +168,7 @@ async fn main() {
     scheduler.start().await.unwrap();
 
     loop {
+        info!("Sleeping 1800 seconds...");
         tokio::time::sleep(Duration::from_secs(1800)).await;
     }
 }
