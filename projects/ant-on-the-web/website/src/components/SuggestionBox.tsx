@@ -18,7 +18,11 @@ function validator(text: string): { valid: boolean; msg: string } {
   };
 }
 
-export function SuggestionBox() {
+export type SuggestionBoxProps = {
+  action?: () => Promise<void> | void;
+};
+
+export function SuggestionBox(props: SuggestionBoxProps) {
   const [ant, setAnt] = useState("");
   const { validMsg, loadingMsg, errorMsg, handle } = useHandle({
     postAction: suggestAnt,
@@ -48,7 +52,10 @@ export function SuggestionBox() {
       <form
         className="flex flex-row flex-wrap pl-2"
         autoComplete="off"
-        onSubmit={(event) => handle(event)}
+        onSubmit={async (event) => {
+          await handle(event);
+          if (props.action !== undefined) await props.action();
+        }}
       >
         <input
           className="m-1"

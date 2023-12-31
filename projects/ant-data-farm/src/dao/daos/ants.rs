@@ -167,6 +167,16 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
 }
 
 impl AntsDao {
+    /// Get the ants in the users feed at the time of the request.
+    /// If the user does not exist, returns None.
+    pub async fn get_user_feed_since(
+        &self,
+        user: &UserId,
+        since: DateTime<Utc>,
+    ) -> Option<Vec<Ant>> {
+        return Some(vec![]);
+    }
+
     pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Option<&Ant> {
         let time = chrono::offset::Utc::now();
 

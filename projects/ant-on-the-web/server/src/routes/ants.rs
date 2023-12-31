@@ -15,6 +15,7 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use uuid::Uuid;
@@ -152,9 +153,41 @@ async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
     )
 }
 
+#[derive(Deserialize)]
+struct FeedInput {
+    pub user_id: UserId,
+    pub since: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+struct FeedOutput {
+    pub ants: Vec<Ant>,
+}
+
+async fn feed(State(db): DbState, Json(input): Json<FeedInput>) -> impl IntoResponse {
+    debug!("Top of /api/ant/feed");
+
+    let ants = db.ants.read().await;
+
+    let feed = match ants.get_user_feed_since(&input.user_id, input.since).await {
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json("User does not exist!".to_string()).into_response(),
+            )
+        }
+        Some(feed) => feed,
+    };
+
+    return (
+        StatusCode::OK,
+        Json(FeedOutput { ants: feed }).into_response(),
+    );
+}
+
 #[derive(Deserialize, Debug)]
 struct Suggestion {
-    pub user_id: Option<String>,
+    pub user_id: Option<UserId>,
     pub suggestion_content: String,
 }
 
@@ -170,7 +203,7 @@ async fn make_suggestion(
         None => users.get_one_by_name("nobody").await,
         Some(u) => {
             users
-                .get_one_by_id(&UserId(Uuid::parse_str(u).unwrap()))
+                .get_one_by_id(&UserId(Uuid::parse_str(u.0.to_string().as_str()).unwrap()))
                 .await
         }
     };
@@ -234,6 +267,7 @@ async fn make_suggestion(
 
 pub fn router() -> DbRouter {
     Router::new()
+        .route_with_tsr("/feed", get(feed))
         .route_with_tsr("/latest-ants", get(latest_ants))
         .route_with_tsr("/unreleased-ants", get(unreleased_ants))
         .route_with_tsr("/released-ants", get(released_ants))
@@ -244,6 +278,7 @@ pub fn router() -> DbRouter {
         // .route_with_tsr("/tweet", post(tweet))
         .fallback(|| async {
             middleware::fallback(&[
+                "GET /feed",
                 "GET /latest-ants",
                 "GET /unreleased-ants",
                 "GET /released-ants",

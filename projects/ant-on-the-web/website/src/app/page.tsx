@@ -7,22 +7,23 @@ import { getReleasedAnts } from "../server/queries";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SuggestionBox } from "../components/SuggestionBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
-import { errorOr } from "@/components/UnhappyPath";
+import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 
 export default function Home() {
   const [page, setPage] = useState(0);
 
-  const { isLoading, isError, data } = useQuery({
+  const {
+    isLoading,
+    isError,
+    data: releasedAnts,
+  } = useQuery({
     queryKey: ["releasedAnts"],
     queryFn: () => getReleasedAnts(page),
   });
 
-  return errorOr(
-    isLoading,
-    isError,
-    { releasedAnts: data },
-    ({ releasedAnts }) => (
-      <>
+  return (
+    <ErrorBoundary isError={isError}>
+      <LoadingBoundary isLoading={isLoading}>
         <div
           id="forms-container"
           style={{
@@ -37,11 +38,11 @@ export default function Home() {
         </div>
         <AntBanner />
         <div id="ant-filler">
-          {releasedAnts.ants.map((ant, i) => (
+          {releasedAnts?.ants.map((ant, i) => (
             <div key={i}>{escapeAnt(ant)}</div>
           ))}
         </div>
-      </>
-    )
+      </LoadingBoundary>
+    </ErrorBoundary>
   );
 }
