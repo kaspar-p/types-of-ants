@@ -1,6 +1,6 @@
 use crate::{
     middleware,
-    types::{DaoRouter, DaoState},
+    types::{DbRouter, DbState},
 };
 use ant_data_farm::{
     ants::{Ant, AntStatus},
@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 const PAGE_SIZE: usize = 1_000_usize;
 
-async fn all_ants(State(dao): DaoState) -> impl IntoResponse {
+async fn all_ants(State(dao): DbState) -> impl IntoResponse {
     (
         StatusCode::OK,
         Json(dao.ants.read().await.get_all().await).into_response(),
@@ -32,7 +32,7 @@ async fn all_ants(State(dao): DaoState) -> impl IntoResponse {
 struct Pagination {
     page: usize,
 }
-async fn unreleased_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
+async fn unreleased_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
     let ants = dao.ants.read().await;
 
     let mut unreleased_ants = ants
@@ -61,7 +61,7 @@ async fn unreleased_ants(State(dao): DaoState, query: Query<Pagination>) -> impl
     }
 }
 
-async fn declined_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
+async fn declined_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
     let ants = dao.ants.read().await;
 
     let declined_ants = ants
@@ -88,7 +88,7 @@ async fn declined_ants(State(dao): DaoState, query: Query<Pagination>) -> impl I
     }
 }
 
-async fn released_ants(State(dao): DaoState, query: Query<Pagination>) -> impl IntoResponse {
+async fn released_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
     let ants = dao.ants.read().await;
 
     let released_ants = ants
@@ -115,7 +115,7 @@ async fn released_ants(State(dao): DaoState, query: Query<Pagination>) -> impl I
     }
 }
 
-async fn latest_release(State(dao): DaoState) -> impl IntoResponse {
+async fn latest_release(State(dao): DbState) -> impl IntoResponse {
     let release = dao.releases.read().await.get_latest_release().await;
     (StatusCode::OK, Json(release))
 }
@@ -127,7 +127,7 @@ struct LatestAntsResponse {
     release: i32,
     ants: Vec<Ant>,
 }
-async fn latest_ants(State(dao): DaoState) -> impl IntoResponse {
+async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
 
@@ -159,7 +159,7 @@ struct Suggestion {
 }
 
 async fn make_suggestion(
-    State(dao): DaoState,
+    State(dao): DbState,
     Json(suggestion): Json<Suggestion>,
 ) -> impl IntoResponse {
     debug!("Top of /api/ant/suggest");
@@ -232,7 +232,7 @@ async fn make_suggestion(
 //     };
 // }
 
-pub fn router() -> DaoRouter {
+pub fn router() -> DbRouter {
     Router::new()
         .route_with_tsr("/latest-ants", get(latest_ants))
         .route_with_tsr("/unreleased-ants", get(unreleased_ants))

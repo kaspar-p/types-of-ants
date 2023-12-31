@@ -1,6 +1,6 @@
-use ant_data_farm::ants::Ant;
-use ant_data_farm::ants::Tweeted;
-use ant_data_farm::{DatabaseConfig, DatabaseCredentials};
+use ant_data_farm::{
+    ants::Ant, ants::Tweeted, AntDataFarmClient, DatabaseConfig, DatabaseCredentials,
+};
 use chrono::Timelike;
 use rand::seq::SliceRandom;
 use std::time::Duration;
@@ -44,18 +44,18 @@ async fn cron_tweet() -> () {
     let config: Config = get_config().expect("Getting config failed!");
 
     info!("Beginning database connection...");
-    let dao = match ant_data_farm::connect_config(config.database).await {
+    let client = match AntDataFarmClient::new(Some(config.database)).await {
         Err(e) => {
             error!("Failed to initialize database: {}", e);
             error!("Ending CRON early!");
             return;
         }
-        Ok(dao) => dao,
+        Ok(client) => client,
     };
 
     info!("Getting random ant choice...");
     let random_ant: Ant = {
-        let read_ants = dao.ants.read().await;
+        let read_ants = client.ants.read().await;
         let ants = read_ants
             .get_all_released()
             .await
@@ -73,7 +73,8 @@ async fn cron_tweet() -> () {
     assert!(res.is_some(), "Failed to tweet!");
 
     info!("Saving result to DB...");
-    dao.ants
+    client
+        .ants
         .write()
         .await
         .add_ant_tweet(&random_ant.ant_id)

@@ -3,7 +3,7 @@ mod middleware;
 mod routes;
 mod types;
 
-use ant_data_farm::connect;
+use ant_data_farm::AntDataFarmClient;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
     routing::{get, post},
@@ -37,7 +37,11 @@ async fn main() {
         .allow_headers([CONTENT_TYPE]);
 
     debug!("Setting up database connection pool...");
-    let dao = Arc::new(connect().await.expect("Connected to db!"));
+    let dao = Arc::new(
+        AntDataFarmClient::new(None)
+            .await
+            .expect("Connected to db!"),
+    );
 
     debug!("Initializing API routes...");
     let api_routes = Router::new()

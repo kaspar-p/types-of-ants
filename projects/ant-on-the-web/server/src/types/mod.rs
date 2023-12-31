@@ -1,6 +1,6 @@
-use ant_data_farm::Dao;
+use ant_data_farm::AntDataFarmClient;
 use axum::{extract::State, Router};
 use std::sync::Arc;
 
-pub type DaoRouter = Router<Arc<Dao>>;
-pub type DaoState = State<Arc<Dao>>;
+pub type DbRouter = Router<Arc<AntDataFarmClient>>;
+pub type DbState = State<Arc<AntDataFarmClient>>;

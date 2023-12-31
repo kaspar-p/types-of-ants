@@ -1,4 +1,3 @@
-use ant_data_farm::Dao;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -7,12 +6,10 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
-use std::sync::Arc;
 
-async fn host_status(
-    Path(host_name): Path<String>,
-    State(_dao): State<Arc<Dao>>,
-) -> impl IntoResponse {
+use crate::types::{DbRouter, DbState};
+
+async fn host_status(Path(host_name): Path<String>, State(_db): DbState) -> impl IntoResponse {
     (
         StatusCode::OK,
         Json(format!(
@@ -22,6 +19,6 @@ async fn host_status(
     )
 }
 
-pub fn router() -> Router<Arc<Dao>> {
+pub fn router() -> DbRouter {
     Router::new().route_with_tsr("/host-status/:host-id-or-name", get(host_status))
 }

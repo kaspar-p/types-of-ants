@@ -1,24 +1,40 @@
 mod dao;
 mod types;
 
-use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
-
-use tokio_postgres::NoTls;
-use tracing::debug;
-use tracing::info;
-
-pub use crate::dao::dao::Dao;
 pub use crate::dao::dao_trait::DaoTrait;
 pub use crate::dao::daos::ants;
 pub use crate::dao::daos::hosts;
 pub use crate::dao::daos::users;
+
+use crate::{
+    dao::daos::{ants::AntsDao, hosts::HostsDao, releases::ReleasesDao, users::UsersDao},
+    dao::db::Database,
+    types::ConnectionPool,
+};
+use bb8::Pool;
+use bb8_postgres::PostgresConnectionManager;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
+use tokio_postgres::NoTls;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 pub struct DatabaseCredentials {
     pub database_name: String,
     pub database_user: String,
     pub database_password: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    pub port: Option<u16>,
+    /// The credentials to connect to the database.
+    /// If omitted, tries to get credentials from $DB_PG_NAME, DB_PG_PASSWORD,
+    /// and DB_PG_USER environment variables
+    pub creds: Option<DatabaseCredentials>,
+    /// The IP-address host of the database.
+    /// If omitted, checks for a $DB_HOST variable, then tries localhost.
+    pub host: Option<String>,
 }
 
 fn get_credentials_from_env() -> Result<DatabaseCredentials, dotenv::Error> {
@@ -70,34 +86,48 @@ async fn database_connection(
     Ok(pool)
 }
 
-#[derive(Debug, Clone)]
-pub struct DatabaseConfig {
-    pub port: Option<u16>,
-    /// The credentials to connect to the database.
-    /// If omitted, tries to get credentials from $DB_PG_NAME, DB_PG_PASSWORD,
-    /// and DB_PG_USER environment variables
-    pub creds: Option<DatabaseCredentials>,
-    /// The IP-address host of the database.
-    /// If omitted, checks for a $DB_HOST variable, then tries localhost.
-    pub host: Option<String>,
+pub struct AntDataFarmClient {
+    pub ants: RwLock<AntsDao>,
+    pub releases: RwLock<ReleasesDao>,
+    pub users: RwLock<UsersDao>,
+    pub hosts: RwLock<HostsDao>,
+    // pub deployments: DeploymentsDao,
+    // pub metrics: MetricsDao,
+    // pub tests: TestsDao,
 }
 
-async fn internal_connect(config: DatabaseConfig) -> Result<Dao, anyhow::Error> {
-    let pool = database_connection(config).await?;
-    info!("Initializing data access layer...");
-    let dao = Dao::new(pool).await;
-    return dao;
-}
+impl AntDataFarmClient {
+    pub async fn new(config: Option<DatabaseConfig>) -> Result<AntDataFarmClient, anyhow::Error> {
+        let config = match config {
+            None => DatabaseConfig {
+                port: None,
+                creds: None,
+                host: None,
+            },
+            Some(c) => c,
+        };
 
-pub async fn connect() -> Result<Dao, anyhow::Error> {
-    internal_connect(DatabaseConfig {
-        port: None,
-        creds: None,
-        host: None,
-    })
-    .await
-}
+        let pool = database_connection(config).await?;
+        info!("Initializing data access layer...");
+        let client = AntDataFarmClient::initialize(pool).await?;
+        return Ok(client);
+    }
 
-pub async fn connect_config(config: DatabaseConfig) -> Result<Dao, anyhow::Error> {
-    internal_connect(config).await
+    async fn initialize(pool: ConnectionPool) -> Result<AntDataFarmClient, anyhow::Error> {
+        let db_con = pool.get_owned().await?;
+
+        let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
+
+        let ants = RwLock::new(AntsDao::new(database.clone()).await?);
+        let releases = RwLock::new(ReleasesDao::new(database.clone()).await?);
+        let hosts = RwLock::new(HostsDao::new(database.clone()).await?);
+        let users = RwLock::new(UsersDao::new(database.clone()).await?);
+
+        Ok(AntDataFarmClient {
+            ants,
+            releases,
+            users,
+            hosts,
+        })
+    }
 }

@@ -1,6 +1,6 @@
 use crate::{
     middleware,
-    types::{DaoRouter, DaoState},
+    types::{DbRouter, DbState},
 };
 use ant_data_farm::{hosts::HostId, DaoTrait};
 use axum::{
@@ -13,7 +13,7 @@ use axum::{
 use axum_extra::routing::RouterExt;
 use uuid::Uuid;
 
-async fn host(Path(host_id): Path<Uuid>, State(dao): DaoState) -> impl IntoResponse {
+async fn host(Path(host_id): Path<Uuid>, State(dao): DbState) -> impl IntoResponse {
     let hosts = dao.hosts.read().await;
     let host = hosts.get_one_by_id(&HostId(host_id)).await;
 
@@ -30,12 +30,12 @@ async fn register_host() -> impl IntoResponse {
     (StatusCode::OK, Json("New host registered!"))
 }
 
-async fn list_all(State(dao): DaoState) -> impl IntoResponse {
+async fn list_all(State(dao): DbState) -> impl IntoResponse {
     let hosts = dao.hosts.read().await;
     (StatusCode::OK, Json(hosts.get_all().await).into_response())
 }
 
-pub fn router() -> DaoRouter {
+pub fn router() -> DbRouter {
     Router::new()
         .route_with_tsr("/host/:host-id", get(host))
         .route_with_tsr("/list-all", get(list_all))

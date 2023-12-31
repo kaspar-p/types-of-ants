@@ -1,6 +1,6 @@
 use crate::{
     middleware,
-    types::{DaoRouter, DaoState},
+    types::{DbRouter, DbState},
 };
 use ant_data_farm::{users::User, DaoTrait};
 use axum::{
@@ -20,7 +20,7 @@ struct EmailRequest {
     email: String,
 }
 async fn add_anonymous_email(
-    State(dao): DaoState,
+    State(dao): DbState,
     Json(EmailRequest { email }): Json<EmailRequest>,
 ) -> impl IntoResponse {
     debug!("Subscribing with email {}", email.as_str());
@@ -80,10 +80,7 @@ async fn add_anonymous_email(
     }
 }
 
-async fn get_user_by_name(
-    Path(user_name): Path<String>,
-    State(dao): DaoState,
-) -> impl IntoResponse {
+async fn get_user_by_name(Path(user_name): Path<String>, State(dao): DbState) -> impl IntoResponse {
     let users = dao.users.read().await;
     let user = users.get_one_by_name(&user_name).await;
     match user {
@@ -106,7 +103,7 @@ struct LoginRequest {
     pub unique_key: String,
     pub cookie: Uuid,
 }
-async fn login(State(dao): DaoState, Json(login_request): Json<LoginRequest>) -> impl IntoResponse {
+async fn login(State(dao): DbState, Json(login_request): Json<LoginRequest>) -> impl IntoResponse {
     let users = dao.users.read().await;
     let from_email = users.get_one_by_email(&login_request.unique_key).await;
     let from_phone_number = users
@@ -162,12 +159,12 @@ struct SignupVerificationRequest {
     pub email_verification: VerificationCode,
 }
 async fn signup_verification(
-    State(dao): DaoState,
+    State(db): DbState,
     Json(signup_verification_request): Json<SignupVerificationRequest>,
 ) -> impl IntoResponse {
     todo!("Verify that the verification codes sent are correct!");
 
-    let mut write_users = dao.users.write().await;
+    let mut write_users = db.users.write().await;
     let user = write_users
         .create_user(
             signup_verification_request.username,
@@ -195,7 +192,7 @@ struct SignupRequest {
     pub phone_number: String,
 }
 async fn signup_request(
-    State(dao): DaoState,
+    State(dao): DbState,
     Json(signup_request): Json<SignupRequest>,
 ) -> impl IntoResponse {
     let read_users = dao.users.read().await;
@@ -226,7 +223,7 @@ async fn signup_request(
     );
 }
 
-pub fn router() -> DaoRouter {
+pub fn router() -> DbRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
         .route_with_tsr("/signup-request", post(signup_request))
