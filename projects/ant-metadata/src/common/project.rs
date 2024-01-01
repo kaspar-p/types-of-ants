@@ -84,7 +84,7 @@ impl FromStr for Project {
             "AntJustCheckingIn" => Ok(Project::AntJustCheckingIn),
 
             "ant-metadata" => Ok(Project::AntMetadata),
-            "AntOnTheWeb" => Ok(Project::AntMetadata),
+            "AntMetadata" => Ok(Project::AntMetadata),
 
             "ant-on-the-web" => Ok(Project::AntOnTheWeb),
             "AntOnTheWeb" => Ok(Project::AntOnTheWeb),
