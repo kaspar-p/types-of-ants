@@ -1,0 +1,2 @@
+1. Add traits, vote on traits
+2. Freeflow feed (twitter clone)
