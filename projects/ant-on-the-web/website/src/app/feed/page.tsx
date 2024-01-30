@@ -3,13 +3,50 @@
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { getUnseenAnts } from "@/server/queries";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ant, getUnseenAnts } from "@/server/queries";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import React, { useState } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const d = new Date(createdUtcMilliseconds);
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+
+  const date = `${months[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+  const minutes =
+    d.getMinutes().toString().length === 1
+      ? "0" + d.getMinutes().toString()
+      : d.getMinutes().toString();
+  return `${d.getHours()}:${minutes}, ${date}`;
+}
+
+export type AntPostProps = {
+  ant: Ant;
+};
+
+function AntPost({ ant }: AntPostProps) {
+  return (
+    <div className="p-2 border-black border-b-2">
+      <div>
+        <Link href="/nobody">@nobody</Link>{" "}
+        <small className="pl-1">{formatDate(ant.created_at)}</small>
+      </div>
+      <div className="pl-4">{ant.ant_name}</div>
+    </div>
+  );
 }
 
 export default function Feed() {
@@ -40,9 +77,7 @@ export default function Feed() {
           >
             <SuggestionBox
               action={async () => {
-                console.log("before!");
                 await refetch();
-                console.log("after!");
               }}
             />
             <NewsletterBox />
@@ -52,9 +87,7 @@ export default function Feed() {
             <button onClick={() => refetch()}>refresh</button>
           </h3>
           {unseenAnts?.map((ant, i) => (
-            <div key={ant.ant_name + i}>
-              [{formatDate(ant.created_at)}] <strong>{ant.ant_name}</strong>
-            </div>
+            <AntPost key={i} ant={ant} />
           ))}
         </div>
       </LoadingBoundary>

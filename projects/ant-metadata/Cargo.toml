@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.72"
+anyhow = "1.0.79"
 axum_typed_multipart = "0.5.2"
-home = "0.5.5"
-reqwest = { version = "0.11.18", features = ["json"] }
-serde = { version = "1.0.174", features = ["derive"] }
-tar = "0.4.39"
+home = "0.5.9"
+reqwest = { version = "0.11.23", features = ["json"] }
+serde = { version = "1.0.196", features = ["derive"] }
+tar = "0.4.40"

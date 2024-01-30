@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { getEndpoint } from "./lib";
 
-const antsSchema = z.array(
-  z.object({ ant_id: z.string(), ant_name: z.string(), created_at: z.string() })
-);
-export type Ants = z.infer<typeof antsSchema>;
+const antSchema = z.object({
+  ant_id: z.string(),
+  ant_name: z.string(),
+  created_at: z.string(),
+});
+export type Ant = z.infer<typeof antSchema>;
+export type Ants = Ant[];
 
 const queries = {
   getReleaseNumber: {
@@ -20,7 +23,7 @@ const queries = {
     path: "/api/ants/latest-ants",
     schema: z.object({
       date: z.number(),
-      ants: antsSchema,
+      ants: z.array(antSchema),
     }),
     transformer: (data: {
       date: number;
@@ -36,7 +39,7 @@ const queries = {
     name: "getUnseenAntsPaginated",
     path: "/api/ants/unreleased-ants",
     queryParams: ["page"],
-    schema: z.object({ ants: antsSchema }),
+    schema: z.object({ ants: z.array(antSchema) }),
     transformer: (data: Ants): Ants => {
       return data;
     },
@@ -45,7 +48,7 @@ const queries = {
     name: "getReleasedAnts",
     path: "/api/ants/released-ants",
     queryParams: ["page"],
-    schema: z.object({ ants: antsSchema }),
+    schema: z.object({ ants: z.array(antSchema) }),
     transformer: (data: Ants): { ants: string[] } => ({
       ants: data.map((ant) => ant.ant_name),
     }),
