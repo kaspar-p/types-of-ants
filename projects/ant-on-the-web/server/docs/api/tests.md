@@ -23,7 +23,8 @@ ONE OF:
 history_length: "hour" | "day" | "week"
 ```
 
-Get the test status history on a single host for the last `history_length` of time, across all projects on that host.
+Get the test status history on a single host for the last `history_length` of
+time, across all projects on that host.
 
 ## `GET /project-status`
 
@@ -48,7 +49,8 @@ ONE OF:
 history_length: "hour" | "day" | "week"
 ```
 
-Get the test status history of a project across all hosts, aggregated. Reaches back `history_length` into time to get the project status.
+Get the test status history of a project across all hosts, aggregated. Reaches
+back `history_length` into time to get the project status.
 
 ## `GET /host-project-status`
 
@@ -63,7 +65,8 @@ ONE OF:
   host_name: string;
 ```
 
-Get the test status of a current project, on a host. This relies on the most recent test data.
+Get the test status of a current project, on a host. This relies on the most
+recent test data.
 
 ## `GET /host-project-status-history`
 
@@ -79,4 +82,5 @@ ONE OF:
 history_length: "hour" | "day" | "week"
 ```
 
-Get the status history (over the past `history_length`) of the tests for a single project, on a single host.
+Get the status history (over the past `history_length`) of the tests for a
+single project, on a single host.

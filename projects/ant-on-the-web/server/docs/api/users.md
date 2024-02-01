@@ -18,4 +18,5 @@ Signup for the newsletter. Only possible for existing users.
 
 ## `POST /user/favorite`
 
-Select an ant as the favorite for a user. This is associated with that user's profile.
+Select an ant as the favorite for a user. This is associated with that user's
+profile.

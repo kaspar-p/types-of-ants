@@ -9,7 +9,8 @@ path: string
 history_length: "hour" | "day" | "week"
 ```
 
-For the `path`, get the anonymized number of accesses over the last `history_length`.
+For the `path`, get the anonymized number of accesses over the last
+`history_length`.
 
 ## `POST /access-page`
 
@@ -31,4 +32,6 @@ antId: string
 userId: string
 ```
 
-When the user expands to know more about an ant, a request with this type is sent. This is used for tracking the top ants of that year, the ants that users are interacting with the most.
+When the user expands to know more about an ant, a request with this type is
+sent. This is used for tracking the top ants of that year, the ants that users
+are interacting with the most.

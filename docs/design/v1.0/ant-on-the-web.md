@@ -1,10 +1,14 @@
 # ant-on-the-web
 
-`ant-on-the-web` is the name for the website portion of the project. The technology with which it will be written is not yet known, but some flavor of Typescript with a corresponding framework.
+`ant-on-the-web` is the name for the website portion of the project. The
+technology with which it will be written is not yet known, but some flavor of
+Typescript with a corresponding framework.
 
 ## Goals
 
-Ant on the web is the dashboarding area for the information/data the other parts of the service will generate. These different types of data will be shown at various routes.
+Ant on the web is the dashboarding area for the information/data the other parts
+of the service will generate. These different types of data will be shown at
+various routes.
 
 The valid routes for the website will be:
 
