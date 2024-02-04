@@ -133,7 +133,7 @@
   <div>ant with ants in its pants</div>
   <div>ant that narrowly avoided being run over (grateful)</div>
   <div>diabetic ant</div>
-  <div>near years ant</div>
+  <div>new years ant</div>
   <div>ant that's built different</div>
   <div>midlife crisis ant (bought corvette)</div>
   <div>violet ant</div>
@@ -400,7 +400,7 @@
   <div>self aware ant</div>
   <div>imperialist ant</div>
   <div>ant so long it looks weird</div>
-  <div>ant that is about to graduate (indimidated by the world)</div>
+  <div>ant that is about to graduate (intimidated by the world)</div>
   <div>rhino ant</div>
   <div>sickly ant</div>
   <div>harvester ant</div>
@@ -483,7 +483,6 @@
   <div>boomer ant</div>
   <div>ant who approves the ant suggestions</div>
   <div>unemployed and emasculated ant</div>
-  <div>zoomer ant</div>
   <div>millennial ant</div>
   <div>a thousand ants</div>
   <div>half an ant</div>
@@ -705,7 +704,7 @@
   <div>ant with multiple personalities</div>
   <div>en passant</div>
   <div>student ant</div>
-  <div>tattoed ant</div>
+  <div>tattooed ant</div>
   <div>skewed ant</div>
   <div>freudian ant</div>
   <div>widdle ant</div>
@@ -741,7 +740,7 @@
   <div>ant sinning for the greater good</div>
   <div>zookeeper ant</div>
   <div>snowboarder ant</div>
-  <div>skiier ant</div>
+  <div>skier ant</div>
   <div>ant just grabbin' a crumb (hungry)</div>
   <div>ant that eats a ticking time bomb</div>
   <div>rich ant</div>
