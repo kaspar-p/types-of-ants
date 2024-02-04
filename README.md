@@ -2,9 +2,12 @@
 
 <div>
   <div>red ant</div>
+  <div>ant just checking in</div>
   <div>black ant</div>
   <div>green ant</div>
+  <div>healer ant</div>
   <div>gummy ant</div>
+  <div>ant on a bike</div>
   <div>ant eating dinner</div>
   <div>blue ant</div>
   <div>ant that would love to work for amazon :)</div>
@@ -37,10 +40,13 @@
   <div>space gray ant</div>
   <div>silly ant</div>
   <div>ant on the moon (space ant)</div>
+  <div>summa cum laude ant</div>
   <div>ant who is a huge baseball fan</div>
   <div>ant that overslept</div>
+  <div>eboy ant</div>
   <div>ant with anger issues</div>
   <div>a cry for help disguised as an ant suggestion</div>
+  <div>ant who don't know what they been told</div>
   <div>vampire ant (mosquito)</div>
   <div>ant cowboy (yeehaw)</div>
   <div>forest green ant</div>
@@ -56,9 +62,11 @@
   <div>ant who forgot it was your birthday</div>
   <div>green party affiliated ant</div>
   <div>theoretically existing ant</div>
+  <div>barista ant</div>
   <div>ant that floats (buoyant)</div>
   <div>indigo ant</div>
   <div>rainbow ant</div>
+  <div>ant that types other ants</div>
   <div>cranberry picker ant</div>
   <div>ant cowgirl (yeehaw)</div>
   <div>gold ant</div>
@@ -112,6 +120,7 @@
   <div>purple ant</div>
   <div>dark gray ant</div>
   <div>ant singing a sea shanty (sailor)</div>
+  <div>ant that misses the good old days</div>
   <div>light gray ant</div>
   <div>mint green ant</div>
   <div>ant enjoying a shower beer</div>
@@ -124,6 +133,7 @@
   <div>ant with ants in its pants</div>
   <div>ant that narrowly avoided being run over (grateful)</div>
   <div>diabetic ant</div>
+  <div>near years ant</div>
   <div>ant that's built different</div>
   <div>midlife crisis ant (bought corvette)</div>
   <div>violet ant</div>
@@ -135,7 +145,9 @@
   <div>cake batter eating ant</div>
   <div>maroon ant</div>
   <div>disposable ant</div>
+  <div>melodious ant</div>
   <div>clear ant</div>
+  <div>ant that really needs a massage</div>
   <div>pink ant</div>
   <div>ant losing motivation for work</div>
   <div>inspector ant</div>
@@ -154,6 +166,7 @@
   <div>ant who likes nirvana</div>
   <div>orchid ant</div>
   <div>ant letting his friends down</div>
+  <div>dead ant</div>
   <div>tsa agent ant</div>
   <div>doorhead ant</div>
   <div>ant learning networking</div>
@@ -178,6 +191,7 @@
   <div>ant taking everything too serious</div>
   <div>ant who cares about your harry potter house placement</div>
   <div>titanium white ant</div>
+  <div>office worker ant</div>
   <div>cadmium yellow ant</div>
   <div>really cute ant</div>
   <div>ant in a sunbeam</div>
@@ -203,6 +217,7 @@
   <div>ant visiting toronto (kyle ant)</div>
   <div>ghost ant</div>
   <div>olive ant</div>
+  <div>tj ant</div>
   <div>ant who has no idea my shower doesn't have crumbs</div>
   <div>wild ant</div>
   <div>tamed ant</div>
@@ -213,6 +228,7 @@
   <div>ant drowning in a single droplet of water</div>
   <div>married ant</div>
   <div>single ant</div>
+  <div>ant colony</div>
   <div>ant with daddy issues</div>
   <div>ant playing handball (european)</div>
   <div>sky blue ant</div>
@@ -227,7 +243,10 @@
   <div>ant on the ceiling (gonna fall down)</div>
   <div>communist ant</div>
   <div>veteran ant</div>
+  <div>ant feeding the larvae</div>
   <div>ant but dead</div>
+  <div>ant who found its buddy's dead body</div>
+  <div>an't</div>
   <div>rust red ant</div>
   <div>aquamarine ant</div>
   <div>azure ant</div>
@@ -247,6 +266,7 @@
   <div>tired ant (bedbug)</div>
   <div>npc ant</div>
   <div>ant on the sidewalk</div>
+  <div>ant doctor</div>
   <div>ant in my pants</div>
   <div>and who doesn't get it</div>
   <div>ant who likes sports</div>
@@ -257,13 +277,19 @@
   <div>independent ant</div>
   <div>ant discovering new ants</div>
   <div>ant who wonders when the pain will subside</div>
+  <div>ant but irish</div>
+  <div>month sober ant (who knew)</div>
   <div>bass player ant</div>
   <div>ant that is a know-it-all</div>
+  <div>ant who colors the internet (rgb ant)</div>
   <div>ant who gave up</div>
   <div>ant in a hat</div>
+  <div>ant k-i-s-s-i-n-g in a tree</div>
+  <div>ant who wants to move</div>
   <div><a href="https://www.mouco.com">mouco ant</a></div>
   <div>ant that is secretly in love with its best friend</div>
   <div>ant with pipes</div>
+  <div>ant living in your snoopy mug (houze)</div>
   <div>ant who isn't depressed so much as sentient</div>
   <div>ant that reacts unsavorily to sunlight</div>
   <div>truant</div>
@@ -279,7 +305,9 @@
   <div>apache ant</div>
   <div>australian ant</div>
   <div>ant in the circus</div>
+  <div>ant with a bday coming up</div>
   <div>ant going to bed</div>
+  <div>santa</div>
   <div>east asian ant</div>
   <div>scary flying ant</div>
   <div>siberian ant</div>
@@ -296,16 +324,21 @@
   <div>eastern steppes ant</div>
   <div>ballerina ant</div>
   <div>uncle ant</div>
+  <div>merchant</div>
   <div>scantinavian</div>
   <div>ukrainian ant</div>
   <div>ant with stinky feet</div>
   <div>belarusian ant</div>
+  <div>ant with a very understanding wife</div>
+  <div>ant setting records</div>
+  <div>🐜</div>
   <div>hot dog! ant</div>
   <div>spicy ant</div>
   <div>ant with children</div>
   <div>ant that's not even an ant joke (running out)</div>
   <div>ant that needs child support</div>
   <div>ant that refuses to pay child support</div>
+  <div>dude turned into an ant (animorph)</div>
   <div>victoria day ant (day off)</div>
   <div>ant with roommates</div>
   <div>ant but it's a dolphin but it's also dead</div>
@@ -314,6 +347,7 @@
   <div>ant on the can</div>
   <div>french ant</div>
   <div>reformed ant (stole your lunch, won't do it again)</div>
+  <div>ant with a bf that hasn't asked her if she wants to be his valentine</div>
   <div>unattentive ant</div>
   <div>ant that found out they're canadian</div>
   <div>ashamed ant</div>
@@ -324,7 +358,7 @@
   <div>ant doing long distance (sad ant)</div>
   <div>ant on a plane</div>
   <div>schizo ant (lots of friends)</div>
-  <div>ant who sweats the picnic was today</div>
+  <div>ant who swears the picnic was today</div>
   <div>csc324 lab 2 ant (memory commemoration)</div>
   <div>lunar new year ant</div>
   <div>swedish ant</div>
@@ -332,10 +366,12 @@
   <div>anthropologist (ant that studies humans)</div>
   <div>sir ant (distinguished)</div>
   <div>ant but it's really short</div>
+  <div>ant operating heavy machinery (forklift certified)</div>
   <div>typecast ant</div>
   <div>ant that misses kaspar</div>
   <div>ant that spent too much money at the club</div>
   <div>infertile ant</div>
+  <div>ant who figured out happiness</div>
   <div>ant that is not improving</div>
   <div>ant who knows it all (know it all ant)</div>
   <div>inuit ant</div>
@@ -349,10 +385,12 @@
   <div>reluctant ant</div>
   <div>f1 ant (max verstappant)</div>
   <div>ant listening to music</div>
+  <div>ant glued to its tv screen</div>
   <div>desperate ant</div>
   <div>million dollar ant (chump change)</div>
   <div>flight attendant</div>
   <div>ant selling wares</div>
+  <div>ant who knows roll over</div>
   <div>anglo-saxon ant</div>
   <div>ant that would dump me if i was a pisces</div>
   <div>olmec ant</div>
@@ -400,6 +438,7 @@
   <div>ant that has to pee</div>
   <div>mommy ant</div>
   <div>southern ant</div>
+  <div>ant that helps you no matter the task</div>
   <div>ant graduating from college</div>
   <div>ants whose chakras are unbalanced</div>
   <div>germant</div>
@@ -409,13 +448,16 @@
   <div>emotionally mature ant</div>
   <div>healthy ant</div>
   <div>bullet ant</div>
+  <div>wild west ant</div>
   <div>ant that's bad (morally)</div>
   <div>politically charged ant</div>
   <div><a href="https://www.linkedin.com/in/kaspar-p">ant that would love to work at amazon but now they actually work at amazon :)</a></div>
   <div>"ant"</div>
+  <div>ant i stepped on</div>
   <div>florida ant</div>
   <div>ant that goes marching two by two</div>
   <div>ant who needs 3 pairs of pants for his 6 legs</div>
+  <div>ant who knows what you did</div>
   <div>ant but he jokin'</div>
   <div>official ant</div>
   <div>antonio</div>
@@ -427,6 +469,7 @@
   <div>hr specialist ant</div>
   <div>uhhh idk man there's a lot of ants already</div>
   <div>project manager ant</div>
+  <div>ant with fibromyalgia</div>
   <div>antisocial ant</div>
   <div>ant in the city</div>
   <div>ant that needs attention</div>
@@ -436,6 +479,7 @@
   <div>ant with no knees (every ant)</div>
   <div>ant who is a taxi</div>
   <div>male manipulator ant</div>
+  <div>valentines day ant (cupid ant)</div>
   <div>boomer ant</div>
   <div>ant who approves the ant suggestions</div>
   <div>unemployed and emasculated ant</div>
@@ -450,6 +494,7 @@
   <div>aphid farmer ant</div>
   <div>artist ant</div>
   <div>self-conscious ant</div>
+  <div>easter egg ant</div>
   <div>ant that chases the bag but the bag is too fast (ants are not fast)</div>
   <div>kaspar ant</div>
   <div>fluid dynamic ant</div>
@@ -465,6 +510,8 @@
   <div>ant playing frisbee</div>
   <div>extinct ant</div>
   <div>slovak ant</div>
+  <div>ant who bugged your house</div>
+  <div>ant who's final words will forever be unknown</div>
   <div>lumpy ant</div>
   <div>deprecated ant</div>
   <div>ant man</div>
@@ -474,6 +521,7 @@
   <div>funky ant</div>
   <div>algorithmic number theory symposium (ants)</div>
   <div>ant in a sandwich (picnic)</div>
+  <div>ant with deep knowledge of typesofants.org lore</div>
   <div>ant foreclosing on a family</div>
   <div>groovy ant</div>
   <div>geometer ant (he schemin')</div>
@@ -484,12 +532,15 @@
   <div>ant who has a bone to pick with you</div>
   <div>ant that keeps making piles in your backyard</div>
   <div>polish ant</div>
+  <div>one track minded ant</div>
   <div>can't an ant just go to bed</div>
   <div>hipster ant</div>
+  <div>ants on a flight to toronto</div>
   <div>ant playing the trumpet</div>
   <div>elmo ant</div>
   <div>ant who forgot to take his meds</div>
   <div>kendrick lamar ant (new album)</div>
+  <div>ant with some photoshop skills</div>
   <div>harry styles ant (new album)</div>
   <div>caged ant</div>
   <div>ant who wants your lunch</div>
@@ -498,12 +549,16 @@
   <div>ant doing the macarena</div>
   <div>ant that games even though it makes him sad</div>
   <div>ant who can't catch a break</div>
+  <div>ant with issues (github issues)</div>
+  <div>sabbatical ant</div>
   <div>ant with a killer headache</div>
   <div>hedgehog ant</div>
   <div>wanter white</div>
   <div>caffeinated ant</div>
   <div>ant that has a bone to pick with you</div>
+  <div>ant who is blurring the line between seeing the system for what it is and having a schizo break</div>
   <div>glue sniffing ant</div>
+  <div>hostage ant</div>
   <div>protestant</div>
   <div>tibetan ant</div>
   <div>nosey ant</div>
@@ -514,6 +569,8 @@
   <div>ant with a cancelled project</div>
   <div>old ant</div>
   <div>ant that would date me if i was a worm</div>
+  <div>ant on a hunger strike</div>
+  <div>ant who helped me quit smoking</div>
   <div>ant that supplies ideas for this website</div>
   <div>ant that smokes</div>
   <div>baby ant</div>
@@ -557,11 +614,14 @@
   <div>ant who's grinding ($)</div>
   <div>ant who will always be scarred</div>
   <div>mormon ant</div>
+  <div>ant with rage issues</div>
   <div>ant who will never be the same again</div>
   <div>and</div>
   <div>antarctican ant</div>
   <div>cold ant</div>
+  <div>ant in the papers</div>
   <div>ant i brought home to meet my parents</div>
+  <div>adidas ant (boos)</div>
   <div>hot ant</div>
   <div>ant who fell for a pyramid scheme in highschool</div>
   <div>united states v. ant (real court case)</div>
@@ -577,12 +637,14 @@
   <div>ant eating a girl dinner (crumbs)</div>
   <div>3 inch ant (average)</div>
   <div>ant in a colony (colonialism)</div>
+  <div>ant on the moon</div>
   <div>pregnant</div>
   <div>ant gaming on the down low (watch over what)</div>
   <div>ant that's not ready to be a parent</div>
   <div>ant but its a bee</div>
   <div>engineer ant</div>
   <div>elephant</div>
+  <div>ant graduating</div>
   <div>girl ant on girl ant twitter</div>
   <div>slapped silly ant</div>
   <div>self-aware ant</div>
@@ -615,14 +677,18 @@
   <div>ant who is gonna drunk text his ex</div>
   <div>ant with a beer addiction</div>
   <div>frat boy ant</div>
+  <div>ant who is gonna get you</div>
+  <div>criminalized ant</div>
   <div>antom of the opera</div>
   <div>plumber ant</div>
   <div>crybaby ant</div>
   <div>ant taking summer courses</div>
   <div>daytime tv host ant</div>
   <div>ant who drinks too much wine</div>
+  <div>ant who nibbles on you (you were too close to the nest)</div>
   <div>teacher ant</div>
   <div>ceo ant</div>
+  <div>martian ant</div>
   <div>father figure ant</div>
   <div>ant building projects</div>
   <div>ant with one pair of pants for its back legs only</div>
@@ -631,6 +697,7 @@
   <div>dr. ant</div>
   <div>ants that sell ant spray to kill other ants</div>
   <div>ant on a journey</div>
+  <div>ant who didn't technically commit a crime</div>
   <div>ant with a different mindset</div>
   <div>ant in your apple</div>
   <div>ant on a stick</div>
@@ -645,6 +712,7 @@
   <div>ant who just wants to be your friend</div>
   <div>martian ant</div>
   <div>ant but quieter (inside voice)</div>
+  <div>ant that got the ick</div>
   <div>ant that plays terrible games over and over again (insane)</div>
   <div>austro-hungarian ant</div>
   <div>adamant</div>
@@ -662,6 +730,7 @@
   <div>ant&trade;</div>
   <div>ant with a big antenna</div>
   <div>ant from the IRS</div>
+  <div>drug user ant</div>
   <div>ant but it's really long</div>
   <div>ant that likes camping</div>
   <div>main character ant</div>
@@ -674,6 +743,7 @@
   <div>snowboarder ant</div>
   <div>skiier ant</div>
   <div>ant just grabbin' a crumb (hungry)</div>
+  <div>ant that eats a ticking time bomb</div>
   <div>rich ant</div>
   <div>ant with an umbrella</div>
   <div>mamant</div>
@@ -691,12 +761,14 @@
   <div>ant on a horse</div>
   <div>loud ant</div>
   <div><a href="http://6krill.com">[6krill] ant</a></div>
+  <div>ant who communicates with aliens</div>
   <div>chillaxed ant</div>
   <div>ant in the womb</div>
   <div>poor ant</div>
   <div>selfish ant</div>
   <div>ant disguised as a termite because it has body issues</div>
   <div>tennis player ant</div>
+  <div>exterminator ant</div>
   <div>ant who hates pineapple on pizza</div>
   <div>ally ant (pride month)</div>
   <div>sunburnt ant</div>
@@ -704,6 +776,7 @@
   <div>doordasher ant</div>
   <div>proletariat ant</div>
   <div>bourgeoisie ant</div>
+  <div>ant on the web</div>
   <div>antoinette (cake enjoyer)</div>
   <div>revolutionary ant</div>
   <div>ant who grows</div>
@@ -717,6 +790,7 @@
   <div>queen ant</div>
   <div>ant who forgot to water his plant</div>
   <div>ant who's watching</div>
+  <div>ant taking bribes</div>
   <div>ant at a funeral</div>
   <div>news correspondant</div>
   <div>ant not looking forward to its future</div>
@@ -724,6 +798,7 @@
   <div>picnic invader</div>
   <div>devil ant (suggestion #666)</div>
   <div>ant in a band</div>
+  <div>http ant</div>
   <div>ant with a human nose</div>
   <div>ant that started the yearly minecraft server</div>
   <div>ant on a bus</div>
