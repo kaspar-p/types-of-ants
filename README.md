@@ -146,7 +146,7 @@
   <div>maroon ant</div>
   <div>disposable ant</div>
   <div>melodious ant</div>
-  <div>clear ant</div>
+  <div>clear ant (translucant)</div>
   <div>ant that really needs a massage</div>
   <div>pink ant</div>
   <div>ant losing motivation for work</div>
