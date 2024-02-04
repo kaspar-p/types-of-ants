@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -11,6 +12,7 @@ import (
 )
 
 var EXIT_STATEMENT string = ".done"
+var RELEASES_DIR string = "./releases"
 var FILE_NAME string = "./ants.txt"
 
 func insert(a []string, index int, value string) []string {
@@ -22,8 +24,35 @@ func insert(a []string, index int, value string) []string {
 	return a
 }
 
+type ReleaseDate struct {
+	Year  int
+	Month string
+	Day   int
+}
+
+type Release struct {
+	Date ReleaseDate
+	Ants []string
+}
+
+func make_release(ants []string, year int, month string, day int) ([]byte, error) {
+	release := Release{
+		Ants: ants,
+		Date: ReleaseDate{
+			Year:  year,
+			Month: month,
+			Day:   day,
+		},
+	}
+
+	return json.Marshal(release)
+}
+
 func main() {
 	rand.Seed(time.Now().Unix())
+
+	year, _month, day := time.Now().Date()
+	month := (_month.String())[:3]
 
 	// Make sure there are no args
 	if len(os.Args[1:]) > 0 {
@@ -32,15 +61,24 @@ func main() {
 	}
 
 	// Open the ants.txt file
-	file, err := os.OpenFile(FILE_NAME, os.O_RDWR, os.ModePerm)
+	ants_file, err := os.OpenFile(FILE_NAME, os.O_RDWR, os.ModePerm)
 	if err != nil {
-		fmt.Printf("Error: %s", err)
+		fmt.Printf("Error opening ants file: %s", err)
 		panic(err)
 	}
-	defer file.Close()
+	defer ants_file.Close()
+
+	// Open the release.txt file
+	release_file_name := RELEASES_DIR + "/" + fmt.Sprint(day) + month + fmt.Sprint(year) + ".json"
+	release_file, err := os.Create(release_file_name)
+	if err != nil {
+		fmt.Printf("Error opening release file: %s", err)
+		panic(err)
+	}
+	defer release_file.Close()
 
 	// Get all ants into a slice
-	fScanner := bufio.NewScanner(file)
+	fScanner := bufio.NewScanner(ants_file)
 	var lines = make([]string, 0)
 	for fScanner.Scan() {
 		lines = append(lines, fScanner.Text())
@@ -76,12 +114,25 @@ func main() {
 		lines = insert(lines, randomIndex, antToAdd)
 	}
 
+	release_bytes, err := make_release(antsToAdd, year, month, day)
+	if err != nil {
+		fmt.Printf("Error creating JSON structure: %s", err)
+		os.Exit(1)
+	}
+
+	err = ioutil.WriteFile(release_file_name, release_bytes, 0644)
+	if err != nil {
+		fmt.Printf("Error writing to release file: %s", err)
+		os.Exit(1)
+	}
+	release_file.Sync()
+	fmt.Printf("Created new release file with %d ants!\n", len(antsToAdd))
+
 	err = ioutil.WriteFile(FILE_NAME, []byte(strings.Join(lines, "\n")+"\n"), 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %s", err)
 		os.Exit(1)
 	}
-	file.Sync()
-
+	ants_file.Sync()
 	fmt.Printf("Added %d ants into file!\n", len(antsToAdd))
 }

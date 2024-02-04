@@ -3,12 +3,12 @@ and in the generation of the index.html page.
 """
 
 TAB_AMOUNT = 2
-TAB = ' ' * TAB_AMOUNT
+TAB = " " * TAB_AMOUNT
 
 
 def apply_ant_rule(ant: str) -> str:
     """
-    Takes an ant and applies a rule. 
+    Takes an ant and applies a rule.
 
     Args:
         ant (str): some ant, e.g. "6krill ant"

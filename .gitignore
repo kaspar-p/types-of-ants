@@ -3,6 +3,7 @@
 .DS_Store
 
 ./cli/add
+./add
 
 # v1.0 compatibility
 *.env*
