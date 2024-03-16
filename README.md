@@ -23,7 +23,7 @@ it's the types of ants. see [www.typesofants.org](www.typesofants.org).
 1. Log onto the raspberry pi `pi@$(find_rpi)` if you're Kaspar and have that
    shell command. If not, find the IP yourself, smart guy.
 1. Run `cd ~/projects/types-of-ants/projects/ant-data-farm` and
-   `docker-compose up -d` to run the database.
+   `docker-compose up -d ant-data-farm` to run the database.
 1. Make sure it succeeds.
 
 ### Start tweeting
