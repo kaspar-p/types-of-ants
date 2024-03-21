@@ -142,31 +142,21 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let scheduler = JobScheduler::new().await.unwrap();
 
-    let local = chrono::offset::Local::now().hour();
-    let utc = chrono::offset::Utc::now().hour();
-    let real_diff: u32 = {
-        if utc > local {
-            utc - local
-        } else {
-            (24 + utc) - local
-        }
-    };
+    // 8pm EST is 6pm MST
+    let hour_to_tweet = 20; // spring/summer
 
-    // NOTE:
-    //      CHANGE TO 2 IN SPRING/SUMMER
-    //      CHANGE TO 6 in SUMMER/WINTER
-    let expected_diff = 2;
-    let hour_offset = expected_diff - real_diff;
+    // let hour_to_tweet = 20; // fall/winter
+    let local = chrono::offset::Local::now().hour();
 
     info!(
-        "Starting up! Local hours: {}, UTC hours: {}, hour to tweet: {}",
-        local, utc, hour_offset
+        "Starting up! Local hour: {}, hour to tweet: {}",
+        local, hour_to_tweet
     );
 
     scheduler
         .add(
             // 6pm MST is midnight UTC
-            Job::new_async(format!("0 0 {} * * *", hour_offset).as_str(), |_, __| {
+            Job::new_async(format!("0 0 {} * * *", hour_to_tweet).as_str(), |_, __| {
                 Box::pin(async move {
                     info!("Entering cron_tweet()...");
                     cron_tweet().await;
