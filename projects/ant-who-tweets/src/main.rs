@@ -151,7 +151,11 @@ async fn main() {
             (24 + utc) - local
         }
     };
-    let expected_diff = 6;
+
+    // NOTE:
+    //      CHANGE TO 2 IN SPRING/SUMMER
+    //      CHANGE TO 6 in SUMMER/WINTER
+    let expected_diff = 2;
     let hour_offset = expected_diff - real_diff;
 
     info!(
