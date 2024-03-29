@@ -143,9 +143,9 @@ async fn main() {
     let scheduler = JobScheduler::new().await.unwrap();
 
     // 8pm EST is 6pm MST
-    let hour_to_tweet = 20; // spring/summer
+    let hour_to_tweet = 0; // spring/summer
 
-    // let hour_to_tweet = 20; // fall/winter
+    // let hour_to_tweet = 0; // fall/winter
     let local = chrono::offset::Local::now().hour();
 
     info!(
