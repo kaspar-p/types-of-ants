@@ -95,7 +95,7 @@ func main() {
 	fmt.Printf("Time to add some ants! Type '%s' rather than an ant name to finish.\n", EXIT_STATEMENT)
 	for {
 		// Ask the user for ants to add
-		fmt.Print("Add ant: ")
+		fmt.Printf("[%d] Add ant: ", len(antsToAdd))
 		inScanner.Scan()
 		ant := inScanner.Text()
 
@@ -113,6 +113,11 @@ func main() {
 		randomIndex := rand.Intn(len(lines)) % len(lines)
 		lines = insert(lines, randomIndex, antToAdd)
 	}
+
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(antsToAdd), func(i, j int) {
+		antsToAdd[i], antsToAdd[j] = antsToAdd[j], antsToAdd[i]
+	})
 
 	release_bytes, err := make_release(antsToAdd, year, month, day)
 	if err != nil {
