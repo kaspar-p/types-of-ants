@@ -70,5 +70,34 @@ Please! Test logging into this machine with `ssh2ant <hostname_or_num>` and make
 
 ```bash
 sudo systemctl restart sshd
-sudo reboot
+```
+
+and remove the default user, either `ubuntu` or `pi`:
+
+```bash
+sudo deluser ubuntu
+sudo deluser pi
+```
+
+## Setup project
+
+First, clone the `types-of-ants` repository:
+
+```bash
+cd ~ && \
+git clone https://github.com/kaspar-p/types-of-ants && \
+cd types-of-ants && \
+git checkout v1.0
+```
+
+Install Cargo and Rust:
+```bash
+sudo snap install rustup --classic && \
+rustup default stable
+```
+
+And build the project. This will take a long time, especially on these slow ass machines.
+```bash
+cargo build
+df
 ```
