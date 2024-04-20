@@ -27,10 +27,17 @@ sudo apt update
 supo apt upgrade
 ```
 
-And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`. Change the hostname to the one you decide on for this machine. Others are named `workerant<num>`. Set it with:
+And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`. Change the hostname to the one you decide on for this machine. Others are named `antworker<num>`. Set it with:
 
 ```bash
-sudo hostnamectl set-hostname <name>
+export ANT_HOSTNAME=antworker<num>
+sudo hostnamectl set-hostname $ANT_HOSTNAME
+sudo cat /etc/hostname
+```
+and make sure it's the right output. Also `cat /etc/hosts/ and make sure there is a line like:
+
+```txt
+127.0.1.1  $ANT_HOSTNAME
 ```
 
 and that's it!
@@ -56,10 +63,10 @@ To get DNS working, go to the [CloudFlare Domain](https://dash.cloudflare.com/31
 To get the SSH key you have working to login to that user, locally from your Mac on the network, run: 
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_rsa ant@<hostname>.hosts.typesofants.org
+ssh-copy-id -i ~/.ssh/id_typesofants_ed25519 ant@<hostname>.hosts.typesofants.org
 ```
 
-Finally, restart the various services we have changed with:
+Please! Test logging into this machine with `ssh2ant <hostname_or_num>` and make sure it works before logging out again! Finally, restart the various services we have changed with, on the new host:
 
 ```bash
 sudo systemctl restart sshd
