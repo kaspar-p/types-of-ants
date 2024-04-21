@@ -16,7 +16,10 @@ impl Host {
         }
     }
 
-    pub fn http_endpoint(&self) -> String {
-        format!("http://{}:{}", self.hostname, self.port)
+    pub fn http_endpoint(&self, path: Option<String>) -> String {
+        match path {
+            None => format!("http://{}:{}", self.hostname, self.port),
+            Some(p) => format!("http://{}:{}/{}", self.hostname, self.port, p),
+        }
     }
 }

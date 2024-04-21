@@ -86,7 +86,7 @@ async fn on_cron(_database: Arc<AntDataFarmClient>) {
 
     let mut metrics: Vec<StatusData> = Vec::new();
     for test in tests {
-        metrics.extend(test.await);
+        metrics.extend(test(true).await);
     }
 
     for metric in metrics.as_slice() {

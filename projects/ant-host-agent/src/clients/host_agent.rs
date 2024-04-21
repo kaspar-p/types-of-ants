@@ -28,7 +28,7 @@ impl HostAgentClient {
             .client
             .request(
                 Method::POST,
-                format!("http://{}/kill_project", self.host.hostname),
+                self.host.http_endpoint(Some("kill_project".to_owned())),
             )
             .json(&KillProjectRequest { project })
             .build()?;
@@ -40,7 +40,10 @@ impl HostAgentClient {
     pub async fn ping(&self) -> Result<()> {
         let req = self
             .client
-            .request(Method::GET, format!("http://{}/ping", self.host.hostname))
+            .request(
+                Method::GET,
+                self.host.http_endpoint(Some("ping".to_owned())),
+            )
             .build()?;
         let res = self.client.execute(req).await?;
         let data = res.json::<String>().await?;
@@ -81,7 +84,7 @@ impl HostAgentClient {
             .client
             .request(
                 Method::PATCH,
-                format!("http://{}/launch_project", self.host.hostname),
+                self.host.http_endpoint(Some("launch_project".to_owned())),
             )
             .multipart(form)
             .build()?;
@@ -96,7 +99,7 @@ impl HostAgentClient {
             .client
             .request(
                 Method::POST,
-                format!("http://{}/get_project_logs", self.host.hostname),
+                self.host.http_endpoint(Some("get_project_logs".to_owned())),
             )
             .json(&GetProjectLogsRequest {})
             .build()?;

@@ -101,7 +101,11 @@ pub fn construct_err(
  *
  * TODO: make the request non-blocking
  */
-pub async fn ping_test() -> Vec<StatusData> {
+pub async fn ping_test(enable: bool) -> Vec<StatusData> {
+    if !enable {
+        return vec![];
+    }
+
     let client = reqwest::Client::new();
 
     let mut metrics: Vec<StatusData> = Vec::new();
