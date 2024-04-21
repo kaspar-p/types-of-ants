@@ -1,5 +1,6 @@
 import * as fs from "fs-extra";
 import { antReleaseSql, antsToSql, releaseSql } from "./sql";
+import { hashCode } from "./main";
 
 type ReleasesFile = {
   Date: {
@@ -44,12 +45,12 @@ function main() {
   );
 
   const tableChange_ant_release = antReleaseSql(
-    release.Ants.map((ant, i) => ({
+    release.Ants.map((ant) => ({
       antContent: ant,
       originalSuggestionContent: ant,
       createdAt: makeDate(release.Date).toISOString(),
       release: releaseNumber,
-      ordering: i,
+      ordering: hashCode(ant),
     }))
   );
 
