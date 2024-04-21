@@ -29,7 +29,9 @@ function antId(originalSuggestionContent: string, createdAt: string) {
 const userId = (user: "kaspar" | "nobody") =>
   `(select user_id from registered_user where user_name = '${user}')`;
 
-export function antsToSql(ants: AntMetadata[]): string {
+export function antsToSql(
+  ants: { createdAt: string; originalSuggestionContent: string }[]
+): string {
   function singleRow(ant: AntMetadata): string {
     const { createdAt, originalSuggestionContent } = ant;
     const content = sanitizeForSql(originalSuggestionContent);
@@ -92,16 +94,13 @@ ${rows}
 ;`;
 }
 
-export function releaseSql(
-  ants: (LegacyAntWithRelease | AcceptedAntWithRelease)[]
-): string {
+export function releaseSql(releases: number[]): string {
   function singleRow(release: number): string {
     const label = `v${release}`;
     return `(${release}, '${label}')`;
   }
 
-  const uniqueReleases = new Set<number>();
-  ants.forEach((ant) => uniqueReleases.add(ant.release));
+  const uniqueReleases = new Set<number>(releases);
 
   const rows = Array.from(uniqueReleases)
     .sort((a, b) => a - b)
@@ -116,11 +115,21 @@ ${rows}
 }
 
 export function antReleaseSql(
-  ants: (LegacyAntWithRelease | AcceptedAntWithRelease)[]
+  ants: {
+    originalSuggestionContent: string;
+    createdAt: string;
+    antContent: string;
+    release: number;
+    ordering: number;
+  }[]
 ): string {
-  function singleRow(
-    ant: LegacyAntWithRelease | AcceptedAntWithRelease
-  ): string {
+  function singleRow(ant: {
+    originalSuggestionContent: string;
+    createdAt: string;
+    antContent: string;
+    release: number;
+    ordering: number;
+  }): string {
     const ant_id = antId(ant.originalSuggestionContent, ant.createdAt);
     const content = sanitizeForSql(ant.antContent);
     return `(${ant_id}, ${ant.release}, '${content}', ${ant.ordering})`;

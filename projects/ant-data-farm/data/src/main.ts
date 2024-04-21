@@ -85,7 +85,7 @@ export function getSiteAntFromContent(
   return undefined;
 }
 
-function hashCode(str: string): number {
+export function hashCode(str: string): number {
   let hash = 0;
   for (let i = 0, len = str.length; i < len; i++) {
     let chr = str.charCodeAt(i);
