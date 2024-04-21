@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into ant (suggested_content, ant_user_id, created_at)
   values
     ('ant just checking in', (select user_id from registered_user where user_name = 'nobody'), '2024-03-03 05:00:00'),
@@ -160,3 +162,5 @@ insert into ant_release (ant_id, release_number, ant_content, ant_content_hash)
     ((select ant_id from ant where suggested_content = 'ant taking bribes' and created_at = '2024-03-03 05:00:00'), 31, 'ant taking bribes', 655313275),
     ((select ant_id from ant where suggested_content = 'http ant' and created_at = '2024-03-03 05:00:00'), 31, 'http ant', 2012842576)
 ;
+
+COMMIT;

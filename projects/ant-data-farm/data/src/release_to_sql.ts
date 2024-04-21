@@ -56,11 +56,15 @@ function main() {
 
   const tableChange_release = releaseSql([releaseNumber]);
 
+  console.log("BEGIN;");
+  console.log();
   console.log(tableChange_ant);
   console.log();
   console.log(tableChange_release);
   console.log();
   console.log(tableChange_ant_release);
+  console.log();
+  console.log("COMMIT;");
 }
 
 main();

@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into ant (suggested_content, ant_user_id, created_at)
   values
     ('goated ant', (select user_id from registered_user where user_name = 'nobody'), '2024-05-14 04:00:00'),
@@ -160,3 +162,5 @@ insert into ant_release (ant_id, release_number, ant_content, ant_content_hash)
     ((select ant_id from ant where suggested_content = 'ant but sideways' and created_at = '2024-05-14 04:00:00'), 32, 'ant but sideways', 46790036),
     ((select ant_id from ant where suggested_content = 'ant supervillain (carries a magnifying glass)' and created_at = '2024-05-14 04:00:00'), 32, 'ant supervillain (carries a magnifying glass)', 42931405)
 ;
+
+COMMIT;
