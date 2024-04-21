@@ -1,4 +1,3 @@
-mod db;
 mod test;
 mod tests;
 
@@ -79,7 +78,7 @@ async fn main() {
 }
 
 // Our cronjob handler.
-async fn on_cron(database: Arc<AntDataFarmClient>) {
+async fn on_cron(_database: Arc<AntDataFarmClient>) {
     println!("Testing...");
 
     // Collect all tests

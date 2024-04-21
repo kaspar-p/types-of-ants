@@ -2,19 +2,29 @@ use chrono::{DateTime, Utc};
 use reqwest::StatusCode;
 
 const URLS: &[&str] = &[
+    // Main
     "http://typesofants.org",
     "https://typesofants.org",
-    "http://beta.typesofants.org",
-    "https://beta.typesofants.org",
     "http://www.typesofants.org",
     "https://www.typesofants.org",
+    // Aliases
+    "http://typeofants.org",
+    "https://typeofants.org",
+    "http://typesofant.org",
+    "https://typesofant.org",
+    "http://typeofant.org",
+    "https://typeofant.org",
+    // Beta endpoints
+    "http://beta.typesofants.org",
+    "https://beta.typesofants.org",
+    // Other endpoints
     "http://6krill.com",
     "https://6krill.com",
 ];
 
 #[derive(Debug)]
 pub struct StatusData {
-    url: &'static str,
+    url: String,
     start_timestamp: DateTime<Utc>,
     end_timestamp: DateTime<Utc>,
     healthy: bool,
@@ -22,12 +32,19 @@ pub struct StatusData {
 }
 
 impl StatusData {
-    pub fn to_test_sql_row(&self, test_id: i32) -> String {
-        let healthy_boolean = if self.healthy { "TRUE" } else { "FALSE" };
-        format!(
-            "({}, '{}', '{}', '{}')",
-            test_id, self.start_timestamp, self.end_timestamp, healthy_boolean
-        )
+    pub fn new(
+        url: String,
+        start_timestamp: DateTime<Utc>,
+        healthy: bool,
+        status: reqwest::StatusCode,
+    ) -> Self {
+        StatusData {
+            url,
+            start_timestamp,
+            end_timestamp: start_timestamp,
+            healthy,
+            status,
+        }
     }
 }
 
@@ -48,8 +65,8 @@ impl std::fmt::Display for StatusData {
 /**
  * From a web response, construct data to go into a database
  */
-fn construct_data(
-    url: &'static str,
+pub fn construct_data(
+    url: String,
     res: reqwest::Response,
     start_timestamp: DateTime<Utc>,
 ) -> StatusData {
@@ -62,8 +79,8 @@ fn construct_data(
     }
 }
 
-fn construct_err(
-    url: &'static str,
+pub fn construct_err(
+    url: String,
     err: reqwest::Error,
     start_timestamp: DateTime<Utc>,
 ) -> StatusData {
@@ -92,8 +109,8 @@ pub async fn ping_test() -> Vec<StatusData> {
         let start_timestamp = std::time::SystemTime::now().into();
         let response = client.get((*url).to_string()).send().await;
         let metric = match response {
-            Err(err) => construct_err(url, err, start_timestamp),
-            Ok(res) => construct_data(url, res, start_timestamp),
+            Err(err) => construct_err(url.to_string(), err, start_timestamp),
+            Ok(res) => construct_data(url.to_string(), res, start_timestamp),
         };
 
         metrics.push(metric);
