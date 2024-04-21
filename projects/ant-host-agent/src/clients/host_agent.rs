@@ -9,18 +9,18 @@ use anyhow::Result;
 use hyper::Method;
 use std::{path::Path, time::Duration};
 
-pub struct HostAgent<'h> {
+pub struct HostAgentClient<'h> {
     host: &'h Host,
     client: reqwest::Client,
 }
 
-impl<'h> HostAgent<'h> {
-    pub async fn connect(host: &'h Host) -> Result<HostAgent> {
+impl<'h> HostAgentClient<'h> {
+    pub async fn connect(host: &'h Host) -> Result<HostAgentClient> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(1))
             .build()?;
 
-        Ok(HostAgent { host, client })
+        Ok(HostAgentClient { host, client })
     }
 
     pub async fn kill_project(&self, project: Project) -> Result<KillProjectResponse> {

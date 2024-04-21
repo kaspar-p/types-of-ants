@@ -1,6 +1,6 @@
 use crate::artifact::artifact::{Artifact, ArtifactBuildError};
 use ant_host_agent::{
-    clients::{Host, HostAgent},
+    clients::{Host, HostAgentClient},
     kill_project::KillStatus,
     launch_project::LaunchStatus,
 };
@@ -77,7 +77,7 @@ pub async fn deploy_project(
     };
 
     let host = Host::new();
-    let daemon = match HostAgent::connect(&host).await {
+    let daemon = match HostAgentClient::connect(&host).await {
         Err(e) => {
             debug!("Failed to connect to host agent daemon! Is it running? Error: {e}");
             return Err(DeployProjectError::Connect);

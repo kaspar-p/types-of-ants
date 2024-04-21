@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use routes::{kill_project, launch_project, ping};
+use routes::{describe_projects, kill_project, launch_project, ping};
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -36,6 +36,7 @@ async fn main() {
     debug!("Initializing API routes...");
     let app = Router::new()
         .route("/ping", get(ping).post(ping))
+        .route("/describe_projects", get(describe_projects))
         .route("/kill_project", post(kill_project))
         .route("/launch_project", post(launch_project))
         .layer(DefaultBodyLimit::disable())
