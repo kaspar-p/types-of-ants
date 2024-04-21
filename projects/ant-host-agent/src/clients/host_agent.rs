@@ -9,13 +9,13 @@ use anyhow::Result;
 use hyper::Method;
 use std::{path::Path, time::Duration};
 
-pub struct HostAgentClient<'h> {
-    host: &'h Host,
+pub struct HostAgentClient {
+    pub host: Host,
     client: reqwest::Client,
 }
 
-impl<'h> HostAgentClient<'h> {
-    pub async fn connect(host: &'h Host) -> Result<HostAgentClient> {
+impl HostAgentClient {
+    pub fn connect(host: Host) -> Result<HostAgentClient> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(1))
             .build()?;
@@ -28,13 +28,27 @@ impl<'h> HostAgentClient<'h> {
             .client
             .request(
                 Method::POST,
-                format!("http://{}/kill_project", self.host.ip),
+                format!("http://{}/kill_project", self.host.hostname),
             )
             .json(&KillProjectRequest { project })
             .build()?;
         let res = self.client.execute(req).await?;
         let data = res.json::<KillProjectResponse>().await?;
         return Ok(data);
+    }
+
+    pub async fn ping(&self) -> Result<()> {
+        let req = self
+            .client
+            .request(Method::GET, format!("http://{}/ping", self.host.hostname))
+            .build()?;
+        let res = self.client.execute(req).await?;
+        let data = res.json::<String>().await?;
+
+        match data.as_str() {
+            "healthy ant" => return Ok(()),
+            other => return Err(anyhow::Error::msg(format!("No healthy string: {}", other))),
+        };
     }
 
     pub async fn launch_project<P>(
@@ -67,7 +81,7 @@ impl<'h> HostAgentClient<'h> {
             .client
             .request(
                 Method::PATCH,
-                format!("http://{}/launch_project", self.host.ip),
+                format!("http://{}/launch_project", self.host.hostname),
             )
             .multipart(form)
             .build()?;
@@ -82,7 +96,7 @@ impl<'h> HostAgentClient<'h> {
             .client
             .request(
                 Method::POST,
-                format!("http://{}/get_project_logs", self.host.ip),
+                format!("http://{}/get_project_logs", self.host.hostname),
             )
             .json(&GetProjectLogsRequest {})
             .build()?;

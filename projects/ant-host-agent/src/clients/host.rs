@@ -3,15 +3,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Host {
     pub label: String,
-    pub ip: String,
+    pub port: u16,
+    pub hostname: String,
 }
 
 impl Host {
-    pub fn new() -> Host {
+    pub fn new(hostname: String, port: u16) -> Host {
         Host {
-            // Terrible practice, the IP of my Raspberry Pi
-            label: String::from("Kaspar's Raspberry Pi"),
-            ip: "192.168.10.162".to_owned(),
+            label: format!("ANT_WORKER: {}:{}", hostname, port.to_string()),
+            port,
+            hostname,
         }
+    }
+
+    pub fn http_endpoint(&self) -> String {
+        format!("http://{}:{}", self.hostname, self.port)
     }
 }

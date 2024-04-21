@@ -21,7 +21,7 @@ async fn main() {
         "RUST_LOG",
         "ant_on_the_web=debug,glimmer=debug,tower_http=debug",
     );
-    dotenv::dotenv().unwrap();
+    dotenv::dotenv().expect("No .env file found!");
 
     // initialize tracing
     tracing_subscriber::fmt()
@@ -55,7 +55,7 @@ async fn main() {
         .parse::<u16>()
         .expect("HOST_AGENT_PORT environment variable needs to be a valid port!");
     debug!("Starting host agent on port {port}");
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
