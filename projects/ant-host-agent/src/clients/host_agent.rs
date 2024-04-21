@@ -47,8 +47,7 @@ impl HostAgentClient {
             )
             .build()?;
         let res = self.client.execute(req).await?;
-        debug!("Ping response: '{:#?}'", res);
-        let data = res.json::<String>().await?;
+        let data = res.text().await?;
         debug!("Ping string: '{}'", data);
 
         match data.as_str() {
