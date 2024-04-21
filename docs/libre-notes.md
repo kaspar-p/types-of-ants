@@ -44,11 +44,12 @@ and that's it!
 
 ## User setup, networking
 
-Create an `ant` user on the host, and rename the `ubuntu` group to the `ants` group:
+Create an `ant` user on the host, and rename the `ubuntu` (or `pi`) group to the `ants` group:
 
 ```bash
 sudo adduser ant
 sudo usermod -aG ubuntu ant
+sudo usermod -aG docker ant
 sudo groupmod -n ants ubuntu
 ```
 
@@ -93,7 +94,9 @@ git checkout v1.0
 Install Cargo and Rust:
 ```bash
 sudo snap install rustup --classic && \
-rustup default stable
+rustup default stable && \
+sudo apt install pkg-config && \
+sudo apt-get install libssl-dev openssl
 ```
 
 And build the project. This will take a long time, especially on these slow ass machines.
