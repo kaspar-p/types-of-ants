@@ -44,12 +44,11 @@ and that's it!
 
 ## User setup, networking
 
-Create an `ant` user on the host, and rename the `ubuntu` (or `pi`) group to the `ants` group:
+Create an `ant` user on the host, and rename the `ubuntu` group to the `ants` group:
 
 ```bash
 sudo adduser ant
 sudo usermod -aG ubuntu ant
-sudo usermod -aG docker ant
 sudo groupmod -n ants ubuntu
 ```
 
@@ -91,57 +90,19 @@ cd types-of-ants && \
 git checkout v1.0
 ```
 
+Install the utilities defined in the package:
+```bash
+echo 'export PATH="$PATH:/home/ant/types-of-ants/bin"' >> ~/.bashrc && source ~/.bashrc
+```
+
 Install Cargo and Rust:
 ```bash
 sudo snap install rustup --classic && \
-rustup default stable && \
-sudo apt install pkg-config && \
-sudo apt-get install libssl-dev openssl
+rustup default stable
 ```
 
 And build the project. This will take a long time, especially on these slow ass machines.
 ```bash
 cargo build
 df
-```
-
-## Start projects
-
-All `.env` files live on the top-level, in the `types-of-ants/` directory.
-
-### Database instance
-
-For the host that is instantiating the database, the following variables need to be set in a `.env.db` file:
-
-```.env title=".env.db"
-POSTGRES_USER=...
-POSTGRES_DB=...
-POSTGRES_PASSWORD=...
-POSTGRES_PORT=...
-PGDATA="/var/lib/postgresql/data/"
-```
-
-### Database clients
-
-For all projects that use the database, they need the credentials to connect. In a `.env` file _in the project directory of the project you're running_, add:
-
-```.env title=".env.db"
-DB_PG_USER=...
-DB_PG_NAME=...
-DB_PG_PASSWORD=...
-Db_PG_PORT=...
-DB_HOST=...
-```
-
-### ant-who-tweets
-
-For the host with `ant-who-tweets`, create a `.env.twitter`
-```.env title=".env.twitter"
-TWITTER_API_CONSUMER_KEY=...
-TWITTER_API_CONSUMER_SECRET=...
-TWITTER_API_BEARER_TOKEN=...
-TWITTER_API_ACCESS_TOKEN=...
-TWITTER_API_ACCESS_TOKEN_SECRET=...
-TWITTER_API_CLIENT_ID=...
-TWITTER_API_CLIENT_SECRET=...
 ```
