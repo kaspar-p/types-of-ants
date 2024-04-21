@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+
+# Given either a worker number, or a the end name, resolve the entire hostname
+
+function error() {
+  echo -e "${RED} $1 ${NC}" > /dev/stderr
+  exit 1
+}
+
+ANT_HOSTNAME="$1"
+if [[ -z "$ANT_HOSTNAME" ]]; then
+  error "  [ERROR] Need hostname argument! For example:
+      - antworker000.hosts.typesofants.org
+      - antworker000
+      - 000"
+elif [[ ${#ANT_HOSTNAME} -gt 12 ]]; then
+  # Then this format is "antworkerxyz.hosts.typesofants.org"
+  ANT_HOSTNAME="$ANT_HOSTNAME"
+elif [[ ${#ANT_HOSTNAME} -gt 3 ]]; then
+  # Then this format is "antworkerxyz"
+  ANT_HOSTNAME="$ANT_HOSTNAME.hosts.typesofants.org"
+else
+  # Then this format is "xyz"
+  ANT_HOSTNAME="antworker${ANT_HOSTNAME}.hosts.typesofants.org"
+fi
+
+echo $ANT_HOSTNAME
+
+exit 0
