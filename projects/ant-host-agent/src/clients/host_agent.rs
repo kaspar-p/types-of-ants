@@ -8,6 +8,7 @@ use ant_metadata::Project;
 use anyhow::Result;
 use hyper::Method;
 use std::{path::Path, time::Duration};
+use tracing::debug;
 
 pub struct HostAgentClient {
     pub host: Host,
@@ -46,7 +47,9 @@ impl HostAgentClient {
             )
             .build()?;
         let res = self.client.execute(req).await?;
+        debug!("Ping response: '{:#?}'", res);
         let data = res.json::<String>().await?;
+        debug!("Ping string: '{}'", data);
 
         match data.as_str() {
             "healthy ant" => return Ok(()),
