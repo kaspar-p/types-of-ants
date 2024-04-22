@@ -34,3 +34,12 @@ it's the types of ants. see [www.typesofants.org](www.typesofants.org).
    `cargo run &` to start the tweet job.
 1. Using the PID from the `cargo run` (or find it with `jobs -l`) disown the
    process with `disown <pid>`.
+
+### Start the host management webserver
+
+1. Log onto the host `ssh2ant <hostnum>`
+1. Run `cd ~/types-of-ants/projects/ant-host-agent`
+1. Make sure there is a `.env` with `HOST_AGENT_PORT` defined to a
+   port number, likely 4499.
+1. Run the program with `nohup cargo run & disown` to make sure it
+   does not get killed when you exit.
