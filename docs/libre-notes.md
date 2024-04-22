@@ -106,3 +106,35 @@ And build the project. This will take a long time, especially on these slow ass 
 cargo build
 df
 ```
+
+## Daemonization
+
+First, we setup ant-host-agent with a .env file:
+
+```bash
+echo 'HOST_AGENT_PORT=4499' > ~/types-of-ants/projects/ant-host-agent/.env
+```
+
+Then, we make ant-host-agent a systemd service:
+
+```bash
+sudo echo '[Unit]
+Description=Start the on-host ant manager!
+
+[Service]
+Type=simple
+ExecStart=/home/ant/types-of-ants/target/debug/ant-host-agent
+WorkingDirectory=/home/ant/types-of-ants/projects/ant-host-agent
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+' > /etc/systemd/system/ant-host-agent.service
+```
+
+and enable it with:
+
+```bash
+sudo systemctl enable ant-host-agent.service
+sudo systemctl start ant-host-agent.service
+```
