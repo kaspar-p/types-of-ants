@@ -118,7 +118,13 @@ echo 'HOST_AGENT_PORT=4499' > ~/types-of-ants/projects/ant-host-agent/.env
 Then, we make ant-host-agent a systemd service:
 
 ```bash
-sudo echo '[Unit]
+sudo nano /etc/systemd/system/ant-host-agent.service
+```
+
+with the content:
+
+```txt
+[Unit]
 Description=Start the on-host ant manager!
 
 [Service]
@@ -129,7 +135,6 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-' > /etc/systemd/system/ant-host-agent.service
 ```
 
 and enable it with:
