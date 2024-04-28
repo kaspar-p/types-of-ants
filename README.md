@@ -875,7 +875,6 @@
   <div>ant with a human nose</div>
   <div>ant that started the yearly minecraft server</div>
   <div>ant on a bus</div>
-  <div>gay ant</div>
   <div>ant on the subway</div>
   <div>ant but its a bus</div>
   <div>anteatereater ant</div>
