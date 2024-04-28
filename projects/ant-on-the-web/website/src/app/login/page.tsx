@@ -43,7 +43,7 @@ export default function LoginPage() {
       </form>
       <h2>signup</h2>
       <div>
-        <div className="mb-2">if you don't have an account, signup:</div>
+        <div className="mb-2">if you don&apos;t have an account, signup:</div>
         <form
           className="grid grid-cols-2 max-w-sm gap-0"
           autoComplete="off"

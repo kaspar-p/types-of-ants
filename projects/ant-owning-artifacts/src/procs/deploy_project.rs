@@ -76,8 +76,8 @@ pub async fn deploy_project(
         Ok(artifact) => artifact,
     };
 
-    let host = Host::new();
-    let daemon = match HostAgentClient::connect(&host).await {
+    let host = Host::new("localhost".to_owned(), 4499);
+    let daemon = match HostAgentClient::connect(host).await {
         Err(e) => {
             debug!("Failed to connect to host agent daemon! Is it running? Error: {e}");
             return Err(DeployProjectError::Connect);

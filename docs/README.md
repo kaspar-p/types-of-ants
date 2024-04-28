@@ -4,17 +4,8 @@ it's the types of ants. see [www.typesofants.org](www.typesofants.org).
 
 ## Development
 
-### Start the developer database
-
-1. Navigate to `projects/ant-data-farm` and run `docker-compose up -d`.
-
-### Start the developer website
-
-1. Navigate to `projects/ant-on-the-web/website` and run `npm dev`.
-
-### Start the developer server
-
-1. Navigate to `projects/ant-on-the-web/server` and run `cargo run`.
+To learn about the architecture and how everything works, see the
+[developer guide documents](./developer-guide) here.
 
 ## Production
 

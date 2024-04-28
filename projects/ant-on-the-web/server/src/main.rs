@@ -81,7 +81,7 @@ async fn main() {
 
     let port: u16 = 3499;
     debug!("Starting server on port {port}...");
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

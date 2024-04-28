@@ -1,12 +1,9 @@
 "use client";
 
-import { getReleasedAnts, getReleaseNumber } from "@/server/queries";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { errorOr } from "@/components/UnhappyPath";
 import { Header } from "@/components/Header";
 
 const inter = Inter({ subsets: ["latin"] });
