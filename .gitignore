@@ -1,13 +1,15 @@
 .vscode
 **/__pycache__
+bazel-*
+rust-project.json
 .DS_Store
+
+# secrets
+*.env*
+
+# Added by cargo
+target
+run
 
 cli/add
 add
-
-# v1.0 compatibility
-*.env*
-run/
-target/
-projects/
-dev/

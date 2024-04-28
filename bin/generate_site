@@ -1,0 +1,82 @@
+#!/bin/bash
+
+set -e
+
+function usage() {
+  echo "[ERROR] Usage: $0 \\
+              <ants.txt path> \\
+              <releases dir> \\
+              <README.md path> \\
+              <index_template.html path> \\
+              <index.html path>"
+}
+
+export ANTS_TXT_PATH=$1
+if [[ -z "$ANTS_TXT_PATH" ]]; then
+  usage
+  exit 1
+fi
+
+export RELEASES_DIR=$2
+if [[ -z "$RELEASES_DIR" ]]; then
+  usage
+  exit 1
+fi
+
+export README_PATH=$3
+if [[ -z "$README_PATH" ]]; then
+  usage
+  exit 1
+fi
+
+export HTML_TEMPLATE_PATH=$4
+if [[ -z "$HTML_TEMPLATE_PATH" ]]; then
+  usage
+  exit 1
+fi
+
+export INDEX_HTML_PATH=$5
+if [[ -z "$INDEX_HTML_PATH" ]]; then
+  usage
+  exit 1
+fi
+
+export TMP_DIR="/tmp/typesofants"
+mkdir -p "$TMP_DIR"
+
+export OLD_README="$TMP_DIR/README_OLD.md"
+cp "$README_PATH" "$OLD_README"
+export OLD_INDEX="$TMP_DIR/index_OLD.html"
+cp "$INDEX_HTML_PATH" "$OLD_INDEX"
+
+python3 static_site/generate/generate_page.py "$ANTS_TXT_PATH" "$RELEASES_DIR" "$HTML_TEMPLATE_PATH" "$INDEX_HTML_PATH"
+python3 static_site/generate/generate_readme.py "$ANTS_TXT_PATH" "$README_PATH"
+
+function join_by {
+  local d=${1-} f=${2-}
+  if shift 2; then
+    printf %s "$f" "${@/#/$d}"
+  fi
+}
+
+diffed=()
+
+diff_readme_result=$(diff "$README_PATH" "$OLD_README")
+if [[ "$diff_readme_result" != "" ]]; then
+    diffed+=("README.md")
+fi
+
+diff_index_result=$(diff "$INDEX_HTML_PATH" "$OLD_INDEX")
+if [[ "$diff_index_result" != "" ]]; then
+    diffed+=("index.html")
+fi
+
+if [[ ${#diffed[@]} -eq 0 ]]; then
+    echo "Nothing changed"
+else
+    space_delimited="${diffed[@]}"
+    comma_space_delimited="${space_delimited// /, }"
+    echo "Updated $comma_space_delimited"
+fi
+
+rm "$OLD_README" "$OLD_INDEX"

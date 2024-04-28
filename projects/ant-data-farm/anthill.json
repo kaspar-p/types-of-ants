@@ -1,0 +1,5 @@
+{
+  "project": "ant-data-farm",
+  "version": "1.0.0",
+  "entry": "docker-compose build && docker-compose up"
+}

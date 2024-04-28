@@ -1,0 +1,10 @@
+{
+  "project": "anthill",
+  "version": "1.0.0",
+  "artifacts": [
+    {
+      "name": "anthill",
+      "kind": "rust-bin"
+    }
+  ]
+}

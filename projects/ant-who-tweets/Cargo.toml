@@ -1,0 +1,19 @@
+[package]
+name = "ant-who-tweets"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dotenv = "0.15.0"
+tokio = { version = "1.35.1", features = ["macros"] }
+twitter-v2 = { version = "0.1.8", features = ["oauth2"] }
+rand = "0.8.5"
+tokio-cron-scheduler = "0.9.4"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tracing-appender = "0.2.3"
+ant-data-farm = { path = "../ant-data-farm" }
+chrono = "0.4.33"
+anyhow = "1.0.79"

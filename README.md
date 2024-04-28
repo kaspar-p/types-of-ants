@@ -1,5 +1,7 @@
 # types of ants
 
+> For real documentation, see the [docs](./docs)
+
 <div>
   <div>red ant</div>
   <div>ant just checking in</div>
@@ -10,7 +12,6 @@
   <div>ant on a bike</div>
   <div>ant eating dinner</div>
   <div>blue ant</div>
-  <div>ant that would love to work for amazon :)</div>
   <div>yellow ant</div>
   <div>orange ant</div>
   <div>teal ant</div>
