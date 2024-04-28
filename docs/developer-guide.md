@@ -71,3 +71,75 @@ developers `PATH` variable. For example, `ssh2ant` just takes a host number and
 performs `ssh` to the right user, using the local PEM file. Like `ssh2ant 000`
 will attempt to connect to `antworker000.hosts.typesofants.org`. That domain is
 aliased to a local IP, `192.168.something`, so it's local to the network.
+
+Try it! If you run `curl antworker000.hosts.typesofants.org:4499/ping` you
+should get the `healthy ant` response back.
+
+## Developing on `ant-on-the-web`
+
+Probably the more complicated one. The website can be run directly, locally, to
+speedup changes.
+
+Running `npm run dev` in the package will start the webserver on
+`localhost:3000`. It by default will attempt to connect to the webserver that
+runs the API, which is `ant-on-the-web/server` on `localhost:3499`, so run that
+with `cargo run` in a terminal tab.
+
+The communication flow is:
+
+```txt
+website <-> backend API <-> database
+```
+
+as any three-tiered web service is built, these days. Any changes made to the
+frontend will immediately take effect!
+
+## Developing on `ant-data-farm`
+
+Start from top-level with `docker-compose up -d ant-data-farm` and it will start
+fine. You might be missing some `.env` variables for all of this
+connection/authentication BTW, ask Kaspar about them.
+
+## Mock feature development
+
+For example, a hypothetical new "login" feature would be built in the following
+way:
+
+First, we make frontend changes to the site, adding new pages/components
+required to signup and log the user in. These will be seen in the website when
+running `npm run dev`. This code is going to all by in
+`ant-on-the-web/website/src`. The buttons can do nothing, they can throw
+exceptions, whatever, but things just need to look nice.
+
+Then, make API changes, likely for new routes like `/api/signup` and
+`/api/login`. That code will be in `ant-on-the-web/server/src`. Implementing the
+state-machine that is user authentication is a bit complicated, but that's ok.
+Not everything has to be easy.
+
+Finally, we make database changes. If the database already has the tables/schema
+that we need, then no changes in the schema, but likely the DB client needs to
+change. We write our own client, meaning it's a semantic object with methods
+like `get_all_ants()` rather than just making network calls. Of course, it makes
+network calls under the hood, but the methods are nice.
+
+A service providing nice clients or a "mini-SDK" for itself is one of my
+favorite things about working at a large web services company: everything has a
+standardized client able to be generated in all major languages! Typesofants
+isn't quite at the "all major languages" thing yet, but that's why everything is
+written in the same language :).
+
+Rust, BTW. Everything's written in Rust. You'll need to install that and NPM to
+work on typesofants. I'm sure you can figure it out. Rust is idiomatic and has
+no external "manager", but for Typescript I use the `nvm` tool.
+
+Anyway, database changes. The schema changes are applied via "migrations", which
+you can see in the `ant-data-farm` directory. That's where you would go to find
+out if the schema you need is already there, by the way. Migrations are applied
+in lexicographical order, the same order files are displayed in directories.
+That's why the are prefixed with numbers, to apply in the right order.
+Migrations should be written as a transaction.
+
+After we have determined if the database supports our use-case or if we need
+schema changes, we have to restart the database locally and apply those
+migrations. New migrations need to be added to the `Dockerfile` of the database,
+to be copied into the image and subsequently applied.
