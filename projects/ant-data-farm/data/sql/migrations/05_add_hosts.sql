@@ -14,8 +14,7 @@ set
   host_type = 'Raspberry Pi',
   host_os = 'Rasbian',
   host_user = 'ant'
-where host_id = '8a541f27-5227-4543-a916-3db30a800f81';
-
+where host_label = 'Kaspar''s Raspberry Pi';
 
 insert into host (host_label, host_location, host_hostname, host_type, host_os, host_user)
   values
