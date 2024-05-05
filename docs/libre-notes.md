@@ -29,6 +29,9 @@ to any temporary ubuntu password! Then, run (this will take a while):
 ```bash
 sudo apt update
 sudo apt upgrade
+sudo apt install net-tools
+sudo apt-get install autoconf
+sudo snap install jq
 sudo snap install docker
 
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -68,6 +71,15 @@ group:
 sudo adduser ant
 sudo usermod -aG ubuntu ant
 sudo groupmod -n ants ubuntu
+```
+
+Make sure you can use `docker` tools:
+
+```bash
+sudo groupadd docker
+sudo usermod -aG docker ant
+newgrp docker
+sudo systemctl restart docker
 ```
 
 Add the `ant` user to be able to `sudo` by adding via `visudo`:
@@ -135,6 +147,14 @@ cargo build
 df
 ```
 
+## Reserve the local dynamic IP
+
+To keep this local IP reserved on the network so it doesn't change anymore, go
+to <http://192.168.2.1> > My Devices > Ethernet, and select the current
+antworker.
+
+Make sure to select the IP it is on as _Reserved_.
+
 ## Daemonization of `ant-host-agent`
 
 First, we setup ant-host-agent with a .env file:
@@ -201,6 +221,7 @@ Description=The typesofants web server!
 Type=simple
 ExecStart=/home/ant/types-of-ants/target/debug/ant-on-the-web
 WorkingDirectory=/home/ant/types-of-ants/projects/ant-on-the-web/server
+EnvironmentFile=/home/ant/types-of-ants/projects/ant-on-the-web/server/.env
 Restart=always
 
 [Install]
@@ -214,10 +235,43 @@ sudo systemctl enable ant-on-the-web.service && \
 sudo systemctl start ant-on-the-web.service
 ```
 
-## Reserve the local dynamic IP
+## Daemonization of `ant-gateway`
 
-To keep this local IP reserved on the network so it doesn't change anymore, go
-to <http://192.168.2.1> > My Devices > Ethernet, and select the current
-antworker.
+The main thing missing is the private key certificate. I have it locally on my
+laptop, so copy it to the right location _LOCALLY_ with:
 
-Make sure to select the IP it is on as _Reserved_.
+```bash
+scp local_path/to/key.pem \
+  ant@$(anthost <NUM>):~/types-of-ants/projects/ant-gateway/secrets/ssl/beta.typesofants.org/key.pem
+```
+
+Then, we make `ant-gateway` a systemd service:
+
+```bash
+sudo nano /etc/systemd/system/ant-gateway.service
+```
+
+with the content:
+
+```txt
+[Unit]
+Description=The reverse proxy for typesofants.org!
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml up --build ant-gateway"
+ExecStop=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml stop --build ant-gateway"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+And enable it with:
+
+```bash
+sudo systemctl enable ant-gateway.service && \
+sudo systemctl start ant-gateway.service
+```
+
+We can check if it's working with `docker ps` and look at the logs with
+`docker logs $(docker ps -q)`.

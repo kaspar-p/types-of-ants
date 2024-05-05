@@ -38,3 +38,54 @@ sudo systemctl restart ant-on-the-web.service
 First, make sure that this host is the one being port-forwarded to on the local
 network. By going to <http://192.168.2.1> > Advanced > Port Forwarding, make
 sure that the right host is pointed to.
+
+The hosts should be named according to their `/etc/hostname` file,
+
+## `ddclient`
+
+I'm not paying $46 a month for a static IP address from Bell. We use a daemon
+job to run in the background on one of the hosts to hit CloudFlare APIs to
+update the value of an IP when we detect that it's changed. This is `ddclient`.
+
+On one of the hosts (I've chosen `antworker002`), install a known working
+version:
+
+```bash
+mkdir -p ~/installs
+cd ~/installs
+wget https://github.com/ddclient/ddclient/archive/refs/tags/v3.11.2.tar.gz
+tar xvfa v3.11.2.tar.gz
+cd ddclient-3.11.2
+./autogen
+./configure \
+  --prefix=/usr \
+  --sysconfdir=/etc/ddclient \
+  --localstatedir=/var
+make
+make VERBOSE=1 check
+sudo make install
+```
+
+And the `/etc/ddclient/ddclient.conf` file needs to be edited with contents:
+
+```txt
+daemon=300
+syslog=yes
+verbose=yes
+pid=/var/run/ddclient.pid
+ssl=yes
+use=web
+web='https://cloudflare.com/cdn-cgi/trace'
+web-skip='ip='
+
+protocol=cloudflare, \
+zone=typesofants.org, \
+ttl=1,
+login=token,
+password='YOUR_SECRET_CLOUDFLARE_API_TOKEN_HERE',
+beta.typesofants.org
+```
+
+where the password field is filled in. Keep the single quotes around it! Then,
+running `ddclient` will begin the process. You can check on it via the logs with
+`ddclient -query`.
