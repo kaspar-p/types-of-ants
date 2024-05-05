@@ -12,6 +12,7 @@ services:
     secrets:
       - twitter_creds
       - database_creds
+
   ant-data-farm:
     build:
       context: ./projects/ant-data-farm
@@ -26,6 +27,23 @@ services:
       - ./projects/ant-data-farm/database-files:/var/lib/postgresql/data
     secrets:
       - database_creds
+
+  ant-gateway:
+    container_name: ant-gateway
+    build:
+      context: ./projects/ant-gateway
+      dockerfile: Dockerfile
+      args:
+        - FQDN=beta.typesofants.org
+        - ANT_WORKER_NUM=002
+        - WEBSERVER_PORT=3499
+        - SSL_CERT_PATH=./data/beta.typesofants.org/cert.pem
+        - SSL_KEY_PATH=./secrets/ssl/beta.typesofants.org/key.pem
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+
 secrets:
   twitter_creds:
     file: ./.env.twitter

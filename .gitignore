@@ -6,6 +6,8 @@ rust-project.json
 
 # secrets
 *.env*
+secrets/*
+!secrets/.gitkeep
 
 # Added by cargo
 target

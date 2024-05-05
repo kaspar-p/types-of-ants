@@ -1,2 +1,2 @@
-data/certbot/*
-!data/certbot/.gitkeep
+secrets/*
+!secrets/.gitkeep

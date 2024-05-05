@@ -27,6 +27,12 @@ There are the following components:
   "doesn't exist" at runtime, just like source code doesn't exist at runtime.
   It's statically compiled into a bunch of JavaScript, CSS, and HTML as a part
   of the build process, and those files are served by the webserver.
+- `ant-gateway`: The reverse proxy. Only a single machine can be responsible for
+  answering requests directed towards a domain, and then fan-out to the
+  individual webservers from there. It's possible that this is the same machine
+  as the webserver itself. It is an NGINX webserver running in a docker
+  container. Certificates are always a pain, I've downloaded the secret ones for
+  `beta.typesofants.org` and those are being used.
 - `ant-host-agent`: is another webserver, a binary that runs on each host.
   Usually bound to port 4499, has a single usable route today `/ping` that
   returns the string `healthy ant`. It's used for an extremely basic monitoring
@@ -46,8 +52,8 @@ The following components are more experimental, may never see the light of day:
 - `ant-building-projects`: The build servers, for eventual CI/CD deployments.
   Making changes currently involves _taking down_ the process and then rebooting
   it, or at least restarting the daemon that starts that process. This is fine
-  for a web server that likely has many hosts running the same binary, but for
-  something like a database not that fine. This would likely be a web server
+  for a webserver that likely has many hosts running the same binary, but for
+  something like a database not that fine. This would likely be a webserver
   listening on a host, and would checkout, build, and store build artifacts.
   Those artifacts would be stored until the next time a deployment is needed.
 - `ant-owning-artifacts`: IDK. Probably the same as the previous one, but
