@@ -11,3 +11,5 @@ COPY data/sql/migrations/01_add_phone.sql /docker-entrypoint-initdb.d/07.sql
 COPY data/sql/migrations/02_08-08-2023_ant_release.sql /docker-entrypoint-initdb.d/08.sql
 COPY data/sql/migrations/03_02-03-2024_ant_release.sql /docker-entrypoint-initdb.d/09.sql
 COPY data/sql/migrations/04_14-04-2024_ant_release.sql /docker-entrypoint-initdb.d/10.sql
+COPY data/sql/migrations/05_add_hosts.sql /docker-entrypoint-initdb.d/11.sql
+COPY data/sql/migrations/06_migrations_tracker.sql /docker-entrypoint-initdb.d/12.sql

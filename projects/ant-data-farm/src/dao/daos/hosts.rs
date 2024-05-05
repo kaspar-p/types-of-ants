@@ -11,6 +11,9 @@ pub struct Host {
     pub host_id: HostId,
     pub host_label: String,
     pub host_location: String,
+    pub host_hostname: String,
+    pub host_type: String,
+    pub host_os: String,
 }
 
 pub struct HostsDao {
@@ -26,13 +29,16 @@ impl DaoTrait<HostsDao, Host> for HostsDao {
         let found_hosts = db
             .lock()
             .await
-            .query("select host_id, host_label, host_location from host;", &[])
+            .query("select host_id, host_label, host_location, host_hostname, host_type, host_os from host;", &[])
             .await?
             .iter()
             .map(|row| Host {
                 host_id: row.get("host_id"),
                 host_label: row.get("host_label"),
                 host_location: row.get("host_location"),
+                host_hostname: row.get("host_hostname"),
+                host_type: row.get("host_type"),
+                host_os: row.get("host_os"),
             })
             .collect::<Vec<Host>>();
 
