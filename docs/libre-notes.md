@@ -275,3 +275,36 @@ sudo systemctl start ant-gateway.service
 
 We can check if it's working with `docker ps` and look at the logs with
 `docker logs $(docker ps -q)`.
+
+## Daemonization of `ant-data-farm`
+
+We make `ant-data-farm` a systemd service:
+
+```bash
+sudo nano /etc/systemd/system/ant-data-farm.service
+```
+
+with the content:
+
+```txt
+[Unit]
+Description=The reverse proxy for typesofants.org!
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml up --build ant-data-farm"
+ExecStop=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml stop --build ant-data-farm"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+And enable it with:
+
+```bash
+sudo systemctl enable ant-data-farm.service && \
+sudo systemctl start ant-data-farm.service
+```
+
+We can check if it's working with `docker ps` and look at the logs with
+`docker logs $(docker ps -q)`.

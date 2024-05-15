@@ -39,7 +39,29 @@ First, make sure that this host is the one being port-forwarded to on the local
 network. By going to <http://192.168.2.1> > Advanced > Port Forwarding, make
 sure that the right host is pointed to.
 
-The hosts should be named according to their `/etc/hostname` file,
+The hosts should be named according to their `/etc/hostname` file.
+
+## Production guide for `ant-data-farm`
+
+Follow the "daemonization" guide for `ant-data-farm` to make it a systemd
+service. Then just run:
+
+```bash
+sudo systemctl enable ant-data-farm.service && \
+sudo systemctl start ant-data-farm.service
+```
+
+to start it. The logs can be read via:
+
+```bash
+sudo journalctl -u ant-data-farm.service
+```
+
+or even through `docker` via:
+
+```bash
+docker logs $(docker ps -q)
+```
 
 ## `ddclient`
 
