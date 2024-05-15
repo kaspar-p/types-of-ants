@@ -3,17 +3,11 @@
 set -e
 set -o pipefail
 
-function error() {
-  echo -e "${RED} $1 ${NC}"
-  exit
-}
-
-
 user='ant'
 host=$(anthost $1)
 key='~/.ssh/id_typesofants_ed25519'
 
-echo "  [INFO] Attempting to SSH to $user@$host"
-echo "  [INFO] Using SSH key $key"
+echo "[INFO] Attempting to SSH to $user@$host"
+echo "[INFO] Using SSH key $key"
 
 ssh -i "$key" "$user@$host"

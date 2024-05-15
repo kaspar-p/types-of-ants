@@ -5,16 +5,16 @@ set -e
 # Given either a worker number, or a the end name, resolve the entire hostname
 
 function error() {
-  echo -e "${RED} $1 ${NC}" > /dev/stderr
+  echo -e "$1" > /dev/stderr
   exit 1
 }
 
 ANT_HOSTNAME="$1"
 if [[ -z "$ANT_HOSTNAME" ]]; then
-  error "  [ERROR] Need hostname argument! For example:
-      - antworker000.hosts.typesofants.org
-      - antworker000
-      - 000"
+  error "[ERROR] Need hostname argument! For example:
+    - antworker000.hosts.typesofants.org
+    - antworker000
+    - 000"
 elif [[ ${#ANT_HOSTNAME} -gt 12 ]]; then
   # Then this format is "antworkerxyz.hosts.typesofants.org"
   ANT_HOSTNAME="$ANT_HOSTNAME"

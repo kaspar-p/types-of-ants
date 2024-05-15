@@ -31,8 +31,7 @@ sudo apt update
 sudo apt upgrade
 sudo apt install net-tools
 sudo apt-get install autoconf
-sudo snap install jq
-sudo snap install docker
+sudo snap install jq docker btop
 
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
