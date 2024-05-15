@@ -194,7 +194,7 @@ sudo systemctl start ant-host-agent.service
 ## Daemonization of `ant-on-the-web`
 
 We also need a .env file here, with the port and some database credentials. For
-the file `./projects/ant-on-the-web/.env`, fill in the details:
+the file `./projects/ant-on-the-web/server/.env`, fill in the details:
 
 ```txt
 DB_PG_USER=...
