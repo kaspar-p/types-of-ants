@@ -1,4 +1,4 @@
-FROM postgres
+FROM postgres:15
 
 COPY data/sql/01_bootstrap_schema.sql /docker-entrypoint-initdb.d/01.sql
 COPY data/sql/02_ant.sql /docker-entrypoint-initdb.d/02.sql
