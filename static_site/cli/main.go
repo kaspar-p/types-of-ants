@@ -12,7 +12,7 @@ import (
 )
 
 var EXIT_STATEMENT string = ".done"
-var RELEASES_DIR string = "./releases"
+var RELEASES_DIR string = "./static_site/releases"
 var FILE_NAME string = "./ants.txt"
 
 func insert(a []string, index int, value string) []string {

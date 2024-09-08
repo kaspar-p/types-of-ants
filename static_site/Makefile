@@ -1,6 +1,9 @@
 all: cli/add
 
-cli/add:
+cli/add: cli/main.go cli/go.mod cli/go.sum
 	cd cli && go build
 
-PSEUDO: all add generate
+clean:
+	cd cli && rm add
+
+PSEUDO: all clean add generate
