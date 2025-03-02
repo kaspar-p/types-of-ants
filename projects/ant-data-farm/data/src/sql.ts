@@ -1,12 +1,19 @@
 import {
-  LegacyAnt,
-  AcceptedAnt,
-  UnseenAnt,
-  DeclinedAnt,
-  AntMetadata,
-  LegacyAntWithRelease,
-  AcceptedAntWithRelease,
+  type DeclinedAnt,
+  type AntMetadata,
+  type LegacyAntWithRelease,
+  type AcceptedAntWithRelease,
 } from "./main";
+
+export function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0, len = str.length; i < len; i++) {
+    let chr = str.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return (hash >>> 0) % (Math.pow(2, 31) - 1);
+}
 
 function sanitizeForSql(content: string): string {
   return content.replace(/'/g, "''");
@@ -143,6 +150,15 @@ export function antReleaseSql(
   return `insert into ant_release (ant_id, release_number, ant_content, ant_content_hash)
   values
 ${rows}
+;`;
+}
+
+export function migrationSql(migrationLabel: string) {
+  const value = `    ('${sanitizeForSql(migrationLabel)}')`;
+
+  return `insert into migration (migration_label)
+  values
+${value}
 ;`;
 }
 

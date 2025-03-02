@@ -1,6 +1,11 @@
-import * as fs from "fs-extra";
-import { antReleaseSql, antsToSql, releaseSql } from "./sql";
-import { hashCode } from "./main";
+import { readFileSync, existsSync } from "fs-extra";
+import {
+  hashCode,
+  antReleaseSql,
+  antsToSql,
+  releaseSql,
+  migrationSql,
+} from "./sql";
 
 type ReleasesFile = {
   Date: {
@@ -30,11 +35,11 @@ function main() {
   const releasesFile: string = process.argv[2];
   const releaseNumber: number = parseInt(process.argv[3]);
 
-  if (!fs.existsSync(releasesFile)) {
+  if (!existsSync(releasesFile)) {
     throw new Error(releasesFile + " does not exist!");
   }
 
-  const content = fs.readFileSync(releasesFile, { encoding: "utf-8" });
+  const content = readFileSync(releasesFile, { encoding: "utf-8" });
   const release: ReleasesFile = JSON.parse(content);
 
   const tableChange_ant = antsToSql(
@@ -56,6 +61,10 @@ function main() {
 
   const tableChange_release = releaseSql([releaseNumber]);
 
+  const tableChange_migration = migrationSql(
+    `ant-release:${release.Date.Year}.${release.Date.Month}.${release.Date.Day}`
+  );
+
   console.log("BEGIN;");
   console.log();
   console.log(tableChange_ant);
@@ -63,6 +72,8 @@ function main() {
   console.log(tableChange_release);
   console.log();
   console.log(tableChange_ant_release);
+  console.log();
+  console.log(tableChange_migration);
   console.log();
   console.log("COMMIT;");
 }

@@ -15,6 +15,8 @@ To learn about the architecture and how everything works, see the
 1. Run `cd ~/types-of-ants/projects/ant-data-farm` and
    `docker-compose up -d ant-data-farm` to run the database.
 1. Make sure it succeeds.
+1. Connect via `psql -p 7000 -h 0.0.0.0 -U typesofants` and type in the password
+   in the `.env` file on this machine, make sure it's healthy.
 
 ### Start tweeting
 

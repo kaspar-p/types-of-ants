@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
@@ -26,7 +25,7 @@ func insert(a []string, index int, value string) []string {
 
 type ReleaseDate struct {
 	Year  int
-	Month string
+	Month int
 	Day   int
 }
 
@@ -35,7 +34,7 @@ type Release struct {
 	Ants []string
 }
 
-func make_release(ants []string, year int, month string, day int) ([]byte, error) {
+func make_release(ants []string, year int, month int, day int) ([]byte, error) {
 	release := Release{
 		Ants: ants,
 		Date: ReleaseDate{
@@ -52,7 +51,7 @@ func main() {
 	rand.Seed(time.Now().Unix())
 
 	year, _month, day := time.Now().Date()
-	month := (_month.String())[:3]
+	month := int(_month)
 
 	// Make sure there are no args
 	if len(os.Args[1:]) > 0 {
@@ -69,7 +68,7 @@ func main() {
 	defer ants_file.Close()
 
 	// Open the release.txt file
-	release_file_name := RELEASES_DIR + "/" + fmt.Sprint(day) + month + fmt.Sprint(year) + ".json"
+	release_file_name := fmt.Sprint(RELEASES_DIR, "/", year, "-", month, "-", day, ".json")
 	release_file, err := os.Create(release_file_name)
 	if err != nil {
 		fmt.Printf("Error opening release file: %s", err)
@@ -125,7 +124,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = ioutil.WriteFile(release_file_name, release_bytes, 0644)
+	err = os.WriteFile(release_file_name, release_bytes, 0644)
 	if err != nil {
 		fmt.Printf("Error writing to release file: %s", err)
 		os.Exit(1)
@@ -133,7 +132,7 @@ func main() {
 	release_file.Sync()
 	fmt.Printf("Created new release file with %d ants!\n", len(antsToAdd))
 
-	err = ioutil.WriteFile(FILE_NAME, []byte(strings.Join(lines, "\n")+"\n"), 0644)
+	err = os.WriteFile(FILE_NAME, []byte(strings.Join(lines, "\n")+"\n"), 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %s", err)
 		os.Exit(1)

@@ -1,13 +1,14 @@
-import { SiteData, getSiteData, getRawData, RawData } from "./parse";
+import { SiteData, getSiteData, getRawData } from "./parse";
 import { exec as _exec } from "child_process";
 import {
   antReleaseSql,
   antTweetedSql,
   antsToSql,
   declinedToSql,
+  hashCode,
   releaseSql,
 } from "./sql";
-import { checkIntegrity } from "./integrity";
+// import { checkIntegrity } from "./integrity";
 import * as fs from "fs-extra";
 import * as util from "util";
 
@@ -83,16 +84,6 @@ export function getSiteAntFromContent(
   }
   // throw new Error("Content is not linked to ANY ant: " + content);
   return undefined;
-}
-
-export function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0, len = str.length; i < len; i++) {
-    let chr = str.charCodeAt(i);
-    hash = (hash << 5) - hash + chr;
-    hash |= 0; // Convert to 32bit integer
-  }
-  return (hash >>> 0) % (Math.pow(2, 31) - 1);
 }
 
 function createMetadataFromSiteAnt(
@@ -368,4 +359,4 @@ async function main() {
   // await writeSqlFiles(siteData, rawData);
 }
 
-main();
+// main();
