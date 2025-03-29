@@ -25,4 +25,6 @@ ENV_FILE_PATH="$1"
 
 source "$ENV_FILE_PATH"
 
-mo ./ddclient.conf.mo > /etc/ddclient/ddclient.conf
+TEMPLATE_FILE="$(dirname $0)//ddclient.conf.mo"
+
+sudo mo "$TEMPLATE_FILE" > /etc/ddclient/ddclient.conf
