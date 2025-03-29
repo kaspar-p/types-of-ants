@@ -87,7 +87,9 @@ cd ddclient-3.11.2
 make
 make VERBOSE=1 check
 sudo make install
+
 sudo chown ant /etc/ddclient/ddclient.conf
+sudo chown ant /var/cache/ddclient/ddclient.cache
 ```
 
 And the `/etc/ddclient/ddclient.conf` file needs to be edited with contents.

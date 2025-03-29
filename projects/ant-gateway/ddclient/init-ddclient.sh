@@ -21,6 +21,8 @@ if [[ -z "$1" ]]; then
   usage
 fi
 
+echo '[INFO] COPYING DDCLIENT CONFIG...'
+
 ENV_FILE_PATH="$1"
 set -o allexport
 source "$ENV_FILE_PATH"
@@ -30,3 +32,7 @@ set -x
 
 TEMPLATE_FILE="$(dirname $0)//ddclient.conf.mo"
 mo "$TEMPLATE_FILE" > /etc/ddclient/ddclient.conf
+
+echo '[INFO] STARTING DDCLIENT...'
+
+ddclient -daemon=0 -debug -verbose -noquiet
