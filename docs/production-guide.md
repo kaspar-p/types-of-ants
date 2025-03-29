@@ -95,7 +95,7 @@ This can be done with:
 ```bash
 cd ~/types-of-ants
 
-./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
+sudo ./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
 ```
 
 where the password field is filled in. Keep the single quotes around it!

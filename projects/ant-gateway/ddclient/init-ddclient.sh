@@ -22,9 +22,9 @@ if [[ -z "$1" ]]; then
 fi
 
 ENV_FILE_PATH="$1"
-
 source "$ENV_FILE_PATH"
 
-TEMPLATE_FILE="$(dirname $0)//ddclient.conf.mo"
+set -x
 
+TEMPLATE_FILE="$(dirname $0)//ddclient.conf.mo"
 sudo mo "$TEMPLATE_FILE" > /etc/ddclient/ddclient.conf

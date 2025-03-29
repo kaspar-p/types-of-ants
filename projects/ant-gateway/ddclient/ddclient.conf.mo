@@ -11,5 +11,5 @@ protocol=cloudflare, \
 zone=typesofants.org, \
 ttl=1,
 login=token,
-password='{{CLOUDFLARE_TOKEN}}',
+password='{{CLOUDFLARE_API_TOKEN}}',
 beta.typesofants.org
