@@ -36,3 +36,7 @@ mo "$TEMPLATE_FILE" > /etc/ddclient/ddclient.conf
 echo '[INFO] STARTING DDCLIENT...'
 
 ddclient -daemon=0 -debug -verbose -noquiet
+
+ps aux | grep ddclient | grep sleeping
+
+echo "DDCLIENT RUNNING AND HEALTHY"
