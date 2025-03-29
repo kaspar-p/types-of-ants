@@ -22,7 +22,9 @@ if [[ -z "$1" ]]; then
 fi
 
 ENV_FILE_PATH="$1"
+set -o allexport
 source "$ENV_FILE_PATH"
+set +o allexport
 
 set -x
 

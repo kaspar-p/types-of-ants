@@ -87,6 +87,7 @@ cd ddclient-3.11.2
 make
 make VERBOSE=1 check
 sudo make install
+sudo chown ant /etc/ddclient/ddclient.conf
 ```
 
 And the `/etc/ddclient/ddclient.conf` file needs to be edited with contents.
@@ -95,7 +96,7 @@ This can be done with:
 ```bash
 cd ~/types-of-ants
 
-sudo ./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
+./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
 ```
 
 where the password field is filled in. Keep the single quotes around it!
