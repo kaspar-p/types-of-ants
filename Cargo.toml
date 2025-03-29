@@ -1,12 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-  "projects/ant-data-farm", 
+  "projects/ant-data-farm",
   "projects/ant-just-checking-in",
   "projects/ant-on-the-web/server",
   "projects/ant-who-tweets",
   "projects/ant-host-agent",
+  # "projects/ant-host-agent-server-sdk",
+  # "projects/ant-host-agent-client",
   "projects/ant-metadata",
   "projects/ant-owning-artifacts",
-  "projects/anthill"
+  "projects/anthill",
 ]

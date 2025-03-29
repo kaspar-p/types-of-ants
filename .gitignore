@@ -4,6 +4,20 @@ bazel-*
 rust-project.json
 .DS_Store
 
+# Code generated packages
+projects/ant-host-agent-client
+projects/ant-host-agent-server-sdk
+
+# Smithy
+.smithy.lsp.log
+
+# Gradle
+.gradle
+build/
+gradle-app.setting
+gradle-wrapper.jar
+gradlew.bat
+
 # secrets
 *.env*
 secrets/*

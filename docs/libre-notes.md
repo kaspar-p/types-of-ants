@@ -43,6 +43,7 @@ source ~/.bashrc
 ```
 
 And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`.
+
 Change the hostname to the one you decide on for this machine. Others are named
 `antworker<num>`. Set it with:
 
@@ -59,7 +60,8 @@ is a line like:
 127.0.1.1  $ANT_HOSTNAME
 ```
 
-and that's it!
+and that's it! The purpose of this hostname change is for port-forwarding, so
+the same machine is permanently reachable by the same `$ANT_HOSTNAME` string.
 
 ## User setup, networking
 
