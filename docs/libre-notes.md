@@ -63,7 +63,7 @@ is a line like:
 and that's it! The purpose of this hostname change is for port-forwarding, so
 the same machine is permanently reachable by the same `$ANT_HOSTNAME` string.
 
-## User setup, networking
+## User setup
 
 Create an `ant` user on the host, and rename the `ubuntu` group to the `ants`
 group:
@@ -74,6 +74,8 @@ sudo usermod -aG ubuntu ant
 sudo groupmod -n ants ubuntu
 ```
 
+## Docker installation
+
 Make sure you can use `docker` tools:
 
 ```bash
@@ -82,6 +84,31 @@ sudo usermod -aG docker ant
 newgrp docker
 sudo systemctl restart docker
 ```
+
+Alternatively, if the `systemctl restart` command doesn't work, this might:
+
+```bash
+sudo systemctl restart snap.docker.dockerd.service
+```
+
+Make sure Docker is up by getting a response from `docker ps`.
+
+## Other tools installation
+
+Install `mo`, a mustache template implementation.
+
+```bash
+mkdir -p ~/installs
+
+curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
+  -o ~/installs/mo
+chmod +x ~/installs/mo
+
+echo 'export PATH="$PATH:/home/ant/installs"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## Networking
 
 Add the `ant` user to be able to `sudo` by adding via `visudo`:
 

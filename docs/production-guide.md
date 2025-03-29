@@ -39,7 +39,8 @@ First, make sure that this host is the one being port-forwarded to on the local
 network. By going to <http://192.168.2.1> > Advanced > Port Forwarding, make
 sure that the right host is pointed to.
 
-The hosts should be named according to their `/etc/hostname` file.
+The hosts should be named according to their `/etc/hostname` file. Last checked
+it was `antworker001` running the ant-gateway.
 
 ## Production guide for `ant-data-farm`
 
@@ -88,26 +89,16 @@ make VERBOSE=1 check
 sudo make install
 ```
 
-And the `/etc/ddclient/ddclient.conf` file needs to be edited with contents:
+And the `/etc/ddclient/ddclient.conf` file needs to be edited with contents.
+This can be done with:
 
-```txt
-daemon=300
-syslog=yes
-verbose=yes
-pid=/var/run/ddclient.pid
-ssl=yes
-use=web
-web='https://cloudflare.com/cdn-cgi/trace'
-web-skip='ip='
+```bash
+cd ~/types-of-ants
 
-protocol=cloudflare, \
-zone=typesofants.org, \
-ttl=1,
-login=token,
-password='YOUR_SECRET_CLOUDFLARE_API_TOKEN_HERE',
-beta.typesofants.org
+./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
 ```
 
-where the password field is filled in. Keep the single quotes around it! Then,
-running `ddclient` will begin the process. You can check on it via the logs with
-`ddclient -query`.
+where the password field is filled in. Keep the single quotes around it!
+
+Then, running `ddclient` will begin the process. You can check on it via the
+logs with `ddclient -query`.
