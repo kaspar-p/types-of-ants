@@ -6,6 +6,7 @@ import {
   releaseSql,
   migrationSql,
 } from "./sql";
+import assert from "assert";
 
 type ReleasesFile = {
   Date: {
@@ -17,9 +18,14 @@ type ReleasesFile = {
 };
 
 function makeDate(date: { Year: number; Month: number; Day: number }): Date {
+  // JavaScript Date has 0 as January, but our data saves 1-12.
+  const zeroIndexedMonth = date.Month - 1;
+  assert(zeroIndexedMonth >= 0);
+  assert(zeroIndexedMonth <= 11);
+
   const d = new Date();
   d.setFullYear(date.Year);
-  d.setMonth(date.Month);
+  d.setMonth(zeroIndexedMonth);
   d.setDate(date.Day);
   d.setHours(0);
   d.setMinutes(0);
