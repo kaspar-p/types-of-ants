@@ -136,11 +136,27 @@ if __name__ == "__main__":
         exit(1)
 
     if len(sys.argv) != 5:
-        raise "Need arguments <ants.txt path> <releases dir> <index_template.html path> <index.html path>"
+        raise "Need argument <repository root>"
+    
+    repo_root = sys.argv[1]
 
-    ants_txt_path = sys.argv[1]
-    releases_dir = sys.argv[2]
-    index_template_path = sys.argv[3]
-    index_path = sys.argv[4]
+    if not os.path.isdir(repo_root):
+        raise "Repository root was not a directory: " + repo_root
+
+    ants_txt_path = os.path.join(repo_root, "ants.txt")
+    if not os.path.isfile(ants_txt_path):
+        raise "Could not find ants.txt at: " + ants_txt_path
+
+    releases_dir = os.path.join(repo_root, "static_site", "releases")
+    if not os.path.isdir(releases_dir):
+        raise "Could not find releases/ directory at: " + releases_dir
+
+    index_template_path = os.path.join(repo_root, "static_site", "generate", "index_template.html")
+    if not os.path.isfile(index_template_path):
+        raise "Could not find index_template.html at: " + index_template_path
+
+    index_path = os.path.join(repo_root, "index.html")
+    if not os.path.isfile(index_path):
+        raise "Could not find index.html at: " + index_path
 
     main(ants_txt_path, releases_dir, index_template_path, index_path)
