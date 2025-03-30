@@ -1,390 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="An informative site about ants, created by kaspar poland."
-    />
-    <style>
-      *,
-      *::before,
-      *::after {
-        position: relative;
-      }
 
-      body {
-        overflow-x: hidden;
-      }
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="An informative site about ants, created by kaspar poland." />
+  <style>
+    *,
+    *::before,
+    *::after {
+      position: relative;
+    }
 
-      h1, h2, h3 {
-        text-align: center;
-      }
+    body {
+      overflow-x: hidden;
+    }
 
-      #banner {
-        display: block; 
-        width: 100%; 
-        background-color: gold; 
-        border-radius: 5px; 
-        padding: 10px; 
-        padding-right: 0
-      }
+    h1,
+    h2,
+    h3 {
+      text-align: center;
+    }
 
-      .banner-ant {
-        display: inline-block;
-        white-space: nowrap;
-        padding-left: 15px;
-        padding-right: 15px;
-      }
+    #banner {
+      display: block;
+      width: 100%;
+      background-color: gold;
+      border-radius: 5px;
+      padding: 10px;
+      padding-right: 0
+    }
 
-      .form-form {
-        display: flex; 
-        flex-direction: row; 
-        flex-wrap: wrap;
-        padding: 10px;
-      }
+    .banner-ant {
+      display: inline-block;
+      white-space: nowrap;
+      padding-left: 15px;
+      padding-right: 15px;
+    }
 
-      .form-label {
-        margin: 2.5px;
-        padding-left: 10px;
-      }
+    .form-form {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      padding: 10px;
+    }
 
-      .form-text {
-        margin: 2.5px;
-      }
+    .form-label {
+      margin: 2.5px;
+      padding-left: 10px;
+    }
 
-      .form-submit {
-        margin: 2.5px;
-      }
+    .form-text {
+      margin: 2.5px;
+    }
 
-      .replacer {
-        padding-left: 12.5px;
-        height: 18px;
-        margin-bottom: 15px;
-      }
+    .form-submit {
+      margin: 2.5px;
+    }
 
-      #scroll-container {
-        overflow: hidden;
-      }
+    .replacer {
+      padding-left: 12.5px;
+      height: 18px;
+      margin-bottom: 15px;
+    }
 
-      #scroll-helper-wrapper {
-        align-items: center;
-        display: flex;
-        left: 0px;
-        transform: translateZ(0);
-        transition-property: left;
-        transition-timing-function: linear;
-      }
+    #scroll-container {
+      overflow: hidden;
+    }
 
+    #scroll-helper-wrapper {
+      align-items: center;
+      display: flex;
+      left: 0px;
+      transform: translateZ(0);
+      transition-property: left;
+      transition-timing-function: linear;
+    }
+
+    #ant-filler {
+      column-count: 2;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    #ant-filler>div {
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+
+    @media (min-width: 768px) {
       #ant-filler {
-        column-count: 2;
-        padding-left: 10px;
-        padding-right: 10px;
+        column-count: 3;
       }
+    }
 
-      #ant-filler > div {
-        padding-top: 5px;
-        padding-bottom: 5px;
+    @media (min-width: 1024px) {
+      #ant-filler {
+        column-count: 4;
       }
+    }
 
-      @media (min-width: 768px) {
-        #ant-filler {
-          column-count: 3;
-        }
+    @media (min-width: 1200px) {
+      #ant-filler {
+        column-count: 5;
       }
+    }
 
-      @media (min-width: 1024px) {
-        #ant-filler {
-          column-count: 4;
-        }
+    @media (min-width: 1200px) {
+      #ant-filler {
+        column-count: 6;
       }
+    }
+  </style>
+  <script>
+    if (window.location.href.match("http://www.typesofants.org")) window.location.protocol = 'https:'
+  </script>
+  <script>
+    const bannerId = "scroll-container"
+    const helperWrapperId = "scroll-helper-wrapper";
+    const pxPerSecond = 75;
 
-      @media (min-width: 1200px) {
-        #ant-filler {
-          column-count: 5;
-        }
-      }
+    function setUpElements() {
+      const banner = document.getElementById(bannerId);
+      const currentHelperWrapper = document.getElementById(helperWrapperId);
 
-      @media (min-width: 1200px) {
-        #ant-filler {
-          column-count: 6;
-        }
-      }
-    </style>
-    <script>
-      if (window.location.href.match("http://www.typesofants.org")) window.location.protocol='https:'
-    </script>
-    <script>
-      const bannerId = "scroll-container"
-      const helperWrapperId = "scroll-helper-wrapper";
-      const pxPerSecond = 75;
+      if (currentHelperWrapper) {
+        const clones = currentHelperWrapper.querySelectorAll("[data-clone]");
+        Array.prototype.forEach.call(clones, clone => clone.remove());
 
-      function setUpElements() {
-        const banner = document.getElementById(bannerId);
-        const currentHelperWrapper = document.getElementById(helperWrapperId);
-        
-        if (currentHelperWrapper) {
-          const clones = currentHelperWrapper.querySelectorAll("[data-clone]");
-          Array.prototype.forEach.call(clones, clone => clone.remove());
-        
-          const childrenCount = currentHelperWrapper.children.length;
-          for (let i = 0; i < childrenCount; i++) {
-            banner.appendChild(currentHelperWrapper.children[0]);
-          }
-          currentHelperWrapper.remove();
-        }
-
-        const bannerWidth = banner.getBoundingClientRect().width;
-        const widestChild = Math.max(...Array.prototype.map.call(banner.children, (child) => child.getBoundingClientRect().width));
-        const minWidthToCoverBanner = bannerWidth + widestChild;
-        const childrenWidth = Array.prototype.reduce.call(banner.children, (total, child) => total + child.getBoundingClientRect().width, 0);
-        let currentWidth = childrenWidth;
-
-        do {
-          // Continue to add children, doubling, until width is reached
-          Array.prototype.forEach.call(banner.children, child => {
-            const clone = child.cloneNode();
-            clone.setAttribute("aria-hidden", true);
-            clone.dataset.clone = true;
-            clone.innerText = child.innerText;
-            banner.appendChild(clone);
-          });
-          currentWidth += childrenWidth;
-        } while (currentWidth < minWidthToCoverBanner);
-
-        const transitionWrapperHelper = document.createElement("div");
-        transitionWrapperHelper.id = helperWrapperId;
-
-        const childrenCount = banner.children.length;
+        const childrenCount = currentHelperWrapper.children.length;
         for (let i = 0; i < childrenCount; i++) {
-          transitionWrapperHelper.appendChild(banner.children[0]);
+          banner.appendChild(currentHelperWrapper.children[0]);
         }
-        banner.appendChild(transitionWrapperHelper);
-        transitionWrapperHelper.dataset.childrenWidth = childrenWidth;
+        currentHelperWrapper.remove();
       }
 
-      function scrollBanner() {
-        const banner = document.getElementById(bannerId);
-        const helperWrapper = document.getElementById(helperWrapperId);
-        const childrenWidth = helperWrapper.dataset.childrenWidth;
-        const offsetLeft = helperWrapper.offsetLeft;
+      const bannerWidth = banner.getBoundingClientRect().width;
+      const widestChild = Math.max(...Array.prototype.map.call(banner.children, (child) => child.getBoundingClientRect().width));
+      const minWidthToCoverBanner = bannerWidth + widestChild;
+      const childrenWidth = Array.prototype.reduce.call(banner.children, (total, child) => total + child.getBoundingClientRect().width, 0);
+      let currentWidth = childrenWidth;
 
-        console.log(offsetLeft);
+      do {
+        // Continue to add children, doubling, until width is reached
+        Array.prototype.forEach.call(banner.children, child => {
+          const clone = child.cloneNode();
+          clone.setAttribute("aria-hidden", true);
+          clone.dataset.clone = true;
+          clone.innerText = child.innerText;
+          banner.appendChild(clone);
+        });
+        currentWidth += childrenWidth;
+      } while (currentWidth < minWidthToCoverBanner);
 
-        if (offsetLeft <= Math.ceil(-1 * childrenWidth)) {
-          helperWrapper.style.transitionDuration = "0s";
-          helperWrapper.style.left = "0px";
-          helperWrapper.style.removeProperty("transition-duration");
-        } else if (helperWrapper.style.left === "" || helperWrapper.style.left === "0px") {
-          window.setTimeout(() => {
-            helperWrapper.style.transitionDuration = ((childrenWidth / pxPerSecond).toFixed()) + "s";
-            helperWrapper.style.left = (-1 * childrenWidth) + "px"
-          }, 0);
-        }
+      const transitionWrapperHelper = document.createElement("div");
+      transitionWrapperHelper.id = helperWrapperId;
 
-        window.requestAnimationFrame(scrollBanner);
+      const childrenCount = banner.children.length;
+      for (let i = 0; i < childrenCount; i++) {
+        transitionWrapperHelper.appendChild(banner.children[0]);
+      }
+      banner.appendChild(transitionWrapperHelper);
+      transitionWrapperHelper.dataset.childrenWidth = childrenWidth;
+    }
+
+    function scrollBanner() {
+      const banner = document.getElementById(bannerId);
+      const helperWrapper = document.getElementById(helperWrapperId);
+      const childrenWidth = helperWrapper.dataset.childrenWidth;
+      const offsetLeft = helperWrapper.offsetLeft;
+
+      console.log(offsetLeft);
+
+      if (offsetLeft <= Math.ceil(-1 * childrenWidth)) {
+        helperWrapper.style.transitionDuration = "0s";
+        helperWrapper.style.left = "0px";
+        helperWrapper.style.removeProperty("transition-duration");
+      } else if (helperWrapper.style.left === "" || helperWrapper.style.left === "0px") {
+        window.setTimeout(() => {
+          helperWrapper.style.transitionDuration = ((childrenWidth / pxPerSecond).toFixed()) + "s";
+          helperWrapper.style.left = (-1 * childrenWidth) + "px"
+        }, 0);
       }
 
-      window.addEventListener("load", () => {
-        setUpElements();
-        scrollBanner();
-        window.addEventListener("resize", setUpElements);
-      });
-    </script>
-    <script>
-      const develop = false;
-      const isHandling = {
-        newAnt: false,
-        newsletter: false,
-      };
+      window.requestAnimationFrame(scrollBanner);
+    }
 
-      async function handle(event, action) {
-        event.preventDefault();
+    window.addEventListener("load", () => {
+      setUpElements();
+      scrollBanner();
+      window.addEventListener("resize", setUpElements);
+    });
+  </script>
+  <script>
+    const develop = false;
+    const isHandling = {
+      newAnt: false,
+      newsletter: false,
+    };
 
-        const { containerID, replaceChildID, inputID, validator, endpoint, handling } = action;
+    async function handle(event, action) {
+      event.preventDefault();
 
-        const container = document.getElementById(containerID);
-        const toReplace = document.getElementById(replaceChildID);
-        const responseText = document.createElement("div");
-        responseText.classList.add("replacer");
+      const { containerID, replaceChildID, inputID, validator, endpoint, handling } = action;
 
-        container.replaceChild(responseText, toReplace);
+      const container = document.getElementById(containerID);
+      const toReplace = document.getElementById(replaceChildID);
+      const responseText = document.createElement("div");
+      responseText.classList.add("replacer");
 
-        const input = document.getElementById(inputID);
-        input.value = input.value.trim();
-        if (isHandling[handling]) {
-          return;
-        }
+      container.replaceChild(responseText, toReplace);
 
-        const { valid, msg } = validator(input.value);
-        if (!valid) {
-          responseText.style.color = "red";
-          responseText.innerText = msg;
-        } else {
-          let counter = 0;
-          const dotInterval = setInterval(() => {
-            responseText.style.color = "blue";
-            responseText.innerText = "loading" + ".".repeat(counter % 5);
-            counter++;
-          }, 100);
+      const input = document.getElementById(inputID);
+      input.value = input.value.trim();
+      if (isHandling[handling]) {
+        return;
+      }
 
-          // Send the request
-          const url = develop
-            ? "http://localhost:3000"
-            : "https://www.kasparpoland.com";
+      const { valid, msg } = validator(input.value);
+      if (!valid) {
+        responseText.style.color = "red";
+        responseText.innerText = msg;
+      } else {
+        let counter = 0;
+        const dotInterval = setInterval(() => {
+          responseText.style.color = "blue";
+          responseText.innerText = "loading" + ".".repeat(counter % 5);
+          counter++;
+        }, 100);
 
-          await fetch(`${url}/${endpoint}`, {
-            method: "POST",
-            body: input.value,
+        // Send the request
+        const url = develop
+          ? "http://localhost:3000"
+          : "https://www.kasparpoland.com";
+
+        await fetch(`${url}/${endpoint}`, {
+          method: "POST",
+          body: input.value,
+        })
+          .then((response) => {
+            clearInterval(dotInterval);
+            if (response.ok && response.status === 200) {
+
+            }
+            return response.json();
           })
-            .then((response) => {
-              clearInterval(dotInterval);
-              if (response.ok && response.status === 200) {
-               
-              }
-              return response.json();
-            })
-            .then(json => {
-              const { status, msg, userExists } = json;
-              if (status === 200 && userExists) {
-                responseText.style.color = "red";
-                responseText.innerText = "you're already subscribed!";
-              } else if (status === 200) {
-                responseText.style.color = "green";
-                responseText.innerText = "thanks!";
-              } else {
-                throw new Error(json);
-              }
-            })
-            .catch((error) => {
-              console.log("Error: ", error);
-              
-              clearInterval(dotInterval);
+          .then(json => {
+            const { status, msg, userExists } = json;
+            if (status === 200 && userExists) {
               responseText.style.color = "red";
-              responseText.innerText = "error encountered, input not processed!";
-            });
-        }
+              responseText.innerText = "you're already subscribed!";
+            } else if (status === 200) {
+              responseText.style.color = "green";
+              responseText.innerText = "thanks!";
+            } else {
+              throw new Error(json);
+            }
+          })
+          .catch((error) => {
+            console.log("Error: ", error);
 
-        // Make text appear and clear input
-        isHandling[handling] = true;
-        input.value = "";
-        setTimeout(() => {
-          container.replaceChild(toReplace, responseText);
-          isHandling[handling] = false;
-        }, 3000);
+            clearInterval(dotInterval);
+            responseText.style.color = "red";
+            responseText.innerText = "error encountered, input not processed!";
+          });
       }
 
-      function newAntIsValid(text) {
-        let msg = "";
-        if (text.length <= 2) {
-          msg = "ant too short!";
-        } else if (text.length >= 100) {
-          msg = "ant too long!";
-        }
+      // Make text appear and clear input
+      isHandling[handling] = true;
+      input.value = "";
+      setTimeout(() => {
+        container.replaceChild(toReplace, responseText);
+        isHandling[handling] = false;
+      }, 3000);
+    }
 
-        return {
-          valid: msg === "",
-          msg,
-        };
+    function newAntIsValid(text) {
+      let msg = "";
+      if (text.length <= 2) {
+        msg = "ant too short!";
+      } else if (text.length >= 100) {
+        msg = "ant too long!";
       }
 
-      function newsletterIsValid(text) {
-        let msg = "";
-        if (
-          !/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/.test(text)
-        ) {
-          msg = "invalid email!";
-        }
-
-        return {
-          valid: msg === "",
-          msg,
-        };
-      }
-
-      const actions = {
-        newAnt: {
-          containerID: "new-ant-form-container",
-          replaceChildID: "new-ant-replacer",
-          inputID: "new-ant",
-          validator: newAntIsValid,
-          handling: "newAnt",
-          endpoint: "api/new-ant",
-        },
-        newsletter: {
-          containerID: "newsletter-form-container",
-          replaceChildID: "newsletter-replacer",
-          inputID: "newsletter",
-          validator: newsletterIsValid,
-          handling: "newsletter",
-          endpoint: "api/ant-newsletter",
-        },
+      return {
+        valid: msg === "",
+        msg,
       };
-    </script>
-    <title>types of ants</title>
-  </head>
-  <body style="padding: 20px;">
-    <h1>types of ants <span style="font-size: 12pt;">v{amt}</span></h1>
-    <h2>ants discovered to date: {amount}</h2>
-    <h3>
-      <button onclick="window.location='https://twitter.com/typesofants'">
-        twitter @typesofants
-      </button>
-      <button onclick="window.location='https://www.github.com/kaspar-p/types-of-ants'">
-        ant who wants to read the code
-      </button>
-    </h3>
-    <div id="forms-container" style="display: flex; flex-direction: row; flex-wrap: wrap; align-self: center;">
-      <div id="new-ant-form-container">
-        <div class="form-label">have any new ant suggestions?</div>
-        <form
-          class="form-form"
-          id="new-ant-form"
-          autocomplete="off"
-          onsubmit="return handle(event, actions.newAnt)"
-        >
-          <input 
-            class="form-text" 
-            id="new-ant" 
-            type="text" 
-          />
-          <input
-            type="submit"
-            class="form-submit"
-            value="submit ant suggestion"
-          />
-        </form>
-        <div class="replacer" id="new-ant-replacer"></div>
-      </div>
-      <div id="newsletter-form-container">
-        <div class="form-label">interested in monthly ant emails?</div>
-        <form
-          class="form-form"
-          id="newsletter-form"
-          autocomplete="off"
-          onsubmit="return handle(event, actions.newsletter)"
-        >
-          <input 
-            class="form-text"
-            id="newsletter"
-            type="text"
-          />
-          <input
-            class="form-submit"
-            type="submit"
-            value="join monthly newsletter"
-          />
-        </form>
-        <div class="replacer" id="newsletter-replacer"></div>
-      </div>
+    }
+
+    function newsletterIsValid(text) {
+      let msg = "";
+      if (
+        !/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/.test(text)
+      ) {
+        msg = "invalid email!";
+      }
+
+      return {
+        valid: msg === "",
+        msg,
+      };
+    }
+
+    const actions = {
+      newAnt: {
+        containerID: "new-ant-form-container",
+        replaceChildID: "new-ant-replacer",
+        inputID: "new-ant",
+        validator: newAntIsValid,
+        handling: "newAnt",
+        endpoint: "api/new-ant",
+      },
+      newsletter: {
+        containerID: "newsletter-form-container",
+        replaceChildID: "newsletter-replacer",
+        inputID: "newsletter",
+        validator: newsletterIsValid,
+        handling: "newsletter",
+        endpoint: "api/ant-newsletter",
+      },
+    };
+  </script>
+  <title>types of ants</title>
+</head>
+
+<body style="padding: 20px;">
+  <h1>types of ants <span style="font-size: 12pt;">v{amt}</span></h1>
+  <h2>ants discovered to date: {amount}</h2>
+  <h3>
+    <button onclick="window.location='https://twitter.com/typesofants'">
+      twitter @typesofants
+    </button>
+    <button onclick="window.location='https://www.github.com/kaspar-p/types-of-ants'">
+      ant who wants to read the code
+    </button>
+  </h3>
+  <div id="forms-container" style="display: flex; flex-direction: row; flex-wrap: wrap; align-self: center;">
+    <div id="new-ant-form-container">
+      <div class="form-label">have any new ant suggestions?</div>
+      <form class="form-form" id="new-ant-form" autocomplete="off" onsubmit="return handle(event, actions.newAnt)">
+        <input class="form-text" id="new-ant" type="text" />
+        <input type="submit" class="form-submit" value="submit ant suggestion" />
+      </form>
+      <div class="replacer" id="new-ant-replacer"></div>
     </div>
-    <div id="banner">
-      <div>discovered {amt} new ants on {date}:</div>
-      <div id="scroll-container"></div>
+    <div id="newsletter-form-container">
+      <div class="form-label">interested in monthly ant emails?</div>
+      <form class="form-form" id="newsletter-form" autocomplete="off"
+        onsubmit="return handle(event, actions.newsletter)">
+        <input class="form-text" id="newsletter" type="text" />
+        <input class="form-submit" type="submit" value="join monthly newsletter" />
+      </form>
+      <div class="replacer" id="newsletter-replacer"></div>
     </div>
-    <div id="ant-filler"></div>
-  </body>
+  </div>
+  <div id="banner">
+    <div>discovered {amt} new ants on {date}:</div>
+    <div id="scroll-container"></div>
+  </div>
+  <div id="ant-filler"></div>
+</body>
+
 </html>
