@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into ant_declined (ant_id, ant_declined_user_id, ant_declined_at)
   values
     ((select ant_id from ant where suggested_content = 'piss ant' and created_at = '2023-06-19 00:23:01'), (select user_id from registered_user where user_name = 'kaspar'), '2023-06-19 00:23:18'),
@@ -1392,3 +1394,5 @@ insert into ant_declined (ant_id, ant_declined_user_id, ant_declined_at)
     ((select ant_id from ant where suggested_content = 'baby' and created_at = '2022-04-22 21:48:35'), (select user_id from registered_user where user_name = 'kaspar'), '2022-04-24 02:26:58'),
     ((select ant_id from ant where suggested_content = 'blarck' and created_at = '2022-04-22 21:22:12'), (select user_id from registered_user where user_name = 'kaspar'), '2022-04-22 21:41:57')
 ;
+
+COMMIT;

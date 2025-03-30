@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into release (release_number, release_label)
   values
     (1, 'v1'),
@@ -30,3 +32,5 @@ insert into release (release_number, release_label)
     (28, 'v28'),
     (29, 'v29')
 ;
+
+COMMIT;

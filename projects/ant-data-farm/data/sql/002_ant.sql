@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into ant (suggested_content, ant_user_id, created_at)
   values
     ('anthropologist', (select user_id from registered_user where user_name = 'nobody'), '2022-06-05 18:11:04'),
@@ -2047,3 +2049,5 @@ insert into ant (suggested_content, ant_user_id, created_at)
     ('baby', (select user_id from registered_user where user_name = 'nobody'), '2022-04-22 21:48:35'),
     ('blarck', (select user_id from registered_user where user_name = 'nobody'), '2022-04-22 21:22:12')
 ;
+
+COMMIT;

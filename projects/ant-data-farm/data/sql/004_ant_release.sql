@@ -1,3 +1,5 @@
+BEGIN;
+
 insert into ant_release (ant_id, release_number, ant_content, ant_content_hash)
   values
     ((select ant_id from ant where suggested_content = 'anthropologist' and created_at = '2022-06-05 18:11:04'), 23, 'anthropologist (ant that studies humans)', 399891542),
@@ -656,3 +658,5 @@ insert into ant_release (ant_id, release_number, ant_content, ant_content_hash)
     ((select ant_id from ant where suggested_content = 'anteatereater ant' and created_at = '2022-04-20 01:35:35'), 1, 'anteatereater ant', 979307150),
     ((select ant_id from ant where suggested_content = 'canadian ant' and created_at = '2022-04-20 00:11:57'), 1, 'canadian ant', 2078237130)
 ;
+
+COMMIT;
