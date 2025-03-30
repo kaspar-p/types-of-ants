@@ -12,13 +12,13 @@ from typing import Union
 
 from lib import TAB, apply_ant_rule
 
-RELEASE_DATE_FILENAME_FORMAT = "%d%b%Y"
+RELEASE_DATE_FILENAME_FORMAT = "%Y-%m-%d"
 
 
 @dataclass
 class AntRelease:
     ants: list[str]
-    date: {"Year": int, "Month": str, "Day": int}
+    date: {"Year": int, "Month": int, "Day": int}
 
 
 @dataclass
@@ -28,7 +28,7 @@ class ReleaseFile:
 
     def pretty_format(self) -> str:
         """
-        >>> f = ReleaseFile(date_filename="3Feb2024", path="./releases/3Feb2024.json")
+        >>> f = ReleaseFile(date_filename="2024-02-03", path="./releases/2024-02-03.json")
         >>> f.pretty_format()
         'February 03, 2024'
         """
@@ -50,15 +50,12 @@ def get_release_files(releases_dir: str) -> list[ReleaseFile]:
 
 def most_recent_release_filename(files: list[ReleaseFile]) -> Union[ReleaseFile, None]:
     """
-    >>> files = [ReleaseFile("03Feb2024", "03Feb2024.json"), ReleaseFile("04Feb2024", "04Feb2024.json")]
+    >>> files = [ReleaseFile("2024-02-03", "2024-02-03.json"), ReleaseFile("2024-02-04", "2024-02-04.json")]
     >>> most_recent_release_filename(files)
-    ReleaseFile(date_filename='04Feb2024', path='04Feb2024.json')
-    >>> files = [ReleaseFile("04Feb2024", "04Feb2024.json"), ReleaseFile("03Feb2024", "03Feb2024.json")]
+    ReleaseFile(date_filename='2024-02-04', path='2024-02-04.json')
+    >>> files = [ReleaseFile("2024-02-04", "2024-02-04.json"), ReleaseFile("2024-02-03", "2024-02-03.json")]
     >>> most_recent_release_filename(files)
-    ReleaseFile(date_filename='04Feb2024', path='04Feb2024.json')
-    >>> files = [ReleaseFile("3Feb2024", "3Feb2024.json"), ReleaseFile("4Feb2024", "4Feb2024.json")]
-    >>> most_recent_release_filename(files)
-    ReleaseFile(date_filename='4Feb2024', path='4Feb2024.json')
+    ReleaseFile(date_filename='2024-02-04', path='2024-02-04.json')
     """
 
     now = int(time.mktime(datetime.now().timetuple()))
