@@ -77,7 +77,7 @@ pub async fn deploy_project(
     };
 
     let host = Host::new("localhost".to_owned(), 4499);
-    let daemon = match HostAgentClient::connect(host).await {
+    let daemon = match HostAgentClient::connect(host.clone()) {
         Err(e) => {
             debug!("Failed to connect to host agent daemon! Is it running? Error: {e}");
             return Err(DeployProjectError::Connect);
@@ -120,7 +120,7 @@ pub async fn deploy_project(
     }
 
     return Ok(Json(DeployProjectResponse {
-        host,
+        host: host.clone(),
         deployed: chrono::offset::Utc::now(),
     }));
 }

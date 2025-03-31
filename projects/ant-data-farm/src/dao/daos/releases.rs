@@ -1,31 +1,43 @@
 use crate::dao::db::Database;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio_postgres::Row;
 
 pub struct ReleasesDao {
     database: Arc<Mutex<Database>>,
-    latest_release: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Release {
+    pub release_number: i32,
+    pub created_at: DateTime<Utc>,
 }
 
 impl ReleasesDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> Result<ReleasesDao, anyhow::Error> {
-        let rows = db
+    pub async fn new(db: Arc<Mutex<Database>>) -> ReleasesDao {
+        ReleasesDao { database: db }
+    }
+
+    pub async fn get_latest_release(&self) -> Result<Release, anyhow::Error> {
+        let rows = self
+            .database
             .lock()
             .await
             .query(
-                "select max(release_number) as latest_release from release limit 1",
+                "select release_number, created_at from release order by created_at desc limit 1;",
                 &[],
             )
             .await?;
-        let latest_release: i32 = rows.last().expect("had last").get("latest_release");
 
-        Ok(ReleasesDao {
-            latest_release,
-            database: db,
-        })
-    }
+        let row: &Row = rows.last().expect("Require at least one release");
+        let release_number: i32 = row.get("release_number");
+        let created_at: DateTime<Utc> = row.get("created_at");
 
-    pub async fn get_latest_release(&self) -> i32 {
-        self.latest_release
+        return Ok(Release {
+            created_at,
+            release_number,
+        });
     }
 }

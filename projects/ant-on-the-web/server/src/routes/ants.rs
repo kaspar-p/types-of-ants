@@ -117,8 +117,10 @@ async fn released_ants(State(dao): DbState, query: Query<Pagination>) -> impl In
 }
 
 async fn latest_release(State(dao): DbState) -> impl IntoResponse {
-    let release = dao.releases.read().await.get_latest_release().await;
-    (StatusCode::OK, Json(release))
+    match dao.releases.read().await.get_latest_release().await {
+        Err(_) => (StatusCode::NOT_FOUND).into_response(),
+        Ok(latest_release) => (StatusCode::OK, Json(latest_release)).into_response(),
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,24 +135,31 @@ async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
     let releases = dao.releases.read().await;
 
     let all_ants: Vec<Ant> = ants.get_all().await.iter().map(|&x| x.clone()).collect();
-    let latest_release = releases.get_latest_release().await;
-    let current_release_ants = all_ants
-        .iter()
-        .filter(|ant| match ant.status {
-            AntStatus::Released(n) => n == latest_release,
-            _ => false,
-        })
-        .map(std::clone::Clone::clone)
-        .collect::<Vec<Ant>>();
+    match releases.get_latest_release().await {
+        Err(_) => {
+            return (StatusCode::NOT_FOUND).into_response();
+        }
+        Ok(latest_release) => {
+            let current_release_ants = all_ants
+                .iter()
+                .filter(|ant| match ant.status {
+                    AntStatus::Released(n) => n == latest_release.release_number,
+                    _ => false,
+                })
+                .map(std::clone::Clone::clone)
+                .collect::<Vec<Ant>>();
 
-    (
-        StatusCode::OK,
-        Json(LatestAntsResponse {
-            date: chrono::offset::Utc::now(),
-            release: latest_release,
-            ants: current_release_ants,
-        }),
-    )
+            return (
+                StatusCode::OK,
+                Json(LatestAntsResponse {
+                    date: latest_release.created_at,
+                    release: latest_release.release_number,
+                    ants: current_release_ants,
+                }),
+            )
+                .into_response();
+        }
+    }
 }
 
 #[derive(Deserialize)]

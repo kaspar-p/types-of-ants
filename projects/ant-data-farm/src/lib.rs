@@ -119,7 +119,7 @@ impl AntDataFarmClient {
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
 
         let ants = RwLock::new(AntsDao::new(database.clone()).await?);
-        let releases = RwLock::new(ReleasesDao::new(database.clone()).await?);
+        let releases = RwLock::new(ReleasesDao::new(database.clone()).await);
         let hosts = RwLock::new(HostsDao::new(database.clone()).await?);
         let users = RwLock::new(UsersDao::new(database.clone()).await?);
 
