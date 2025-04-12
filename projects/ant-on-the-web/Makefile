@@ -14,8 +14,8 @@ release: $(BUILD_DIR)/release/$(PROJECT)
 
 clean:
 	rm -rf build
-# cd ./server && cargo clean
-# $(MAKE) -C ./website clean
+	cd ./server && cargo clean
+	$(MAKE) -C ./website clean
 
 install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
 install: release
@@ -31,9 +31,9 @@ $(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**
 	mkdir -p $(@D)
 	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
 
-$(BUILD_DIR)/%/$(STATIC)/:
+$(BUILD_DIR)/%/$(STATIC)/: ./website/**
 	$(MAKE) -C ./website
-	mkdir -p $(@D)
-	cp -R ./website/out $@
+	mkdir -p $@
+	cp -R ./website/out/* $@
 
 .PHONY: all clean debug release install
