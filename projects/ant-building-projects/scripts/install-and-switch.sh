@@ -26,7 +26,8 @@ fi
 # Remove the current systemd service file
 unit_path="${SYSTEMD_DIR:?}/$project.service"
 sudo rm -rf "$unit_path"
-sudo ln -s "$HOME/service/$project/$INSTALL_VERSION/$project.service" "$unit_path"
+
+sudo systemctl enable "$HOME/service/$project/$INSTALL_VERSION/$project.service"
 
 # Restart the service
 sudo systemctl daemon-reload
