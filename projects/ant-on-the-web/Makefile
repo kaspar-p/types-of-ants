@@ -24,6 +24,7 @@ install: release
 	cp -R $(BUILD_DIR)/release/$(STATIC) $(INSTALL_DIR)/$(STATIC)
 	cp ../../.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
+	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 
 $(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**
 	cd ./server && cargo build $(RUST_FLAGS)
