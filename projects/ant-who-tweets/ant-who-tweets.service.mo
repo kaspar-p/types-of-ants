@@ -5,7 +5,7 @@ Description=The @typesofants twitter bot!
 Type=simple
 EnvironmentFile={{HOME}}/service/ant-who-tweets/{{VERSION}}/.env
 ExecStart={{HOME}}/service/ant-who-tweets/{{VERSION}}/ant-who-tweets
-WorkingDirectory={{HOME}}/service/ant-who-tweets
+WorkingDirectory={{HOME}}/service/ant-who-tweets/{{VERSION}}
 Restart=always
 
 [Install]
