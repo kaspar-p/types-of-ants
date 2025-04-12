@@ -1,5 +1,5 @@
 PROJECT_ROOT = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-PROJECT = ant-on-the-web
+PROJECT = ant-who-tweets
 
 -include $(PROJECT_ROOT)/../../Makefile.common
 
@@ -15,25 +15,18 @@ release: $(BUILD_DIR)/release/$(PROJECT)
 
 clean:
 	rm -rf build
-# cd ./server && cargo clean
-# $(MAKE) -C ./website clean
+# cargo clean
 
 install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
 install: release
-	echo $(BUILD_DIR) $(BUILD_MODE) $(RUST_FLAGS) $(INSTALL_DIR)
-	mkdir -p $(INSTALL_DIR)/$(STATIC)
-	cp -R $(BUILD_DIR)/release/$(STATIC) $(INSTALL_DIR)/$(STATIC)
+	mkdir -p $(INSTALL_DIR)
 	cp $(PROJECT_ROOT)/../../.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
+	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ 
-	cd $(PROJECT_ROOT)/server && cargo build $(RUST_FLAGS)
+$(BUILD_DIR)/%/$(PROJECT):
+	cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp $(PROJECT_ROOT)/../../target/$(BUILD_MODE)/$(PROJECT) $@
 
-$(BUILD_DIR)/%/$(STATIC)/:
-	$(MAKE) -C ./website
-	mkdir -p $(@D)
-	cp -R ./website/out $@
-
-.PHONY: all clean debug release install
+.PHONY: all debug release clean

@@ -1,7 +1,9 @@
 
+-include Makefile.common
+
 BUILD_MODE = debug
 
-PROJECTS = ant-on-the-web
+PROJECTS = ant-on-the-web ant-who-tweets
 
 all: debug
 
@@ -12,12 +14,9 @@ release: BUILD_MODE = release
 release: $(PROJECTS)
 
 $(PROJECTS): %:
-	cd projects/$@ && $(MAKE) $(BUILD_MODE)
+	$(MAKE) -C projects/$@ $(BUILD_MODE)
 
 clean:
 	echo $(PROJECTS)
-
-remake: clean debug
-.NOTPARALLEL: remake
 
 .PHONY: all debug release clean $(PROJECTS)

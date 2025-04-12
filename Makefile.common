@@ -1,0 +1,14 @@
+BUILD_DIR = build
+STATIC = static
+
+INSTALL_VERSION = default
+INSTALL_PREFIX = $(HOME)/service/
+
+UNAME_S = $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+# systemd doesn't exist on Mac, put it elsewhere
+	SYSTEMD_SERVICES_DIR = $(HOME)/service/systemd/
+endif
+ifeq ($(UNAME_S),Linux)
+	SYSTEMD_SERVICES_DIR = /etc/systemd/system/
+endif
