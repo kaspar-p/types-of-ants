@@ -1,0 +1,12 @@
+[Unit]
+Description=The typesofants web server!
+
+[Service]
+Type=simple
+EnvironmentFile=/home/ant/types-of-ants/projects/ant-on-the-web/server/.env
+ExecStart=/home/ant/types-of-ants/target/debug/ant-on-the-web
+WorkingDirectory=/home/ant/types-of-ants/projects/ant-on-the-web/server
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

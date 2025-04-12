@@ -1,10 +1,11 @@
 # Production Guide
 
-Notes I take as I attempt to deploy various services to various hosts
+Notes I take as I attempt to deploy various services to various hosts,
 
 ## Production guide for `ant-on-the-web`
 
-Install dependencies and build the project with
+Get new changes by `cd ~/types-of-ants && git pull`. Install dependencies and
+build the project with:
 
 ```bash
 cd ./projects/ant-on-the-web/website
@@ -63,6 +64,19 @@ or even through `docker` via:
 ```bash
 docker logs $(docker ps -q)
 ```
+
+You can install migrations via:
+
+- Log onto the host with the DB (000 currently)
+
+```bash
+cd ~/types-of-ants
+git pull
+cd projects/ant-data-farm/data/sql
+```
+
+- Connect via `psql -U typesofants -h 0.0.0.0 -p <port>`.
+- Apply each migration file with `\i <file-name>`
 
 ## `ddclient`
 

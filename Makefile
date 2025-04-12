@@ -1,22 +1,23 @@
 
-all: ant-on-the-web ant-data-farm ant-gateway ant-host-agent ant-host-agent-codegen ant-just-checking-in
+BUILD_MODE = debug
 
-ant-on-the-web:
-	cd projects/ant-on-the-web/server; cargo build;
+PROJECTS = ant-on-the-web
 
-ant-data-farm:
-	docker-compose build ant-data-farm
+all: debug
 
-ant-gateway:
-	docker-compose build ant-gateway
+debug: $(PROJECTS)
 
-ant-host-agent:
-	cd projects/ant-host-agent; cargo build;
+release: RUST_FLAGS += --release
+release: BUILD_MODE = release
+release: $(PROJECTS)
 
-# ant-host-agent-codegen:
-# 	gradlew assemble
+$(PROJECTS): %:
+	cd projects/$@ && $(MAKE) $(BUILD_MODE)
 
-ant-just-checking-in:
-	cd projects/ant-just-checking-in; cargo build;
+clean:
+	echo $(PROJECTS)
 
-PSEUDO: all ant-on-the-web ant-data-farm ant-gateway ant-host-agent ant-host-agent-codegen ant-just-checking-in
+remake: clean debug
+.NOTPARALLEL: remake
+
+.PHONY: all debug release clean $(PROJECTS)

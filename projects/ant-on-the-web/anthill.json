@@ -1,0 +1,9 @@
+{
+  "project": "ant-on-the-web",
+  "version": "1.0.0",
+
+  "service": "ant-on-the-web.service",
+
+  "build_cmd": "make",
+  "build_root": "build"
+}
