@@ -78,7 +78,10 @@ async fn database_connection(
         db_creds.database_user, db_creds.database_password, host, port, db_creds.database_name
     );
 
-    debug!("Connecting to database at port {port}...");
+    debug!(
+        "Connecting to database {}:{}/{}",
+        host, port, db_creds.database_name
+    );
     let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls).unwrap();
     let pool: Pool<PostgresConnectionManager<NoTls>> =
         Pool::builder().build(manager).await.unwrap();

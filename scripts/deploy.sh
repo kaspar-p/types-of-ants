@@ -49,3 +49,4 @@ sudo systemctl daemon-reload
 sudo systemctl restart "$project.service"
 
 echo "Successfully transitioned $project to version $INSTALL_VERSION"
+echo "    Directory: $HOME/service/$project/$INSTALL_VERSION/"
