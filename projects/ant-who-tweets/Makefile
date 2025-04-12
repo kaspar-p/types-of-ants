@@ -24,7 +24,7 @@ install: release
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 
-$(BUILD_DIR)/%/$(PROJECT):
+$(BUILD_DIR)/%/$(PROJECT): src/** Cargo.toml
 	cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp $(PROJECT_ROOT)/../../target/$(BUILD_MODE)/$(PROJECT) $@

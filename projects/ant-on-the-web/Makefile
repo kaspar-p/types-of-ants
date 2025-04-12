@@ -26,7 +26,7 @@ install: release
 	cp $(PROJECT_ROOT)/../../.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ 
+$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ $(PROJECT_ROOT)/server/**
 	cd $(PROJECT_ROOT)/server && cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp $(PROJECT_ROOT)/../../target/$(BUILD_MODE)/$(PROJECT) $@

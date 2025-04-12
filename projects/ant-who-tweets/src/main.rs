@@ -89,21 +89,8 @@ struct Config {
 }
 
 fn get_config() -> Result<Config, dotenv::Error> {
-    let twitter_env_key = "TWITTER_CREDS_FILE";
-    let db_env_key = "DATABASE_CREDS_FILE";
-
-    info!("Loading twitter env...");
-    let twitter_env =
-        dotenv::var(twitter_env_key).expect("Twitter file credential not in environment!");
-
-    info!("Loading db env...");
-    let db_env = dotenv::var(db_env_key).expect("Database file credentials not in environment!");
-
-    info!("Loading twitter creds from env...");
-    dotenv::from_path(twitter_env).expect("Twitter creds file not found!");
-
-    info!("Loading db creds from env...");
-    dotenv::from_path(db_env).expect("Database creds file not found!");
+    info!("Loading creds from env...");
+    dotenv::dotenv()?;
 
     let config = Config {
         twitter: TwitterCredentials {
