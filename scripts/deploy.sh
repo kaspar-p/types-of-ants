@@ -1,17 +1,32 @@
 #!/bin/bash
 
+#
+# A script to build and deploy a project based on systemd units.
+#
+
 set -euxo pipefail
 
+function usage() {
+  echo "USAGE: $0 <project-name>"
+  exit 1
+}
+
+set +u
 project="$1"
+set -u
+
+if [[ -z "$project" ]]; then
+  usage
+fi
 
 GIT_COMMIT="$(git log --format='%h' -n 1)"
 INSTALL_VERSION="$(date "+%Y-%m-%d-%H-%M-$GIT_COMMIT")"
 
 # Build the project
-make -C "../$project" release
+make -C "./projects/$project" release
 
 # Install the project
-make -C "../$project" install INSTALL_VERSION="$INSTALL_VERSION"
+make -C "./projects/$project" install INSTALL_VERSION="$INSTALL_VERSION"
 
 # Cut over to the systemd service
 os="$(uname -s)"

@@ -1,8 +1,0 @@
-{
-  "project": "ant-building-projects",
-  "version": "1.0.0",
-  "entry": "docker-compose build && docker-compose up",
-  "deps": {
-    "ant-data-farm": "1.0.0"
-  }
-}
