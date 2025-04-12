@@ -5,7 +5,6 @@ use chrono::Timelike;
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::error;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use twitter_v2::authorization::Oauth1aToken;
@@ -39,19 +38,21 @@ async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<tw
         .into_data()
 }
 
+async fn ant_client(config: DatabaseConfig) -> AntDataFarmClient {
+    match AntDataFarmClient::new(Some(config)).await {
+        Err(e) => {
+            panic!("Failed to initialize database: {}", e);
+        }
+        Ok(client) => client,
+    }
+}
+
 async fn cron_tweet() -> () {
     info!("Starting cron_tweet()...");
     let config: Config = get_config().expect("Getting config failed!");
 
     info!("Beginning database connection...");
-    let client = match AntDataFarmClient::new(Some(config.database)).await {
-        Err(e) => {
-            error!("Failed to initialize database: {}", e);
-            error!("Ending CRON early!");
-            return;
-        }
-        Ok(client) => client,
-    };
+    let client = ant_client(config.database).await;
 
     info!("Getting random ant choice...");
     let random_ant: Ant = {
@@ -110,7 +111,7 @@ fn get_config() -> Result<Config, dotenv::Error> {
         },
     };
 
-    info!("Config constructed successfully: {:#?}", config);
+    info!("Config constructed successfully.");
     return Ok(config);
 }
 
@@ -139,6 +140,14 @@ async fn main() {
         "Starting up! Local hour: {}, hour to tweet: {}",
         local, hour_to_tweet
     );
+
+    // Check the connection to the database by creating a dummy "test" client at the front.
+    ant_client(
+        get_config()
+            .expect("Getting environment variables failed!")
+            .database,
+    )
+    .await;
 
     scheduler
         .add(
