@@ -10,12 +10,21 @@ export type Ant = z.infer<typeof antSchema>;
 export type Ants = Ant[];
 
 const queries = {
-  getReleaseNumber: {
-    name: "getReleaseNumber",
+  getLatestRelease: {
+    name: "getLatestRelease",
     path: "/api/ants/latest-release",
-    schema: z.number(),
-    transformer: (data: number): number => {
-      return data;
+    schema: z.object({
+      release_number: z.number(),
+      created_at: z.string(),
+    }),
+    transformer: (data: {
+      release_number: number;
+      created_at: string;
+    }): { release_number: number; created_at: Date } => {
+      return {
+        release_number: data.release_number,
+        created_at: new Date(data.created_at),
+      };
     },
   },
   getLatestAnts: {
@@ -87,4 +96,4 @@ export const getReleasedAnts = (page: number) =>
   constructQuery(queries.getReleasedAnts, { page });
 export const getUnseenAnts = (page: number) =>
   constructQuery(queries.getUnseenAnts, { page });
-export const getReleaseNumber = () => constructQuery(queries.getReleaseNumber);
+export const getLatestRelease = () => constructQuery(queries.getLatestRelease);

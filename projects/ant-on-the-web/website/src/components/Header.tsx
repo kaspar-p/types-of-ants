@@ -1,6 +1,6 @@
 "use client";
 
-import { getReleasedAnts, getReleaseNumber } from "@/server/queries";
+import { getReleasedAnts, getLatestRelease } from "@/server/queries";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
@@ -27,25 +27,28 @@ export function Header({ children }: HeaderProps) {
     queryFn: () => getReleasedAnts(page),
   });
 
-  const releaseNumberResult = useQuery({
+  const latestReleaseResult = useQuery({
     queryKey: ["releaseNumber"],
-    queryFn: getReleaseNumber,
+    queryFn: getLatestRelease,
   });
 
-  const releaseNumber = releaseNumberResult.data;
+  const latestRelease = latestReleaseResult.data;
   const allAnts = allAntsResult.data;
 
   return (
     <ErrorBoundary
-      isError={allAntsResult.isError || releaseNumberResult.isError}
+      isError={allAntsResult.isError || latestReleaseResult.isError}
     >
       <LoadingBoundary
-        isLoading={allAntsResult.isLoading || releaseNumberResult.isLoading}
+        isLoading={allAntsResult.isLoading || latestReleaseResult.isLoading}
       >
         <div className="p-5" style={{ fontFamily: "serif" }}>
           <div className="flex flex-row align-center justify-center">
             <h1 className="mb-0 pb-5">
-              types of ants <span className="text-sm">v{releaseNumber}</span>
+              types of ants{" "}
+              <span className="text-sm">
+                v{latestReleaseResult.data?.release_number}
+              </span>
             </h1>
           </div>
           <h3 className="text-center m-0">

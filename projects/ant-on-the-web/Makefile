@@ -17,6 +17,9 @@ clean:
 	cd ./server && cargo clean
 	$(MAKE) -C ./website clean
 
+run: debug
+	$(BUILD_DIR)/debug/$(PROJECT)
+
 install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
 install: release
 	echo $(BUILD_DIR) $(BUILD_MODE) $(RUST_FLAGS) $(INSTALL_DIR)
