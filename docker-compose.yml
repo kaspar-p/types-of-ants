@@ -1,18 +1,6 @@
 version: "3.7"
 
 services:
-  ant-who-tweets:
-    build:
-      context: ./
-      dockerfile: ./projects/ant-who-tweets/Dockerfile
-    environment:
-      TWITTER_CREDS_FILE: /run/secrets/twitter_creds
-      DATABASE_CREDS_FILE: /run/secrets/database_creds
-      DB_HOST: 172.17.0.1 # Default 'bridge' IP of docker? Somehow it works! TODO: find a better way
-    secrets:
-      - twitter_creds
-      - database_creds
-
   ant-data-farm:
     build:
       context: ./projects/ant-data-farm
@@ -35,7 +23,7 @@ services:
       dockerfile: Dockerfile
       args:
         - FQDN=beta.typesofants.org
-        - ANT_WORKER_NUM=002
+        - DESTINATION_ANT_WORKER_NUM=002
         - WEBSERVER_PORT=3499
         - SSL_CERT_PATH=./data/beta.typesofants.org/cert.pem
         - SSL_KEY_PATH=./secrets/ssl/beta.typesofants.org/key.pem

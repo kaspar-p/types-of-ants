@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 # Given either a worker number, or a the end name, resolve the entire hostname
 
@@ -26,6 +26,6 @@ else
   ANT_HOSTNAME="antworker${ANT_HOSTNAME}.hosts.typesofants.org"
 fi
 
-echo $ANT_HOSTNAME
+echo "$ANT_HOSTNAME"
 
 exit 0

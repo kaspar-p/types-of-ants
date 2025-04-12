@@ -4,35 +4,36 @@ Notes I take as I attempt to deploy various services to various hosts,
 
 ## Production guide for `ant-on-the-web`
 
-Get new changes by `cd ~/types-of-ants && git pull`. Install dependencies and
-build the project with:
+Get new changes by `cd ~/types-of-ants && git pull`.
+
+Everything can then be done with the deployment script:
 
 ```bash
-cd ./projects/ant-on-the-web/website
-npm ci
-npm run build
+./scripts/deploy.sh ant-on-the-web
 ```
 
-This will take a while, and will create a `./out` directory with static HTML,
-CSS, and JavaScript build artifacts. Copy these into the right location with:
+This will take a while, but builds the ant-on-the-web website, server, builds
+them into the local `./projects/ant-on-the-web/build` directory in the correct
+way, and runs `make install`, which brings those artifacts into the `~/service`
+directory.
+
+The final step that this script performs is to link the `ant-on-the-web.service`
+daemon and restart the daemon, which should be all the steps.
+
+You may run into problems, make sure that `~/types-of-ants/.env` exists and is
+correct for the case. Especially be wary of the `DB_HOST` environment variable
+for webservers on a machine that isn't the database machine.
+
+## Production guide for `ant-who-tweets`
+
+Get new changes with `cd ~/types-of-ants && git pull`. The deployment looks
+exactly the same as `ant-on-the-web`, so just run:
 
 ```bash
-mv ./out ../server/static
+./scripts/deploy.sh ant-who-tweets
 ```
 
-for the Rust webserver to pick them up. Build the rust webserver with:
-
-```bash
-cd ../server
-cargo build
-```
-
-which will also take a long time. It should be daemonized on this host (see
-[./libre-notes.md]), and we can restart it with:
-
-```bash
-sudo systemctl restart ant-on-the-web.service
-```
+And the rest is done for you. See the working directory for logs.
 
 ## Production guide for `ant-gateway`
 

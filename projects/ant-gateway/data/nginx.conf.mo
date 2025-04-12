@@ -22,7 +22,7 @@ http {
             proxy_set_header X-NginX-Proxy true;
 
             proxy_redirect off;
-            proxy_pass http://antworker{{ANT_WORKER_NUM}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
+            proxy_pass http://antworker{{DESTINATION_ANT_WORKER_NUM}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
         }
 
         ssl_certificate     /ant-on-the-web/{{FQDN}}/cert.pem;
