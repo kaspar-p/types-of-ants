@@ -3,8 +3,8 @@ Description=The typesofants web server!
 
 [Service]
 Type=simple
-EnvironmentFile=.env
-ExecStart=ant-on-the-web
+EnvironmentFile={{HOME}}/service/ant-on-the-web/{{VERSION}}/.env
+ExecStart={{HOME}}/service/ant-on-the-web/{{VERSION}}/ant-on-the-web
 WorkingDirectory={{HOME}}/service/ant-on-the-web/{{VERSION}}
 Restart=always
 

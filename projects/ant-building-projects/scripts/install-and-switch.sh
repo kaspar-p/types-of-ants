@@ -5,7 +5,7 @@ set -euxo pipefail
 project="$1"
 
 GIT_COMMIT="$(git log --format='%h' -n 1)"
-INSTALL_VERSION="$(date "+%Y-%m-%d-%H-%M@$GIT_COMMIT")"
+INSTALL_VERSION="$(date "+%Y-%m-%d-%H-%M-$GIT_COMMIT")"
 
 # Build the project
 make -C "../$project" release
