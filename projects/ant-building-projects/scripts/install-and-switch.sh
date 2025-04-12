@@ -5,7 +5,7 @@ set -euxo pipefail
 project="$1"
 
 GIT_COMMIT="$(git log --format='%h' -n 1)"
-INSTALL_VERSION="$(date "+%Y-%m-%d@%H:%M@$GIT_COMMIT")"
+INSTALL_VERSION="$(date "+%Y-%m-%d-%H-%M@$GIT_COMMIT")"
 
 # Build the project
 make -C "../$project" release
@@ -25,8 +25,11 @@ fi
 
 # Remove the current systemd service file
 unit_path="${SYSTEMD_DIR:?}/$project.service"
-rm -rf "$unit_path"
-ln -s "$unit_path" "$HOME/service/$project/$INSTALL_VERSION/$project.service"
+sudo rm -rf "$unit_path"
+sudo ln -s "$HOME/service/$project/$INSTALL_VERSION/$project.service" "$unit_path"
 
 # Restart the service
+sudo systemctl daemon-reload
 sudo systemctl restart "$project.service"
+
+echo "Successfully transitioned $project to version $INSTALL_VERSION"

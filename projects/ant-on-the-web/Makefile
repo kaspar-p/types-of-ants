@@ -1,7 +1,6 @@
-PROJECT_ROOT = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 PROJECT = ant-on-the-web
 
--include $(PROJECT_ROOT)/../../Makefile.common
+-include ../../Makefile.common
 
 # Default to debug builds
 all: debug
@@ -23,13 +22,13 @@ install: release
 	echo $(BUILD_DIR) $(BUILD_MODE) $(RUST_FLAGS) $(INSTALL_DIR)
 	mkdir -p $(INSTALL_DIR)/$(STATIC)
 	cp -R $(BUILD_DIR)/release/$(STATIC) $(INSTALL_DIR)/$(STATIC)
-	cp $(PROJECT_ROOT)/../../.env $(INSTALL_DIR)
+	cp ../../.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ $(PROJECT_ROOT)/server/**
-	cd $(PROJECT_ROOT)/server && cargo build $(RUST_FLAGS)
+$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**
+	cd ./server && cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
-	cp $(PROJECT_ROOT)/../../target/$(BUILD_MODE)/$(PROJECT) $@
+	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
 
 $(BUILD_DIR)/%/$(STATIC)/:
 	$(MAKE) -C ./website
