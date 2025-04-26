@@ -66,7 +66,7 @@ echo "{
 }" > "$install_dir/manifest.json"
 
 log "INSTALLED [$project] VERSION [$install_version]"
-log "  when:        $install_datetime"
+log "  when:        $(date -Iseconds)"
 log "  install dir: $install_dir"
 log "  version:     $install_version"
 log "  unit file:   $new_unit_path"
