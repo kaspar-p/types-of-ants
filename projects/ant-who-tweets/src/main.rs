@@ -118,7 +118,7 @@ fn get_config() -> Result<Config, dotenv::Error> {
 #[tokio::main]
 async fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         .with_file(true)
         .with_ansi(false)
         .with_writer(tracing_appender::rolling::hourly(

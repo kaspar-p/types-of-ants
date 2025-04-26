@@ -6,7 +6,7 @@
 
 source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
-set -euxo pipefail
+set -euo pipefail
 
 function usage() {
   echo "USAGE: $0 <project-name> <version>"
