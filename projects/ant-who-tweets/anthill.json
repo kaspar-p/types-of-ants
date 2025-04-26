@@ -1,5 +1,5 @@
 {
   "project": "ant-who-tweets",
   "version": "1.0.0",
-  "project-type": "rust-binary"
+  "project_type": "rust-binary"
 }

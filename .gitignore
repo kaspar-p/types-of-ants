@@ -10,6 +10,7 @@ projects/ant-host-agent-server-sdk
 
 # Smithy
 .smithy.lsp.log
+*.log
 
 # Gradle
 .gradle
