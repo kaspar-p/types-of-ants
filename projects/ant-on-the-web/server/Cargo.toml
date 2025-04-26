@@ -40,5 +40,5 @@ uuid = { version = "1.7.0", features = ["serde", "v4"] }
 validator = "0.16.1"
 twilio-rs = "0.1.1"
 serde_derive = "1.0.196"
-ant-data-farm = { path = "../../ant-data-farm" }
+ant-data-farm = { path = "../../ant-data-farm-client" }
 ant-library = { path = "../../ant-library" }

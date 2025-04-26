@@ -38,7 +38,7 @@ tracing = { version = "0.1.40", features = ["max_level_debug"] }
 tracing-subscriber = "0.3.18"
 uuid = { version = "1.7.0", features = ["serde", "v4"] }
 validator = "0.16.1"
-ant-data-farm = { path = "../ant-data-farm" }
+ant-data-farm = { path = "../ant-data-farm-client" }
 ant-host-agent = { path = "../ant-host-agent" }
 ant-metadata = { path = "../ant-metadata" }
 tokio-util = "0.7.10"

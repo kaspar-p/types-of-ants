@@ -1,7 +1,4 @@
-use crate::{
-    middleware,
-    types::{DbRouter, DbState},
-};
+use crate::types::{DbRouter, DbState};
 use ant_data_farm::{hosts::HostId, DaoTrait};
 use axum::{
     extract::{Path, State},
@@ -41,6 +38,10 @@ pub fn router() -> DbRouter {
         .route_with_tsr("/list-all", get(list_all))
         .route_with_tsr("/register-host", post(register_host))
         .fallback(|| async {
-            middleware::fallback(&["GET /host/:host-id", "GET /list-all", "POST /register-host"])
+            ant_library::api_fallback(&[
+                "GET /host/:host-id",
+                "GET /list-all",
+                "POST /register-host",
+            ])
         })
 }

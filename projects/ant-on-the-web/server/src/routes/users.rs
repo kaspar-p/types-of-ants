@@ -1,7 +1,4 @@
-use crate::{
-    middleware,
-    types::{DbRouter, DbState},
-};
+use crate::types::{DbRouter, DbState};
 use ant_data_farm::{users::User, DaoTrait};
 use axum::{
     extract::{Path, State},
@@ -231,7 +228,7 @@ pub fn router() -> DbRouter {
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/user/:user-name", get(get_user_by_name))
         .fallback(|| async {
-            middleware::fallback(&[
+            ant_library::api_fallback(&[
                 "POST /signup",
                 "POST /user/:user-name",
                 "POST /subscribe-newsletter",
