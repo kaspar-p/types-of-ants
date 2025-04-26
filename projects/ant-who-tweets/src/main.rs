@@ -122,8 +122,8 @@ async fn main() {
         .with_file(true)
         .with_ansi(false)
         .with_writer(tracing_appender::rolling::hourly(
-            "./logs/ant-on-twitter",
-            "ant-on-twitter.log",
+            "./logs",
+            "ant-who-tweets.log",
         ))
         .finish();
 
