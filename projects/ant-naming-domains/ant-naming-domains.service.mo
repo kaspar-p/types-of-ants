@@ -1,7 +1,5 @@
 [Unit]
 Description=The typesofants dynamic dns client!
-Requires=docker.service
-After=docker.service
 
 [Service]
 Type=simple
