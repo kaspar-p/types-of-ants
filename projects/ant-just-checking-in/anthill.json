@@ -1,8 +1,5 @@
 {
   "project": "ant-just-checking-in",
   "version": "1.0.0",
-  "entry": "docker-compose build && docker-compose up",
-  "deps": {
-    "ant-data-farm": "1.0.0"
-  }
+  "project-type": "docker-compose"
 }

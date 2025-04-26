@@ -1,16 +1,67 @@
-pub mod artifact;
-pub mod procs;
+pub mod client;
+pub mod routes;
 
-pub fn add(a: i32, b: i32) -> i32 {
-    return a + b;
-}
+use ant_data_farm::AntDataFarmClient;
+use axum::{
+    http::{header::CONTENT_TYPE, Method},
+    routing::{get, post},
+    Router,
+};
+use axum_extra::routing::RouterExt;
+use std::{net::SocketAddr, sync::Arc};
+use tower::ServiceBuilder;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tracing::info;
 
-#[cfg(test)]
-mod tests {
-    use crate::*;
+use hyper::server::conn::AddrIncoming;
 
-    #[test]
-    fn adds() {
-        assert_eq!(1, add(0, 1));
-    }
+pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error> {
+    std::env::set_var(
+        "RUST_LOG",
+        "ant_owning_artifacts=debug,glimmer=debug,tower_http=debug",
+    );
+    dotenv::dotenv().unwrap();
+
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(tower_http::cors::Any)
+        .allow_headers([CONTENT_TYPE]);
+
+    info!("Initializing artifact directory...");
+    // artifact::initialize()?;
+
+    let db = Arc::new(
+        AntDataFarmClient::new(None)
+            .await
+            .expect("Failed to connect to database!"),
+    );
+
+    let api_routes = Router::new()
+        .route_with_tsr("/make", post(routes::make::make))
+        .with_state(db)
+        .layer(axum::middleware::from_fn(
+            ant_library::middleware_print_request_response,
+        ))
+        .fallback(|| async { ant_library::api_fallback(&["POST /make"]) });
+
+    info!("Initializing API routes...");
+    let app = Router::new()
+        .nest("/api", api_routes)
+        .route_with_tsr("/ping", get(ant_library::api_ping))
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(cors),
+        )
+        .fallback(|| async { ant_library::api_fallback(&["GET /ping", "/api"]) });
+
+    let port: u16 = port.unwrap_or(4499);
+    info!("Starting server on port {port}...");
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+
+    Ok(())
 }

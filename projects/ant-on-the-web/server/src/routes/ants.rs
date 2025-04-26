@@ -1,7 +1,4 @@
-use crate::{
-    middleware,
-    types::{DbRouter, DbState},
-};
+use crate::types::{DbRouter, DbState};
 use ant_data_farm::{
     ants::{Ant, AntStatus},
     users::UserId,
@@ -286,7 +283,7 @@ pub fn router() -> DbRouter {
         .route_with_tsr("/suggest", post(make_suggestion))
         // .route_with_tsr("/tweet", post(tweet))
         .fallback(|| async {
-            middleware::fallback(&[
+            ant_library::api_fallback(&[
                 "GET /feed",
                 "GET /latest-ants",
                 "GET /unreleased-ants",

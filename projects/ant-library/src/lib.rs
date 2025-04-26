@@ -5,7 +5,13 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-pub fn fallback(routes: &[&str]) -> (StatusCode, String) {
+/// The standard ping that all typesofants web servers should use.
+pub async fn api_ping() -> (StatusCode, String) {
+    (StatusCode::OK, "healthy".to_string())
+}
+
+/// An API fallback function declaring which routes exist for the user to query.
+pub fn api_fallback(routes: &[&str]) -> (StatusCode, String) {
     (
         StatusCode::NOT_FOUND,
         format!(
@@ -17,22 +23,6 @@ pub fn fallback(routes: &[&str]) -> (StatusCode, String) {
                 .collect::<String>()
         ),
     )
-}
-
-pub async fn print_request_response(
-    req: Request<Body>,
-    next: Next<Body>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let (parts, body) = req.into_parts();
-    let bytes = buffer_and_print("request", body).await?;
-    let request = Request::from_parts(parts, Body::from(bytes));
-    let res = next.run(request).await;
-
-    let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body).await?;
-    let response = Response::from_parts(parts, Body::from(bytes));
-
-    Ok(response)
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes, (StatusCode, String)>
@@ -55,4 +45,22 @@ where
     }
 
     Ok(bytes)
+}
+
+/// Axum middleware for printing requests and responses.
+/// Should be used as a middleware layer for all types-of-ants web servers.
+pub async fn middleware_print_request_response(
+    req: Request<Body>,
+    next: Next<Body>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let (parts, body) = req.into_parts();
+    let bytes = buffer_and_print("request", body).await?;
+    let request = Request::from_parts(parts, Body::from(bytes));
+    let res = next.run(request).await;
+
+    let (parts, body) = res.into_parts();
+    let bytes = buffer_and_print("response", body).await?;
+    let response = Response::from_parts(parts, Body::from(bytes));
+
+    Ok(response)
 }

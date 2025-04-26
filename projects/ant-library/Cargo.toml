@@ -1,0 +1,13 @@
+[package]
+name = "ant-library"
+version = "1.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.6.20", features = ["tracing", "json"] }
+axum-extra = "0.7.7"
+axum-macros = "0.3.8"
+hyper = "0.14.28"
+tracing = { version = "0.1.40", features = ["max_level_debug"] }

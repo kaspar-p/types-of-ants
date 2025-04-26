@@ -25,7 +25,7 @@ install: release
 	echo $(BUILD_DIR) $(BUILD_MODE) $(RUST_FLAGS) $(INSTALL_DIR)
 	mkdir -p $(INSTALL_DIR)/$(STATIC)
 	cp -R $(BUILD_DIR)/release/$(STATIC) $(INSTALL_DIR)/
-	cp ../../.env $(INSTALL_DIR)
+	cp $(SECRETS_DIR)/.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 

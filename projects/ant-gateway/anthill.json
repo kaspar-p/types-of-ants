@@ -1,5 +1,5 @@
 {
-  "project": "ant-data-farm",
+  "project": "ant-gateway",
   "version": "1.0.0",
   "project-type": "docker-compose"
 }

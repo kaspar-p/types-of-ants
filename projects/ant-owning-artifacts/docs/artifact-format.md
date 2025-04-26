@@ -1,0 +1,1 @@
+# The Typesofants Artifact Format

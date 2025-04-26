@@ -99,6 +99,7 @@ Install `mo`, a mustache template implementation.
 
 ```bash
 mkdir -p ~/installs
+mkdir -p ~/secrets
 
 curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
   -o ~/installs/mo

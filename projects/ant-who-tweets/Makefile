@@ -19,7 +19,7 @@ clean:
 install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
 install: release
 	mkdir -p $(INSTALL_DIR)
-	cp ../../.env $(INSTALL_DIR)
+	cp $(SECRETS_DIR)/.env $(INSTALL_DIR)
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 

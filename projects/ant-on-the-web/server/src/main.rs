@@ -1,5 +1,4 @@
 mod clients;
-mod middleware;
 mod routes;
 mod types;
 
@@ -54,10 +53,10 @@ async fn main() {
         .nest("/deployments", routes::deployments::router())
         .with_state(dao)
         .layer(axum::middleware::from_fn(
-            middleware::print_request_response,
+            ant_library::middleware_print_request_response,
         ))
         .fallback(|| async {
-            middleware::fallback(&[
+            ant_library::api_fallback(&[
                 "/ants",
                 "/users",
                 "/hosts",
@@ -70,6 +69,7 @@ async fn main() {
     debug!("Initializing site routes...");
     let app = Router::new()
         .nest("/api", api_routes)
+        .route_with_tsr("/ping", get(ant_library::api_ping))
         // Marking the main filesystem as fallback allows wrong paths like
         // /api/something to still hit the /api router fallback()
         .fallback_service(ServeDir::new("static"))
