@@ -4,6 +4,7 @@
 # A script to deploy a rust binary. Expects that the rust binary has already been installed on the system.
 #
 
+# shellcheck disable=SC1091
 source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
 set -euo pipefail

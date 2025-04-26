@@ -2,6 +2,7 @@ version: "3.7"
 
 services:
   ant-data-farm:
+    container_name: ant-data-farm
     build:
       context: ./projects/ant-data-farm
       dockerfile: Dockerfile
@@ -32,8 +33,24 @@ services:
       - "80:80"
       - "443:443"
 
+  ant-naming-domains:
+    image: linuxserver/ddclient:amd64-4.0.0
+    container_name: ant-naming-domains
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - FILE__CLOUDFLARE_API_TOKEN=/run/secrets/cloudflare_api_token
+    volumes:
+      - ./projects/ant-naming-domains/config:/config
+    restart: always
+    secrets:
+      - cloudflare_api_token
+
 secrets:
   twitter_creds:
     file: ./.env.twitter
   database_creds:
     file: ./.env.db
+  cloudflare_api_token:
+    file: ./secrets/cloudflare_api_token.secret

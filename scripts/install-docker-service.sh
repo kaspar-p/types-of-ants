@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# A script to build+install a rust binary. Does not affect the runtime of any running projects,
+# A script to build+install a docker container. Does not affect the runtime of any running projects,
 # is completely safe to run.
 #
 
@@ -36,7 +36,7 @@ install_version="$install_datetime-$commit_sha"
 log "BUILDING [$project]..."
 
 # Build the project
-run_command make -C "$project_src" release
+run_command docker-compose build "$project"
 
 log "INSTALLING [$project]..."
 
@@ -47,11 +47,6 @@ run_command mkdir -p "$install_dir"
 secrets_dir="$repository_root"
 run_command cp "$secrets_dir/.env" "$install_dir"
 
-# Copy all other build/ files into the install dir
-build_dir="$project_src/build"
-build_mode="release"
-run_command cp -R "$build_dir/$build_mode/." "$install_dir"
-
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"
 HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" > "$new_unit_path"
@@ -59,7 +54,7 @@ HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" > 
 # Write the installation manifest
 echo "{
   \"project\": \"$project\",
-  \"project_type\": \"rust-binary\",
+  \"project_type\": \"docker-service\",
   \"version\": \"$install_version\",
   \"commit_sha\": \"$commit_sha\",
   \"installed_at\": \"$install_datetime\",
