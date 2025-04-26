@@ -4,46 +4,33 @@ Owns the `ddclient` instance on one of the hosts that is responsible for
 updating CloudFlare IP mappings when the public IP of the physical location that
 typesofants is deployed changes.
 
-## Installing ddclient on a host for the first time
+## Installing and running
 
-I'm not paying $46 a month for a static IP address from Bell. We use a daemon
-job to run in the background on one of the hosts to hit CloudFlare APIs to
-update the value of an IP when we detect that it's changed. This is `ddclient`.
+This is a project managed via `docker-compose` and `systemctl`.
 
-On one of the hosts (I've chosen `antworker002`), install a known working
-version:
+Install the latest version on the host:
 
 ```bash
-mkdir -p ~/installs
-cd ~/installs
-wget https://github.com/ddclient/ddclient/archive/refs/tags/v3.11.2.tar.gz
-tar xvfa v3.11.2.tar.gz
-cd ddclient-3.11.2
-./autogen
-./configure \
-  --prefix=/usr \
-  --sysconfdir=/etc/ddclient \
-  --localstatedir=/var
-make
-make VERBOSE=1 check
-sudo make install
-
-sudo chown ant /etc/ddclient/ddclient.conf
-sudo chown ant /var/cache/ddclient/ddclient.cache
+./scripts/install-docker-service.sh ant-naming-domains
 ```
 
-## Running ddclient
+which will spit out the version, something like:
 
-The `/etc/ddclient/ddclient.conf` file needs to be edited with contents. This
-can be done with:
+```txt
+INFO [ 2025-04-26T21:06:05+00:00 ant@antworker002 types-of-ants ] INSTALLED [ant-naming-domains] VERSION [2025-04-26-21-06-5d82aea]
+INFO [ 2025-04-26T21:06:05+00:00 ant@antworker002 types-of-ants ]   when:        2025-04-26T21:06:05+00:00
+INFO [ 2025-04-26T21:06:05+00:00 ant@antworker002 types-of-ants ]   install dir: /home/ant/service/ant-naming-domains/2025-04-26-21-06-5d82aea
+INFO [ 2025-04-26T21:06:05+00:00 ant@antworker002 types-of-ants ]   version:     2025-04-26-21-06-5d82aea
+INFO [ 2025-04-26T21:06:05+00:00 ant@antworker002 types-of-ants ]   unit file:   /home/ant/service/ant-naming-domains/2025-04-26-21-06-5d82aea/ant-naming-domains.service
+ant@antworker002:~/types-of-ants$ ./scripts/deploy-systemd.sh ant-naming-domains 2025-04-26-21-06-5d82aea
+```
+
+Taking the version `2025-04-26-21-06-5d82aea`, run:
 
 ```bash
-cd ~/types-of-ants
-
-./projects/ant-gateway/ddclient/init-ddclient.sh '.env'
+./scripts/deploy-systemd.sh ant-naming-domains 2025-04-26-21-06-5d82aea
 ```
 
-where the password field is filled in. Keep the single quotes around it!
-
-Then, running `ddclient` will begin the process. You can check on it via the
-logs with `ddclient -query`.
+And it should be started. You can be sure by running `docker ps` and seeing a
+`ant-naming-domains` container, or
+`sudo journalctl -u ant-naming-domains.service --since '1 hour ago'`.
