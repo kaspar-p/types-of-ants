@@ -6,9 +6,7 @@ use ant_host_agent::start_server;
 
 #[tokio::main]
 async fn main() -> () {
-    start_server(Some(7008))
-        .await
-        .expect("Server failed to start!");
+    start_server(None).await.expect("Server failed to start!");
 
     ()
 }
