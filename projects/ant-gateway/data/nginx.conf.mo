@@ -3,6 +3,12 @@ events {
 }
 
 http {
+    upstream fleet {
+        server antworker{{ANT_WORKER_NUM_ONE}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
+        server antworker{{ANT_WORKER_NUM_TWO}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
+        server antworker{{ANT_WORKER_NUM_THREE}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
+    } 
+
     server {
         listen 80;
         server_name {{FQDN}};
@@ -10,8 +16,9 @@ http {
     }
 
     server {
-        listen 443 ssl http2;
-        listen [::]:443 ssl http2;
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
         server_name {{FQDN}};
 
         location / {
@@ -22,7 +29,7 @@ http {
             proxy_set_header X-NginX-Proxy true;
 
             proxy_redirect off;
-            proxy_pass http://antworker{{DESTINATION_ANT_WORKER_NUM}}.hosts.typesofants.org:{{WEBSERVER_PORT}};
+            proxy_pass http://fleet;
         }
 
         ssl_certificate     /ant-on-the-web/{{FQDN}}/cert.pem;

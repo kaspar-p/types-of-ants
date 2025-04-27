@@ -44,6 +44,20 @@ sure that the right host is pointed to.
 The hosts should be named according to their `/etc/hostname` file. Last checked
 it was `antworker001` running the ant-gateway.
 
+The `ant-gateway` project is a docker container with systemd, same as
+`ant-naming-domains`. It can be deployed the same way:
+
+```bash
+./scripts/install-docker-service.sh ant-gateway
+./scripts/deploy-systemd.sh ant-gateway <version>
+```
+
+and to make sure it's healthy,
+
+```bash
+./scripts/smoketest-docker-service.sh ant-gateway
+```
+
 ## Production guide for `ant-data-farm`
 
 Follow the "daemonization" guide for `ant-data-farm` to make it a systemd
