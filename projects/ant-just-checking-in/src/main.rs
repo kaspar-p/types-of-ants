@@ -25,15 +25,15 @@ fn get_config() -> Result<DatabaseConfig, dotenv::Error> {
 #[tokio::main]
 async fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         .with_file(true)
         .with_ansi(false)
         .with_writer(tracing_appender::rolling::hourly(
-            "./logs/ant-just-checking-in",
+            "./logs",
             "ant-just-checking-in.log",
         ))
         .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::subscriber::set_default(subscriber).expect("setting default subscriber failed");
 
     let client = match AntDataFarmClient::new(Some(get_config().unwrap())).await {
         Err(e) => {

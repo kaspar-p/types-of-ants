@@ -1,0 +1,16 @@
+{
+  "antworker000": [
+    "ant-host-agent",
+    "ant-data-farm", // can only be 1
+    "ant-who-tweets" // can only be 1
+  ],
+  "antworker001": [
+    "ant-host-agent",
+    "ant-gateway" // can only be 1
+  ],
+  "antworker002": [
+    "ant-host-agent",
+    "ant-naming-domains", // can only be 1
+    "ant-on-the-web"
+  ]
+}

@@ -127,7 +127,7 @@ async fn main() {
         ))
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::subscriber::set_default(subscriber).expect("setting default subscriber failed");
     let scheduler = JobScheduler::new().await.unwrap();
 
     // 8pm EST is 6pm MST

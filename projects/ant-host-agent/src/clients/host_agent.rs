@@ -38,6 +38,10 @@ impl HostAgentClient {
         return Ok(data);
     }
 
+    pub async fn healthy(&self) -> bool {
+        return self.ping().await.is_ok();
+    }
+
     pub async fn ping(&self) -> Result<()> {
         let req = self
             .client
