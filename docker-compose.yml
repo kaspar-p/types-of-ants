@@ -24,8 +24,8 @@ services:
       dockerfile: Dockerfile
       args:
         - FQDN=beta.typesofants.org
-        - ANT_WORKER_NUM_ONE=000
-        - ANT_WORKER_NUM_TWO=001
+        - ANT_WORKER_NUM_ONE=002
+        - ANT_WORKER_NUM_TWO=002
         - ANT_WORKER_NUM_THREE=002
         - WEBSERVER_PORT=3231
         - SSL_CERT_PATH=./data/beta.typesofants.org/cert.pem

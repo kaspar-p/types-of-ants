@@ -80,9 +80,9 @@ async fn main() {
         );
 
     let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
-        .unwrap_or("3231".to_owned())
+        .expect("ANT_ON_THE_WEB_PORT environment variable not found")
         .parse()
-        .expect("port could not be parsed to u16");
+        .expect("ANT_ON_THE_WEB_PORT was not u16");
     debug!("Starting server on port {port}...");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::bind(&addr)
