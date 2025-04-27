@@ -33,7 +33,7 @@ async fn main() {
             "ant-just-checking-in.log",
         ))
         .finish();
-    tracing::subscriber::set_default(subscriber).expect("setting default subscriber failed");
+    let _ = tracing::subscriber::set_default(subscriber);
 
     let client = match AntDataFarmClient::new(Some(get_config().unwrap())).await {
         Err(e) => {
