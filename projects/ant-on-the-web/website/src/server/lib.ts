@@ -9,7 +9,10 @@ function generateBaseUrl() {
     case "beta":
       return "https://beta.typesofants.org";
     case "dev":
-      return "http://localhost:3499";
+      if (!process.env.ANT_ON_THE_WEB_PORT) {
+        throw new Error("Require ANT_ON_THE_WEB_PORT environment variable.");
+      }
+      return `http://localhost:${process.env.ANT_ON_THE_WEB_PORT}`;
   }
 }
 

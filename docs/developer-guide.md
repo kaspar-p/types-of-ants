@@ -33,10 +33,9 @@ There are the following components:
   as the webserver itself. It is an NGINX webserver running in a docker
   container. Certificates are always a pain, I've downloaded the secret ones for
   `beta.typesofants.org` and those are being used.
-- `ant-host-agent`: is another webserver, a binary that runs on each host.
-  Usually bound to port 4499, has a single usable route today `/ping` that
-  returns the string `healthy ant`. It's used for an extremely basic monitoring
-  system.
+- `ant-host-agent`: is another webserver, a binary that runs on each host. Has a
+  single usable route today `/ping` that returns the string `healthy ant`. It's
+  used for an extremely basic monitoring system.
 - `ant-who-tweets`: a CRON job that runs on one of the hosts and tweets every 24
   hours at 6PM MST. Tweets one of the many released ants at random, people love
   it!
@@ -88,8 +87,8 @@ speedup changes.
 
 Running `npm run dev` in the package will start the webserver on
 `localhost:3000`. It by default will attempt to connect to the webserver that
-runs the API, which is `ant-on-the-web/server` on `localhost:3499`, so run that
-with `cargo run` in a terminal tab.
+runs the API, which is `ant-on-the-web/server` on `localhost`, so run that with
+`cargo run` in a terminal tab.
 
 The communication flow is:
 

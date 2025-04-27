@@ -39,15 +39,15 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
     let api_routes = Router::new()
         .route_with_tsr("/make", post(routes::make::make))
         .with_state(db)
-        .layer(axum::middleware::from_fn(
-            ant_library::middleware_print_request_response,
-        ))
         .fallback(|| async { ant_library::api_fallback(&["POST /make"]) });
 
     info!("Initializing API routes...");
     let app = Router::new()
         .nest("/api", api_routes)
         .route_with_tsr("/ping", get(ant_library::api_ping))
+        .layer(axum::middleware::from_fn(
+            ant_library::middleware_print_request_response,
+        ))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -55,7 +55,7 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
         )
         .fallback(|| async { ant_library::api_fallback(&["GET /ping", "/api"]) });
 
-    let port: u16 = port.unwrap_or(4499);
+    let port: u16 = port.unwrap_or(4599);
     info!("Starting server on port {port}...");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::bind(&addr)

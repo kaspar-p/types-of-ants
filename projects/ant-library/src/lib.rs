@@ -7,7 +7,7 @@ use axum::{
 
 /// The standard ping that all typesofants web servers should use.
 pub async fn api_ping() -> (StatusCode, String) {
-    (StatusCode::OK, "healthy".to_string())
+    (StatusCode::OK, "healthy ant".to_string())
 }
 
 /// An API fallback function declaring which routes exist for the user to query.

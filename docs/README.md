@@ -30,7 +30,6 @@ To learn about the architecture and how everything works, see the
 
 1. Log onto the host `ssh2ant <hostnum>`
 1. Run `cd ~/types-of-ants/projects/ant-host-agent`
-1. Make sure there is a `.env` with `HOST_AGENT_PORT` defined to a port number,
-   likely 4499.
+1. Make sure there is a `.env` with `HOST_AGENT_PORT` defined to a port number.
 1. Run the program with `nohup cargo run & disown` to make sure it does not get
    killed when you exit.

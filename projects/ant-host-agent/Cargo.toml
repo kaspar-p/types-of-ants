@@ -47,3 +47,4 @@ sysinfo = "0.29.11"
 futures-util = "0.3.30"
 axum_typed_multipart = "0.5.2"
 tar = "0.4.40"
+ant-library = { version = "1.0.0", path = "../ant-library" }

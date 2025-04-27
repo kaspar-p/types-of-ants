@@ -26,13 +26,18 @@ impl Into<AntOwningArtifactError> for reqwest::Error {
 impl AntOwningArtifactsClient {
     /// Create a new client for the ant-owning-artifacts webserver.
     /// host: Defaults to localhost
-    /// port: Defaults to 4499, the default port the webserver starts on.
+    /// port: Defaults to the value of the HOST_AGENT_PORT environment variable
     pub fn new(host: Option<String>, port: Option<u16>) -> Self {
         AntOwningArtifactsClient {
             url: format!(
                 "http://{}:{}",
                 host.unwrap_or("localhost".to_string()),
-                port.unwrap_or(4499)
+                port.unwrap_or(
+                    dotenv::var("HOST_AGENT_PORT")
+                        .expect("Could not find HOST_AGENT_PORT environment variable")
+                        .parse::<u16>()
+                        .expect("HOST_AGENT_PORT was not u16")
+                )
             ),
             client: reqwest::Client::new(),
         }

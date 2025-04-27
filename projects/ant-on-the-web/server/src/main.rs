@@ -79,7 +79,10 @@ async fn main() {
                 .layer(cors),
         );
 
-    let port: u16 = 3499;
+    let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
+        .unwrap_or("3231".to_owned())
+        .parse()
+        .expect("port could not be parsed to u16");
     debug!("Starting server on port {port}...");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::bind(&addr)

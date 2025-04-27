@@ -19,9 +19,14 @@ pub async fn pinghost_test(enable: bool) -> Vec<StatusData> {
         return vec![];
     }
 
+    let host_agent_port: u16 = dotenv::var("HOST_AGENT_PORT")
+        .expect("Could not find HOST_AGENT_PORT environment variable")
+        .parse()
+        .expect("HOST_AGENT_PORT environment variable was not u16");
+
     let mut metrics: Vec<StatusData> = Vec::new();
     for host in HOSTS {
-        let agent = HostAgentClient::connect(Host::new(host.to_string(), 4499)).unwrap();
+        let agent = HostAgentClient::connect(Host::new(host.to_string(), host_agent_port)).unwrap();
 
         let start_timestamp = std::time::SystemTime::now().into();
         let res = agent.ping().await;

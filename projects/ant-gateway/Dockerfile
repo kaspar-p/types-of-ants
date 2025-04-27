@@ -1,10 +1,10 @@
 FROM nginx
 
-ARG SSL_KEY_PATH
-ARG SSL_CERT_PATH
 ARG FQDN
-ARG DESTINATION_ANT_WORKER_NUM=002
-ARG WEBSERVER_PORT=3499
+ARG DESTINATION_ANT_WORKER_NUM
+ARG WEBSERVER_PORT
+ARG SSL_CERT_PATH
+ARG SSL_KEY_PATH
 
 # Copy the templates nginx.conf into the container
 COPY ./data/nginx.conf.mo /tmp/ant-on-the-web/nginx.conf.mo

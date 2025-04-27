@@ -144,6 +144,7 @@ name = "ant-host-agent"
 version = "0.1.0"
 dependencies = [
  "ant-data-farm",
+ "ant-library",
  "ant-metadata",
  "anyhow",
  "axum",

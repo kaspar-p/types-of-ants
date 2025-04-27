@@ -76,7 +76,13 @@ pub async fn deploy_project(
         Ok(artifact) => artifact,
     };
 
-    let host = Host::new("localhost".to_owned(), 4499);
+    let host = Host::new(
+        "localhost".to_owned(),
+        dotenv::var("HOST_AGENT_PORT")
+            .expect("No HOST_AGENT_PORT environment variable found")
+            .parse::<u16>()
+            .expect("HOST_AGENT_PORT was not u16"),
+    );
     let daemon = match HostAgentClient::connect(host.clone()) {
         Err(e) => {
             debug!("Failed to connect to host agent daemon! Is it running? Error: {e}");

@@ -186,39 +186,29 @@ Make sure to select the IP it is on as _Reserved_.
 
 ## Daemonization of `ant-host-agent`
 
-First, we setup ant-host-agent with a .env file:
+The `ant-host-agent` project is a rust binary, and can be deployed like the
+others.
+
+On the right machine, run:
 
 ```bash
-echo 'HOST_AGENT_PORT=4499' > ~/types-of-ants/projects/ant-host-agent/.env
+./scripts/install-rust-binary.sh ant-host-agent
 ```
 
-Then, we make ant-host-agent a systemd service:
-
-```bash
-sudo nano /etc/systemd/system/ant-host-agent.service
-```
-
-with the content:
+It will return the installed version, like:
 
 ```txt
-[Unit]
-Description=Start the on-host ant manager!
-
-[Service]
-Type=simple
-ExecStart=/home/ant/types-of-ants/target/debug/ant-host-agent
-WorkingDirectory=/home/ant/types-of-ants/projects/ant-host-agent
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+INSTALLED [ant-host-agent] VERSION [2025-04-27-12-59-43a85ad]
+   when:        2025-04-27T13:00:48-04:00
+   install dir: /Users/kasparpoland/service/ant-host-agent/2025-04-27-12-59-43a85ad
+   version:     2025-04-27-12-59-43a85ad
+   unit file:   /Users/kasparpoland/service/ant-host-agent/2025-04-27-12-59-43a85ad/ant-host-agent.service
 ```
 
-and enable it with:
+And using version `2025-04-27-12-59-43a85ad`, run:
 
 ```bash
-sudo systemctl enable ant-host-agent.service
-sudo systemctl start ant-host-agent.service
+./deploy-systemd ant-host-agent 2025-04-27-12-59-43a85ad
 ```
 
 ## Daemonization of `ant-on-the-web`
