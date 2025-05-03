@@ -1,9 +1,9 @@
 use crate::types::{DbRouter, DbState};
-use ant_data_farm::{users::User, DaoTrait};
+use ant_data_farm::users::User;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -19,77 +19,92 @@ struct EmailRequest {
 async fn add_anonymous_email(
     State(dao): DbState,
     Json(EmailRequest { email }): Json<EmailRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, UsersError> {
     debug!("Subscribing with email {}", email.as_str());
 
     let exists = {
         let users = dao.users.read().await;
         users
-            .get_one_by_name("nobody")
-            .await
+            .get_one_by_user_name("nobody")
+            .await?
             .map(|u| u.emails.contains(&email))
     };
     match exists {
         None => {
-            return (
+            return Ok((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json("Failed to validate uniqueness").into_response(),
-            )
+            ))
         }
         Some(email_exists) => {
             if email_exists {
-                return (
+                return Ok((
                     StatusCode::BAD_REQUEST,
                     Json(format!("Email '{email}' is already subscribed!")).into_response(),
-                );
+                ));
             }
         }
     }
 
     let nobody_user: Option<User> = {
         let users = dao.users.read().await;
-        users
-            .get_one_by_name("nobody")
-            .await
-            .map(std::clone::Clone::clone)
+        users.get_one_by_user_name("nobody").await?
     };
     if nobody_user.is_none() {
-        return (
+        return Ok((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json("Failed attaching email!").into_response(),
-        );
+        ));
     }
 
     let mut user_write = dao.users.write().await;
-    let user: Option<&User> = user_write
+    user_write
         .add_email_to_user(nobody_user.unwrap().user_id, email)
-        .await;
+        .await?;
 
-    match user {
-        None => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Failed attaching email!".to_owned()).into_response(),
-        ),
-        Some(_) => (
-            StatusCode::OK,
-            Json("Subscribed!".to_owned()).into_response(),
-        ),
-    }
+    return Ok((
+        StatusCode::OK,
+        Json("Subscribed!".to_owned()).into_response(),
+    ));
 }
 
-async fn get_user_by_name(Path(user_name): Path<String>, State(dao): DbState) -> impl IntoResponse {
+async fn get_user_by_name(
+    Path(user_name): Path<String>,
+    State(dao): DbState,
+) -> Result<impl IntoResponse, UsersError> {
     let users = dao.users.read().await;
-    let user = users.get_one_by_name(&user_name).await;
+    let user = users.get_one_by_user_name(&user_name).await?;
     match user {
-        None => (
+        None => Ok((
             StatusCode::NOT_FOUND,
             Json(format!(
                 "There was no user with username: {} found!",
                 user_name
             ))
             .into_response(),
-        ),
-        Some(user) => (StatusCode::OK, Json(user).into_response()),
+        )),
+        Some(user) => Ok((StatusCode::OK, Json(user).into_response())),
+    }
+}
+
+struct UsersError(anyhow::Error);
+
+impl IntoResponse for UsersError {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+impl<E> From<E> for UsersError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
     }
 }
 
@@ -100,47 +115,51 @@ struct LoginRequest {
     pub unique_key: String,
     pub cookie: Uuid,
 }
-async fn login(State(dao): DbState, Json(login_request): Json<LoginRequest>) -> impl IntoResponse {
+async fn login(
+    State(dao): DbState,
+    Json(login_request): Json<LoginRequest>,
+) -> Result<impl IntoResponse, UsersError> {
     let users = dao.users.read().await;
-    let from_email = users.get_one_by_email(&login_request.unique_key).await;
+    let from_email = users.get_one_by_email(&login_request.unique_key).await?;
     let from_phone_number = users
         .get_one_by_phone_number(&login_request.unique_key)
-        .await;
-    let from_username = users.get_one_by_name(&login_request.unique_key).await;
+        .await?;
+    let from_username = users
+        .get_one_by_user_name(&login_request.unique_key)
+        .await?;
 
-    let all_some = [from_email, from_phone_number, from_username]
+    let all_some = [&from_email, &from_phone_number, &from_username]
         .iter()
-        .fold(true, |acc, &u| acc && u.is_some());
+        .fold(true, |acc, u| acc && u.is_some());
     if !all_some {
-        return (
+        return Ok((
             StatusCode::BAD_REQUEST,
             Json("No user exists with that username, phone number, or email!").into_response(),
-        );
+        ));
     }
 
-    let all_same =
-        [from_email, from_phone_number, from_username]
-            .iter()
-            .fold(from_email, |acc, &u| {
-                if let (Some(prev), Some(current)) = (acc, u) {
-                    if current == prev {
-                        return Some(current);
-                    }
-                }
-                return None;
-            });
+    // let all_same = [&from_email, &from_phone_number, &from_username]
+    //     .iter()
+    //     .fold(true, |acc, u| {
+    //         if let (Some(prev), Some(current)) = (acc, u) {
+    //             if current == prev {
+    //                 return Some(current);
+    //             }
+    //         }
+    //         return None;
+    //     });
 
     // Check the cookie is valid for that user. If it is, allow them through. If not, do two-factor
 
-    match all_same {
-        None => (
+    match Some(1) {
+        None => Ok((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json("ERROR: encountered error parsing user data").into_response(),
-        ),
-        Some(u) => (
+        )),
+        Some(u) => Ok((
             StatusCode::OK,
             Json("Found user, logging you in!").into_response(), // TODO: give the user a cookie to save!
-        ),
+        )),
     }
 }
 
@@ -195,23 +214,23 @@ async fn signup_request(
     let read_users = dao.users.read().await;
 
     // Check if the user already exists
-    let by_username = read_users
-        .get_one_by_name(signup_request.username.as_str())
-        .await;
-    let by_email = read_users
-        .get_one_by_email(signup_request.email.as_str())
-        .await;
-    let by_phone_number = read_users
-        .get_one_by_phone_number(signup_request.phone_number.as_str())
-        .await;
-    for user in [by_username, by_email, by_phone_number] {
-        if user.is_some() {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(format!("A user with that data already exists!")).into_response(),
-            );
-        }
-    }
+    // let by_username = read_users
+    //     .get_one_by_name(signup_request.username.as_str())
+    //     .await?;
+    // let by_email = read_users
+    //     .get_one_by_email(signup_request.email.as_str())
+    //     .await;
+    // let by_phone_number = read_users
+    //     .get_one_by_phone_number(signup_request.phone_number.as_str())
+    //     .await;
+    // for user in [by_username, by_email, by_phone_number] {
+    //     if user.is_some() {
+    //         return (
+    //             StatusCode::BAD_REQUEST,
+    //             Json(format!("A user with that data already exists!")).into_response(),
+    //         );
+    //     }
+    // }
 
     todo!(
         "Send verification codes to the user!

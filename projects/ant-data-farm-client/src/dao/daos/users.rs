@@ -1,11 +1,11 @@
 pub use super::lib::Id as UserId;
 use crate::dao::{dao_trait::DaoTrait, db::Database};
 use chrono::{DateTime, Utc};
-use double_map::DHashMap;
 use futures::future;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio_postgres::Row;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -38,13 +38,50 @@ async fn construct_emails_for_user(db: Arc<Mutex<Database>>, user_id: UserId) ->
 
 pub struct UsersDao {
     database: Arc<Mutex<Database>>,
-    users: DHashMap<UserId, String, Box<User>>,
+}
+
+fn row_to_user(user_row: &Row, emails: Vec<String>) -> User {
+    User {
+        user_id: user_row.get("user_id"),
+        username: user_row.get("user_name"),
+        phone_number: user_row.get("user_phone_number"),
+        emails,
+        joined: user_row.get("user_joined"),
+    }
 }
 
 #[async_trait::async_trait]
 impl DaoTrait<UsersDao, User> for UsersDao {
     async fn new(db: Arc<Mutex<Database>>) -> Result<UsersDao, anyhow::Error> {
-        let rows = db
+        Ok(UsersDao { database: db })
+    }
+
+    async fn get_one_by_id(&self, user_id: &UserId) -> Result<Option<User>, anyhow::Error> {
+        let binding = self.database
+        .lock()
+        .await
+        .query(
+            "select user_id, user_name, user_phone_number, user_joined from registered_user where user_id = $1 limit 1;",
+            &[&user_id.0],
+        )
+        .await?;
+
+        let row = binding.first().map(|row: &Row| async move {
+            let user_id: UserId = row.get("user_id");
+            let in_db = self.database.clone();
+            let emails = construct_emails_for_user(in_db, user_id).await;
+            row_to_user(row, emails)
+        });
+
+        match row {
+            Some(user) => Ok(Some(user.await)),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_all(&self) -> Result<Vec<User>, anyhow::Error> {
+        let rows = self
+            .database
             .lock()
             .await
             .query(
@@ -53,60 +90,14 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             )
             .await?;
 
-        let users_list = future::join_all(rows.iter().map(|row| {
+        Ok(future::join_all(rows.iter().map(|row| async move {
             let user_id: UserId = row.get("user_id");
-            let in_db = db.clone();
-            async move {
-                User {
-                    user_id: row.get("user_id"),
-                    username: row.get("user_name"),
-                    phone_number: row.get("user_phone_number"),
-                    joined: row.get("user_joined"),
-                    emails: construct_emails_for_user(in_db, user_id).await,
-                }
-            }
+            let in_db = self.database.clone();
+            let emails = construct_emails_for_user(in_db, user_id).await;
+
+            row_to_user(row, emails)
         }))
-        .await;
-
-        let mut users = DHashMap::<UserId, String, Box<User>>::new();
-        for user in users_list {
-            users.insert(user.user_id, user.username.clone(), Box::new(user.clone()));
-        }
-
-        Ok(UsersDao {
-            database: db,
-            users,
-        })
-    }
-
-    async fn get_one_by_id(&self, user_id: &UserId) -> Option<&User> {
-        Some(self.users.get_key1(user_id)?)
-    }
-
-    async fn get_one_by_id_mut(&mut self, user_id: &UserId) -> Option<&mut User> {
-        Some(self.users.get_mut_key1(user_id)?)
-    }
-
-    async fn get_one_by_name(&self, user_name: &str) -> Option<&User> {
-        Some(self.users.get_key2(user_name)?)
-    }
-
-    async fn get_one_by_name_mut(&mut self, user_name: &str) -> Option<&mut User> {
-        Some(self.users.get_mut_key2(user_name)?)
-    }
-
-    async fn get_all(&self) -> Vec<&User> {
-        self.users
-            .values()
-            .map(std::convert::AsRef::as_ref)
-            .collect::<Vec<&User>>()
-    }
-
-    async fn get_all_mut(&mut self) -> Vec<&mut User> {
-        self.users
-            .values_mut()
-            .map(std::convert::AsMut::as_mut)
-            .collect::<Vec<&mut User>>()
+        .await)
     }
 }
 
@@ -116,7 +107,7 @@ impl UsersDao {
         username: String,
         phone_number: String,
         emails: Vec<String>,
-    ) -> Option<&User> {
+    ) -> Option<User> {
         let mut db = self.database.lock().await;
         let t = db.transaction().await.unwrap();
 
@@ -162,24 +153,24 @@ impl UsersDao {
             return None;
         }
 
-        let user = Box::new(User {
+        let user = User {
             username,
             emails,
             phone_number,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
-        });
+        };
 
-        self.users
-            .insert(user.user_id, user.username.clone(), user.clone())?
-            .ok()?;
-        let user = self.users.get_key1(&user.user_id)?.as_ref();
         t.commit().await.ok()?;
 
         return Some(user);
     }
 
-    pub async fn add_email_to_user(&mut self, user_id: UserId, email: String) -> Option<&User> {
+    pub async fn add_email_to_user(
+        &mut self,
+        user_id: UserId,
+        email: String,
+    ) -> Result<(), anyhow::Error> {
         debug!("IN DAO");
         let res_affected = self
             .database
@@ -189,39 +180,50 @@ impl UsersDao {
                 "insert into registered_user_email (user_id, user_email) values ($1::uuid, $2) limit 1",
                 &[&user_id.0, &email],
             )
-            .await;
-        if res_affected.is_err() {
-            debug!("DATABASE ERROR: {}", res_affected.unwrap_err());
-            return None;
-        }
+            .await?;
 
-        let affected = res_affected.unwrap();
-        if affected != 1 {
+        if res_affected != 1 {
             debug!("SQL insert for user email failed!");
-            return None;
+            return Err(anyhow::Error::msg("More than 1 affected"));
         }
-        debug!("Here!");
-
-        let user = self.users.get_mut_key1(&user_id)?;
-        user.emails.push(email);
-
-        debug!("All users: {:?}", user);
-        Some(user)
+        Ok(())
     }
 
-    pub async fn get_one_by_email(&self, email: &str) -> Option<&User> {
-        self.get_all()
-            .await
-            .iter()
-            .map(|&user| user)
-            .find(|&user| user.emails.contains(&String::from(email)))
+    pub async fn get_one_by_email(&self, email: &str) -> Result<Option<User>, anyhow::Error> {
+        let user = self
+            .get_all()
+            .await?
+            .into_iter()
+            .map(|user| user)
+            .find(|user| user.emails.contains(&String::from(email)));
+        Ok(user)
     }
 
-    pub async fn get_one_by_phone_number(&self, phone_number: &str) -> Option<&User> {
-        self.get_all()
-            .await
-            .iter()
-            .map(|&user| user)
-            .find(|&user| user.phone_number == phone_number)
+    pub async fn get_one_by_phone_number(
+        &self,
+        phone_number: &str,
+    ) -> Result<Option<User>, anyhow::Error> {
+        let user = self
+            .get_all()
+            .await?
+            .into_iter()
+            .map(|user| user)
+            .find(|user| user.phone_number == phone_number);
+
+        Ok(user)
+    }
+
+    pub async fn get_one_by_user_name(
+        &self,
+        username: &str,
+    ) -> Result<Option<User>, anyhow::Error> {
+        let user = self
+            .get_all()
+            .await?
+            .into_iter()
+            .map(|user| user)
+            .find(|user| user.username == username);
+
+        Ok(user)
     }
 }

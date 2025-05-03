@@ -39,7 +39,7 @@ export default function LoginPage() {
             onChange={(e) => setLoginUnique(e.target.value)}
           />
         </span>
-        <input type="submit" className="m-1" value="login" />
+        <input type="submit" className="m-1" value="login (does nothing)" />
       </form>
       <h2>signup</h2>
       <div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
             value={signupEmail}
             onChange={(e) => setSignupEmail(e.target.value)}
           />
-          <input type="submit" className="m-1" value="signup" />
+          <input type="submit" className="m-1" value="signup (does nothing)" />
         </form>
       </div>
     </div>

@@ -7,11 +7,12 @@ use ant_data_farm::{
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
+use axum_macros::debug_handler;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -19,96 +20,112 @@ use uuid::Uuid;
 
 const PAGE_SIZE: usize = 1_000_usize;
 
-async fn all_ants(State(dao): DbState) -> impl IntoResponse {
-    (
+async fn all_ants(State(dao): DbState) -> Result<impl IntoResponse, AntsError> {
+    Ok((
         StatusCode::OK,
-        Json(dao.ants.read().await.get_all().await).into_response(),
-    )
+        Json(dao.ants.read().await.get_all().await?).into_response(),
+    ))
 }
 
 #[derive(Serialize, Deserialize)]
 struct Pagination {
     page: usize,
 }
-async fn unreleased_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
+
+#[derive(Serialize)]
+struct UnreleasedAntsOutput<'a>(&'a [Ant]);
+
+async fn unreleased_ants(
+    State(dao): DbState,
+    query: Query<Pagination>,
+) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
 
     let mut unreleased_ants = ants
         .get_all()
-        .await
-        .iter()
-        .filter_map(|&ant| match ant.status {
+        .await?
+        .into_iter()
+        .filter_map(|ant| match ant.status {
             AntStatus::Unreleased => Some(ant),
             _ => None,
         })
-        .collect::<Vec<&Ant>>();
+        .collect::<Vec<Ant>>();
     unreleased_ants.sort();
     unreleased_ants.reverse();
 
     let ants_page = unreleased_ants.chunks(PAGE_SIZE).nth(query.page);
     match ants_page {
         None => {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json(format!("No page {} exists!", query.page)).into_response(),
-            )
+            ))
         }
         Some(unreleased_ants) => {
-            return (StatusCode::OK, Json(unreleased_ants).into_response());
+            return Ok((
+                StatusCode::OK,
+                Json(UnreleasedAntsOutput(unreleased_ants)).into_response(),
+            ));
         }
     }
 }
 
-async fn declined_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
+async fn declined_ants(
+    State(dao): DbState,
+    query: Query<Pagination>,
+) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
 
     let declined_ants = ants
         .get_all()
-        .await
-        .iter()
-        .filter_map(|&ant| match ant.status {
+        .await?
+        .into_iter()
+        .filter_map(|ant| match ant.status {
             AntStatus::Released(_) => Some(ant),
             _ => None,
         })
-        .collect::<Vec<&Ant>>();
+        .collect::<Vec<Ant>>();
 
     let ants_page = declined_ants.chunks(PAGE_SIZE).nth(query.page);
     match ants_page {
         None => {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json(format!("No page {} exists!", query.page)).into_response(),
-            )
+            ))
         }
         Some(released_ants) => {
-            return (StatusCode::OK, Json(released_ants).into_response());
+            return Ok((StatusCode::OK, Json(released_ants).into_response()));
         }
     }
 }
 
-async fn released_ants(State(dao): DbState, query: Query<Pagination>) -> impl IntoResponse {
+async fn released_ants(
+    State(dao): DbState,
+    query: Query<Pagination>,
+) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
 
     let released_ants = ants
         .get_all()
-        .await
-        .iter()
-        .filter_map(|&ant| match ant.status {
+        .await?
+        .into_iter()
+        .filter_map(|ant| match ant.status {
             AntStatus::Released(_) => Some(ant),
             _ => None,
         })
-        .collect::<Vec<&Ant>>();
+        .collect::<Vec<Ant>>();
 
     let ants_page = released_ants.chunks(PAGE_SIZE).nth(query.page);
     match ants_page {
         None => {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json(format!("No page {} exists!", query.page)).into_response(),
-            )
+            ))
         }
         Some(released_ants) => {
-            return (StatusCode::OK, Json(released_ants).into_response());
+            return Ok((StatusCode::OK, Json(released_ants).into_response()));
         }
     }
 }
@@ -127,14 +144,14 @@ struct LatestAntsResponse {
     release: i32,
     ants: Vec<Ant>,
 }
-async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
+async fn latest_ants(State(dao): DbState) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
 
-    let all_ants: Vec<Ant> = ants.get_all().await.iter().map(|&x| x.clone()).collect();
+    let all_ants: Vec<Ant> = ants.get_all().await?;
     match releases.get_latest_release().await {
         Err(_) => {
-            return (StatusCode::NOT_FOUND).into_response();
+            return Ok((StatusCode::NOT_FOUND).into_response());
         }
         Ok(latest_release) => {
             let current_release_ants = all_ants
@@ -146,7 +163,7 @@ async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
                 .map(std::clone::Clone::clone)
                 .collect::<Vec<Ant>>();
 
-            return (
+            return Ok((
                 StatusCode::OK,
                 Json(LatestAntsResponse {
                     date: latest_release.created_at,
@@ -154,7 +171,7 @@ async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
                     ants: current_release_ants,
                 }),
             )
-                .into_response();
+                .into_response());
         }
     }
 }
@@ -162,6 +179,7 @@ async fn latest_ants(State(dao): DbState) -> impl IntoResponse {
 #[derive(Deserialize)]
 struct FeedInput {
     pub user_id: UserId,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub since: DateTime<Utc>,
 }
 
@@ -170,25 +188,28 @@ struct FeedOutput {
     pub ants: Vec<Ant>,
 }
 
-async fn feed(State(db): DbState, Json(input): Json<FeedInput>) -> impl IntoResponse {
+async fn feed(State(db): DbState, query: Query<FeedInput>) -> Result<impl IntoResponse, AntsError> {
     debug!("Top of /api/ant/feed");
 
     let ants = db.ants.read().await;
 
-    let feed = match ants.get_user_feed_since(&input.user_id, input.since).await {
+    let feed = match ants
+        .get_user_feed_since(&query.user_id, &query.since)
+        .await?
+    {
         None => {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json("User does not exist!".to_string()).into_response(),
-            )
+            ))
         }
         Some(feed) => feed,
     };
 
-    return (
+    return Ok((
         StatusCode::OK,
         Json(FeedOutput { ants: feed }).into_response(),
-    );
+    ));
 }
 
 #[derive(Deserialize, Debug)]
@@ -200,49 +221,41 @@ struct Suggestion {
 async fn make_suggestion(
     State(dao): DbState,
     Json(suggestion): Json<Suggestion>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AntsError> {
     debug!("Top of /api/ant/suggest");
     let users = dao.users.read().await;
     let mut ants = dao.ants.write().await;
 
     let o_user = match &suggestion.user_id {
-        None => users.get_one_by_name("nobody").await,
+        None => users.get_one_by_user_name("nobody").await?,
         Some(u) => {
             users
                 .get_one_by_id(&UserId(Uuid::parse_str(u.0.to_string().as_str()).unwrap()))
-                .await
+                .await?
         }
     };
 
     if o_user.is_none() {
         if suggestion.user_id.is_some() {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json("NOT_FOUND".to_string()).into_response(),
-            );
+            ));
         }
-        return (
+        return Ok((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json("Unable to process ant suggestion!").into_response(),
-        );
+        ));
     }
 
     let user = o_user.unwrap();
-    let res = ants
-        .add_unreleased_ant(suggestion.suggestion_content, user.user_id)
-        .await;
-    if res.is_err() {
-        debug!("Encountered error: {}", res.unwrap_err());
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Unable to process ant suggestion!").into_response(),
-        );
-    }
+    ants.add_unreleased_ant(suggestion.suggestion_content, user.user_id)
+        .await?;
 
-    (
+    Ok((
         StatusCode::OK,
         Json("Added suggestion, thanks!").into_response(),
-    )
+    ))
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -295,4 +308,25 @@ pub fn router() -> DbRouter {
                 // "POST /tweet",
             ])
         })
+}
+
+struct AntsError(anyhow::Error);
+
+impl IntoResponse for AntsError {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+impl<E> From<E> for AntsError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
 }

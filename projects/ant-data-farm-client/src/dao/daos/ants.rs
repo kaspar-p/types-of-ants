@@ -1,12 +1,12 @@
 pub use super::lib::Id as AntId;
 use super::users::UserId;
 use crate::dao::{dao_trait::DaoTrait, db::Database};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
-use double_map::DHashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::debug;
+use tokio_postgres::Row;
 
 // #[derive(Debug, Clone, Serialize, Deserialize)]
 // pub enum SuggestionStatus {
@@ -60,127 +60,122 @@ impl Ord for Ant {
 
 pub struct AntsDao {
     database: Arc<Mutex<Database>>,
-    ants: DHashMap<AntId, String, Box<Ant>>,
 }
 
 #[async_trait::async_trait]
 impl DaoTrait<AntsDao, Ant> for AntsDao {
     async fn new(db: Arc<Mutex<Database>>) -> Result<AntsDao, anyhow::Error> {
-        let mut ants = DHashMap::<AntId, String, Box<Ant>>::new();
+        Ok(AntsDao { database: db })
+    }
 
-        let released_ant_rows = db
+    // Read
+    async fn get_all(&self) -> anyhow::Result<Vec<Ant>> {
+        let rows = self
+            .database
             .lock()
             .await
             .query(
                 "select 
-                    ant.ant_id, 
-                    ant.suggested_content,
-                    ant_release.ant_content, 
-                    ant_release.release_number, 
-                    ant.created_at,
-                    ant.ant_user_id,
-                    ant_declined.ant_declined_at,
-                    ant_tweeted.tweeted_at
-                from 
-                    ant left join ant_release on ant.ant_id = ant_release.ant_id
-                        left join ant_declined on ant.ant_id = ant_declined.ant_id
-                        left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
-                ",
+                ant.ant_id, 
+                ant.suggested_content,
+                ant_release.ant_content, 
+                ant_release.release_number, 
+                ant.created_at,
+                ant.ant_user_id,
+                ant_declined.ant_declined_at,
+                ant_tweeted.tweeted_at
+            from 
+                ant left join ant_release on ant.ant_id = ant_release.ant_id
+                    left join ant_declined on ant.ant_id = ant_declined.ant_id
+                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+            ",
                 &[],
             )
             .await?;
 
-        let released_ants = futures::future::join_all(released_ant_rows.iter().map(|row| async {
-            let tweeted_at: Option<DateTime<Utc>> = row.get("tweeted_at");
-            let ant_content: Option<String> = row.get("ant_content");
-            let declined_at: Option<DateTime<Utc>> = row.get("ant_declined_at");
+        Ok(rows.into_iter().map(|row| row_to_ant(&row)).collect())
+    }
 
-            let status = {
-                if ant_content.is_some() {
-                    AntStatus::Released(row.get("release_number"))
-                } else if declined_at.is_some() {
-                    AntStatus::Declined
-                } else {
-                    AntStatus::Unreleased
-                }
-            };
+    async fn get_one_by_id(&self, ant_id: &AntId) -> Result<Option<Ant>> {
+        let rows = self
+            .database
+            .lock()
+            .await
+            .query(
+                "select 
+                ant.ant_id, 
+                ant.suggested_content,
+                ant_release.ant_content, 
+                ant_release.release_number, 
+                ant.created_at,
+                ant.ant_user_id,
+                ant_declined.ant_declined_at,
+                ant_tweeted.tweeted_at
+            from 
+                ant left join ant_release on ant.ant_id = ant_release.ant_id
+                    left join ant_declined on ant.ant_id = ant_declined.ant_id
+                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+            where
+                ant.ant_id = $1
+            ",
+                &[&ant_id.0],
+            )
+            .await?;
 
-            let tweeted_status = if tweeted_at.is_some() {
-                Tweeted::Tweeted(row.get("tweeted_at"))
-            } else {
-                Tweeted::NotTweeted
-            };
+        return Ok(rows.first().map(|row| row_to_ant(row)));
+    }
+}
 
-            let content: String = if let Some(name) = row.get("ant_content") {
-                name
-            } else {
-                row.get("suggested_content")
-            };
+fn row_to_ant(row: &Row) -> Ant {
+    let tweeted_at: Option<DateTime<Utc>> = row.get("tweeted_at");
+    let ant_content: Option<String> = row.get("ant_content");
+    let declined_at: Option<DateTime<Utc>> = row.get("ant_declined_at");
 
-            Ant {
-                ant_id: row.get("ant_id"),
-                ant_name: content,
-                created_at: row.get("created_at"),
-                created_by: row.get("ant_user_id"),
-                status,
-                tweeted: tweeted_status,
-            }
-        }))
-        .await;
-
-        for ant in released_ants {
-            ants.insert(ant.ant_id, ant.ant_name.clone(), Box::new(ant));
+    let status = {
+        if ant_content.is_some() {
+            AntStatus::Released(row.get("release_number"))
+        } else if declined_at.is_some() {
+            AntStatus::Declined
+        } else {
+            AntStatus::Unreleased
         }
+    };
 
-        Ok(AntsDao { database: db, ants })
-    }
+    let tweeted_status = if tweeted_at.is_some() {
+        Tweeted::Tweeted(row.get("tweeted_at"))
+    } else {
+        Tweeted::NotTweeted
+    };
 
-    // Read
-    async fn get_all(&self) -> Vec<&Ant> {
-        self.ants
-            .values()
-            .into_iter()
-            .map(std::convert::AsRef::as_ref)
-            .collect::<Vec<&Ant>>()
-    }
+    let content: String = if let Some(name) = row.get("ant_content") {
+        name
+    } else {
+        row.get("suggested_content")
+    };
 
-    async fn get_all_mut(&mut self) -> Vec<&mut Ant> {
-        vec![]
-    }
-
-    async fn get_one_by_id(&self, ant_id: &AntId) -> Option<&Ant> {
-        Some(self.ants.get_key1(ant_id)?.as_ref())
-    }
-
-    async fn get_one_by_id_mut(&mut self, ant_id: &AntId) -> Option<&mut Ant> {
-        let ant = self.ants.get_mut_key1(ant_id)?;
-        Some(ant.as_mut())
-    }
-
-    async fn get_one_by_name(&self, ant_name: &str) -> Option<&Ant> {
-        Some(self.ants.get_key2(ant_name)?.as_ref())
-    }
-
-    async fn get_one_by_name_mut(&mut self, ant_name: &str) -> Option<&mut Ant> {
-        Some(self.ants.get_mut_key2(ant_name)?.as_mut())
+    Ant {
+        ant_id: row.get("ant_id"),
+        ant_name: content,
+        created_at: row.get("created_at"),
+        created_by: row.get("ant_user_id"),
+        status,
+        tweeted: tweeted_status,
     }
 }
 
 impl AntsDao {
-    /// Get the ants in the users feed at the time of the request.
-    /// If the user does not exist, returns None.
     pub async fn get_user_feed_since(
         &self,
-        user: &UserId,
-        since: DateTime<Utc>,
-    ) -> Option<Vec<Ant>> {
-        return Some(vec![]);
+        user_id: &UserId,
+        since: &DateTime<Utc>,
+    ) -> Result<Option<Vec<Ant>>, anyhow::Error> {
+        return Ok(Some(vec![]));
     }
 
-    pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Option<&Ant> {
+    pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Result<Ant> {
         let time = chrono::offset::Utc::now();
 
-        let res_affected = self
+        let _ = self
             .database
             .lock()
             .await
@@ -188,31 +183,26 @@ impl AntsDao {
                 "insert into ant_tweeted (ant_id, tweeted_at) values ($1::uuid, $2::timestamptz) limit 1",
                 &[&ant.0, &time],
             )
-            .await;
-        if res_affected.is_err() {
-            debug!(
-                "Error inserting ant tweet with ID '{}': {}",
-                ant,
-                res_affected.unwrap_err()
-            );
-            return None;
-        }
+            .await?;
 
-        let ant = self.get_one_by_id_mut(ant).await?;
+        let mut ant = self
+            .get_one_by_id(ant)
+            .await?
+            .ok_or(anyhow::Error::msg("No such ant."))?;
         ant.tweeted = Tweeted::Tweeted(time);
-        Some(ant)
+        Ok(ant)
     }
 
-    pub async fn get_all_released(&self) -> Vec<&Ant> {
-        self.get_all()
-            .await
-            .iter()
-            .filter(|&&ant| match ant.status {
+    pub async fn get_all_released(&self) -> Result<Vec<Ant>> {
+        Ok(self
+            .get_all()
+            .await?
+            .into_iter()
+            .filter(|ant| match ant.status {
                 AntStatus::Released(_) => true,
                 _ => false,
             })
-            .map(|&ant| ant)
-            .collect::<Vec<&Ant>>()
+            .collect::<Vec<Ant>>())
     }
 
     pub async fn add_unreleased_ant(
@@ -242,11 +232,6 @@ impl AntsDao {
             return Result::Err(e);
         }
 
-        self.ants.insert(
-            ant.ant_id.clone(),
-            ant.ant_name.clone(),
-            Box::new(ant.clone()),
-        );
         Ok(())
     }
 }

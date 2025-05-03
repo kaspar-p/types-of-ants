@@ -18,7 +18,7 @@ clean:
 	$(MAKE) -C ./website clean
 
 run: debug
-	$(BUILD_DIR)/debug/$(PROJECT)
+	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
 install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
 install: release
@@ -29,12 +29,12 @@ install: release
 	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
 	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
 
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**
+$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**/*
 	cd ./server && cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
 
-$(BUILD_DIR)/%/$(STATIC)/: ./website/**
+$(BUILD_DIR)/%/$(STATIC)/: ./website/**/*
 	$(MAKE) -C ./website
 	mkdir -p $@
 	cp -R ./website/out/* $@

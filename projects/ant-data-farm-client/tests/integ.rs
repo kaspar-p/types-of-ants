@@ -21,7 +21,7 @@ async fn more_than_500_ants() {
     .expect("Connected!");
 
     let ants = dao.ants.read().await;
-    let all_ants = ants.get_all_released().await;
+    let all_ants = ants.get_all_released().await.unwrap();
     assert!(all_ants.len() >= 500);
 }
 
@@ -42,7 +42,7 @@ async fn add_tweeted(_logging: &()) {
 
     let ant_id = {
         let ants = dao.ants.read().await;
-        ants.get_all().await.last().unwrap().ant_id
+        ants.get_all().await.unwrap().last().unwrap().ant_id
     };
 
     {
@@ -58,7 +58,7 @@ async fn add_tweeted(_logging: &()) {
     }
 
     let ants = dao.ants.read().await;
-    let found_ant = ants.get_one_by_id(&ant_id).await;
+    let found_ant = ants.get_one_by_id(&ant_id).await.unwrap();
     match found_ant {
         None => panic!("Failed to get ant again!"),
         Some(found_ant) => match &found_ant.tweeted {

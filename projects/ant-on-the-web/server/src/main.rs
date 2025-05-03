@@ -5,7 +5,7 @@ mod types;
 use ant_data_farm::AntDataFarmClient;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use axum_extra::routing::RouterExt;
@@ -16,7 +16,7 @@ use tower_http::{
     services::ServeDir,
     trace::TraceLayer,
 };
-use tracing::{debug, info};
+use tracing::debug;
 
 #[tokio::main]
 async fn main() {
@@ -88,5 +88,5 @@ async fn main() {
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .expect("Server failed!");
 }
