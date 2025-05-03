@@ -17,7 +17,7 @@ clean:
 	cargo clean
 
 run: debug
-	$(BUILD_DIR)/debug/$(PROJECT)
+	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
 $(BUILD_DIR)/%/$(PROJECT): src/** Cargo.toml
 	cargo build $(RUST_FLAGS)

@@ -206,8 +206,11 @@ dependencies = [
  "axum",
  "axum-extra",
  "axum-macros",
+ "dotenv",
  "hyper 0.14.28",
  "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -302,6 +305,7 @@ name = "ant-who-tweets"
 version = "0.1.0"
 dependencies = [
  "ant-data-farm",
+ "ant-library",
  "anyhow",
  "chrono",
  "dotenv",
@@ -4809,9 +4813,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
+checksum = "e8189decb5ac0fa7bc8b96b7cb9b2701d60d48805aca84a238004d665fcc4008"
 dependencies = [
  "matchers",
  "nu-ansi-term",

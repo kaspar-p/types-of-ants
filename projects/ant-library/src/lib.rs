@@ -4,6 +4,8 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use tracing::{debug, Level};
+use tracing_subscriber::FmtSubscriber;
 
 /// The standard ping that all typesofants web servers should use.
 pub async fn api_ping() -> (StatusCode, String) {
@@ -23,6 +25,32 @@ pub fn api_fallback(routes: &[&str]) -> (StatusCode, String) {
                 .collect::<String>()
         ),
     )
+}
+
+pub fn set_global_logs(project: &str) -> () {
+    std::env::set_var(
+        "RUST_LOG",
+        format!(
+            "{}=debug,glimmer=debug,tower_http=debug,axum::rejection=trace",
+            project
+        ),
+    );
+    dotenv::dotenv().expect("No .env file found!");
+
+    // initialize tracing
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::DEBUG)
+        .with_file(true)
+        .with_ansi(false)
+        .with_writer(tracing_appender::rolling::hourly(
+            "./logs",
+            format!("{}.log", project),
+        ))
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
+    debug!("Logs initialized...");
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes, (StatusCode, String)>

@@ -16,9 +16,12 @@ clean:
 	rm -rf build
 # cargo clean
 
+run: debug
+	cd $(BUILD_DIR)/debug/ && ./$(PROJECT)
+
 $(BUILD_DIR)/%/$(PROJECT): src/** Cargo.toml
 	cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
 
-.PHONY: all debug release clean
+.PHONY: all debug release clean run

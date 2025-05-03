@@ -1,6 +1,7 @@
 use ant_data_farm::{
     ants::Ant, ants::Tweeted, AntDataFarmClient, DatabaseConfig, DatabaseCredentials,
 };
+use ant_library::set_global_logs;
 use chrono::Timelike;
 use rand::seq::SliceRandom;
 use std::time::Duration;
@@ -118,17 +119,8 @@ fn get_config() -> Result<Config, dotenv::Error> {
 
 #[tokio::main]
 async fn main() {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
-        .with_file(true)
-        .with_ansi(false)
-        .with_writer(tracing_appender::rolling::hourly(
-            "./logs",
-            "ant-who-tweets.log",
-        ))
-        .finish();
+    set_global_logs("ant-who-tweets");
 
-    let _ = tracing::subscriber::set_default(subscriber);
     let scheduler = JobScheduler::new().await.unwrap();
 
     // 8pm EST is 6pm MST

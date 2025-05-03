@@ -17,3 +17,4 @@ tracing-appender = "0.2.3"
 ant-data-farm = { path = "../ant-data-farm-client" }
 chrono = "0.4.33"
 anyhow = "1.0.79"
+ant-library = { version = "1.0.0", path = "../ant-library" }
