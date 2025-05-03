@@ -47,7 +47,7 @@ async fn ant_client(config: DatabaseConfig) -> AntDataFarmClient {
     }
 }
 
-async fn cron_tweet() -> () {
+async fn cron_tweet() -> Result<(), anyhow::Error> {
     info!("Starting cron_tweet()...");
     let config: Config = get_config().expect("Getting config failed!");
 
@@ -59,10 +59,9 @@ async fn cron_tweet() -> () {
         let read_ants = client.ants.read().await;
         let ants = read_ants
             .get_all_released()
-            .await
-            .iter()
-            .filter(|&ant| ant.tweeted == Tweeted::NotTweeted)
-            .map(|&x| x.clone())
+            .await?
+            .into_iter()
+            .filter(|ant| ant.tweeted == Tweeted::NotTweeted)
             .collect::<Vec<Ant>>();
         ants.choose(&mut rand::thread_rng())
             .unwrap_or_else(|| panic!("Failed to get a random choice!"))
@@ -79,8 +78,10 @@ async fn cron_tweet() -> () {
         .write()
         .await
         .add_ant_tweet(&random_ant.ant_id)
-        .await;
+        .await?;
     info!("Cron tasks done, exiting...");
+
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -155,7 +156,7 @@ async fn main() {
             Job::new_async(format!("0 0 {} * * *", hour_to_tweet).as_str(), |_, __| {
                 Box::pin(async move {
                     info!("Entering cron_tweet()...");
-                    cron_tweet().await;
+                    cron_tweet().await.expect("Cron tweet failed!");
                 })
             })
             .unwrap(),

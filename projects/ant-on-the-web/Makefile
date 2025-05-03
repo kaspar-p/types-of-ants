@@ -20,21 +20,14 @@ clean:
 run: debug
 	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
-install: INSTALL_DIR = $(INSTALL_PREFIX)/$(PROJECT)/$(INSTALL_VERSION)/
-install: release
-	echo $(BUILD_DIR) $(BUILD_MODE) $(RUST_FLAGS) $(INSTALL_DIR)
-	mkdir -p $(INSTALL_DIR)/$(STATIC)
-	cp -R $(BUILD_DIR)/release/$(STATIC) $(INSTALL_DIR)/
-	cp $(SECRETS_DIR)/.env $(INSTALL_DIR)
-	install -v -m 0755 $(BUILD_DIR)/release/$(PROJECT) $(INSTALL_DIR)
-	HOME=$(HOME) VERSION=$(INSTALL_VERSION) mo $(PROJECT).service.mo > $(INSTALL_DIR)/$(PROJECT).service
-
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ ./server/**/*
+SERVER_SOURCES := $(shell find ./server)
+$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ $(SERVER_SOURCES)
 	cd ./server && cargo build $(RUST_FLAGS)
 	mkdir -p $(@D)
 	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
 
-$(BUILD_DIR)/%/$(STATIC)/: ./website/**/*
+WEBSITE_SOURCES := $(shell find ./website)
+$(BUILD_DIR)/%/$(STATIC)/: $(WEBSITE_SOURCES)
 	$(MAKE) -C ./website
 	mkdir -p $@
 	cp -R ./website/out/* $@
