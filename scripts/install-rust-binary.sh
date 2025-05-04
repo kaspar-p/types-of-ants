@@ -34,7 +34,7 @@ install_datetime="$(date "+%Y-%m-%d-%H-%M")"
 install_version="$install_datetime-$commit_sha"
 
 # Some projects require this for generating deterministic build hashes
-export install_version
+export commit_sha
 
 log "BUILDING [$project]..."
 
