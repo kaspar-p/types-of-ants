@@ -24,7 +24,7 @@ services:
       dockerfile: Dockerfile
       args:
         - FQDN=beta.typesofants.org
-        - ANT_WORKER_NUM_ONE=000
+        - ANT_WORKER_NUM_ONE=001
         - ANT_WORKER_NUM_TWO=001
         - ANT_WORKER_NUM_THREE=002
         - WEBSERVER_PORT=3231
