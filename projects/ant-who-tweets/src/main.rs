@@ -6,8 +6,7 @@ use chrono::Timelike;
 use rand::seq::SliceRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing::info;
 use twitter_v2::authorization::Oauth1aToken;
 use twitter_v2::TwitterApi;
 
