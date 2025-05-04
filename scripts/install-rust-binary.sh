@@ -33,6 +33,9 @@ commit_sha="$(git log --format='%h' -n 1)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
 install_version="$install_datetime-$commit_sha"
 
+# Some projects require this for generating deterministic build hashes
+export install_version
+
 log "BUILDING [$project]..."
 
 # Build the project
