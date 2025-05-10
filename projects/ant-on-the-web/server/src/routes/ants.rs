@@ -12,7 +12,6 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
-use axum_macros::debug_handler;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -316,7 +315,7 @@ impl IntoResponse for AntsError {
     fn into_response(self) -> Response {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", self.0),
+            "Something went wrong, please retry",
         )
             .into_response()
     }

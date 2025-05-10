@@ -1,4 +1,6 @@
-use sysinfo::{ProcessExt, System, SystemExt};
+use std::ffi::OsStr;
+
+use sysinfo::System;
 
 use crate::common::kill_project::{KillProjectRequest, KillProjectResponse, KillStatus};
 
@@ -13,7 +15,9 @@ pub async fn kill_project(
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let o_proc = sys.processes_by_exact_name(project.as_str()).last();
+    let o_proc = sys
+        .processes_by_exact_name(OsStr::new(project.as_str()))
+        .last();
     let proc = match o_proc {
         None => return Err(KillProjectError::NothingToKill),
         Some(proc) => proc,

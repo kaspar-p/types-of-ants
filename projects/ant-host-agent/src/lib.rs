@@ -57,10 +57,10 @@ pub async fn start_server(port: Option<u16>) -> Result<(), anyhow::Error> {
     );
     info!("Starting host agent on port {port}");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .unwrap();
+        .expect(format!("failed to bind to {port}").as_str());
+    axum::serve(listener, app).await.unwrap();
 
     return Ok(());
 }

@@ -1,7 +1,9 @@
 use rstest::fixture;
 use std::process::Command;
-use testcontainers::{clients::Cli, images::generic::GenericImage};
-use tracing::{debug, info};
+use testcontainers::{
+    core::client::docker_client_instance, ContainerRequest, GenericImage, ImageExt,
+};
+use tracing::debug;
 
 #[fixture]
 #[once]
@@ -13,13 +15,13 @@ pub fn logging() -> () {
 }
 
 pub struct TestFixture {
-    pub docker: Cli,
-    pub image: GenericImage,
+    pub image: ContainerRequest<GenericImage>,
 }
 
 #[must_use]
-pub fn test_fixture() -> TestFixture {
+pub async fn test_fixture(tag: &str) -> TestFixture {
     let cwd: String = dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!");
+    println!("{}", cwd);
     let db_name = dotenv::var("DB_PG_NAME").expect("DB_PG_NAME environment variable!");
     let user = dotenv::var("DB_PG_USER").expect("DB_PG_USER environment variable!");
     let pw = dotenv::var("DB_PG_PASSWORD").expect("DB_PG_PASSWORD environment variable!");
@@ -28,28 +30,29 @@ pub fn test_fixture() -> TestFixture {
     let output = Command::new("docker")
         .arg("build")
         .arg("--file")
-        .arg(&format!("{cwd}/ant-data-farm.dockerfile"))
+        .arg(&format!("{cwd}/../ant-data-farm/Dockerfile"))
         .arg("--force-rm")
         .arg("--tag")
-        .arg("ant-data-farm:latest")
-        .arg(".")
+        .arg(format!("ant-data-farm:{}", tag))
+        .arg(&format!("{cwd}/../ant-data-farm"))
         .output()
         .expect("Building the ant-data-farm docker image worked!");
     debug!("Built docker image!");
     if !output.status.success() {
         eprintln!("stderr: {}", String::from_utf8(output.stderr).unwrap());
-        panic!("Unable to build ant-data-farm:latest");
+        panic!("Unable to build ant-data-farm:{}", tag);
     }
 
-    let image = GenericImage::new("ant-data-farm", "latest")
+    let image = GenericImage::new("ant-data-farm", tag)
+        .with_wait_for(testcontainers::core::WaitFor::message_on_stdout(
+            "database system is ready to accept connections",
+        ))
+        .with_env_var("PGDATA", "/var/lib/postgresql/data")
         .with_env_var("POSTGRES_DB", db_name)
         .with_env_var("POSTGRES_PASSWORD", pw)
-        .with_env_var("POSTGRES_USER", user)
-        .with_wait_for(testcontainers::core::WaitFor::StdOutMessage {
-            message: "database system is ready to accept connections".to_owned(),
-        });
+        .with_env_var("POSTGRES_USER", user);
 
-    let docker = Cli::docker();
+    let docker = docker_client_instance().await.unwrap();
 
-    TestFixture { docker, image }
+    TestFixture { image }
 }

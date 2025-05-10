@@ -20,15 +20,7 @@ use tracing::debug;
 
 #[tokio::main]
 async fn main() {
-    std::env::set_var(
-        "RUST_LOG",
-        "ant_on_the_web=debug,glimmer=debug,tower_http=debug",
-    );
-
-    // initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .init();
+    ant_library::set_global_logs("ant-on-the-web");
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
@@ -85,8 +77,8 @@ async fn main() {
         .expect("ANT_ON_THE_WEB_PORT was not u16");
     debug!("Starting server on port {port}...");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .expect("Server failed!");
+        .expect(format!("failed to bind server to {port}").as_str());
+    axum::serve(listener, app).await.expect("Server failed!");
 }

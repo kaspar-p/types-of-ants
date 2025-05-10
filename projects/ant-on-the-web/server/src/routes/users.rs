@@ -1,5 +1,8 @@
+use std::str::FromStr;
+
 use crate::types::{DbRouter, DbState};
 use ant_data_farm::users::User;
+use ant_data_farm::users::UserId;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -8,9 +11,9 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
-use serde::Deserialize;
-use tracing::debug;
-use uuid::Uuid;
+use serde::{Deserialize, Serialize};
+use tracing::error;
+use tracing::{debug, info};
 
 #[derive(Deserialize)]
 struct EmailRequest {
@@ -20,7 +23,7 @@ async fn add_anonymous_email(
     State(dao): DbState,
     Json(EmailRequest { email }): Json<EmailRequest>,
 ) -> Result<impl IntoResponse, UsersError> {
-    debug!("Subscribing with email {}", email.as_str());
+    debug!("Subscribing with email {}", email);
 
     let exists = {
         let users = dao.users.read().await;
@@ -80,58 +83,42 @@ async fn get_user_by_name(
             Json(format!(
                 "There was no user with username: {} found!",
                 user_name
-            ))
-            .into_response(),
-        )),
-        Some(user) => Ok((StatusCode::OK, Json(user).into_response())),
-    }
-}
-
-struct UsersError(anyhow::Error);
-
-impl IntoResponse for UsersError {
-    fn into_response(self) -> Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", self.0),
+            )),
         )
-            .into_response()
-    }
-}
-
-impl<E> From<E> for UsersError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
+            .into_response()),
+        Some(user) => Ok((StatusCode::OK, Json(user).into_response()).into_response()),
     }
 }
 
 #[derive(Deserialize)]
-struct LoginRequest {
-    // The user can pass either a username, or phone number,
-    // or email, all of which are unique to them
-    pub unique_key: String,
-    pub cookie: Uuid,
+#[serde(tag = "method")]
+enum LoginRequest {
+    #[serde(rename = "username")]
+    Username { unique_key: String },
+
+    #[serde(rename = "email")]
+    Email { unique_key: String },
+
+    #[serde(rename = "phone")]
+    Phone { unique_key: String },
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    token: String,
 }
 async fn login(
     State(dao): DbState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, UsersError> {
     let users = dao.users.read().await;
-    let from_email = users.get_one_by_email(&login_request.unique_key).await?;
-    let from_phone_number = users
-        .get_one_by_phone_number(&login_request.unique_key)
-        .await?;
-    let from_username = users
-        .get_one_by_user_name(&login_request.unique_key)
-        .await?;
+    let user: Option<User> = match login_request {
+        LoginRequest::Email { unique_key } => users.get_one_by_email(&unique_key).await?,
+        LoginRequest::Phone { unique_key } => users.get_one_by_phone_number(&unique_key).await?,
+        LoginRequest::Username { unique_key } => users.get_one_by_user_name(&unique_key).await?,
+    };
 
-    let all_some = [&from_email, &from_phone_number, &from_username]
-        .iter()
-        .fold(true, |acc, u| acc && u.is_some());
-    if !all_some {
+    if user.is_none() {
         return Ok((
             StatusCode::BAD_REQUEST,
             Json("No user exists with that username, phone number, or email!").into_response(),
@@ -151,106 +138,479 @@ async fn login(
 
     // Check the cookie is valid for that user. If it is, allow them through. If not, do two-factor
 
-    match Some(1) {
-        None => Ok((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("ERROR: encountered error parsing user data").into_response(),
-        )),
-        Some(u) => Ok((
-            StatusCode::OK,
-            Json("Found user, logging you in!").into_response(), // TODO: give the user a cookie to save!
-        )),
-    }
+    Ok((
+        StatusCode::OK,
+        Json(LoginResponse {
+            token: "".to_string(),
+        })
+        .into_response(), // TODO: give the user a cookie to save!
+    ))
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct VerificationCode(String);
 
-#[derive(Deserialize)]
-struct SignupVerificationRequest {
-    pub username: String,
-    pub email: String,
-    pub phone_number: String,
-    pub phone_verification: VerificationCode,
-    pub email_verification: VerificationCode,
+#[derive(Serialize, Deserialize)]
+struct VerificationRequest {
+    user_id: UserId,
+    submission: VerificationSubmission,
 }
-async fn signup_verification(
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "method")]
+enum VerificationSubmission {
+    #[serde(rename = "username")]
+    Username { otp: String },
+
+    #[serde(rename = "email")]
+    Email { otp: String },
+
+    #[serde(rename = "phone")]
+    Phone { otp: String },
+}
+async fn post_verification(
     State(db): DbState,
-    Json(signup_verification_request): Json<SignupVerificationRequest>,
+    Json(signup_verification_request): Json<VerificationRequest>,
 ) -> impl IntoResponse {
-    todo!("Verify that the verification codes sent are correct!");
-
-    let mut write_users = db.users.write().await;
-    let user = write_users
-        .create_user(
-            signup_verification_request.username,
-            signup_verification_request.phone_number,
-            vec![signup_verification_request.email],
-        )
-        .await;
-
-    match user {
-        Some(_) => (
-            StatusCode::OK,
-            Json("Signup request accepted!").into_response(),
-        ),
-        None => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("ERROR: Signup request failed!").into_response(),
-        ),
-    }
+    return (StatusCode::NOT_IMPLEMENTED, "Unimplemented");
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct SignupRequest {
     pub username: String,
     pub email: String,
+    #[serde(rename = "phoneNumber")]
     pub phone_number: String,
+    pub password: String,
 }
 async fn signup_request(
     State(dao): DbState,
     Json(signup_request): Json<SignupRequest>,
-) -> impl IntoResponse {
-    let read_users = dao.users.read().await;
+) -> Result<impl IntoResponse, UsersError> {
+    info!("Validating signup request...");
+    let (canonical_email, canonical_phone_number) = {
+        let canonical_phone_number = match phonenumber::parse(None, &signup_request.phone_number) {
+            Err(e) => {
+                info!(
+                    "Signup request phone number {} was invalid: {}",
+                    signup_request.phone_number, e
+                );
+                return Ok((StatusCode::BAD_REQUEST, "Field phone_number invalid.").into_response());
+            }
+            Ok(phone_number) => phone_number.format().to_string(),
+        };
 
-    // Check if the user already exists
-    // let by_username = read_users
-    //     .get_one_by_name(signup_request.username.as_str())
-    //     .await?;
-    // let by_email = read_users
-    //     .get_one_by_email(signup_request.email.as_str())
-    //     .await;
-    // let by_phone_number = read_users
-    //     .get_one_by_phone_number(signup_request.phone_number.as_str())
-    //     .await;
-    // for user in [by_username, by_email, by_phone_number] {
-    //     if user.is_some() {
-    //         return (
-    //             StatusCode::BAD_REQUEST,
-    //             Json(format!("A user with that data already exists!")).into_response(),
-    //         );
-    //     }
-    // }
+        let canonical_email = match email_address::EmailAddress::from_str(&signup_request.email) {
+            Err(e) => {
+                info!("Signup request email {}: {}", signup_request.email, e);
+                return Ok((StatusCode::BAD_REQUEST, "Field email invalid.").into_response());
+            }
+            Ok(email) => email.as_str().to_string(),
+        };
 
-    todo!(
-        "Send verification codes to the user!
-    1. Instantiate a twilio client here and call it
-    2. Instantiate an email client and call it!"
-    );
+        let username_len = signup_request.username.len();
+        if username_len < 3 || username_len > 16 {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                "Field username must be between 3 and 16 characters.",
+            )
+                .into_response());
+        }
+
+        let username_regex =
+            regex::Regex::new(r"^[a-z0-9]{3,16}$").expect("invalid username regex");
+        if !username_regex.is_match(&signup_request.username) {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                "Field username must contain only lowercase characters and numbers.",
+            )
+                .into_response());
+        }
+
+        let password_len = signup_request.password.len();
+        if password_len < 8 || password_len > 64 {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                "Field password must be between 8 and 64 characters.",
+            )
+                .into_response());
+        }
+
+        if !signup_request.password.contains("ant") {
+            return Ok((StatusCode::BAD_REQUEST, "Field password must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.").into_response());
+        }
+
+        (canonical_email, canonical_phone_number)
+    };
+
+    {
+        info!("Checking if user already exists...");
+        let read_users = dao.users.read().await;
+
+        let by_email = read_users
+            .get_one_by_email(&canonical_email)
+            .await?
+            .is_some();
+        let by_username = read_users
+            .get_one_by_user_name(&signup_request.username)
+            .await?
+            .is_some();
+        let by_phone = read_users
+            .get_one_by_phone_number(&canonical_phone_number)
+            .await?
+            .is_some();
+        if by_email || by_username || by_phone {
+            return Ok((StatusCode::CONFLICT, "User already exists.").into_response());
+        }
+    }
+
+    {
+        // Make user
+        info!("User does not exist, creating...");
+        let mut write_users = dao.users.write().await;
+        let user = write_users
+            .create_user(
+                signup_request.username,
+                canonical_phone_number,
+                canonical_email,
+                signup_request.password,
+            )
+            .await?;
+    }
+
+    return Ok((StatusCode::OK, "Signup completed.").into_response());
 }
 
 pub fn router() -> DbRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
-        .route_with_tsr("/signup-request", post(signup_request))
-        .route_with_tsr("/signup-verification", post(signup_verification))
+        .route_with_tsr("/signup", post(signup_request))
+        // .route_with_tsr("/verification", post(verification))
         .route_with_tsr("/login", post(login))
-        .route_with_tsr("/user/:user-name", get(get_user_by_name))
+        .route_with_tsr("/user/{user_name}", get(get_user_by_name))
         .fallback(|| async {
             ant_library::api_fallback(&[
                 "POST /signup",
-                "POST /user/:user-name",
+                "POST /user/{user_name}",
                 "POST /subscribe-newsletter",
             ])
         })
+}
+
+enum UsersError {
+    InternalServerError(anyhow::Error),
+}
+
+impl IntoResponse for UsersError {
+    fn into_response(self) -> Response {
+        match self {
+            UsersError::InternalServerError(e) => {
+                error!("UsersError: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong, please retry.",
+                )
+            }
+            .into_response(),
+        }
+    }
+}
+
+impl<E> From<E> for UsersError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self::InternalServerError(err.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, sync::Arc};
+
+    use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
+    use ant_library::axum_test_client::TestClient;
+    use http::StatusCode;
+    use postgresql_embedded::PostgreSQL;
+    use tracing_test::traced_test;
+
+    use crate::types::DbRouter;
+
+    use super::{router, SignupRequest};
+
+    async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
+        let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
+            temporary: true,
+            ..Default::default()
+        });
+        pg.setup().await.unwrap();
+        pg.start().await.unwrap();
+
+        pg.create_database("test").await.unwrap();
+
+        let client = AntDataFarmClient::new(Some(DatabaseConfig {
+            port: Some(pg.settings().port),
+            host: Some(pg.settings().host.clone()),
+            creds: Some(DatabaseCredentials {
+                database_name: "test".to_string(),
+                database_password: pg.settings().password.clone(),
+                database_user: pg.settings().username.clone(),
+            }),
+            migration_dir: Some(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("..")
+                    .join("..")
+                    .join("ant-data-farm/data/sql"),
+            ),
+        }))
+        .await
+        .expect("connection failed");
+
+        return (pg, client);
+    }
+
+    struct TestFixture {
+        pub client: TestClient,
+        _guard: PostgreSQL,
+    }
+
+    async fn test_router(router: DbRouter) -> TestFixture {
+        let (db, db_client) = test_database_client().await;
+        let app = router.with_state(Arc::new(db_client));
+        return TestFixture {
+            client: TestClient::new(app).await,
+            _guard: db,
+        };
+    }
+
+    #[tokio::test]
+    async fn user_signup_fails_if_not_json() {
+        let fixture = test_router(router()).await;
+
+        let res = fixture
+            .client
+            .post("/signup")
+            .header("Content-Type", mime::TEXT.as_str())
+            .body("text here")
+            .send()
+            .await;
+
+        assert!(res.status().is_client_error());
+    }
+
+    #[tokio::test]
+    async fn user_signup_fails_if_username_invalid() {
+        let fixture = test_router(router()).await;
+
+        {
+            let req = SignupRequest {
+                username: "".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(
+                res.text().await,
+                "Field username must be between 3 and 16 characters."
+            );
+        }
+
+        {
+            let req = SignupRequest {
+                username: "reallylongusernamethatbreaksthevalidationcode".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(
+                res.text().await,
+                "Field username must be between 3 and 16 characters."
+            );
+        }
+
+        {
+            let req = SignupRequest {
+                username: "OtherCharacters-_*090][]".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(
+                res.text().await,
+                "Field username must be between 3 and 16 characters."
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn user_signup_fails_if_phone_invalid() {
+        let fixture = test_router(router()).await;
+
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "not a phone number".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture.client.post("/signup").json(&req).send().await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.text().await, "Field phone_number invalid.");
+    }
+
+    #[tokio::test]
+    async fn user_signup_fails_if_password_invalid() {
+        let fixture = test_router(router()).await;
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(res.text().await, "Field password must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+        }
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "1234567".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(
+                res.text().await,
+                "Field password must be between 8 and 64 characters."
+            );
+        }
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "four".repeat(100).to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(
+                res.text().await,
+                "Field password must be between 8 and 64 characters."
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn user_signup_fails_if_user_already_exists() {
+        let fixture = test_router(router()).await;
+
+        {
+            let req = SignupRequest {
+                username: "nobody".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::CONFLICT);
+            assert_eq!(res.text().await, "User already exists.");
+        }
+
+        {
+            let req = SignupRequest {
+                username: "newuser".to_string(),
+                email: "nobody@typesofants.org".to_string(), // the 'nobody' user email
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::CONFLICT);
+            assert_eq!(res.text().await, "User already exists.");
+        }
+
+        {
+            let req = SignupRequest {
+                username: "newuser".to_string(),
+                email: "email@domain.org".to_string(),
+                phone_number: "+1 (222) 333-4444".to_string(), // the 'nobody' user phone number
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::CONFLICT);
+            assert_eq!(res.text().await, "User already exists.");
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn user_signup_succeeds() {
+        let fixture = test_router(router()).await;
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            assert_eq!(res.text().await, "Signup completed.");
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn user_signup_fails_if_user_already_signed_up() {
+        let fixture = test_router(router()).await;
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            assert_eq!(res.text().await, "Signup completed.");
+        }
+
+        {
+            let req = SignupRequest {
+                username: "user".to_string(),
+                email: "email@domain.com".to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                password: "my-ant-password".to_string(),
+            };
+            let res = fixture.client.post("/signup").json(&req).send().await;
+
+            assert_eq!(res.status(), StatusCode::CONFLICT);
+            assert_eq!(res.text().await, "User already exists.");
+        }
+    }
 }

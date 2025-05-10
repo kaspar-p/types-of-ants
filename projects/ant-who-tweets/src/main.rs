@@ -46,6 +46,7 @@ async fn ant_client(config: DatabaseConfig) -> AntDataFarmClient {
         Ok(client) => client,
     }
 }
+use rand::seq::IteratorRandom;
 
 async fn cron_tweet() -> Result<(), anyhow::Error> {
     info!("Starting cron_tweet()...");
@@ -63,7 +64,8 @@ async fn cron_tweet() -> Result<(), anyhow::Error> {
             .into_iter()
             .filter(|ant| ant.tweeted == Tweeted::NotTweeted)
             .collect::<Vec<Ant>>();
-        ants.choose(&mut rand::thread_rng())
+        ants.into_iter()
+            .choose(&mut rand::rng())
             .unwrap_or_else(|| panic!("Failed to get a random choice!"))
             .clone()
     };

@@ -2,9 +2,9 @@ use crate::common::launch_project::{LaunchProjectResponse, LaunchStatus};
 use ant_metadata::{get_typesofants_home, Project};
 use anyhow::Result;
 use hyper::body::Bytes;
-use std::io::Write;
 use std::path::PathBuf;
-use sysinfo::{Process, System, SystemExt};
+use std::{ffi::OsStr, io::Write};
+use sysinfo::{Process, System};
 use tracing::debug;
 
 fn already_running(project: Project) -> bool {
@@ -12,7 +12,7 @@ fn already_running(project: Project) -> bool {
     sys.refresh_all();
 
     let exists = sys
-        .processes_by_exact_name(project.as_str())
+        .processes_by_exact_name(OsStr::new(project.as_str()))
         .collect::<Vec<&Process>>()
         .len()
         > 0;

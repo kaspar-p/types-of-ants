@@ -12,7 +12,11 @@ use crate::{
     types::ConnectionPool,
 };
 use bb8::Pool;
+use bb8::PooledConnection;
 use bb8_postgres::PostgresConnectionManager;
+use std::fs::read_dir;
+use std::fs::read_to_string;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tokio_postgres::NoTls;
@@ -35,6 +39,8 @@ pub struct DatabaseConfig {
     /// The IP-address host of the database.
     /// If omitted, checks for a $DB_HOST variable, then tries localhost.
     pub host: Option<String>,
+    /// On client startup, execute the SQL within the directory to bootstrap schemas and databases.
+    pub migration_dir: Option<PathBuf>,
 }
 
 fn get_credentials_from_env() -> Result<DatabaseCredentials, dotenv::Error> {
@@ -57,13 +63,13 @@ fn get_host_from_env() -> Option<String> {
 }
 
 async fn database_connection(
-    config: DatabaseConfig,
+    config: &DatabaseConfig,
 ) -> Result<Pool<PostgresConnectionManager<NoTls>>, dotenv::Error> {
     let port = config
         .port
         .unwrap_or(get_port_from_env().unwrap_or(7000))
         .clone();
-    let db_creds = config.creds.unwrap_or_else(|| {
+    let db_creds = config.creds.clone().unwrap_or_else(|| {
         get_credentials_from_env()
             .expect("Credentials not explicitly passed in must be in the environment!")
     });
@@ -71,6 +77,7 @@ async fn database_connection(
     // TODO: find out a more dynamic way of getting the IP of a host
     let host = config
         .host
+        .clone()
         .unwrap_or_else(|| get_host_from_env().unwrap_or("localhost".to_owned()));
 
     let connection_string = format!(
@@ -97,6 +104,7 @@ pub struct AntDataFarmClient {
     // pub deployments: DeploymentsDao,
     // pub metrics: MetricsDao,
     // pub tests: TestsDao,
+    pool: ConnectionPool,
 }
 
 impl AntDataFarmClient {
@@ -106,18 +114,26 @@ impl AntDataFarmClient {
                 port: None,
                 creds: None,
                 host: None,
+                migration_dir: None,
             },
             Some(c) => c,
         };
 
-        let pool = database_connection(config).await?;
+        let pool = database_connection(&config).await?;
+
+        if let Some(migration_dir) = &config.migration_dir {
+            let con = pool.get().await?;
+            bootstrap(con, migration_dir).await?;
+        }
+
         info!("Initializing data access layer...");
         let client = AntDataFarmClient::initialize(pool).await?;
         return Ok(client);
     }
 
     async fn initialize(pool: ConnectionPool) -> Result<AntDataFarmClient, anyhow::Error> {
-        let db_con = pool.get_owned().await?;
+        let db_con: PooledConnection<'_, PostgresConnectionManager<NoTls>> =
+            pool.get_owned().await?;
 
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
 
@@ -127,10 +143,40 @@ impl AntDataFarmClient {
         let users = RwLock::new(UsersDao::new(database.clone()).await?);
 
         Ok(AntDataFarmClient {
+            pool,
             ants,
             releases,
             users,
             hosts,
         })
     }
+}
+
+/// Bootstrap the database with many migration files, ordered by their filenames within a directory.
+/// Reads all SQL files and executes the SQL within. Intended to be used on startup by a database process
+/// For testing or any first-time use.
+async fn bootstrap<'a>(
+    db_con: PooledConnection<'a, PostgresConnectionManager<NoTls>>,
+    migration_dir: &PathBuf,
+) -> Result<(), anyhow::Error> {
+    let mut files: Vec<std::fs::DirEntry> = read_dir(migration_dir)
+        .expect("reading migration dir failed")
+        .map(|r| r.expect("path invalid"))
+        .filter(|f| f.file_type().unwrap().is_file())
+        .collect();
+    files.sort_by_key(|dir| dir.path());
+
+    for file in files {
+        debug!(
+            "Bootstrapping SQL in {}",
+            file.path().canonicalize().unwrap().to_str().unwrap()
+        );
+        let ddl = read_to_string(file.path()).expect("failed to read SQL file.");
+        db_con
+            .batch_execute(&ddl)
+            .await
+            .expect("Failed to execute SQL file.");
+    }
+
+    Ok(())
 }

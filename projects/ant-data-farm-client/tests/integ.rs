@@ -3,15 +3,17 @@ mod util;
 use ant_data_farm::{ants::Tweeted, AntDataFarmClient, DaoTrait, DatabaseConfig};
 use chrono::Duration;
 
+use testcontainers::runners::AsyncRunner;
 use tracing::debug;
 use util::{logging, test_fixture};
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn more_than_500_ants() {
-    let fixture = test_fixture();
-    let container = fixture.docker.run(fixture.image);
-    let port = container.get_host_port_ipv4(5432);
+    let fixture = test_fixture("more_than_500_ants").await;
+    let container = fixture.image.start().await.unwrap();
+
+    let port = container.get_host_port_ipv4(5432).await.unwrap();
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: None,
@@ -25,13 +27,66 @@ async fn more_than_500_ants() {
     assert!(all_ants.len() >= 500);
 }
 
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn user_gets_created() {
+    let fixture = test_fixture("user_gets_created").await;
+    let container = fixture.image.start().await.unwrap();
+
+    let port = container.get_host_port_ipv4(5432).await.unwrap();
+    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
+        port: Some(port),
+        creds: None,
+        host: None,
+    }))
+    .await
+    .expect("Connected!");
+
+    let mut users = dao.users.write().await;
+
+    users
+        .create_user(
+            "integ-user".to_string(),
+            "(111) 222-3333".to_string(),
+            "email@domain.com".to_string(),
+            "integ-user-password".to_string(),
+        )
+        .await
+        .unwrap();
+
+    let user_by_name = users
+        .get_one_by_user_name("integ-user")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(user_by_name.username, "integ-user");
+    assert_eq!(user_by_name.phone_number, "(111) 222-3333");
+
+    let user_by_phone = users
+        .get_one_by_phone_number("(111) 222-3333")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(user_by_phone.username, "integ-user");
+    assert_eq!(user_by_phone.phone_number, "(111) 222-3333");
+
+    let user_by_email = users
+        .get_one_by_email("email@domain.com")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(user_by_email.username, "integ-user");
+    assert_eq!(user_by_email.phone_number, "(111) 222-3333");
+}
+
 #[rstest::rstest(logging as _logging)]
 #[tokio::test(flavor = "multi_thread")]
 async fn add_tweeted(_logging: &()) {
-    let fixture = test_fixture();
-    let container = fixture.docker.run(fixture.image);
+    let fixture = test_fixture("add_tweeted").await;
+    let container = fixture.image.start().await.unwrap();
+
+    let port = container.get_host_port_ipv4(5432).await.unwrap();
     debug!("Ran fixture!");
-    let port = container.get_host_port_ipv4(5432);
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: None,

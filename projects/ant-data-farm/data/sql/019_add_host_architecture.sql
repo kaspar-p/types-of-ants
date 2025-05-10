@@ -13,8 +13,8 @@ create table architecture (
 
 insert into architecture (label, os, arch)
   values
-    ("Raspberry Pi", "raspbian", "arm"),
-    ("Libre", "ubuntu", "arm")
+    ('Raspberry Pi', 'raspbian', 'arm'),
+    ('Libre', 'ubuntu', 'arm')
   ;
 
 alter table host

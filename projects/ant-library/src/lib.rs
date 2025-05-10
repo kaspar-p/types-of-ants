@@ -4,8 +4,11 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use http_body_util::BodyExt;
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
+
+pub mod axum_test_client;
 
 /// The standard ping that all typesofants web servers should use.
 pub async fn api_ping() -> (StatusCode, String) {
@@ -31,7 +34,7 @@ pub fn set_global_logs(project: &str) -> () {
     std::env::set_var(
         "RUST_LOG",
         format!(
-            "{}=debug,glimmer=debug,tower_http=debug,axum::rejection=trace",
+            "{}=debug,ant_library=debug,ant_data_farm=debug,glimmer=debug,tower_http=debug,axum::rejection=trace",
             project
         ),
     );
@@ -58,8 +61,8 @@ where
     B: axum::body::HttpBody<Data = Bytes>,
     B::Error: std::fmt::Display,
 {
-    let bytes = match hyper::body::to_bytes(body).await {
-        Ok(bytes) => bytes,
+    let bytes = match body.collect().await {
+        Ok(collection) => collection.to_bytes(),
         Err(err) => {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -79,7 +82,7 @@ where
 /// Should be used as a middleware layer for all types-of-ants web servers.
 pub async fn middleware_print_request_response(
     req: Request<Body>,
-    next: Next<Body>,
+    next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let (parts, body) = req.into_parts();
     let bytes = buffer_and_print("request", body).await?;

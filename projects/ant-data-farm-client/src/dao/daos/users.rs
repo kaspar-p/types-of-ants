@@ -1,12 +1,16 @@
 pub use super::lib::Id as UserId;
 use crate::dao::{dao_trait::DaoTrait, db::Database};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use chrono::{DateTime, Utc};
 use futures::future;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -101,69 +105,116 @@ impl DaoTrait<UsersDao, User> for UsersDao {
     }
 }
 
+fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+
+    // Step 1: Hash the password using the salt
+    info!("Hashing password");
+    let phc: String = match argon2.hash_password(password.as_bytes(), &salt) {
+        Ok(phc) => {
+            info!("Password hashed successfully");
+            phc.to_string()
+        }
+        Err(e) => {
+            debug!("Hashing password failed: {}", e);
+            return Err(anyhow::Error::msg(e.to_string()));
+        }
+    };
+
+    // Step 2: Sanity check verify works
+    info!("Running sanity password check");
+    if !verify_password_hash(password, phc.as_str())? {
+        debug!("password self-verification failed");
+        return Err(anyhow::Error::msg("sanity test self-verification failed!"));
+    }
+
+    return Ok(phc);
+}
+
+fn verify_password_hash(password_attempt: &str, db_password: &str) -> Result<bool, anyhow::Error> {
+    // Step: Verify attempt with stored PHC string
+    let argon2 = Argon2::default();
+
+    debug!("Parsing stored password as PHC formatted string");
+    let phc = match PasswordHash::new(db_password) {
+        Ok(phc) => phc,
+        Err(e) => {
+            debug!("Stored password was not PHC formatted string: {}", e);
+            return Err(anyhow::Error::msg(e.to_string()));
+        }
+    };
+
+    match argon2.verify_password(password_attempt.as_bytes(), &phc) {
+        Err(e) => {
+            debug!("hash verification failed: {}", e);
+            return Ok(false);
+        }
+        Ok(()) => {
+            return Ok(true);
+        }
+    }
+}
+
 impl UsersDao {
+    /// Create a user in the database, the user_name, phone_number, or email should not already be taken
+    /// or else the transaction will fail.
     pub async fn create_user(
         &mut self,
         username: String,
         phone_number: String,
-        emails: Vec<String>,
-    ) -> Option<User> {
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await.unwrap();
+        email: String,
+        password: String,
+    ) -> Result<User, anyhow::Error> {
+        info!(
+            "Creating user '{}' '{}' '{}'",
+            username, phone_number, email
+        );
 
-        t.query(
+        let mut db = self.database.lock().await;
+        let t = db.transaction().await?;
+
+        let password = make_password_hash(password.as_str())?;
+
+        t.execute(
             "
         insert into registered_user 
-            (user_name, user_phone_number)
-        values ($1, $2);",
-            &[&username, &phone_number],
+            (user_name, user_phone_number, password_hash)
+        values ($1, $2, $3);",
+            &[&username, &phone_number, &password],
         )
-        .await
-        .unwrap_or_else(|e| panic!("Failed to create user: {e}"));
+        .await?;
 
         let user_id: Uuid = t
             .query(
-                "select user_id from registered_user where user_name = $1",
+                "select user_id from registered_user where user_name = $1 limit 1;",
                 &[&username],
             )
-            .await
-            .unwrap_or_else(|_| panic!("Creating user failed!"))[0]
+            .await?
+            .first()
+            .expect("No user_id for user we just created.")
             .get("user_id");
 
-        let mut query = String::from(
+        t.execute(
             "
         insert into registered_user_email
             (user_id, user_email)
-        values
-        ",
-        );
-        query.push_str(
-            emails
-                .iter()
-                .map(|e| format!("({user_id}, {e})"))
-                .collect::<Vec<String>>()
-                .join(",\n")
-                .as_str(),
-        );
-        query.push_str(";");
-
-        if let Err(e) = t.execute(&query, &[]).await {
-            debug!("Email insert failed: {e}");
-            t.rollback().await.expect("rollback failed");
-            return None;
-        }
+        values ($1, $2);",
+            &[&user_id, &email],
+        )
+        .await?;
 
         let user = User {
             username,
-            emails,
+            emails: vec![email],
             phone_number,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
         };
 
-        t.commit().await.ok()?;
+        t.commit().await?;
 
-        return Some(user);
+        return Ok(user);
     }
 
     pub async fn add_email_to_user(
@@ -171,7 +222,6 @@ impl UsersDao {
         user_id: UserId,
         email: String,
     ) -> Result<(), anyhow::Error> {
-        debug!("IN DAO");
         let res_affected = self
             .database
             .lock()

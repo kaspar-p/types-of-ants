@@ -6,47 +6,47 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.6.20", features = ["tracing", "json"] }
-axum-extra = "0.7.7"
-axum-macros = "0.3.8"
-bb8 = "0.8.1"
-bb8-postgres = "0.8.1"
-chrono = { version = "0.4.33", features = ["serde"] }
+axum = { version = "0.8.4", features = ["tracing", "json"] }
+axum-extra = "0.10.1"
+axum-macros = "0.5.0"
+bb8 = "0.9.0"
+bb8-postgres = "0.9.0"
+chrono = { version = "0.4.41", features = ["serde"] }
 dotenv = "0.15.0"
 double-map = "0.14.0"
-futures = "0.3.30"
-hyper = "0.14.28"
-postgres-types = { version = "0.2.6", features = ["derive"] }
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = "1.0.112"
-thiserror = "1.0.56"
-tokio = { version = "1.35.1", features = ["full"] }
-tokio-postgres = { version = "0.7.10", features = [
+futures = "0.3.31"
+hyper = "1.6.0"
+postgres-types = { version = "0.2.9", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+thiserror = "2.0.12"
+tokio = { version = "1.45.0", features = ["full"] }
+tokio-postgres = { version = "0.7.13", features = [
   "with-uuid-1",
   "with-serde_json-1",
   "with-chrono-0_4",
 ] }
-tower = "0.4.13"
-tower-http = { version = "0.4.4", features = [
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = [
   "fs",
   "trace",
   "metrics",
   "cors",
   "normalize-path",
 ] }
-tracing = { version = "0.1.40", features = ["max_level_debug"] }
-tracing-subscriber = "0.3.18"
-uuid = { version = "1.7.0", features = ["serde", "v4"] }
-validator = "0.16.1"
+tracing = { version = "0.1.41", features = ["max_level_debug"] }
+tracing-subscriber = "0.3.19"
+uuid = { version = "1.16.0", features = ["serde", "v4"] }
+validator = "0.20.0"
 ant-data-farm = { path = "../ant-data-farm-client" }
 ant-host-agent = { path = "../ant-host-agent" }
 ant-metadata = { path = "../ant-metadata" }
-tokio-util = "0.7.10"
-anyhow = "1.0.79"
-git2 = "0.17.2"
+tokio-util = "0.7.15"
+anyhow = "1.0.98"
+git2 = "0.20.2"
 anthill = { path = "../anthill" }
-home = "0.5.9"
-tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
+home = "0.5.11"
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 ant-library = { path = "../ant-library" }
 reqwest = { version = "0.12.15", features = ["json"] }
 flate2 = "1.1.1"

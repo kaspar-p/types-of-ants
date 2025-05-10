@@ -13,8 +13,6 @@ use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
-use hyper::server::conn::AddrIncoming;
-
 pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error> {
     std::env::set_var(
         "RUST_LOG",
@@ -58,10 +56,8 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
     let port: u16 = port.unwrap_or(4599);
     info!("Starting server on port {port}...");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 
     Ok(())
 }
