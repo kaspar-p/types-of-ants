@@ -101,12 +101,16 @@ async fn cron_tweet() -> Result<(), anyhow::Error> {
     if let Some(tweet) = choose_scheduled_ants(&client).await? {
         info!("Tweeting scheduled tweet...");
 
-        let mut tweet_content: String = tweet.tweet_prefix.unwrap_or("".to_string());
+        let mut tweet_content: String = "".to_owned();
+        tweet_content.push_str(tweet.tweet_prefix.unwrap_or("".to_string()).as_str());
         for ant in tweet.ants_to_tweet.iter() {
             tweet_content.push_str(ant.ant_content.as_str());
             tweet_content.push('\n');
         }
         tweet_content.push_str(tweet.tweet_suffix.unwrap_or("".to_string()).as_str());
+        tweet_content.push_str(
+            format!("\ntweet scheduled by user {}", tweet.scheduled_by_user_name).as_str(),
+        );
 
         let res = post_tweet(tweet_content, config.twitter).await;
         assert!(res.is_some(), "Failed to tweet!");
