@@ -4,6 +4,7 @@ mod types;
 pub use crate::dao::dao_trait::DaoTrait;
 pub use crate::dao::daos::ants;
 pub use crate::dao::daos::hosts;
+pub use crate::dao::daos::tweets;
 pub use crate::dao::daos::users;
 
 use crate::{

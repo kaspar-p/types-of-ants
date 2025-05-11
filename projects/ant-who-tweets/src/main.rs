@@ -1,9 +1,10 @@
 use ant_data_farm::{
-    ants::Ant, ants::Tweeted, AntDataFarmClient, DatabaseConfig, DatabaseCredentials,
+    ants::Ant, ants::Tweeted, tweets::ScheduledTweet, AntDataFarmClient, DatabaseConfig,
+    DatabaseCredentials,
 };
 use ant_library::set_global_logs;
-use chrono::Timelike;
-use rand::seq::SliceRandom;
+use chrono::{DateTime, Timelike, Utc};
+use rand::seq::IteratorRandom;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::info;
@@ -18,8 +19,8 @@ struct TwitterCredentials {
     pub access_token_secret: String,
 }
 
-async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<twitter_v2::Tweet> {
-    info!("Tweeting with ant: {}", ant_content);
+async fn post_tweet(tweet_content: String, creds: TwitterCredentials) -> Option<twitter_v2::Tweet> {
+    info!("Tweeting with content: {}", tweet_content);
 
     let token = Oauth1aToken::new(
         creds.consumer_key,
@@ -31,7 +32,7 @@ async fn post_tweet(ant_content: String, creds: TwitterCredentials) -> Option<tw
     let client = TwitterApi::new(token);
     client
         .post_tweet()
-        .text(ant_content)
+        .text(tweet_content)
         .send()
         .await
         .unwrap_or_else(|e| panic!("Error sending tweet: {e}"))
@@ -46,7 +47,48 @@ async fn ant_client(config: DatabaseConfig) -> AntDataFarmClient {
         Ok(client) => client,
     }
 }
-use rand::seq::IteratorRandom;
+
+/// Check if there is a scheduled ant within 24 hours that needs to be tweeted instead. If so, tweet that.
+async fn choose_scheduled_ants(
+    client: &AntDataFarmClient,
+) -> Result<Option<ScheduledTweet>, anyhow::Error> {
+    let read_tweets = client.tweets.read().await;
+    match read_tweets.get_next_scheduled_tweet().await? {
+        None => {
+            return Ok(None);
+        }
+        Some(tweet) => {
+            let till_scheduled: i64 =
+                DateTime::signed_duration_since(tweet.scheduled_at, Utc::now()).num_hours();
+            info!("Next scheduled tweet is {} hours away...", till_scheduled);
+
+            // The schedule can be placed anytime that day, could be in the past a bit.
+            if till_scheduled < 24 && till_scheduled > -24 {
+                return Ok(Some(tweet));
+            } else {
+                return Ok(None);
+            }
+        }
+    }
+}
+
+/// From the entire list of released ants, choose one randomly
+async fn choose_random_ant(client: &AntDataFarmClient) -> Result<Ant, anyhow::Error> {
+    let read_ants = client.ants.read().await;
+    let ants = read_ants
+        .get_all_released()
+        .await?
+        .into_iter()
+        .filter(|ant| ant.tweeted == Tweeted::NotTweeted)
+        .collect::<Vec<Ant>>();
+    let ant = ants
+        .into_iter()
+        .choose(&mut rand::rng())
+        .unwrap_or_else(|| panic!("Failed to get a random choice!"))
+        .clone();
+
+    return Ok(ant);
+}
 
 async fn cron_tweet() -> Result<(), anyhow::Error> {
     info!("Starting cron_tweet()...");
@@ -56,34 +98,43 @@ async fn cron_tweet() -> Result<(), anyhow::Error> {
     let client = ant_client(config.database).await;
 
     info!("Getting random ant choice...");
-    let random_ant: Ant = {
-        let read_ants = client.ants.read().await;
-        let ants = read_ants
-            .get_all_released()
-            .await?
-            .into_iter()
-            .filter(|ant| ant.tweeted == Tweeted::NotTweeted)
-            .collect::<Vec<Ant>>();
-        ants.into_iter()
-            .choose(&mut rand::rng())
-            .unwrap_or_else(|| panic!("Failed to get a random choice!"))
-            .clone()
-    };
+    if let Some(tweet) = choose_scheduled_ants(&client).await? {
+        info!("Tweeting scheduled tweet...");
 
-    info!("Tweeting...");
-    let res = post_tweet(random_ant.ant_name, config.twitter).await;
-    assert!(res.is_some(), "Failed to tweet!");
+        let mut tweet_content: String = tweet.tweet_prefix.unwrap_or("".to_string());
+        for ant in tweet.ants_to_tweet.iter() {
+            tweet_content.push_str(ant.ant_content.as_str());
+            tweet_content.push('\n');
+        }
+        tweet_content.push_str(tweet.tweet_suffix.unwrap_or("".to_string()).as_str());
 
-    info!("Saving result to DB...");
-    client
-        .ants
-        .write()
-        .await
-        .add_ant_tweet(&random_ant.ant_id)
-        .await?;
-    info!("Cron tasks done, exiting...");
+        let res = post_tweet(tweet_content, config.twitter).await;
+        assert!(res.is_some(), "Failed to tweet!");
 
-    Ok(())
+        for ant in tweet.ants_to_tweet.iter() {
+            info!("Saving ant content '{}' as tweeted...", ant.ant_content);
+            client.ants.write().await.add_ant_tweet(&ant.ant_id).await?;
+        }
+
+        info!("Cron tasks done, exiting...");
+        return Ok(());
+    } else {
+        let random_ant = choose_random_ant(&client).await?;
+
+        info!("Tweeting...");
+        let res = post_tweet(random_ant.ant_name, config.twitter).await;
+        assert!(res.is_some(), "Failed to tweet!");
+
+        info!("Saving result to DB...");
+        client
+            .ants
+            .write()
+            .await
+            .add_ant_tweet(&random_ant.ant_id)
+            .await?;
+        info!("Cron tasks done, exiting...");
+        return Ok(());
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -125,15 +176,13 @@ async fn main() {
 
     let scheduler = JobScheduler::new().await.unwrap();
 
-    // 8pm EST is 6pm MST
-    let hour_to_tweet = 0; // spring/summer
-
-    // let hour_to_tweet = 0; // fall/winter
-    let local = chrono::offset::Local::now().hour();
+    // Midnight UTC is 8pm EST is 6pm MST
+    let utc_hour_to_tweet = 0;
 
     info!(
         "Starting up! Local hour: {}, hour to tweet: {}",
-        local, hour_to_tweet
+        chrono::offset::Local::now().hour(),
+        utc_hour_to_tweet
     );
 
     // Check the connection to the database by creating a dummy "test" client at the front.
@@ -147,12 +196,15 @@ async fn main() {
     scheduler
         .add(
             // 6pm MST is midnight UTC
-            Job::new_async(format!("0 0 {} * * *", hour_to_tweet).as_str(), |_, __| {
-                Box::pin(async move {
-                    info!("Entering cron_tweet()...");
-                    cron_tweet().await.expect("Cron tweet failed!");
-                })
-            })
+            Job::new_async(
+                format!("0 0 {} * * *", utc_hour_to_tweet).as_str(),
+                |_, __| {
+                    Box::pin(async move {
+                        info!("Entering cron_tweet()...");
+                        cron_tweet().await.expect("Cron tweet failed!");
+                    })
+                },
+            )
             .unwrap(),
         )
         .await

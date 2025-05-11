@@ -21,8 +21,8 @@ pub struct ScheduledTweet {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TweetAnt {
-    ant_id: AntId,
-    ant_content: String,
+    pub ant_id: AntId,
+    pub ant_content: String,
 }
 
 pub struct TweetsDao {
@@ -55,6 +55,8 @@ impl TweetsDao {
     pub async fn get_next_scheduled_tweet(&self) -> Result<Option<ScheduledTweet>, anyhow::Error> {
         let db = self.database.lock().await;
 
+        // The interval needs to be subtracted by a day, so that the tweeter at midnight will see the tweet
+        // of "today" as being valid. So placing the data at noon always and subtracting a day works.
         let scheduled_tweet_rows = db
             .query(
                 "select
@@ -62,7 +64,7 @@ impl TweetsDao {
             from
                 scheduled_tweet
             where
-                scheduled_at >= now()
+                scheduled_at >= now() - interval '1 day'
             order by scheduled_at asc
             limit 1",
                 &[],
