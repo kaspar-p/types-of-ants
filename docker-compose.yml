@@ -51,8 +51,6 @@ services:
       - cloudflare_api_token
 
 secrets:
-  twitter_creds:
-    file: ./.env.twitter
   database_creds:
     file: ./.env.db
   cloudflare_api_token:

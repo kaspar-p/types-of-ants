@@ -276,12 +276,14 @@ dependencies = [
  "anyhow",
  "chrono",
  "dotenv",
+ "postgresql_embedded",
  "rand 0.9.1",
  "tokio",
  "tokio-cron-scheduler",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "tracing-test",
  "twitter-v2",
 ]
 
