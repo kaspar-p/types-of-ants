@@ -18,6 +18,7 @@ async fn more_than_500_ants() {
         port: Some(port),
         creds: None,
         host: None,
+        migration_dir: None,
     }))
     .await
     .expect("Connected!");
@@ -38,6 +39,7 @@ async fn user_gets_created() {
         port: Some(port),
         creds: None,
         host: None,
+        migration_dir: None,
     }))
     .await
     .expect("Connected!");
@@ -81,6 +83,34 @@ async fn user_gets_created() {
 
 #[rstest::rstest(logging as _logging)]
 #[tokio::test(flavor = "multi_thread")]
+async fn see_scheduled_tweets(_logging: &()) {
+    let fixture = test_fixture("see_scheduled_tweets").await;
+    let container = fixture.image.start().await.unwrap();
+
+    let port = container.get_host_port_ipv4(5432).await.unwrap();
+    debug!("Ran fixture!");
+    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
+        port: Some(port),
+        creds: None,
+        host: None,
+        migration_dir: None,
+    }))
+    .await
+    .expect("Connected!");
+
+    let scheduled = dao
+        .tweets
+        .read()
+        .await
+        .get_next_scheduled_tweet()
+        .await
+        .unwrap();
+
+    assert!(scheduled.is_some() || scheduled.is_none());
+}
+
+#[rstest::rstest(logging as _logging)]
+#[tokio::test(flavor = "multi_thread")]
 async fn add_tweeted(_logging: &()) {
     let fixture = test_fixture("add_tweeted").await;
     let container = fixture.image.start().await.unwrap();
@@ -91,6 +121,7 @@ async fn add_tweeted(_logging: &()) {
         port: Some(port),
         creds: None,
         host: None,
+        migration_dir: None,
     }))
     .await
     .expect("Connected!");

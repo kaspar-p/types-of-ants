@@ -111,6 +111,7 @@ fn get_config() -> Result<Config, dotenv::Error> {
             }),
             host: Some(dotenv::var("DB_HOST")?),
             port: Some(7000),
+            migration_dir: None,
         },
     };
 
