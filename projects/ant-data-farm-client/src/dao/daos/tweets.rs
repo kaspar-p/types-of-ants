@@ -52,6 +52,32 @@ impl TweetsDao {
         TweetsDao { database: db }
     }
 
+    pub async fn mark_scheduled_tweet_tweeted(
+        &self,
+        scheduled_tweet: Id,
+    ) -> Result<(), anyhow::Error> {
+        let mut db = self.database.lock().await;
+
+        let t = db.transaction().await?;
+
+        t.execute(
+            "update
+            scheduled_tweet
+        where
+            scheduled_tweet_id = $1
+        set
+            tweeted_at = now(),
+            is_tweeted = true
+        limit 1",
+            &[&scheduled_tweet.0],
+        )
+        .await?;
+
+        t.commit().await?;
+
+        return Ok(());
+    }
+
     pub async fn get_next_scheduled_tweet(&self) -> Result<Option<ScheduledTweet>, anyhow::Error> {
         let db = self.database.lock().await;
 
@@ -64,7 +90,8 @@ impl TweetsDao {
             from
                 scheduled_tweet
             where
-                scheduled_at >= now() - interval '1 day'
+                scheduled_at >= now() - interval '1 day' and
+                is_tweeted = false
             order by scheduled_at asc
             limit 1",
                 &[],

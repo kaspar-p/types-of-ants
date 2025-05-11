@@ -154,6 +154,14 @@ pub async fn cron_tweet(config: Config) -> Result<Vec<twitter_v2::Tweet>, anyhow
             client.ants.write().await.add_ant_tweet(&ant.ant_id).await?;
         }
 
+        info!("Marking {} as tweeted...", tweet.scheduled_tweet_id);
+        client
+            .tweets
+            .write()
+            .await
+            .mark_scheduled_tweet_tweeted(tweet.scheduled_tweet_id)
+            .await?;
+
         info!("Cron tasks done, exiting...");
         return Ok(tweets);
     } else {
