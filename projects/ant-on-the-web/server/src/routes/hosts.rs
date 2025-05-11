@@ -34,12 +34,12 @@ async fn list_all(State(dao): DbState) -> Result<impl IntoResponse, HostsError> 
 
 pub fn router() -> DbRouter {
     Router::new()
-        .route_with_tsr("/host/:host-id", get(host))
+        .route_with_tsr("/host/{host_id}", get(host))
         .route_with_tsr("/list-all", get(list_all))
         // .route_with_tsr("/register-host", post(register_host))
         .fallback(|| async {
             ant_library::api_fallback(&[
-                "GET /host/:host-id",
+                "GET /host/{host_id}",
                 "GET /list-all",
                 "POST /register-host",
             ])

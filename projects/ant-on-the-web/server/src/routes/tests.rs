@@ -20,5 +20,5 @@ async fn host_status(Path(host_name): Path<String>, State(_db): DbState) -> impl
 }
 
 pub fn router() -> DbRouter {
-    Router::new().route_with_tsr("/host-status/:host-id-or-name", get(host_status))
+    Router::new().route_with_tsr("/host-status/{host_name}", get(host_status))
 }
