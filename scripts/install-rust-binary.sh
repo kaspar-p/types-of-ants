@@ -30,8 +30,9 @@ repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
 commit_sha="$(git log --format='%h' -n 1)"
+commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
-install_version="$install_datetime-$commit_sha"
+install_version="$commit_datetime-$commit_sha"
 
 # Some projects require this for generating deterministic build hashes
 export commit_sha
@@ -65,6 +66,7 @@ echo "{
   \"project_type\": \"rust-binary\",
   \"version\": \"$install_version\",
   \"commit_sha\": \"$commit_sha\",
+  \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"
 }" > "$install_dir/manifest.json"
