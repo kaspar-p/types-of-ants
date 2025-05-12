@@ -5,6 +5,9 @@ use crate::types::{DbRouter, DbState};
 use ant_data_farm::users::verify_password_hash;
 use ant_data_farm::users::User;
 use ant_data_farm::users::UserId;
+use ant_data_farm::DaoTrait;
+use axum::extract::FromRequestParts;
+use axum::RequestPartsExt;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -12,13 +15,21 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use axum_extra::routing::RouterExt;
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    routing::RouterExt,
+    TypedHeader,
+};
+use jsonwebtoken::decode;
 use jsonwebtoken::DecodingKey;
 use jsonwebtoken::EncodingKey;
 use jsonwebtoken::Header;
+use jsonwebtoken::Validation;
 use serde::{Deserialize, Serialize};
 use tracing::error;
+use tracing::warn;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
     let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
@@ -95,11 +106,23 @@ async fn add_anonymous_email(
     ));
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetUserResponse {
+    pub user: User,
+}
 async fn get_user_by_name(
+    claims: AuthClaims,
     Path(user_name): Path<String>,
     State(dao): DbState,
 ) -> Result<impl IntoResponse, UsersError> {
+    // AuthZ
     let users = dao.users.read().await;
+    if users.get_one_by_id(&claims.sub).await?.is_none() {
+        warn!("Claim was not user: {}", claims.sub);
+        return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+    }
+
+    // Impl
     let user = users.get_one_by_user_name(&user_name).await?;
     match user {
         None => Ok((
@@ -107,10 +130,13 @@ async fn get_user_by_name(
             Json(format!(
                 "There was no user with username: {} found!",
                 user_name
-            )),
-        )
-            .into_response()),
-        Some(user) => Ok((StatusCode::OK, Json(user).into_response()).into_response()),
+            ))
+            .into_response(),
+        )),
+        Some(user) => Ok((
+            StatusCode::OK,
+            Json(GetUserResponse { user }).into_response(),
+        )),
     }
 }
 
@@ -140,9 +166,10 @@ fn canonicalize_email(email: &str) -> Result<String, anyhow::Error> {
         .to_string())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
-    pub token: String,
+    pub token_type: String,
+    pub access_token: String,
 }
 async fn login(
     State(dao): DbState,
@@ -188,7 +215,7 @@ async fn login(
     }
 
     let claims = AuthClaims {
-        sub: user.username.clone(),
+        sub: user.user_id.clone(),
         exp: 2000000000, // may 2033, my problem then!
     };
 
@@ -198,16 +225,54 @@ async fn login(
 
     Ok((
         StatusCode::OK,
-        Json(LoginResponse { token: jwt }).into_response(),
+        Json(LoginResponse {
+            token_type: "Bearer".to_string(),
+            access_token: jwt,
+        })
+        .into_response(),
     ))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AuthClaims {
     /// JWT subject, as per standard.
-    sub: String,
+    sub: UserId,
     /// JWT expiration, as per standard.
     exp: usize,
+}
+
+impl<S> FromRequestParts<S> for AuthClaims
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(
+        parts: &mut http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        // Extract the Bearer token header
+        let TypedHeader(Authorization(bearer)) = parts
+            .extract::<TypedHeader<Authorization<Bearer>>>()
+            .await
+            .map_err(|e| {
+                warn!("Invalid authorization token: {e}");
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "Invalid authorization token.".to_string(),
+                );
+            })?;
+
+        // Decode claim data
+        let claim_data =
+            decode::<AuthClaims>(bearer.token(), &AUTH_KEYS.decoding, &Validation::default())
+                .map_err(|e| {
+                    warn!("Unauthorized access attempted: {e}");
+                    return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+                })?;
+
+        return Ok(claim_data.claims);
+    }
 }
 
 #[derive(Serialize, Deserialize)]

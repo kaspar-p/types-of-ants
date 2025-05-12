@@ -2,7 +2,9 @@ use fixture::test_router;
 use http::StatusCode;
 use tracing_test::traced_test;
 
-use ant_on_the_web::users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest};
+use ant_on_the_web::users::{
+    GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
+};
 
 mod fixture;
 
@@ -475,7 +477,7 @@ async fn user_login_after_signup_returns_token() {
 
         assert_eq!(res.status(), StatusCode::OK);
         let res: LoginResponse = res.json().await;
-        assert!(res.token.contains(".")); // JWT standard mandates it
+        assert!(res.access_token.contains(".")); // JWT standard mandates it
     }
 
     // Login via email
@@ -494,7 +496,7 @@ async fn user_login_after_signup_returns_token() {
 
         assert_eq!(res.status(), StatusCode::OK);
         let res: LoginResponse = res.json().await;
-        assert!(res.token.contains(".")); // JWT standard mandates it
+        assert!(res.access_token.contains(".")); // JWT standard mandates it
     }
 
     // Login via phone
@@ -513,6 +515,101 @@ async fn user_login_after_signup_returns_token() {
 
         assert_eq!(res.status(), StatusCode::OK);
         let res: LoginResponse = res.json().await;
-        assert!(res.token.contains(".")); // JWT standard mandates it
+        assert!(res.access_token.contains(".")); // JWT standard mandates it
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn authenticated_endpoints_throw_if_token_has_been_tampered_with() {
+    let fixture = test_router().await;
+
+    // Hit authenticated endpoint /users/user/{user_name}
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user/nobody")
+            .header("Authorization", "Bearer some-token-here")
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn authenticated_endpoints_return_400_if_missing_token() {
+    let fixture = test_router().await;
+
+    // Hit authenticated endpoint /users/user/{user_name}
+    {
+        let res = fixture.client.get("/api/users/user/nobody").send().await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.text().await, "Invalid authorization token.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn authenticated_endpoints_with_right_token_work() {
+    let fixture = test_router().await;
+
+    // Signup
+    {
+        let req = SignupRequest {
+            username: "someuser".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, "Signup completed.");
+    }
+
+    // Login
+    let token = {
+        let req = LoginRequest {
+            method: LoginMethod::Phone("+1 (111) 222-3333".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: LoginResponse = res.json().await;
+        assert!(res.access_token.contains(".")); // JWT standard mandates it
+        res.access_token
+    };
+
+    // Hit authenticated endpoint /users/user/{user_name}
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user/someuser")
+            .header("Authorization", ("Bearer ".to_owned() + &token).as_str())
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: GetUserResponse = res.json().await;
+        assert_eq!(res.user.emails.len(), 1);
+        assert_eq!(res.user.emails[0].as_str(), "email@domain.com");
+        assert_eq!(res.user.username, "someuser");
+        assert_ne!(res.user.password_hash, "my-ant-password");
     }
 }
