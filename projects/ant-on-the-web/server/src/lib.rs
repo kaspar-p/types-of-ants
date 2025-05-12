@@ -11,6 +11,7 @@ mod clients;
 mod routes;
 mod types;
 
+pub use crate::routes::hosts;
 pub use crate::routes::users;
 
 pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Router, anyhow::Error> {

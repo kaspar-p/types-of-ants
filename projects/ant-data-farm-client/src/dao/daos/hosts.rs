@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Host {
     pub host_id: HostId,
     pub host_label: String,
@@ -29,6 +29,26 @@ fn row_to_host(row: &Row) -> Host {
         host_hostname: row.get("host_hostname"),
         host_type: row.get("host_type"),
         host_os: row.get("host_os"),
+    }
+}
+
+impl HostsDao {
+    pub async fn get_one_by_hostname(&self, hostname: &str) -> Result<Option<Host>, anyhow::Error> {
+        Ok(self
+            .database
+            .lock()
+            .await
+            .query(
+                "
+                        select host_id, host_label, host_location, host_hostname, host_type, host_os
+                        from host
+                        where host_hostname = $1 or host_label = $1
+                        limit 1",
+                &[&hostname],
+            )
+            .await?
+            .first()
+            .map(|row| row_to_host(row)))
     }
 }
 
