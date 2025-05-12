@@ -1,6 +1,8 @@
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use crate::types::{DbRouter, DbState};
+use ant_data_farm::users::verify_password_hash;
 use ant_data_farm::users::User;
 use ant_data_farm::users::UserId;
 use axum::{
@@ -11,9 +13,31 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
+use jsonwebtoken::DecodingKey;
+use jsonwebtoken::EncodingKey;
+use jsonwebtoken::Header;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use tracing::{debug, info};
+
+static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
+    let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
+    AuthKeys::new(secret.as_bytes())
+});
+
+struct AuthKeys {
+    encoding: EncodingKey,
+    decoding: DecodingKey,
+}
+
+impl AuthKeys {
+    pub fn new(secret: &[u8]) -> Self {
+        AuthKeys {
+            encoding: EncodingKey::from_secret(secret),
+            decoding: DecodingKey::from_secret(secret),
+        }
+    }
+}
 
 #[derive(Deserialize)]
 pub struct EmailRequest {
@@ -90,61 +114,100 @@ async fn get_user_by_name(
     }
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "method")]
-pub enum LoginRequest {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum LoginMethod {
     #[serde(rename = "username")]
-    Username { unique_key: String },
-
+    Username(String),
     #[serde(rename = "email")]
-    Email { unique_key: String },
-
+    Email(String),
     #[serde(rename = "phone")]
-    Phone { unique_key: String },
+    Phone(String),
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub method: LoginMethod,
+    pub password: String,
+}
+
+fn canonicalize_phone_number(phone_number: &str) -> Result<String, anyhow::Error> {
+    Ok(phonenumber::parse(None, phone_number)?.format().to_string())
+}
+
+fn canonicalize_email(email: &str) -> Result<String, anyhow::Error> {
+    Ok(email_address::EmailAddress::from_str(email)?
+        .as_str()
+        .to_string())
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct LoginResponse {
-    token: String,
+    pub token: String,
 }
 async fn login(
     State(dao): DbState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, UsersError> {
     let users = dao.users.read().await;
-    let user: Option<User> = match login_request {
-        LoginRequest::Email { unique_key } => users.get_one_by_email(&unique_key).await?,
-        LoginRequest::Phone { unique_key } => users.get_one_by_phone_number(&unique_key).await?,
-        LoginRequest::Username { unique_key } => users.get_one_by_user_name(&unique_key).await?,
+    let user: Option<User> = match &login_request.method {
+        LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
+            Err(e) => {
+                info!("Field method.email invalid: {}", e);
+                return Ok((
+                    StatusCode::BAD_REQUEST,
+                    "Field method.email invalid.".into_response(),
+                ));
+            }
+            Ok(email) => users.get_one_by_email(&email).await?,
+        },
+        LoginMethod::Phone(phone) => match canonicalize_phone_number(phone.as_str()) {
+            Err(e) => {
+                info!("Field method.phone invalid: {}", e);
+                return Ok((
+                    StatusCode::BAD_REQUEST,
+                    "Field method.phone invalid.".into_response(),
+                ));
+            }
+            Ok(phone) => users.get_one_by_phone_number(&phone).await?,
+        },
+        LoginMethod::Username(username) => users.get_one_by_user_name(&username).await?,
     };
 
-    if user.is_none() {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json("No user exists with that username, phone number, or email!").into_response(),
-        ));
+    let user = match user {
+        None => {
+            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+        }
+        Some(user) => user,
+    };
+
+    if !verify_password_hash(
+        login_request.password.as_str(),
+        &user.password_hash.as_str(),
+    )? {
+        return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
     }
 
-    // let all_same = [&from_email, &from_phone_number, &from_username]
-    //     .iter()
-    //     .fold(true, |acc, u| {
-    //         if let (Some(prev), Some(current)) = (acc, u) {
-    //             if current == prev {
-    //                 return Some(current);
-    //             }
-    //         }
-    //         return None;
-    //     });
+    let claims = AuthClaims {
+        sub: user.username.clone(),
+        exp: 2000000000, // may 2033, my problem then!
+    };
 
-    // Check the cookie is valid for that user. If it is, allow them through. If not, do two-factor
+    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+
+    // TODO: Verify with two-factor
 
     Ok((
         StatusCode::OK,
-        Json(LoginResponse {
-            token: "".to_string(),
-        })
-        .into_response(), // TODO: give the user a cookie to save!
+        Json(LoginResponse { token: jwt }).into_response(),
     ))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct AuthClaims {
+    /// JWT subject, as per standard.
+    sub: String,
+    /// JWT expiration, as per standard.
+    exp: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -186,23 +249,26 @@ async fn signup_request(
 ) -> Result<impl IntoResponse, UsersError> {
     info!("Validating signup request...");
     let (canonical_email, canonical_phone_number) = {
-        let canonical_phone_number = match phonenumber::parse(None, &signup_request.phone_number) {
-            Err(e) => {
-                info!(
-                    "Signup request phone number {} was invalid: {}",
-                    signup_request.phone_number, e
-                );
-                return Ok((StatusCode::BAD_REQUEST, "Field phone_number invalid.").into_response());
-            }
-            Ok(phone_number) => phone_number.format().to_string(),
-        };
+        let canonical_phone_number =
+            match canonicalize_phone_number(signup_request.phone_number.as_str()) {
+                Err(e) => {
+                    info!(
+                        "Signup request phone number {} was invalid: {}",
+                        signup_request.phone_number, e
+                    );
+                    return Ok(
+                        (StatusCode::BAD_REQUEST, "Field phone_number invalid.").into_response()
+                    );
+                }
+                Ok(phone_number) => phone_number,
+            };
 
-        let canonical_email = match email_address::EmailAddress::from_str(&signup_request.email) {
+        let canonical_email = match canonicalize_email(&signup_request.email.as_str()) {
             Err(e) => {
                 info!("Signup request email {}: {}", signup_request.email, e);
                 return Ok((StatusCode::BAD_REQUEST, "Field email invalid.").into_response());
             }
-            Ok(email) => email.as_str().to_string(),
+            Ok(email) => email,
         };
 
         let username_len = signup_request.username.len();

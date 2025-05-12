@@ -2,7 +2,7 @@ use fixture::test_router;
 use http::StatusCode;
 use tracing_test::traced_test;
 
-use ant_on_the_web::users::SignupRequest;
+use ant_on_the_web::users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest};
 
 mod fixture;
 
@@ -298,5 +298,221 @@ async fn user_signup_fails_if_user_already_signed_up() {
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
         assert_eq!(res.text().await, "User already exists.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn user_login_with_no_corresponding_user_gets_unauthorized() {
+    let fixture = test_router().await;
+
+    // Username
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Username("someuser".to_string()),
+            password: "somepassword".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+
+    // Phone
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Phone("+2 (444) 222-3232".to_string()),
+            password: "somepassword".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+
+    // Email
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Email("some@email.ca".to_string()),
+            password: "somepassword".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn user_signup_and_bad_login_returns_unauthorized() {
+    let fixture = test_router().await;
+
+    {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, "Signup completed.");
+    }
+
+    // Right password, wrong username.
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Username("username".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+
+    // Right password, wrong phone number.
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Phone("+2 (444) 111-2222".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+
+    // Right password, wrong email.
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Email("user@domain.ca".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn user_login_after_signup_returns_token() {
+    let fixture = test_router().await;
+
+    {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, "Signup completed.");
+    }
+
+    // Login via username
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Username("user".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: LoginResponse = res.json().await;
+        assert!(res.token.contains(".")); // JWT standard mandates it
+    }
+
+    // Login via email
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Email("email@domain.com".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: LoginResponse = res.json().await;
+        assert!(res.token.contains(".")); // JWT standard mandates it
+    }
+
+    // Login via phone
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Phone("+1 (111) 222-3333".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: LoginResponse = res.json().await;
+        assert!(res.token.contains(".")); // JWT standard mandates it
     }
 }

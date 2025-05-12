@@ -21,6 +21,7 @@ pub struct User {
     pub user_id: UserId,
     pub username: String,
     pub phone_number: String,
+    pub password_hash: String,
     pub emails: Vec<String>,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub joined: DateTime<Utc>,
@@ -49,6 +50,7 @@ fn row_to_user(user_row: &Row, emails: Vec<String>) -> User {
         user_id: user_row.get("user_id"),
         username: user_row.get("user_name"),
         phone_number: user_row.get("user_phone_number"),
+        password_hash: user_row.get("password_hash"),
         emails,
         joined: user_row.get("user_joined"),
     }
@@ -65,7 +67,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
         .lock()
         .await
         .query(
-            "select user_id, user_name, user_phone_number, user_joined from registered_user where user_id = $1 limit 1;",
+            "select user_id, user_name, user_phone_number, user_joined, password_hash from registered_user where user_id = $1 limit 1;",
             &[&user_id.0],
         )
         .await?;
@@ -89,7 +91,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             .lock()
             .await
             .query(
-                "select user_id, user_name, user_phone_number, user_joined from registered_user;",
+                "select user_id, user_name, user_phone_number, user_joined, password_hash from registered_user;",
                 &[],
             )
             .await?;
@@ -132,7 +134,10 @@ fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
     return Ok(phc);
 }
 
-fn verify_password_hash(password_attempt: &str, db_password: &str) -> Result<bool, anyhow::Error> {
+pub fn verify_password_hash(
+    password_attempt: &str,
+    db_password: &str,
+) -> Result<bool, anyhow::Error> {
     // Step: Verify attempt with stored PHC string
     let argon2 = Argon2::default();
 
@@ -174,14 +179,14 @@ impl UsersDao {
         let mut db = self.database.lock().await;
         let t = db.transaction().await?;
 
-        let password = make_password_hash(password.as_str())?;
+        let password_hash = make_password_hash(password.as_str())?;
 
         t.execute(
             "
         insert into registered_user 
             (user_name, user_phone_number, password_hash)
         values ($1, $2, $3);",
-            &[&username, &phone_number, &password],
+            &[&username, &phone_number, &password_hash],
         )
         .await?;
 
@@ -208,6 +213,7 @@ impl UsersDao {
             username,
             emails: vec![email],
             phone_number,
+            password_hash,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
         };
