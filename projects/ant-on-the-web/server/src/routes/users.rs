@@ -15,11 +15,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum_extra::headers::Cookie;
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     routing::RouterExt,
     TypedHeader,
 };
+use http::header;
 use jsonwebtoken::decode;
 use jsonwebtoken::DecodingKey;
 use jsonwebtoken::EncodingKey;
@@ -180,20 +182,14 @@ async fn login(
         LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
             Err(e) => {
                 info!("Field method.email invalid: {}", e);
-                return Ok((
-                    StatusCode::BAD_REQUEST,
-                    "Field method.email invalid.".into_response(),
-                ));
+                return Ok((StatusCode::BAD_REQUEST, "Field method.email invalid.").into_response());
             }
             Ok(email) => users.get_one_by_email(&email).await?,
         },
         LoginMethod::Phone(phone) => match canonicalize_phone_number(phone.as_str()) {
             Err(e) => {
                 info!("Field method.phone invalid: {}", e);
-                return Ok((
-                    StatusCode::BAD_REQUEST,
-                    "Field method.phone invalid.".into_response(),
-                ));
+                return Ok((StatusCode::BAD_REQUEST, "Field method.phone invalid.").into_response());
             }
             Ok(phone) => users.get_one_by_phone_number(&phone).await?,
         },
@@ -202,7 +198,7 @@ async fn login(
 
     let user = match user {
         None => {
-            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+            return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
         }
         Some(user) => user,
     };
@@ -211,7 +207,7 @@ async fn login(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )? {
-        return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+        return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
     }
 
     let claims = AuthClaims {
@@ -225,12 +221,19 @@ async fn login(
 
     Ok((
         StatusCode::OK,
+        [
+            // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
+            (
+                header::SET_COOKIE,
+                format!("__Secure-typesofants={jwt}; SameSite=Strict; HttpOnly"),
+            ),
+        ],
         Json(LoginResponse {
             token_type: "Bearer".to_string(),
             access_token: jwt,
-        })
-        .into_response(),
-    ))
+        }),
+    )
+        .into_response())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

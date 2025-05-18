@@ -1,5 +1,5 @@
 use fixture::test_router;
-use http::StatusCode;
+use http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode};
 use tracing_test::traced_test;
 
 use ant_on_the_web::users::{
@@ -440,6 +440,52 @@ async fn user_signup_and_bad_login_returns_unauthorized() {
 
 #[tokio::test]
 #[traced_test]
+async fn login_returns_cookie_headers() {
+    let fixture = test_router().await;
+
+    {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, "Signup completed.");
+    }
+
+    // Login includes Set-Cookie header with the right properties.
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Username("user".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert!(cookie.contains("__Secure-typesofants="));
+        assert!(cookie.contains("SameSite=Strict"));
+        assert!(cookie.contains("HttpOnly"));
+    }
+}
+
+#[tokio::test]
+#[traced_test]
 async fn user_login_after_signup_returns_token() {
     let fixture = test_router().await;
 
@@ -459,6 +505,27 @@ async fn user_login_after_signup_returns_token() {
 
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.text().await, "Signup completed.");
+    }
+
+    // Login includes Set-Cookie header with the right properties.
+    {
+        let req = LoginRequest {
+            method: LoginMethod::Username("user".to_string()),
+            password: "my-ant-password".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers().get(SET_COOKIE).unwrap(),
+            HeaderValue::from_str("").unwrap()
+        );
     }
 
     // Login via username
