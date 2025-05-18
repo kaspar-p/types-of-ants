@@ -1,8 +1,5 @@
-mod clients;
-mod routes;
-mod types;
-
 use ant_data_farm::AntDataFarmClient;
+use ant_library::get_mode;
 use std::{net::SocketAddr, sync::Arc};
 use tracing::debug;
 
@@ -23,7 +20,8 @@ async fn main() {
         .expect("ANT_ON_THE_WEB_PORT environment variable not found")
         .parse()
         .expect("ANT_ON_THE_WEB_PORT was not u16");
-    debug!("Starting server on port {port}...");
+
+    debug!("Starting [{}] server on port [{}]...", get_mode(), port);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await

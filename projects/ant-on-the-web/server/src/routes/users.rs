@@ -6,6 +6,8 @@ use ant_data_farm::users::verify_password_hash;
 use ant_data_farm::users::User;
 use ant_data_farm::users::UserId;
 use ant_data_farm::DaoTrait;
+use ant_library::get_mode;
+use ant_library::Mode;
 use axum::extract::FromRequestParts;
 use axum::RequestPartsExt;
 use axum::{
@@ -15,23 +17,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use axum_extra::headers::Cookie;
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    routing::RouterExt,
-    TypedHeader,
-};
+use axum_extra::extract::cookie::SameSite;
+use axum_extra::headers;
+use axum_extra::{extract::cookie::Cookie, routing::RouterExt, TypedHeader};
 use http::header;
-use jsonwebtoken::decode;
-use jsonwebtoken::DecodingKey;
-use jsonwebtoken::EncodingKey;
-use jsonwebtoken::Header;
-use jsonwebtoken::Validation;
+use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use tracing::error;
-use tracing::warn;
-use tracing::{debug, info};
-use uuid::Uuid;
+use tracing::{debug, error, info, warn};
 
 static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
     let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
@@ -119,27 +111,26 @@ async fn get_user_by_name(
 ) -> Result<impl IntoResponse, UsersError> {
     // AuthZ
     let users = dao.users.read().await;
-    if users.get_one_by_id(&claims.sub).await?.is_none() {
-        warn!("Claim was not user: {}", claims.sub);
-        return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
-    }
 
-    // Impl
-    let user = users.get_one_by_user_name(&user_name).await?;
+    let user = users.get_one_by_id(&claims.sub).await?;
     match user {
-        None => Ok((
-            StatusCode::NOT_FOUND,
-            Json(format!(
-                "There was no user with username: {} found!",
-                user_name
-            ))
-            .into_response(),
-        )),
-        Some(user) => Ok((
-            StatusCode::OK,
-            Json(GetUserResponse { user }).into_response(),
-        )),
-    }
+        None => {
+            warn!("Claim was not user: {}", claims.sub);
+            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+        }
+        Some(u) if u.username != user_name => {
+            warn!("Tried to access other user: {}", claims.sub);
+            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
+        }
+        Some(auth_user) => {
+            info!("Granted access to {}", auth_user.user_id);
+            let user = users.get_one_by_user_name(&user_name).await?.unwrap();
+            return Ok((
+                StatusCode::OK,
+                Json(GetUserResponse { user }).into_response(),
+            ));
+        }
+    };
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -148,7 +139,7 @@ pub enum LoginMethod {
     Username(String),
     #[serde(rename = "email")]
     Email(String),
-    #[serde(rename = "phone")]
+    #[serde(rename = "phoneNumber")]
     Phone(String),
 }
 
@@ -219,21 +210,26 @@ async fn login(
 
     // TODO: Verify with two-factor
 
-    Ok((
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
+    let cookie = Cookie::build(("typesofants_auth", jwt.clone()))
+        .secure(true)
+        .http_only(true)
+        .permanent()
+        .path("/")
+        .same_site(match get_mode() {
+            Mode::Dev => SameSite::None,
+            Mode::Prod => SameSite::Strict,
+        });
+
+    return Ok((
         StatusCode::OK,
-        [
-            // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
-            (
-                header::SET_COOKIE,
-                format!("__Secure-typesofants={jwt}; SameSite=Strict; HttpOnly"),
-            ),
-        ],
+        [(header::SET_COOKIE, cookie.to_string())],
         Json(LoginResponse {
             token_type: "Bearer".to_string(),
             access_token: jwt,
         }),
     )
-        .into_response())
+        .into_response());
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -255,8 +251,8 @@ where
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
         // Extract the Bearer token header
-        let TypedHeader(Authorization(bearer)) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
+        let TypedHeader(cookie) = parts
+            .extract::<TypedHeader<headers::Cookie>>()
             .await
             .map_err(|e| {
                 warn!("Invalid authorization token: {e}");
@@ -266,13 +262,23 @@ where
                 );
             })?;
 
+        let jwt = match cookie.get("typesofants_auth") {
+            Some(cookie) => cookie,
+            None => {
+                warn!("No 'typesofants_auth' cookie found.");
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Invalid authorization token.".to_string(),
+                ));
+            }
+        };
+
         // Decode claim data
-        let claim_data =
-            decode::<AuthClaims>(bearer.token(), &AUTH_KEYS.decoding, &Validation::default())
-                .map_err(|e| {
-                    warn!("Unauthorized access attempted: {e}");
-                    return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-                })?;
+        let claim_data = decode::<AuthClaims>(jwt, &AUTH_KEYS.decoding, &Validation::default())
+            .map_err(|e| {
+                warn!("Unauthorized access attempted: {e}");
+                return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+            })?;
 
         return Ok(claim_data.claims);
     }
@@ -324,9 +330,10 @@ async fn signup_request(
                         "Signup request phone number {} was invalid: {}",
                         signup_request.phone_number, e
                     );
-                    return Ok(
-                        (StatusCode::BAD_REQUEST, "Field phone_number invalid.").into_response()
-                    );
+                    return Err(UsersError::ValidationError(ValidationMessage {
+                        field: "phoneNumber".to_string(),
+                        msg: "Field invalid.".to_string(),
+                    }));
                 }
                 Ok(phone_number) => phone_number,
             };
@@ -334,41 +341,45 @@ async fn signup_request(
         let canonical_email = match canonicalize_email(&signup_request.email.as_str()) {
             Err(e) => {
                 info!("Signup request email {}: {}", signup_request.email, e);
-                return Ok((StatusCode::BAD_REQUEST, "Field email invalid.").into_response());
+                return Err(UsersError::ValidationError(ValidationMessage {
+                    field: "email".to_string(),
+                    msg: "Field invalid.".to_string(),
+                }));
             }
             Ok(email) => email,
         };
 
         let username_len = signup_request.username.len();
         if username_len < 3 || username_len > 16 {
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                "Field username must be between 3 and 16 characters.",
-            )
-                .into_response());
+            return Err(UsersError::ValidationError(ValidationMessage {
+                field: "username".to_string(),
+                msg: "Field must be between 3 and 16 characters.".to_string(),
+            }));
         }
 
         let username_regex =
             regex::Regex::new(r"^[a-z0-9]{3,16}$").expect("invalid username regex");
         if !username_regex.is_match(&signup_request.username) {
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                "Field username must contain only lowercase characters and numbers.",
-            )
-                .into_response());
+            return Err(UsersError::ValidationError(ValidationMessage {
+                field: "username".to_string(),
+                msg: "Field must contain only lowercase characters (a-z) and numbers (0-9)."
+                    .to_string(),
+            }));
         }
 
         let password_len = signup_request.password.len();
         if password_len < 8 || password_len > 64 {
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                "Field password must be between 8 and 64 characters.",
-            )
-                .into_response());
+            return Err(UsersError::ValidationError(ValidationMessage {
+                field: "password".to_string(),
+                msg: "Field must be between 8 and 64 characters.".to_string(),
+            }));
         }
 
         if !signup_request.password.contains("ant") {
-            return Ok((StatusCode::BAD_REQUEST, "Field password must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.").into_response());
+            return Err(UsersError::ValidationError(ValidationMessage {
+                field: "password".to_string(),
+                msg: "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.".to_string() 
+                    }));
         }
 
         (canonical_email, canonical_phone_number)
@@ -391,7 +402,9 @@ async fn signup_request(
             .await?
             .is_some();
         if by_email || by_username || by_phone {
-            return Ok((StatusCode::CONFLICT, "User already exists.").into_response());
+            return Err(UsersError::ConflictError(UserTaken {
+                msg: "User already exists.".to_string(),
+            }));
         }
     }
 
@@ -428,19 +441,44 @@ pub fn router() -> DbRouter {
         })
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidationMessage {
+    pub field: String,
+    pub msg: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserTaken {
+    pub msg: String,
+}
+
 enum UsersError {
     InternalServerError(anyhow::Error),
+    ValidationError(ValidationMessage),
+    ConflictError(UserTaken),
 }
 
 impl IntoResponse for UsersError {
     fn into_response(self) -> Response {
         match self {
             UsersError::InternalServerError(e) => {
-                error!("UsersError: {}", e);
+                error!("UsersError::InternalServerError {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong, please retry.",
                 )
+            }
+            .into_response(),
+
+            UsersError::ValidationError(msg) => {
+                error!("UsersError::ValidationError {:?}", msg);
+                (StatusCode::BAD_REQUEST, Json(msg))
+            }
+            .into_response(),
+
+            UsersError::ConflictError(taken) => {
+                error!("UsersError::ConflictError {:?}", taken);
+                (StatusCode::CONFLICT, Json(taken))
             }
             .into_response(),
         }

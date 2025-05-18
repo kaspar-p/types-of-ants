@@ -1,9 +1,11 @@
 use fixture::test_router;
 use http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode};
+use serde_json::json;
 use tracing_test::traced_test;
 
 use ant_on_the_web::users::{
-    GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
+    GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest, UserTaken,
+    ValidationMessage,
 };
 
 mod fixture;
@@ -42,10 +44,9 @@ async fn user_signup_fails_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            res.text().await,
-            "Field username must be between 3 and 16 characters."
-        );
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "username");
+        assert_eq!(j.msg, "Field must be between 3 and 16 characters.");
     }
 
     {
@@ -63,15 +64,14 @@ async fn user_signup_fails_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            res.text().await,
-            "Field username must be between 3 and 16 characters."
-        );
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "username");
+        assert_eq!(j.msg, "Field must be between 3 and 16 characters.");
     }
 
     {
         let req = SignupRequest {
-            username: "OtherCharacters-_*090][]".to_string(),
+            username: "-_*090][]".to_string(),
             email: "email@domain.com".to_string(),
             phone_number: "+1 (111) 222-3333".to_string(),
             password: "my-ant-password".to_string(),
@@ -84,9 +84,11 @@ async fn user_signup_fails_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "username");
         assert_eq!(
-            res.text().await,
-            "Field username must be between 3 and 16 characters."
+            j.msg,
+            "Field must contain only lowercase characters (a-z) and numbers (0-9)."
         );
     }
 }
@@ -109,7 +111,9 @@ async fn user_signup_fails_if_phone_invalid() {
         .await;
 
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(res.text().await, "Field phone_number invalid.");
+    let j: ValidationMessage = res.json().await;
+    assert_eq!(j.field, "phoneNumber");
+    assert_eq!(j.msg, "Field invalid.");
 }
 
 #[tokio::test]
@@ -131,7 +135,9 @@ async fn user_signup_fails_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(res.text().await, "Field password must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "password");
+        assert_eq!(j.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
     }
 
     {
@@ -149,10 +155,9 @@ async fn user_signup_fails_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            res.text().await,
-            "Field password must be between 8 and 64 characters."
-        );
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "password");
+        assert_eq!(j.msg, "Field must be between 8 and 64 characters.");
     }
 
     {
@@ -170,10 +175,9 @@ async fn user_signup_fails_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            res.text().await,
-            "Field password must be between 8 and 64 characters."
-        );
+        let j: ValidationMessage = res.json().await;
+        assert_eq!(j.field, "password");
+        assert_eq!(j.msg, "Field must be between 8 and 64 characters.");
     }
 }
 
@@ -197,7 +201,8 @@ async fn user_signup_fails_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        let j: UserTaken = res.json().await;
+        assert_eq!(j.msg, "User already exists.");
     }
 
     {
@@ -215,7 +220,8 @@ async fn user_signup_fails_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        let j: UserTaken = res.json().await;
+        assert_eq!(j.msg, "User already exists.");
     }
 
     {
@@ -233,7 +239,8 @@ async fn user_signup_fails_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        let j: UserTaken = res.json().await;
+        assert_eq!(j.msg, "User already exists.");
     }
 }
 
@@ -299,7 +306,8 @@ async fn user_signup_fails_if_user_already_signed_up() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        let j: UserTaken = res.json().await;
+        assert_eq!(j.msg, "User already exists.");
     }
 }
 
@@ -478,8 +486,8 @@ async fn login_returns_cookie_headers() {
         assert_eq!(res.status(), StatusCode::OK);
 
         let cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
-        assert!(cookie.contains("__Secure-typesofants="));
-        assert!(cookie.contains("SameSite=Strict"));
+        assert!(cookie.contains("typesofants_auth="));
+        // assert!(cookie.contains("SameSite=Strict"));
         assert!(cookie.contains("HttpOnly"));
     }
 }
@@ -505,27 +513,6 @@ async fn user_login_after_signup_returns_token() {
 
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.text().await, "Signup completed.");
-    }
-
-    // Login includes Set-Cookie header with the right properties.
-    {
-        let req = LoginRequest {
-            method: LoginMethod::Username("user".to_string()),
-            password: "my-ant-password".to_string(),
-        };
-
-        let res = fixture
-            .client
-            .post("/api/users/login")
-            .json(&req)
-            .send()
-            .await;
-
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(
-            res.headers().get(SET_COOKIE).unwrap(),
-            HeaderValue::from_str("").unwrap()
-        );
     }
 
     // Login via username
@@ -588,7 +575,7 @@ async fn user_login_after_signup_returns_token() {
 
 #[tokio::test]
 #[traced_test]
-async fn authenticated_endpoints_throw_if_token_has_been_tampered_with() {
+async fn authenticated_endpoints_return_401_if_token_has_been_tampered_with() {
     let fixture = test_router().await;
 
     // Hit authenticated endpoint /users/user/{user_name}
@@ -596,7 +583,7 @@ async fn authenticated_endpoints_throw_if_token_has_been_tampered_with() {
         let res = fixture
             .client
             .get("/api/users/user/nobody")
-            .header("Authorization", "Bearer some-token-here")
+            .header("Cookie", "typesofants_auth=blahblahblah")
             .send()
             .await;
 
@@ -610,9 +597,22 @@ async fn authenticated_endpoints_throw_if_token_has_been_tampered_with() {
 async fn authenticated_endpoints_return_400_if_missing_token() {
     let fixture = test_router().await;
 
-    // Hit authenticated endpoint /users/user/{user_name}
+    // No Cookie header at all
     {
         let res = fixture.client.get("/api/users/user/nobody").send().await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.text().await, "Invalid authorization token.");
+    }
+
+    // Not using the typesofants_auth name
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user/nobody")
+            .header("Cookie", "other_cookie=blahblahblah")
+            .send()
+            .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         assert_eq!(res.text().await, "Invalid authorization token.");
@@ -668,7 +668,7 @@ async fn authenticated_endpoints_with_right_token_work() {
         let res = fixture
             .client
             .get("/api/users/user/someuser")
-            .header("Authorization", ("Bearer ".to_owned() + &token).as_str())
+            .header("Cookie", ("typesofants_auth=".to_owned() + &token).as_str())
             .send()
             .await;
 

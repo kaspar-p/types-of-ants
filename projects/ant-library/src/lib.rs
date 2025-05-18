@@ -1,12 +1,15 @@
+use std::fmt::Display;
+
 use axum::{
     body::{Body, Bytes},
     http::{Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use http::{header, HeaderValue};
 use http_body_util::BodyExt;
 use tracing::{debug, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
 
 pub mod axum_test_client;
 
@@ -40,14 +43,14 @@ pub fn set_global_logs(project: &str) -> () {
     );
     dotenv::dotenv().expect("No .env file found!");
 
-    // initialize tracing
+    // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
         .with_file(true)
         .with_ansi(false)
-        .with_writer(tracing_appender::rolling::hourly(
-            "./logs",
-            format!("{}.log", project),
+        .with_writer(Tee::new(
+            std::io::stdout,
+            tracing_appender::rolling::hourly("./logs", format!("{}.log", project)),
         ))
         .finish();
 
@@ -94,4 +97,47 @@ pub async fn middleware_print_request_response(
     let response = Response::from_parts(parts, Body::from(bytes));
 
     Ok(response)
+}
+
+#[derive(Debug)]
+pub enum Mode {
+    Dev,
+    Prod,
+}
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Mode::Dev => f.write_str("DEV")?,
+            Mode::Prod => f.write_str("PRODUCTION")?,
+        };
+        Ok(())
+    }
+}
+
+pub fn get_mode() -> Mode {
+    match dotenv::var("ANT_ON_THE_WEB_MODE") {
+        Ok(mode) if mode.as_str() == "dev" => Mode::Dev,
+        _ => Mode::Prod,
+    }
+}
+
+pub async fn middleware_mode_headers(
+    req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let mut response = next.run(req).await;
+
+    let response = match get_mode() {
+        Mode::Dev => {
+            let headers = response.headers_mut();
+            headers.append(
+                header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                HeaderValue::from_str("true").unwrap(),
+            );
+            response
+        }
+        Mode::Prod => response,
+    };
+    return Ok(response);
 }
