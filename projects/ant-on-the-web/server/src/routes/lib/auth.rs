@@ -1,30 +1,32 @@
-use std::fmt;
-use std::sync::Arc;
-use std::sync::LazyLock;
+use std::{
+    fmt,
+    sync::{Arc, LazyLock},
+};
 
-use ant_data_farm::users::User;
-use ant_data_farm::AntDataFarmClient;
-use ant_data_farm::{users::UserId, DaoTrait};
-use ant_library::get_mode;
-use ant_library::Mode;
-use axum::extract::FromRequestParts;
-use axum::extract::OptionalFromRequestParts;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::response::Response;
-use axum::RequestPartsExt;
+use ant_data_farm::{
+    users::{User, UserId},
+    AntDataFarmClient, DaoTrait,
+};
+use ant_library::{get_mode, Mode};
+use axum::{
+    extract::{FromRequestParts, OptionalFromRequestParts},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    RequestPartsExt,
+};
 use axum_extra::{
     extract::cookie::{Cookie, SameSite},
     headers, TypedHeader,
 };
 use jsonwebtoken::{decode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use tracing::error;
-use tracing::info;
-use tracing::warn;
+use tracing::{debug, error, info, warn};
 
 pub static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
+    debug!("Initializing jwt secret...");
     let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
+
+    debug!("jwt secret initialized...");
     AuthKeys::new(secret.as_bytes())
 });
 

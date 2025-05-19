@@ -149,7 +149,7 @@ pub fn verify_password_hash(
     // Step: Verify attempt with stored PHC string
     let argon2 = Argon2::default();
 
-    debug!("Parsing stored password as PHC formatted string");
+    debug!("Parsing stored password as PHC formatted string...");
     let phc = match PasswordHash::new(db_password) {
         Ok(phc) => phc,
         Err(e) => {
@@ -158,6 +158,7 @@ pub fn verify_password_hash(
         }
     };
 
+    debug!("Verifying hash...");
     match argon2.verify_password(password_attempt.as_bytes(), &phc) {
         Err(e) => {
             debug!("hash verification failed: {}", e);

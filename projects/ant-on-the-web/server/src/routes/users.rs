@@ -192,11 +192,13 @@ async fn login(
         return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
     }
 
+    debug!("Password verified, generating jwt token...");
     let claims = AuthClaims::new(user.user_id.clone());
     let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
 
     // TODO: Verify with two-factor
 
+    debug!("Making JWT cookie for the browser...");
     let cookie = make_cookie(jwt.clone());
 
     return Ok((
