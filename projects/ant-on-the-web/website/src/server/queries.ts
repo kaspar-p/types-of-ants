@@ -2,9 +2,9 @@ import { z } from "zod";
 import { getEndpoint, getFetchOptions } from "./lib";
 
 const antSchema = z.object({
-  ant_id: z.string(),
-  ant_name: z.string(),
-  created_at: z.string(),
+  antId: z.string(),
+  antName: z.string(),
+  createdAt: z.string(),
 });
 export type Ant = z.infer<typeof antSchema>;
 export type Ants = Ant[];
@@ -14,16 +14,22 @@ const queries = {
     name: "getLatestRelease",
     path: "/api/ants/latest-release",
     schema: z.object({
-      release_number: z.number(),
-      created_at: z.string(),
+      release: z.object({
+        releaseNumber: z.number(),
+        createdAt: z.string(),
+      }),
     }),
     transformer: (data: {
-      release_number: number;
-      created_at: string;
-    }): { release_number: number; created_at: Date } => {
+      release: {
+        releaseNumber: number;
+        createdAt: string;
+      };
+    }): { release: { releaseNumber: number; createdAt: Date } } => {
       return {
-        release_number: data.release_number,
-        created_at: new Date(data.created_at),
+        release: {
+          releaseNumber: data.release.releaseNumber,
+          createdAt: new Date(data.release.createdAt),
+        },
       };
     },
   },
@@ -36,19 +42,31 @@ const queries = {
     }),
     transformer: (data: {
       date: number;
-      ants: { ant_id: string; ant_name: string }[];
+      ants: { antId: string; antName: string }[];
     }): { date: Date; ants: string[] } => {
       return {
         date: new Date(data.date * 1000),
-        ants: data.ants.map((ant) => ant.ant_name),
+        ants: data.ants.map((ant) => ant.antName),
       };
+    },
+  },
+  getTotalAnts: {
+    name: "getTotalAnts",
+    path: "/api/ants/total",
+    schema: z.object({
+      total: z.number(),
+    }),
+    transformer(d: { total: number }): number {
+      return d.total;
     },
   },
   getUnseenAnts: {
     name: "getUnseenAntsPaginated",
     path: "/api/ants/unreleased-ants",
     queryParams: ["page"],
-    schema: z.object({ ants: z.array(antSchema) }),
+    schema: z.object({
+      ants: z.array(antSchema),
+    }),
     transformer: (data: Ants): Ants => {
       return data;
     },
@@ -57,9 +75,11 @@ const queries = {
     name: "getReleasedAnts",
     path: "/api/ants/released-ants",
     queryParams: ["page"],
-    schema: z.object({ ants: z.array(antSchema) }),
-    transformer: (data: Ants): { ants: string[] } => ({
-      ants: data.map((ant) => ant.ant_name),
+    schema: z.object({
+      ants: z.array(antSchema),
+    }),
+    transformer: (data: { ants: Ants }): { ants: string[] } => ({
+      ants: data.ants.map((ant) => ant.antName),
     }),
   },
   getUser: {
@@ -84,6 +104,7 @@ async function constructQuery<Q extends Query>(
   query: Q,
   inputData?: QueryParams<Q>
 ): Promise<ReturnType<Q["transformer"]>> {
+  console.log("GET: ", query.path);
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
@@ -93,15 +114,14 @@ async function constructQuery<Q extends Query>(
       );
     }
   }
-  console.log("GET: ", endpoint);
 
   const data = await (await fetch(endpoint)).json();
-  console.log("GOT DATA: ", data);
   const transformedData = query.transformer(data);
   return transformedData as any as QueryRet<Q>;
 }
 
 export const getLatestAnts = () => constructQuery(queries.getLatestAnts);
+export const getTotalAnts = () => constructQuery(queries.getTotalAnts);
 export const getReleasedAnts = (page: number) =>
   constructQuery(queries.getReleasedAnts, { page });
 export const getUnseenAnts = (page: number) =>
@@ -112,6 +132,7 @@ async function constructQuery2<Q extends Query>(
   query: Q,
   inputData?: QueryParams<Q>
 ): Promise<Response> {
+  console.log("GET: ", query.path);
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
@@ -121,8 +142,6 @@ async function constructQuery2<Q extends Query>(
       );
     }
   }
-  console.log("GET: ", endpoint);
-
   const response = await fetch(endpoint, getFetchOptions());
 
   return response;

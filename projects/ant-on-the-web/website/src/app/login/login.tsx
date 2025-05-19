@@ -2,6 +2,7 @@ import { login } from "@/server/posts";
 import { useContext, useState } from "react";
 import { UserContext } from "../../state/userContext";
 import { useRouter } from "next/router";
+import { getUser } from "@/server/queries";
 
 export const LoginBox = () => {
   const [loginUnique, setLoginUnique] = useState("");
@@ -65,6 +66,8 @@ export const LoginBox = () => {
         setPasswordAttemptValidationMsg("");
 
         setFormState({ success: true, msg: "login complete, welcome!" });
+        const user = await (await getUser()).json();
+        setUser(user);
         // push("/");
         return;
       }

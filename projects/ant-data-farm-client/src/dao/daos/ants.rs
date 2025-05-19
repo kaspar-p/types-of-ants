@@ -25,24 +25,41 @@ use tokio_postgres::Row;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AntStatus {
+    #[serde(rename = "unreleased")]
     Unreleased,
+
+    #[serde(rename = "released")]
     Released(i32),
+
+    #[serde(rename = "declined")]
     Declined,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]
 pub enum Tweeted {
+    #[serde(rename = "notTweeted")]
     NotTweeted,
+
+    #[serde(rename = "tweeted")]
     Tweeted(DateTime<Utc>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Ant {
+    #[serde(rename = "antId")]
     pub ant_id: AntId,
+
+    #[serde(rename = "antName")]
     pub ant_name: String,
+
+    #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+
+    #[serde(rename = "createdBy")]
     pub created_by: UserId,
+
     pub tweeted: Tweeted,
+
     pub status: AntStatus,
 }
 

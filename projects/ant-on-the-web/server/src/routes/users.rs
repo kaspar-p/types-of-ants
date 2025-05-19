@@ -149,7 +149,7 @@ async fn authenticate(auth: &AuthClaims, dao: &Arc<AntDataFarmClient>) -> Result
 async fn logout(auth: AuthClaims, State(dao): DbState) -> Result<impl IntoResponse, UsersError> {
     authenticate(&auth, &dao).await?;
 
-    let mut cookie_expiration = Cookie::new("typesofants_auth", "");
+    let mut cookie_expiration = make_cookie("".to_string());
     cookie_expiration.make_removal();
 
     return Ok((
@@ -239,16 +239,7 @@ async fn login(
 
     // TODO: Verify with two-factor
 
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
-    let cookie = Cookie::build(("typesofants_auth", jwt.clone()))
-        .secure(true)
-        .http_only(true)
-        .permanent()
-        .path("/")
-        .same_site(match get_mode() {
-            Mode::Dev => SameSite::None,
-            Mode::Prod => SameSite::Strict,
-        });
+    let cookie = make_cookie(jwt.clone());
 
     return Ok((
         StatusCode::OK,
@@ -259,6 +250,20 @@ async fn login(
         }),
     )
         .into_response());
+}
+
+fn make_cookie(jwt: String) -> Cookie<'static> {
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
+    Cookie::build(("typesofants_auth", jwt.clone()))
+        .secure(true)
+        .http_only(true)
+        .permanent()
+        .path("/")
+        .same_site(match get_mode() {
+            Mode::Dev => SameSite::None,
+            Mode::Prod => SameSite::Strict,
+        })
+        .build()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

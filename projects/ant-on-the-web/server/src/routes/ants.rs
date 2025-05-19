@@ -1,6 +1,7 @@
 use crate::types::{DbRouter, DbState};
 use ant_data_farm::{
     ants::{Ant, AntStatus},
+    releases::Release,
     users::UserId,
     DaoTrait,
 };
@@ -19,10 +20,15 @@ use uuid::Uuid;
 
 const PAGE_SIZE: usize = 1_000_usize;
 
+#[derive(Serialize, Deserialize)]
+pub struct AllAntsResponse {
+    pub ants: Vec<Ant>,
+}
 async fn all_ants(State(dao): DbState) -> Result<impl IntoResponse, AntsError> {
+    let ants = dao.ants.read().await.get_all().await?;
     Ok((
         StatusCode::OK,
-        Json(dao.ants.read().await.get_all().await?).into_response(),
+        Json(AllAntsResponse { ants }).into_response(),
     ))
 }
 
@@ -32,7 +38,9 @@ struct Pagination {
 }
 
 #[derive(Serialize)]
-struct UnreleasedAntsOutput<'a>(&'a [Ant]);
+struct UnreleasedAntsResponse {
+    pub ants: Vec<Ant>,
+}
 
 async fn unreleased_ants(
     State(dao): DbState,
@@ -63,7 +71,10 @@ async fn unreleased_ants(
         Some(unreleased_ants) => {
             return Ok((
                 StatusCode::OK,
-                Json(UnreleasedAntsOutput(unreleased_ants)).into_response(),
+                Json(UnreleasedAntsResponse {
+                    ants: unreleased_ants.to_vec(),
+                })
+                .into_response(),
             ));
         }
     }
@@ -99,6 +110,10 @@ async fn declined_ants(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ReleasedAntsResponse {
+    pub ants: Vec<Ant>,
+}
 async fn released_ants(
     State(dao): DbState,
     query: Query<Pagination>,
@@ -124,24 +139,50 @@ async fn released_ants(
             ))
         }
         Some(released_ants) => {
-            return Ok((StatusCode::OK, Json(released_ants).into_response()));
+            return Ok((
+                StatusCode::OK,
+                Json(ReleasedAntsResponse {
+                    ants: released_ants.to_vec(),
+                })
+                .into_response(),
+            ));
         }
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct LatestReleaseResponse {
+    release: Release,
+}
 async fn latest_release(State(dao): DbState) -> impl IntoResponse {
     match dao.releases.read().await.get_latest_release().await {
         Err(_) => (StatusCode::NOT_FOUND).into_response(),
-        Ok(latest_release) => (StatusCode::OK, Json(latest_release)).into_response(),
+        Ok(latest_release) => (
+            StatusCode::OK,
+            Json(LatestReleaseResponse {
+                release: latest_release,
+            }),
+        )
+            .into_response(),
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TotalResponse {
+    pub total: usize,
+}
+async fn total(State(dao): DbState) -> Result<impl IntoResponse, AntsError> {
+    let ants = dao.ants.read().await;
+    let total = ants.get_all_released().await?.len();
+    Ok((StatusCode::OK, Json(TotalResponse { total })))
 }
 
 #[derive(Serialize, Deserialize)]
 struct LatestAntsResponse {
     #[serde(with = "chrono::serde::ts_seconds")]
-    date: chrono::DateTime<chrono::Utc>,
-    release: i32,
-    ants: Vec<Ant>,
+    pub date: chrono::DateTime<chrono::Utc>,
+    pub release: i32,
+    pub ants: Vec<Ant>,
 }
 async fn latest_ants(State(dao): DbState) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
@@ -175,14 +216,16 @@ async fn latest_ants(State(dao): DbState) -> Result<impl IntoResponse, AntsError
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct FeedInput {
+    #[serde(rename = "userId")]
     pub user_id: UserId,
+
     #[serde(with = "chrono::serde::ts_seconds")]
     pub since: DateTime<Utc>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct FeedOutput {
     pub ants: Vec<Ant>,
 }
@@ -213,7 +256,10 @@ async fn feed(State(db): DbState, query: Query<FeedInput>) -> Result<impl IntoRe
 
 #[derive(Deserialize, Debug)]
 struct Suggestion {
+    #[serde(rename = "userId")]
     pub user_id: Option<UserId>,
+
+    #[serde(rename = "suggestionContent")]
     pub suggestion_content: String,
 }
 
@@ -292,6 +338,7 @@ pub fn router() -> DbRouter {
         .route_with_tsr("/declined-ants", get(declined_ants))
         .route_with_tsr("/all-ants", get(all_ants))
         .route_with_tsr("/latest-release", get(latest_release))
+        .route_with_tsr("/total", get(total))
         .route_with_tsr("/suggest", post(make_suggestion))
         // .route_with_tsr("/tweet", post(tweet))
         .fallback(|| async {
@@ -303,6 +350,7 @@ pub fn router() -> DbRouter {
                 "GET /declined-ants",
                 "GET /all-ants",
                 "GET /latest-release",
+                "GET /total",
                 "POST /suggest",
                 // "POST /tweet",
             ])

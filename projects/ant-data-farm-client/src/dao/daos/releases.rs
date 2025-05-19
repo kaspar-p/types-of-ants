@@ -11,7 +11,10 @@ pub struct ReleasesDao {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Release {
+    #[serde(rename = "releaseNumber")]
     pub release_number: i32,
+
+    #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
 }
 
