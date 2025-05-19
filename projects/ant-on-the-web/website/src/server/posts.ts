@@ -28,6 +28,10 @@ const posts = {
       password: z.string(),
     }),
   },
+  logout: {
+    path: "/api/users/logout",
+    inputDataSchema: z.object({}),
+  },
   newsletterSignup: {
     path: "/api/users/subscribe-newsletter",
     inputDataSchema: z.object({
@@ -102,5 +106,6 @@ async function constructPost2<Q extends Query>(
 export const signup = (
   inputData: z.infer<typeof posts.signup.inputDataSchema>
 ) => constructPost2(posts.signup, inputData);
+export const logout = () => constructPost2(posts.logout, {});
 export const login = (inputData: z.infer<typeof posts.login.inputDataSchema>) =>
   constructPost2(posts.login, inputData);

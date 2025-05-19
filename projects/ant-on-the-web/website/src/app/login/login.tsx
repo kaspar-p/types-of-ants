@@ -1,5 +1,7 @@
 import { login } from "@/server/posts";
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { UserContext } from "../../state/userContext";
+import { useRouter } from "next/router";
 
 export const LoginBox = () => {
   const [loginUnique, setLoginUnique] = useState("");
@@ -8,6 +10,10 @@ export const LoginBox = () => {
   const [passwordAttempt, setPasswordAttempt] = useState("");
   const [passwordAttemptValidationMsg, setPasswordAttemptValidationMsg] =
     useState("");
+
+  const { setUser } = useContext(UserContext);
+
+  // const { push } = useRouter();
 
   const [formState, setFormState] = useState<{ success: boolean; msg: string }>(
     { success: false, msg: "" }
@@ -51,6 +57,7 @@ export const LoginBox = () => {
       }
 
       case 200: {
+        const body: { userId: string } = await response.json();
         setLoginUnique("");
         setLoginValidationMsg("");
 
@@ -58,6 +65,7 @@ export const LoginBox = () => {
         setPasswordAttemptValidationMsg("");
 
         setFormState({ success: true, msg: "login complete, welcome!" });
+        // push("/");
         return;
       }
     }

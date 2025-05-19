@@ -25,3 +25,16 @@ export function getEndpoint(path: string): URL {
   if (path[0] !== "/") path = "/" + path;
   return new URL(baseUrl + path);
 }
+
+export function getFetchOptions(): { credentials?: "include" } {
+  const environment = z
+    .union([z.literal("dev"), z.literal("beta"), z.literal("prod")])
+    .parse(process.env.ENVIRONMENT ?? process.env.NEXT_PUBLIC_ENVIRONMENT);
+  switch (environment) {
+    case "prod":
+    case "beta":
+      return {};
+    case "dev":
+      return { credentials: "include" };
+  }
+}

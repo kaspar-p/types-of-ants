@@ -1,10 +1,12 @@
 use std::str::FromStr;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use crate::types::{DbRouter, DbState};
 use ant_data_farm::users::verify_password_hash;
 use ant_data_farm::users::User;
 use ant_data_farm::users::UserId;
+use ant_data_farm::AntDataFarmClient;
 use ant_data_farm::DaoTrait;
 use ant_library::get_mode;
 use ant_library::Mode;
@@ -105,32 +107,56 @@ pub struct GetUserResponse {
     pub user: User,
 }
 async fn get_user_by_name(
-    claims: AuthClaims,
-    Path(user_name): Path<String>,
+    auth: AuthClaims,
+    path: Option<Path<String>>,
     State(dao): DbState,
 ) -> Result<impl IntoResponse, UsersError> {
-    // AuthZ
-    let users = dao.users.read().await;
+    // AuthN
+    let user = authenticate(&auth, &dao).await?;
 
-    let user = users.get_one_by_id(&claims.sub).await?;
+    if path.is_none() {
+        return Ok((
+            StatusCode::OK,
+            Json(GetUserResponse { user }).into_response(),
+        ));
+    }
+
+    let user_name = path.unwrap().0;
+
+    // AuthZ
+    if user.username != user_name {
+        return Err(UsersError::AccessDenied(Some(user.user_id.to_string())));
+    }
+    info!("Granted access to {}", user.user_id);
+
+    let users = dao.users.read().await;
+    let user = users.get_one_by_user_name(&user_name).await?.unwrap();
+    return Ok((
+        StatusCode::OK,
+        Json(GetUserResponse { user }).into_response(),
+    ));
+}
+
+async fn authenticate(auth: &AuthClaims, dao: &Arc<AntDataFarmClient>) -> Result<User, UsersError> {
+    let users = dao.users.read().await;
+    let user = users.get_one_by_id(&auth.sub).await?;
     match user {
-        None => {
-            warn!("Claim was not user: {}", claims.sub);
-            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
-        }
-        Some(u) if u.username != user_name => {
-            warn!("Tried to access other user: {}", claims.sub);
-            return Ok((StatusCode::UNAUTHORIZED, "Access denied.".into_response()));
-        }
-        Some(auth_user) => {
-            info!("Granted access to {}", auth_user.user_id);
-            let user = users.get_one_by_user_name(&user_name).await?.unwrap();
-            return Ok((
-                StatusCode::OK,
-                Json(GetUserResponse { user }).into_response(),
-            ));
-        }
-    };
+        None => Err(UsersError::AccessDenied(Some(auth.sub.to_string()))),
+        Some(u) => Ok(u),
+    }
+}
+
+async fn logout(auth: AuthClaims, State(dao): DbState) -> Result<impl IntoResponse, UsersError> {
+    authenticate(&auth, &dao).await?;
+
+    let mut cookie_expiration = Cookie::new("typesofants_auth", "");
+    cookie_expiration.make_removal();
+
+    return Ok((
+        StatusCode::OK,
+        [(header::SET_COOKIE, cookie_expiration.to_string())],
+        "Logout successful.",
+    ));
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,7 +187,10 @@ fn canonicalize_email(email: &str) -> Result<String, anyhow::Error> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
-    pub token_type: String,
+    #[serde(rename = "userId")]
+    pub user_id: UserId,
+
+    #[serde(rename = "accessToken")]
     pub access_token: String,
 }
 async fn login(
@@ -225,7 +254,7 @@ async fn login(
         StatusCode::OK,
         [(header::SET_COOKIE, cookie.to_string())],
         Json(LoginResponse {
-            token_type: "Bearer".to_string(),
+            user_id: user.user_id.clone(),
             access_token: jwt,
         }),
     )
@@ -420,6 +449,7 @@ async fn signup_request(
                 signup_request.password,
             )
             .await?;
+        info!("Created user {}", user.user_id);
     }
 
     return Ok((StatusCode::OK, "Signup completed.").into_response());
@@ -428,15 +458,20 @@ async fn signup_request(
 pub fn router() -> DbRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
+        .route_with_tsr("/login", post(login))
+        .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))
         // .route_with_tsr("/verification", post(verification))
-        .route_with_tsr("/login", post(login))
+        .route_with_tsr("/user", get(get_user_by_name))
         .route_with_tsr("/user/{user_name}", get(get_user_by_name))
         .fallback(|| async {
             ant_library::api_fallback(&[
-                "POST /signup",
-                "POST /user/{user_name}",
                 "POST /subscribe-newsletter",
+                "POST /login",
+                "POST /logout",
+                "POST /signup",
+                "GET /user",
+                "GET /user/{user_name}",
             ])
         })
 }
@@ -453,6 +488,7 @@ pub struct UserTaken {
 }
 
 enum UsersError {
+    AccessDenied(Option<String>),
     InternalServerError(anyhow::Error),
     ValidationError(ValidationMessage),
     ConflictError(UserTaken),
@@ -470,14 +506,19 @@ impl IntoResponse for UsersError {
             }
             .into_response(),
 
+            UsersError::AccessDenied(identity) => {
+                warn!("Access denied to identity: {:?}", identity);
+                (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
+            }
+
             UsersError::ValidationError(msg) => {
-                error!("UsersError::ValidationError {:?}", msg);
+                warn!("UsersError::ValidationError {:?}", msg);
                 (StatusCode::BAD_REQUEST, Json(msg))
             }
             .into_response(),
 
             UsersError::ConflictError(taken) => {
-                error!("UsersError::ConflictError {:?}", taken);
+                warn!("UsersError::ConflictError {:?}", taken);
                 (StatusCode::CONFLICT, Json(taken))
             }
             .into_response(),

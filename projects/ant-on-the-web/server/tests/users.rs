@@ -1,6 +1,5 @@
 use fixture::test_router;
-use http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode};
-use serde_json::json;
+use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
 
 use ant_on_the_web::users::{
@@ -11,7 +10,7 @@ use ant_on_the_web::users::{
 mod fixture;
 
 #[tokio::test]
-async fn user_signup_fails_if_not_json() {
+async fn users_signup_returns_400_if_not_json() {
     let fixture = test_router().await;
 
     let res = fixture
@@ -26,7 +25,7 @@ async fn user_signup_fails_if_not_json() {
 }
 
 #[tokio::test]
-async fn user_signup_fails_if_username_invalid() {
+async fn users_signup_returns_400_if_username_invalid() {
     let fixture = test_router().await;
 
     {
@@ -94,7 +93,7 @@ async fn user_signup_fails_if_username_invalid() {
 }
 
 #[tokio::test]
-async fn user_signup_fails_if_phone_invalid() {
+async fn users_signup_returns_400_if_phone_number_invalid() {
     let fixture = test_router().await;
 
     let req = SignupRequest {
@@ -117,7 +116,7 @@ async fn user_signup_fails_if_phone_invalid() {
 }
 
 #[tokio::test]
-async fn user_signup_fails_if_password_invalid() {
+async fn users_signup_returns_400_if_password_invalid() {
     let fixture = test_router().await;
 
     {
@@ -183,7 +182,7 @@ async fn user_signup_fails_if_password_invalid() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_signup_fails_if_user_already_exists() {
+async fn users_signup_returns_409_if_user_already_exists() {
     let fixture = test_router().await;
 
     {
@@ -246,7 +245,7 @@ async fn user_signup_fails_if_user_already_exists() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_signup_succeeds() {
+async fn users_signup_succeeds() {
     let fixture = test_router().await;
 
     {
@@ -270,7 +269,7 @@ async fn user_signup_succeeds() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_signup_fails_if_user_already_signed_up() {
+async fn users_signup_returns_409_if_user_already_signed_up() {
     let fixture = test_router().await;
 
     {
@@ -313,7 +312,7 @@ async fn user_signup_fails_if_user_already_signed_up() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_login_with_no_corresponding_user_gets_unauthorized() {
+async fn users_login_returns_401_if_no_corresponding_user() {
     let fixture = test_router().await;
 
     // Username
@@ -370,7 +369,32 @@ async fn user_login_with_no_corresponding_user_gets_unauthorized() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_signup_and_bad_login_returns_unauthorized() {
+async fn users_logout_returns_4xx_if_not_authenticated() {
+    let fixture = test_router().await;
+
+    {
+        let res = fixture.client.post("/api/users/logout").send().await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.text().await, "Invalid authorization token.");
+    }
+
+    {
+        let res = fixture
+            .client
+            .post("/api/users/logout")
+            .header("Cookie", "typesofants_auth=abc")
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(res.text().await, "Access denied.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_login_returns_401_if_wrong_fields() {
     let fixture = test_router().await;
 
     {
@@ -448,7 +472,7 @@ async fn user_signup_and_bad_login_returns_unauthorized() {
 
 #[tokio::test]
 #[traced_test]
-async fn login_returns_cookie_headers() {
+async fn users_login_returns_200_with_cookie_headers() {
     let fixture = test_router().await;
 
     {
@@ -494,7 +518,7 @@ async fn login_returns_cookie_headers() {
 
 #[tokio::test]
 #[traced_test]
-async fn user_login_after_signup_returns_token() {
+async fn users_login_returns_200_returns_bearer_token() {
     let fixture = test_router().await;
 
     {
@@ -575,7 +599,7 @@ async fn user_login_after_signup_returns_token() {
 
 #[tokio::test]
 #[traced_test]
-async fn authenticated_endpoints_return_401_if_token_has_been_tampered_with() {
+async fn users_user_returns_401_if_token_has_been_tampered_with() {
     let fixture = test_router().await;
 
     // Hit authenticated endpoint /users/user/{user_name}
@@ -594,7 +618,7 @@ async fn authenticated_endpoints_return_401_if_token_has_been_tampered_with() {
 
 #[tokio::test]
 #[traced_test]
-async fn authenticated_endpoints_return_400_if_missing_token() {
+async fn users_user_returns_400_if_missing_token() {
     let fixture = test_router().await;
 
     // No Cookie header at all
@@ -621,7 +645,7 @@ async fn authenticated_endpoints_return_400_if_missing_token() {
 
 #[tokio::test]
 #[traced_test]
-async fn authenticated_endpoints_with_right_token_work() {
+async fn users_user_returns_200_if_authn_token_right() {
     let fixture = test_router().await;
 
     // Signup

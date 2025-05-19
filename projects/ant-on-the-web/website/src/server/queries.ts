@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getEndpoint } from "./lib";
+import { getEndpoint, getFetchOptions } from "./lib";
 
 const antSchema = z.object({
   ant_id: z.string(),
@@ -62,6 +62,16 @@ const queries = {
       ants: data.map((ant) => ant.ant_name),
     }),
   },
+  getUser: {
+    name: "getUser",
+    path: "/api/users/user",
+    schema: z.object({
+      user: z.object({
+        userId: z.string(),
+      }),
+    }),
+    transformer: (d: { user: { userId: string } }) => d,
+  },
 } as const;
 
 type Query = (typeof queries)[keyof typeof queries];
@@ -97,3 +107,24 @@ export const getReleasedAnts = (page: number) =>
 export const getUnseenAnts = (page: number) =>
   constructQuery(queries.getUnseenAnts, { page });
 export const getLatestRelease = () => constructQuery(queries.getLatestRelease);
+
+async function constructQuery2<Q extends Query>(
+  query: Q,
+  inputData?: QueryParams<Q>
+): Promise<Response> {
+  const endpoint = getEndpoint(query.path);
+  if ("queryParams" in query && inputData !== undefined) {
+    for (const param of query.queryParams) {
+      endpoint.searchParams.set(
+        param,
+        encodeURIComponent(JSON.stringify(inputData[param]))
+      );
+    }
+  }
+  console.log("GET: ", endpoint);
+
+  const response = await fetch(endpoint, getFetchOptions());
+
+  return response;
+}
+export const getUser = () => constructQuery2(queries.getUser);

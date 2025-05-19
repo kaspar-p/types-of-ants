@@ -8,9 +8,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SuggestionBox } from "../components/SuggestionBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
+import { TUserContext, User, UserContext } from "../state/userContext";
 
 export default function Home() {
   const [page, setPage] = useState(0);
+  const [user, setUser] = useState<TUserContext>({ loggedIn: false });
 
   const {
     isLoading,
