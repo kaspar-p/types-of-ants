@@ -142,6 +142,9 @@ pub async fn middleware_mode_headers(
     return Ok(response);
 }
 
+/// Axum middleware for translating a panicked handler into a 500 InternalServerError.
+/// The thread that panics will die, but new threads and requests will succeed.
+/// All webservers should use this layer.
 pub fn middleware_catch_panic(
     err: Box<dyn std::any::Any + Send + 'static>,
 ) -> Response<Full<Bytes>> {

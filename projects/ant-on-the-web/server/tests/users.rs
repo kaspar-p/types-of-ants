@@ -677,7 +677,7 @@ async fn users_user_returns_200_if_authn_token_right() {
     {
         let res = fixture
             .client
-            .get("/api/users/user/someuser")
+            .get("/api/users/user")
             .header("Cookie", &cookie)
             .send()
             .await;
@@ -686,7 +686,7 @@ async fn users_user_returns_200_if_authn_token_right() {
         let res: GetUserResponse = res.json().await;
         assert_eq!(res.user.emails.len(), 1);
         assert_eq!(res.user.emails[0].as_str(), "email@domain.com");
-        assert_eq!(res.user.username, "someuser");
+        assert_eq!(res.user.username, "user");
         assert_ne!(res.user.password_hash, "my-ant-password");
     }
 }
