@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use axum::{
     body::{Body, Bytes},
     http::{Request, StatusCode},
@@ -8,7 +6,9 @@ use axum::{
 };
 use http::{header, HeaderValue};
 use http_body_util::BodyExt;
-use tracing::{debug, Level};
+use http_body_util::Full;
+use std::fmt::Display;
+use tracing::{debug, error, Level};
 use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
 
 pub mod axum_test_client;
@@ -140,4 +140,16 @@ pub async fn middleware_mode_headers(
         Mode::Prod => response,
     };
     return Ok(response);
+}
+
+pub fn middleware_catch_panic(
+    err: Box<dyn std::any::Any + Send + 'static>,
+) -> Response<Full<Bytes>> {
+    error!("panic: {:?}", err);
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(Full::from(
+            "Internal server error, please retry.".to_string(),
+        ))
+        .unwrap()
 }

@@ -6,6 +6,7 @@ use hyper::http::Method;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{
+    catch_panic::CatchPanicLayer,
     cors::{AllowOrigin, CorsLayer},
     services::ServeDir,
     trace::TraceLayer,
@@ -61,6 +62,7 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
         .layer(axum::middleware::from_fn(
             ant_library::middleware_print_request_response,
         ))
+        .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
         // .layer(axum::middleware::from_fn(
         //     ant_library::middleware_mode_headers,
         // ))
