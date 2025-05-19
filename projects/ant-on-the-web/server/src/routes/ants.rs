@@ -1,6 +1,6 @@
 use crate::types::{DbRouter, DbState};
 use ant_data_farm::{
-    ants::{Ant, AntStatus},
+    ants::{Ant, AntId, AntStatus},
     releases::Release,
     users::UserId,
     DaoTrait,
@@ -15,8 +15,9 @@ use axum::{
 use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
-use uuid::Uuid;
+use tracing::{error, warn};
+
+use super::lib::auth::{authenticate, AuthClaims, AuthError};
 
 const PAGE_SIZE: usize = 1_000_usize;
 
@@ -226,13 +227,11 @@ struct FeedInput {
 }
 
 #[derive(Serialize, Deserialize)]
-struct FeedOutput {
+struct FeedResponse {
     pub ants: Vec<Ant>,
 }
 
 async fn feed(State(db): DbState, query: Query<FeedInput>) -> Result<impl IntoResponse, AntsError> {
-    debug!("Top of /api/ant/feed");
-
     let ants = db.ants.read().await;
 
     let feed = match ants
@@ -250,56 +249,46 @@ async fn feed(State(db): DbState, query: Query<FeedInput>) -> Result<impl IntoRe
 
     return Ok((
         StatusCode::OK,
-        Json(FeedOutput { ants: feed }).into_response(),
+        Json(FeedResponse { ants: feed }).into_response(),
     ));
 }
 
-#[derive(Deserialize, Debug)]
-struct Suggestion {
-    #[serde(rename = "userId")]
-    pub user_id: Option<UserId>,
-
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuggestionRequest {
     #[serde(rename = "suggestionContent")]
     pub suggestion_content: String,
 }
 
-async fn make_suggestion(
-    State(dao): DbState,
-    Json(suggestion): Json<Suggestion>,
-) -> Result<impl IntoResponse, AntsError> {
-    debug!("Top of /api/ant/suggest");
-    let users = dao.users.read().await;
-    let mut ants = dao.ants.write().await;
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuggestionResponse {
+    pub ant: Ant,
+}
 
-    let o_user = match &suggestion.user_id {
-        None => users.get_one_by_user_name("nobody").await?,
-        Some(u) => {
+async fn make_suggestion(
+    auth: Option<AuthClaims>,
+    State(dao): DbState,
+    Json(suggestion): Json<SuggestionRequest>,
+) -> Result<impl IntoResponse, AntsError> {
+    let user = match auth {
+        None => {
+            let users = dao.users.read().await;
             users
-                .get_one_by_id(&UserId(Uuid::parse_str(u.0.to_string().as_str()).unwrap()))
+                .get_one_by_user_name("nobody")
                 .await?
+                .expect("nobody user exists")
         }
+        Some(auth) => authenticate(&auth, &dao).await?,
     };
 
-    if o_user.is_none() {
-        if suggestion.user_id.is_some() {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                Json("NOT_FOUND".to_string()).into_response(),
-            ));
-        }
-        return Ok((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Unable to process ant suggestion!").into_response(),
-        ));
-    }
+    let mut ants = dao.ants.write().await;
 
-    let user = o_user.unwrap();
-    ants.add_unreleased_ant(suggestion.suggestion_content, user.user_id)
+    let ant = ants
+        .add_unreleased_ant(suggestion.suggestion_content, user.user_id, user.username)
         .await?;
 
     Ok((
         StatusCode::OK,
-        Json("Added suggestion, thanks!").into_response(),
+        Json(SuggestionResponse { ant }).into_response(),
     ))
 }
 
@@ -357,15 +346,36 @@ pub fn router() -> DbRouter {
         })
 }
 
-struct AntsError(anyhow::Error);
+enum AntsError {
+    AccessDenied(Option<String>),
+    InternalServerError(anyhow::Error),
+}
 
 impl IntoResponse for AntsError {
     fn into_response(self) -> Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Something went wrong, please retry",
-        )
-            .into_response()
+        match self {
+            AntsError::InternalServerError(e) => {
+                error!("AntsError::InternalServerError: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong, please retry",
+                )
+                    .into_response()
+            }
+            AntsError::AccessDenied(identity) => {
+                warn!("Access denied to identity: {:?}", identity);
+                (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
+            }
+        }
+    }
+}
+
+impl From<AuthError> for AntsError {
+    fn from(value: AuthError) -> Self {
+        match value {
+            AuthError::AccessDenied(identity) => AntsError::AccessDenied(identity),
+            AuthError::InternalServerError(e) => AntsError::InternalServerError(e),
+        }
     }
 }
 
@@ -374,6 +384,6 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self(err.into())
+        Self::InternalServerError(err.into())
     }
 }

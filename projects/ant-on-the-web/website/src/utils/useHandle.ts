@@ -1,20 +1,19 @@
 import type { newsletterSignup, suggestAnt } from "@/server/posts";
 import React, { useState, FormEvent } from "react";
 
-type PostAction = typeof suggestAnt | typeof newsletterSignup;
-type HandleProps<A extends PostAction> = {
+type HandleProps<Input> = {
   messages: {
     valid: string;
     error: string;
   };
   inputName: string;
-  constructInputData: (text: string) => Parameters<A>[number];
+  constructInputData: (text: string) => Input;
   clearInput: () => void;
-  postAction: A;
+  postAction: (inp: Input) => Promise<Response>;
   validator: (text: string) => { msg: string; valid: boolean };
 };
 
-export function useHandle<A extends PostAction>(props: HandleProps<A>) {
+export function useHandle<Input>(props: HandleProps<Input>) {
   const [handling, setHandling] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCounter, setLoadingCounter] = useState(0);
@@ -68,18 +67,20 @@ export function useHandle<A extends PostAction>(props: HandleProps<A>) {
     if (!valid) return setMessage(setErrorMsg, msg);
 
     startHandling();
-    try {
-      const input = props.constructInputData(value) as any;
-      const res = await props.postAction(input);
-      if (res.success) {
+    const input = props.constructInputData(value) as any;
+    const res = await props.postAction(input);
+    switch (res.status) {
+      case 200: {
         setValidMsg(props.messages.valid);
         setErrorMsg("");
         createMsgTimeout(setValidMsg);
-      } else {
-        handleError();
+        return;
       }
-    } catch {
-      handleError();
+      case 400:
+      case 500: {
+        handleError();
+        return;
+      }
     }
   }
 

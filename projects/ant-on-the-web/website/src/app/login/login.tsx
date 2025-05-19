@@ -16,12 +16,13 @@ export const LoginBox = () => {
 
   // const { push } = useRouter();
 
-  const [formState, setFormState] = useState<{ success: boolean; msg: string }>(
-    { success: false, msg: "" }
-  );
+  const [formState, setFormState] = useState<
+    { loading: false; success: boolean; msg: string } | { loading: true }
+  >({ loading: false, success: false, msg: "" });
 
   async function handleLogin(e: any) {
     e.preventDefault();
+    setFormState({ loading: true });
     const response = await login({
       method: { username: loginUnique },
       password: passwordAttempt,
@@ -30,6 +31,7 @@ export const LoginBox = () => {
     switch (response.status) {
       case 500: {
         return setFormState({
+          loading: false,
           success: false,
           msg: "something went wrong, please retry.",
         });
@@ -37,6 +39,7 @@ export const LoginBox = () => {
 
       case 401: {
         return setFormState({
+          loading: false,
           success: false,
           msg: "username or password invalid.",
         });
@@ -51,6 +54,7 @@ export const LoginBox = () => {
             return setPasswordAttemptValidationMsg(j.msg.toLowerCase());
           default:
             return setFormState({
+              loading: false,
               success: false,
               msg: "invalid field, please retry.",
             });
@@ -65,7 +69,11 @@ export const LoginBox = () => {
         setPasswordAttempt("");
         setPasswordAttemptValidationMsg("");
 
-        setFormState({ success: true, msg: "login complete, welcome!" });
+        setFormState({
+          loading: false,
+          success: true,
+          msg: "login complete, welcome!",
+        });
         const user = await (await getUser()).json();
         setUser(user);
         // push("/");
@@ -75,41 +83,46 @@ export const LoginBox = () => {
   }
 
   return (
-    <form
-      className="grid grid-cols-3 max-w-xl gap-0"
-      autoComplete="off"
-      onSubmit={(event) => handleLogin(event)}
-    >
-      <span>your username:</span>
-      <input
-        className="m-1"
-        type="text"
-        name="unique"
-        autoComplete="off"
-        placeholder="ex. kaspar"
-        value={loginUnique}
-        onChange={(e) => setLoginUnique(e.target.value)}
-      />
-      <span className={`m-1 text-red-600 content-center`}>
-        {loginValidationMsg}
-      </span>
-      <span>your password:</span>
-      <input
-        className="m-1"
-        type="password"
-        name="password"
-        autoComplete="off"
-        value={passwordAttempt}
-        onChange={(e) => setPasswordAttempt(e.target.value)}
-      />
-      <span className="text-red-600">{passwordAttemptValidationMsg}</span>
-      <input type="submit" className="m-1" value="login" />
+    <form autoComplete="off" onSubmit={(event) => handleLogin(event)}>
+      <div className="grid grid-cols-3 gap-0">
+        <span className="flex flex-col justify-center">your username:</span>
+        <input
+          className="m-1"
+          type="text"
+          name="unique"
+          autoComplete="off"
+          placeholder="ex. kaspar"
+          value={loginUnique}
+          onChange={(e) => setLoginUnique(e.target.value)}
+        />
+        <span
+          className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+        >
+          {loginValidationMsg}
+        </span>
+        <span className="flex flex-col justify-center">your password:</span>
+        <input
+          className="m-1"
+          type="password"
+          name="password"
+          autoComplete="off"
+          value={passwordAttempt}
+          onChange={(e) => setPasswordAttempt(e.target.value)}
+        />
+        <span className="flex flex-col justify-center m-1 text-red-600 content-center">
+          {passwordAttemptValidationMsg}
+        </span>
+      </div>
+
+      <div className="flex flex-row justify-center w-8/12">
+        <input type="submit" className="w-full m-1" value="login" />
+      </div>
       <span
         className={`m-1 text-${
-          formState.success ? "green" : "red"
+          formState.loading ? "blue" : formState.success ? "green" : "red"
         }-600 content-center`}
       >
-        {formState.msg}
+        {formState.loading ? "loading..." : formState.msg}
       </span>
     </form>
   );

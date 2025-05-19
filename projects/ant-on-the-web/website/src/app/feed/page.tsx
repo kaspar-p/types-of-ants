@@ -4,9 +4,10 @@ import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { Ant, getUnseenAnts } from "@/server/queries";
+import { UserContext } from "@/state/userContext";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
   const months = [
@@ -41,15 +42,16 @@ function AntPost({ ant }: AntPostProps) {
   return (
     <div className="p-2 border-black border-b-2">
       <div>
-        <Link href="/nobody">@nobody</Link>{" "}
-        <small className="pl-1">{formatDate(ant.created_at)}</small>
+        <Link href={`/${ant.createdByUsername}`}>@{ant.createdByUsername}</Link>{" "}
+        <small className="pl-1">{formatDate(ant.createdAt)}</small>
       </div>
-      <div className="pl-4">{ant.ant_name}</div>
+      <div className="pl-4">{ant.antName}</div>
     </div>
   );
 }
 
 export default function Feed() {
+  const { user, setUser } = useContext(UserContext);
   const [page, setPage] = useState(0);
 
   const {

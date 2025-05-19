@@ -6,11 +6,12 @@
   ],
   "antworker001": [
     "ant-host-agent",
-    "ant-gateway" // can only be 1
+    "ant-gateway", // can only be 1
+    "ant-on-the-web" // Only on Ubuntu
   ],
   "antworker002": [
     "ant-host-agent",
     "ant-naming-domains", // can only be 1
-    "ant-on-the-web"
+    "ant-on-the-web" // Only on Ubuntu
   ]
 }

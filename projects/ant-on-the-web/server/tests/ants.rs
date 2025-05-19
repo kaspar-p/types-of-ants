@@ -1,5 +1,8 @@
-use ant_on_the_web::ants::{ReleasedAntsResponse, TotalResponse};
-use fixture::test_router;
+use ant_on_the_web::{
+    ants::{ReleasedAntsResponse, SuggestionRequest, TotalResponse},
+    users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest},
+};
+use fixture::{authn_test_router, test_router};
 use http::StatusCode;
 use tracing_test::traced_test;
 
@@ -23,4 +26,41 @@ async fn ants_total_matches_ants_released() {
     let total: TotalResponse = total_res.json().await;
 
     assert_eq!(total.total, ants.ants.len());
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_suggest_returns_200_with_user_if_authenticated() {
+    let (fixture, cookie) = authn_test_router().await;
+
+    {
+        let req = SuggestionRequest {
+            suggestion_content: "some ant content".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/suggest")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_suggest_returns_200_even_if_not_authenticated() {
+    let fixture = test_router().await;
+
+    let req = SuggestionRequest {
+        suggestion_content: "some ant content".to_string(),
+    };
+    let res = fixture
+        .client
+        .post("/api/ants/suggest")
+        .json(&req)
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
 }

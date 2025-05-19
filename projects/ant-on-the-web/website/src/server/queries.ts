@@ -5,6 +5,7 @@ const antSchema = z.object({
   antId: z.string(),
   antName: z.string(),
   createdAt: z.string(),
+  createdByUsername: z.string(),
 });
 export type Ant = z.infer<typeof antSchema>;
 export type Ants = Ant[];
@@ -67,8 +68,8 @@ const queries = {
     schema: z.object({
       ants: z.array(antSchema),
     }),
-    transformer: (data: Ants): Ants => {
-      return data;
+    transformer: (data: { ants: Ants }): Ants => {
+      return data.ants;
     },
   },
   getReleasedAnts: {
@@ -115,7 +116,7 @@ async function constructQuery<Q extends Query>(
     }
   }
 
-  const data = await (await fetch(endpoint)).json();
+  const data = await (await fetch(endpoint, getFetchOptions())).json();
   const transformedData = query.transformer(data);
   return transformedData as any as QueryRet<Q>;
 }

@@ -58,6 +58,9 @@ pub struct Ant {
     #[serde(rename = "createdBy")]
     pub created_by: UserId,
 
+    #[serde(rename = "createdByUsername")]
+    pub created_by_username: String,
+
     pub tweeted: Tweeted,
 
     pub status: AntStatus,
@@ -92,12 +95,14 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
             .lock()
             .await
             .query(
-                "select 
+                "
+            select 
                 ant.ant_id, 
                 ant.suggested_content,
                 ant_release.ant_content, 
                 ant_release.release_number, 
                 ant.created_at,
+                registered_user.user_name,
                 ant.ant_user_id,
                 ant_declined.ant_declined_at,
                 ant_tweeted.tweeted_at
@@ -105,6 +110,7 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                 ant left join ant_release on ant.ant_id = ant_release.ant_id
                     left join ant_declined on ant.ant_id = ant_declined.ant_id
                     left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                    left join registered_user on ant.ant_user_id = registered_user.user_id
             ",
                 &[],
             )
@@ -119,12 +125,14 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
             .lock()
             .await
             .query(
-                "select 
+                "
+            select 
                 ant.ant_id, 
                 ant.suggested_content,
                 ant_release.ant_content, 
                 ant_release.release_number, 
                 ant.created_at,
+                registered_user.user_name,
                 ant.ant_user_id,
                 ant_declined.ant_declined_at,
                 ant_tweeted.tweeted_at
@@ -132,6 +140,7 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                 ant left join ant_release on ant.ant_id = ant_release.ant_id
                     left join ant_declined on ant.ant_id = ant_declined.ant_id
                     left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                    left join registered_user on ant.ant_user_id = registered_user.user_id
             where
                 ant.ant_id = $1
             ",
@@ -174,6 +183,7 @@ fn row_to_ant(row: &Row) -> Ant {
         ant_id: row.get("ant_id"),
         ant_name: content,
         created_at: row.get("created_at"),
+        created_by_username: row.get("user_name"),
         created_by: row.get("ant_user_id"),
         status,
         tweeted: tweeted_status,
@@ -197,7 +207,12 @@ impl AntsDao {
             .lock()
             .await
             .execute(
-                "insert into ant_tweeted (ant_id, tweeted_at) values ($1::uuid, $2::timestamptz) limit 1",
+                "
+            insert into ant_tweeted
+                (ant_id, tweeted_at)
+            values
+                ($1::uuid, $2::timestamptz)
+            limit 1",
                 &[&ant.0, &time],
             )
             .await?;
@@ -226,30 +241,33 @@ impl AntsDao {
         &mut self,
         ant_suggestion_content: String,
         user_id: UserId,
-    ) -> Result<(), tokio_postgres::Error> {
+        username: String,
+    ) -> Result<Ant, tokio_postgres::Error> {
         let ant = Ant {
             ant_id: AntId(uuid::Uuid::new_v4()),
             ant_name: ant_suggestion_content,
             created_at: chrono::offset::Utc::now(),
             created_by: user_id,
+            created_by_username: username,
             tweeted: Tweeted::NotTweeted,
             status: AntStatus::Unreleased,
         };
 
-        let changed = self
-            .database
+        self.database
             .lock()
             .await
             .execute(
-                "insert into ant (ant_id, suggested_content, ant_user_id) values ($1::uuid, $2, $3::uuid) limit 1",
+                "
+            insert into ant
+                (ant_id, suggested_content, ant_user_id)
+            values
+                ($1::uuid, $2, $3::uuid)
+            limit 1",
                 &[&ant.ant_id.0, &ant.ant_name, &ant.created_by.0],
             )
-            .await;
-        if let Err(e) = changed {
-            return Result::Err(e);
-        }
+            .await?;
 
-        Ok(())
+        Ok(ant)
     }
 }
 

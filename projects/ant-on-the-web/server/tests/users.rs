@@ -1,4 +1,4 @@
-use fixture::test_router;
+use fixture::{authn_test_router, test_router};
 use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
 
@@ -394,6 +394,31 @@ async fn users_logout_returns_4xx_if_not_authenticated() {
 
 #[tokio::test]
 #[traced_test]
+async fn users_logout_returns_200_if_authenticated() {
+    let (fixture, cookie) = authn_test_router().await;
+
+    {
+        let res = fixture
+            .client
+            .post("/api/users/logout")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let expiration_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert!(expiration_cookie.contains("typesofants_auth="));
+        assert!(expiration_cookie.contains("HttpOnly"));
+        assert!(expiration_cookie.contains("SameSite"));
+
+        let text = res.text().await;
+        assert_eq!(text, "Logout successful.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
 async fn users_login_returns_401_if_wrong_fields() {
     let fixture = test_router().await;
 
@@ -646,53 +671,14 @@ async fn users_user_returns_400_if_missing_token() {
 #[tokio::test]
 #[traced_test]
 async fn users_user_returns_200_if_authn_token_right() {
-    let fixture = test_router().await;
-
-    // Signup
-    {
-        let req = SignupRequest {
-            username: "someuser".to_string(),
-            email: "email@domain.com".to_string(),
-            phone_number: "+1 (111) 222-3333".to_string(),
-            password: "my-ant-password".to_string(),
-        };
-        let res = fixture
-            .client
-            .post("/api/users/signup")
-            .json(&req)
-            .send()
-            .await;
-
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
-    }
-
-    // Login
-    let token = {
-        let req = LoginRequest {
-            method: LoginMethod::Phone("+1 (111) 222-3333".to_string()),
-            password: "my-ant-password".to_string(),
-        };
-
-        let res = fixture
-            .client
-            .post("/api/users/login")
-            .json(&req)
-            .send()
-            .await;
-
-        assert_eq!(res.status(), StatusCode::OK);
-        let res: LoginResponse = res.json().await;
-        assert!(res.access_token.contains(".")); // JWT standard mandates it
-        res.access_token
-    };
+    let (fixture, cookie) = authn_test_router().await;
 
     // Hit authenticated endpoint /users/user/{user_name}
     {
         let res = fixture
             .client
             .get("/api/users/user/someuser")
-            .header("Cookie", ("typesofants_auth=".to_owned() + &token).as_str())
+            .header("Cookie", &cookie)
             .send()
             .await;
 

@@ -20,12 +20,17 @@ pub struct Email(String);
 pub struct User {
     #[serde(rename = "userId")]
     pub user_id: UserId,
+
     pub username: String,
+
     #[serde(rename = "phoneNumber")]
     pub phone_number: String,
+
     #[serde(skip)]
     pub password_hash: String,
+
     pub emails: Vec<String>,
+
     #[serde(with = "chrono::serde::ts_seconds")]
     pub joined: DateTime<Utc>,
 }

@@ -48,7 +48,7 @@ export function Header() {
             ants discovered to date: {totalAntsResult?.data}
           </h3>
           <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
-            <div className="text-center flex flex-row space-x-2 align-center">
+            <div className="text-center flex flex-row space-x-2 align-center justify-center">
               {user.loggedIn ? (
                 <>
                   <button onClick={() => push("/profile")}>profile</button>
@@ -58,7 +58,9 @@ export function Header() {
                 <button onClick={() => push("/login")}>log in / signup</button>
               )}
               <button onClick={() => push("/")}>home</button>
-              <button onClick={() => push("/feed")}>feed</button>
+              {user.loggedIn && (
+                <button onClick={() => push("/feed")}>feed</button>
+              )}
               <button onClick={() => push("/info")}>contact me</button>
               <button
                 onClick={() =>

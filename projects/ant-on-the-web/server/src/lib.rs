@@ -2,11 +2,14 @@ use ant_data_farm::AntDataFarmClient;
 use axum::{routing::get, Router};
 use axum_extra::routing::RouterExt;
 use http::header;
-use hyper::http::{header::CONTENT_TYPE, Method};
+use hyper::http::Method;
 use std::sync::Arc;
 use tower::ServiceBuilder;
-use tower_http::cors::AllowOrigin;
-use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    services::ServeDir,
+    trace::TraceLayer,
+};
 use tracing::debug;
 
 mod clients;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FormEvent, useState } from "react";
+import React, { useState } from "react";
 import { suggestAnt } from "../server/posts";
 import { useHandle } from "@/utils/useHandle";
 
@@ -26,7 +26,7 @@ export function SuggestionBox(props: SuggestionBoxProps) {
   const [ant, setAnt] = useState("");
   const { validMsg, loadingMsg, errorMsg, handle } = useHandle({
     postAction: suggestAnt,
-    constructInputData: (val: string) => ({ suggestion_content: val }),
+    constructInputData: (val: string) => ({ suggestionContent: val }),
     clearInput: () => setAnt(""),
     inputName: "ant",
     messages: {

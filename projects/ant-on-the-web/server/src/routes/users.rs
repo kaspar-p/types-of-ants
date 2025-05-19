@@ -1,17 +1,7 @@
 use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::LazyLock;
 
 use crate::types::{DbRouter, DbState};
-use ant_data_farm::users::verify_password_hash;
-use ant_data_farm::users::User;
-use ant_data_farm::users::UserId;
-use ant_data_farm::AntDataFarmClient;
-use ant_data_farm::DaoTrait;
-use ant_library::get_mode;
-use ant_library::Mode;
-use axum::extract::FromRequestParts;
-use axum::RequestPartsExt;
+use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -19,32 +9,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use axum_extra::extract::cookie::SameSite;
-use axum_extra::headers;
-use axum_extra::{extract::cookie::Cookie, routing::RouterExt, TypedHeader};
+use axum_extra::routing::RouterExt;
 use http::header;
-use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::Header;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
-    let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
-    AuthKeys::new(secret.as_bytes())
-});
-
-struct AuthKeys {
-    encoding: EncodingKey,
-    decoding: DecodingKey,
-}
-
-impl AuthKeys {
-    pub fn new(secret: &[u8]) -> Self {
-        AuthKeys {
-            encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret),
-        }
-    }
-}
+use super::lib::auth::{authenticate, make_cookie, AuthClaims, AuthError, AUTH_KEYS};
 
 #[derive(Deserialize)]
 pub struct EmailRequest {
@@ -137,15 +108,6 @@ async fn get_user_by_name(
     ));
 }
 
-async fn authenticate(auth: &AuthClaims, dao: &Arc<AntDataFarmClient>) -> Result<User, UsersError> {
-    let users = dao.users.read().await;
-    let user = users.get_one_by_id(&auth.sub).await?;
-    match user {
-        None => Err(UsersError::AccessDenied(Some(auth.sub.to_string()))),
-        Some(u) => Ok(u),
-    }
-}
-
 async fn logout(auth: AuthClaims, State(dao): DbState) -> Result<impl IntoResponse, UsersError> {
     authenticate(&auth, &dao).await?;
 
@@ -230,11 +192,7 @@ async fn login(
         return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
     }
 
-    let claims = AuthClaims {
-        sub: user.user_id.clone(),
-        exp: 2000000000, // may 2033, my problem then!
-    };
-
+    let claims = AuthClaims::new(user.user_id.clone());
     let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
 
     // TODO: Verify with two-factor
@@ -252,75 +210,8 @@ async fn login(
         .into_response());
 }
 
-fn make_cookie(jwt: String) -> Cookie<'static> {
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
-    Cookie::build(("typesofants_auth", jwt.clone()))
-        .secure(true)
-        .http_only(true)
-        .permanent()
-        .path("/")
-        .same_site(match get_mode() {
-            Mode::Dev => SameSite::None,
-            Mode::Prod => SameSite::Strict,
-        })
-        .build()
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct AuthClaims {
-    /// JWT subject, as per standard.
-    sub: UserId,
-    /// JWT expiration, as per standard.
-    exp: usize,
-}
-
-impl<S> FromRequestParts<S> for AuthClaims
-where
-    S: Send + Sync,
-{
-    type Rejection = (StatusCode, String);
-
-    async fn from_request_parts(
-        parts: &mut http::request::Parts,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        // Extract the Bearer token header
-        let TypedHeader(cookie) = parts
-            .extract::<TypedHeader<headers::Cookie>>()
-            .await
-            .map_err(|e| {
-                warn!("Invalid authorization token: {e}");
-                return (
-                    StatusCode::BAD_REQUEST,
-                    "Invalid authorization token.".to_string(),
-                );
-            })?;
-
-        let jwt = match cookie.get("typesofants_auth") {
-            Some(cookie) => cookie,
-            None => {
-                warn!("No 'typesofants_auth' cookie found.");
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Invalid authorization token.".to_string(),
-                ));
-            }
-        };
-
-        // Decode claim data
-        let claim_data = decode::<AuthClaims>(jwt, &AUTH_KEYS.decoding, &Validation::default())
-            .map_err(|e| {
-                warn!("Unauthorized access attempted: {e}");
-                return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-            })?;
-
-        return Ok(claim_data.claims);
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct VerificationRequest {
-    pub user_id: UserId,
     pub submission: VerificationSubmission,
 }
 
@@ -527,6 +418,15 @@ impl IntoResponse for UsersError {
                 (StatusCode::CONFLICT, Json(taken))
             }
             .into_response(),
+        }
+    }
+}
+
+impl From<AuthError> for UsersError {
+    fn from(value: AuthError) -> Self {
+        match value {
+            AuthError::AccessDenied(e) => UsersError::AccessDenied(e),
+            AuthError::InternalServerError(e) => UsersError::InternalServerError(e),
         }
     }
 }
