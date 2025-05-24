@@ -22,60 +22,55 @@ use super::lib::{
     err::AntOnTheWebError,
 };
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct EmailRequest {
-    email: String,
+    pub email: String,
 }
-async fn add_anonymous_email(
+async fn subscribe_email(
+    auth: Option<AuthClaims>,
     State(dao): DbState,
-    Json(EmailRequest { email }): Json<EmailRequest>,
+    Json(EmailRequest { email: unsafe_email }): Json<EmailRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    debug!("Subscribing with email {}", email);
-
-    let exists = {
-        let users = dao.users.read().await;
-        users
-            .get_one_by_user_name("nobody")
-            .await?
-            .map(|u| u.emails.contains(&email))
-    };
-    match exists {
+    let user = match auth {
         None => {
-            return Ok((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Failed to validate uniqueness").into_response(),
-            ))
+            let users = dao.users.read().await;
+            users
+                .get_one_by_user_name("nobody")
+                .await?
+                .expect("nobody user exists")
         }
-        Some(email_exists) => {
-            if email_exists {
-                return Ok((
-                    StatusCode::BAD_REQUEST,
-                    Json(format!("Email '{email}' is already subscribed!")).into_response(),
-                ));
+        Some(auth) => authenticate(&auth, &dao).await?,
+    };
+
+    let canonical_email= match canonicalize_email(&unsafe_email) {
+        Ok(e) => e,
+        Err(e )=> {
+            info!("email invalid {e}");
+            return Err(AntOnTheWebError::ValidationError(ValidationError { errors: 
+                vec![ValidationMessage::invalid("email")] }));
+        }
+    };
+
+    {
+        let users = dao.users.read().await;
+
+        if let Some(u) = users.get_one_by_email(&canonical_email).await? {
+            if u != user {
+                return Err(AntOnTheWebError::ConflictError("Already subscribed!"));
             }
         }
     }
 
-    let nobody_user: Option<User> = {
-        let users = dao.users.read().await;
-        users.get_one_by_user_name("nobody").await?
-    };
-    if nobody_user.is_none() {
-        return Ok((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Failed attaching email!").into_response(),
-        ));
+    if user.emails.contains(&canonical_email) {
+        return Err(AntOnTheWebError::ConflictError("Already subscribed!"));
     }
 
     let mut user_write = dao.users.write().await;
     user_write
-        .add_email_to_user(nobody_user.unwrap().user_id, email)
+        .add_email_to_user(user.user_id, canonical_email)
         .await?;
 
-    return Ok((
-        StatusCode::OK,
-        Json("Subscribed!".to_owned()).into_response(),
-    ));
+    return Ok((StatusCode::OK, "Subscribed!"));
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -374,7 +369,7 @@ async fn signup_request(
 
 pub fn router() -> DbRouter {
     Router::new()
-        .route_with_tsr("/subscribe-newsletter", post(add_anonymous_email))
+        .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))

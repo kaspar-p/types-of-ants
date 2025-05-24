@@ -21,6 +21,7 @@ mod clients;
 mod routes;
 mod types;
 
+use crate::err::AntOnTheWebError;
 pub use crate::routes::ants;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;
@@ -55,11 +56,7 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
         } => (StatusCode::TOO_MANY_REQUESTS, "Throttling limit reached.").into_response(),
         err => {
             error!("throttling failed {err}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Something went wrong, please retry.",
-            )
-                .into_response()
+            AntOnTheWebError::InternalServerError(None).into_response()
         }
     }
 }

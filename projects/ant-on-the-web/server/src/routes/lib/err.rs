@@ -38,7 +38,7 @@ pub struct ValidationError {
 
 pub enum AntOnTheWebError {
     AccessDenied(Option<String>),
-    InternalServerError(anyhow::Error),
+    InternalServerError(Option<anyhow::Error>),
     ValidationError(ValidationError),
     ConflictError(&'static str),
 }
@@ -47,7 +47,7 @@ impl IntoResponse for AntOnTheWebError {
     fn into_response(self) -> Response {
         match self {
             AntOnTheWebError::InternalServerError(e) => {
-                error!("AntOnTheWebError::InternalServerError {}", e);
+                error!("AntOnTheWebError::InternalServerError, err: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong, please retry.",
@@ -77,7 +77,7 @@ impl From<AuthError> for AntOnTheWebError {
     fn from(value: AuthError) -> Self {
         match value {
             AuthError::AccessDenied(e) => AntOnTheWebError::AccessDenied(e),
-            AuthError::InternalServerError(e) => AntOnTheWebError::InternalServerError(e),
+            AuthError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
         }
     }
 }
@@ -87,6 +87,6 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError(err.into())
+        Self::InternalServerError(Some(err.into()))
     }
 }

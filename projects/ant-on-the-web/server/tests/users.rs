@@ -4,7 +4,9 @@ use tracing_test::traced_test;
 
 use ant_on_the_web::{
     err::ValidationError,
-    users::{GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest},
+    users::{
+        EmailRequest, GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
+    },
 };
 
 mod fixture;
@@ -747,5 +749,122 @@ async fn users_user_returns_200_if_authn_token_right() {
         assert_eq!(res.user.emails[0].as_str(), "email@domain.com");
         assert_eq!(res.user.username, "user");
         assert_ne!(res.user.password_hash, "my-ant-password");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_subscribe_newsletter_returns_400_if_malformed_email() {
+    let (fixture, cookie) = authn_test_router().await;
+
+    {
+        let req = EmailRequest {
+            email: "blahblah".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        let res: ValidationError = res.json().await;
+        let v = res.errors.first().unwrap();
+        assert_eq!(v.field, "email");
+        assert_eq!(v.msg, "Field invalid.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_subscribe_newsletter_returns_409_if_email_already_registered() {
+    let (fixture, cookie) = authn_test_router().await;
+
+    {
+        let req = EmailRequest {
+            email: "brand-new@domain.com".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    {
+        let req = EmailRequest {
+            email: "brand-new@domain.com".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        assert_eq!(res.text().await, "Already subscribed!");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_subscribe_newsletter_returns_200_for_unauthenticated_calls() {
+    let (fixture, _) = authn_test_router().await;
+
+    {
+        let req = EmailRequest {
+            email: "some-new-email@domain.com".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_subscribe_newsletter_returns_409_if_email_taken_by_another_user() {
+    let (fixture, cookie) = authn_test_router().await;
+
+    {
+        let req = EmailRequest {
+            email: "some-new-email@domain.com".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    {
+        let req = EmailRequest {
+            email: "some-new-email@domain.com".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/subscribe-newsletter")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::CONFLICT);
     }
 }
