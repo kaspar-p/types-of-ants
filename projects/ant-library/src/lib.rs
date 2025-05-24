@@ -59,7 +59,11 @@ pub fn set_global_logs(project: &str) -> () {
     debug!("Logs initialized...");
 }
 
-async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes, (StatusCode, String)>
+async fn buffer_and_print<B>(
+    direction: &str,
+    body: B,
+    redact: bool,
+) -> Result<Bytes, (StatusCode, String)>
 where
     B: axum::body::HttpBody<Data = Bytes>,
     B::Error: std::fmt::Display,
@@ -75,7 +79,11 @@ where
     };
 
     if let Ok(body) = std::str::from_utf8(&bytes) {
-        tracing::debug!("{} body = {:?}", direction, body);
+        if redact {
+            tracing::debug!("{} body = {{REDACTED}}", direction)
+        } else {
+            tracing::debug!("{} body = {:?}", direction, body)
+        };
     }
 
     Ok(bytes)
@@ -83,17 +91,20 @@ where
 
 /// Axum middleware for printing requests and responses.
 /// Should be used as a middleware layer for all types-of-ants web servers.
+/// Use `ignore_paths` to specify the paths which to REDACT the request and response.
 pub async fn middleware_print_request_response(
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let redact = req.uri().path().contains("signup") || req.uri().path().contains("login");
+
     let (parts, body) = req.into_parts();
-    let bytes = buffer_and_print("request", body).await?;
+    let bytes = buffer_and_print("request", body, redact).await?;
     let request = Request::from_parts(parts, Body::from(bytes));
     let res = next.run(request).await;
 
     let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body).await?;
+    let bytes = buffer_and_print("response", body, redact).await?;
     let response = Response::from_parts(parts, Body::from(bytes));
 
     Ok(response)

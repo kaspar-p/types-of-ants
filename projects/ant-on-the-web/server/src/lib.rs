@@ -4,6 +4,7 @@ use axum_extra::routing::RouterExt;
 use http::{header, Response, StatusCode};
 use hyper::http::Method;
 use std::sync::Arc;
+use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
 use tower_governor::{
     governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorError,
@@ -15,10 +16,11 @@ use tower_http::{
     services::ServeDir,
     trace::TraceLayer,
 };
-use tracing::{debug, error};
+use tracing::debug;
 
 mod clients;
 mod routes;
+mod throttle;
 mod types;
 
 use crate::err::AntOnTheWebError;
@@ -55,20 +57,22 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
             headers: _,
         } => (StatusCode::TOO_MANY_REQUESTS, "Throttling limit reached.").into_response(),
         err => {
-            error!("throttling failed {err}");
-            AntOnTheWebError::InternalServerError(None).into_response()
+            AntOnTheWebError::InternalServerError(Some(anyhow::Error::msg(format!("{:?}", err))))
+                .into_response()
         }
     }
 }
 
 pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Router, anyhow::Error> {
+    debug!("Initializing API routes...");
+
     let governor_conf = Arc::new(
         GovernorConfigBuilder::default()
             // 10 TPS
             .period(std::time::Duration::from_millis(100))
             .burst_size(25)
             .use_headers()
-            .key_extractor(SmartIpKeyExtractor) // Limit based on X-Real-IP Header
+            .key_extractor(ThrottleExtractor::new()) // Limit based on X-Real-IP Header
             .error_handler(|err| handle_throttling_error(&err))
             .finish()
             .unwrap(),
@@ -80,7 +84,6 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
         .allow_credentials(true)
         .allow_headers([header::CONTENT_TYPE]);
 
-    debug!("Initializing API routes...");
     let api_routes = Router::new()
         .nest("/ants", ants::router())
         // .nest("/msg", routes::msg::router())
@@ -118,11 +121,11 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(cors),
-        )
-        .layer(GovernorLayer {
-            config: governor_conf,
-        });
+                .layer(cors)
+                .layer(GovernorLayer {
+                    config: governor_conf,
+                }),
+        );
 
     return Ok(app);
 }

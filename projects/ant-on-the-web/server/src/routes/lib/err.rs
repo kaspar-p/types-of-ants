@@ -4,7 +4,6 @@ use axum::{
 };
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::{error, warn};
 
 use super::auth::AuthError;
@@ -47,7 +46,7 @@ impl IntoResponse for AntOnTheWebError {
     fn into_response(self) -> Response {
         match self {
             AntOnTheWebError::InternalServerError(e) => {
-                error!("AntOnTheWebError::InternalServerError, err: {:?}", e);
+                error!("AntOnTheWebError::InternalServerError: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong, please retry.",
@@ -56,17 +55,17 @@ impl IntoResponse for AntOnTheWebError {
             }
 
             AntOnTheWebError::AccessDenied(identity) => {
-                warn!("AntOnTheWebError::AccessDenied, identity: {:?}", identity);
+                warn!("AntOnTheWebError::AccessDenied: {:?}", identity);
                 (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
             }
 
             AntOnTheWebError::ValidationError(msg) => {
-                warn!("AntOnTheWebError::ValidationError {:?}", msg);
+                warn!("AntOnTheWebError::ValidationError: {:?}", msg);
                 (StatusCode::BAD_REQUEST, Json(msg)).into_response()
             }
 
             AntOnTheWebError::ConflictError(taken) => {
-                warn!("UsersError::ConflictError {:?}", taken);
+                warn!("UsersError::ConflictError: {:?}", taken);
                 (StatusCode::CONFLICT, taken).into_response()
             }
         }
