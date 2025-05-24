@@ -7,11 +7,11 @@ import { LoginBox } from "./login";
 export default function LoginPage() {
   return (
     <div className="h-full w-full flex flex-col md:flex-row justify-center">
-      <div className="m-4">
+      <div className="m-4 w-full md:w-8/12 xl:w-3/12">
         <h2>login</h2>
         <LoginBox />
       </div>
-      <div className="m-4">
+      <div className="m-4 w-full md:w-8/12 xl:w-3/12">
         <h2>signup</h2>
         <SignupBox />
       </div>

@@ -1,13 +1,15 @@
 use std::str::FromStr;
 
 use crate::{
-    err::ValidationError, routes::lib::err::ValidationMessage, types::{DbRouter, DbState}
+    err::ValidationError,
+    routes::lib::err::ValidationMessage,
+    types::{DbRouter, DbState},
 };
 use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -29,7 +31,9 @@ pub struct EmailRequest {
 async fn subscribe_email(
     auth: Option<AuthClaims>,
     State(dao): DbState,
-    Json(EmailRequest { email: unsafe_email }): Json<EmailRequest>,
+    Json(EmailRequest {
+        email: unsafe_email,
+    }): Json<EmailRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let user = match auth {
         None => {
@@ -42,12 +46,13 @@ async fn subscribe_email(
         Some(auth) => authenticate(&auth, &dao).await?,
     };
 
-    let canonical_email= match canonicalize_email(&unsafe_email) {
+    let canonical_email = match canonicalize_email(&unsafe_email) {
         Ok(e) => e,
-        Err(e )=> {
+        Err(e) => {
             info!("email invalid {e}");
-            return Err(AntOnTheWebError::ValidationError(ValidationError { errors: 
-                vec![ValidationMessage::invalid("email")] }));
+            return Err(AntOnTheWebError::ValidationError(ValidationError {
+                errors: vec![ValidationMessage::invalid("email")],
+            }));
         }
     };
 
@@ -185,7 +190,9 @@ async fn login(
 
     let user = match user {
         Err(v) => {
-            return Err(AntOnTheWebError::ValidationError(ValidationError{errors: vec![v]}));
+            return Err(AntOnTheWebError::ValidationError(ValidationError {
+                errors: vec![v],
+            }));
         }
         Ok(None) => {
             return Err(AntOnTheWebError::AccessDenied(None));
@@ -309,9 +316,9 @@ async fn signup_request(
         }
 
         if !signup_request.password.contains("ant") {
-            validations.push(ValidationMessage::new( 
+            validations.push(ValidationMessage::new(
                  "password",
-                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
+                                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
             ));
         }
 
@@ -323,7 +330,9 @@ async fn signup_request(
 
     let (canonical_email, canonical_phone_number) = match validations {
         Err(v) => {
-            return Err(AntOnTheWebError::ValidationError(ValidationError { errors: v }));
+            return Err(AntOnTheWebError::ValidationError(ValidationError {
+                errors: v,
+            }));
         }
         Ok(data) => data,
     };

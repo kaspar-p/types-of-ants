@@ -46,18 +46,30 @@ export const LoginBox = () => {
       }
 
       case 400: {
-        const j: { field: string; msg: string } = await response.json();
-        switch (j.field) {
-          case "method":
-            return setLoginValidationMsg(j.msg.toLowerCase());
-          case "password":
-            return setPasswordAttemptValidationMsg(j.msg.toLowerCase());
-          default:
-            return setFormState({
-              loading: false,
-              success: false,
-              msg: "invalid field, please retry.",
-            });
+        const resp: { errors: { field: string; msg: string }[] } =
+          await response.json();
+
+        for (const error of resp.errors) {
+          switch (error.field) {
+            case "method.email":
+            case "method.username":
+            case "method.phone": {
+              setLoginValidationMsg(error.msg.toLowerCase());
+              break;
+            }
+            case "password": {
+              setPasswordAttemptValidationMsg(error.msg.toLowerCase());
+              break;
+            }
+            default: {
+              setFormState({
+                loading: false,
+                success: false,
+                msg: "invalid field, please retry.",
+              });
+              break;
+            }
+          }
         }
       }
 
@@ -93,7 +105,10 @@ export const LoginBox = () => {
           autoComplete="off"
           placeholder="ex. kaspar"
           value={loginUnique}
-          onChange={(e) => setLoginUnique(e.target.value)}
+          onChange={(e) => {
+            setLoginUnique(e.target.value);
+            setLoginValidationMsg("");
+          }}
         />
         <span
           className={`flex flex-col justify-center m-1 text-red-600 content-center`}
@@ -107,7 +122,10 @@ export const LoginBox = () => {
           name="password"
           autoComplete="off"
           value={passwordAttempt}
-          onChange={(e) => setPasswordAttempt(e.target.value)}
+          onChange={(e) => {
+            setPasswordAttempt(e.target.value);
+            setPasswordAttemptValidationMsg("");
+          }}
         />
         <span className="flex flex-col justify-center m-1 text-red-600 content-center">
           {passwordAttemptValidationMsg}

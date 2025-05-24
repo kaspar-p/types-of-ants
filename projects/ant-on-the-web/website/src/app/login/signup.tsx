@@ -32,52 +32,58 @@ export function SignupBox() {
     switch (response.status) {
       default:
       case 500: {
-        return setFormState({
+        setFormState({
           loading: false,
           success: false,
           msg: "something went wrong, please retry.",
         });
+        break;
       }
 
       case 409: {
-        const j: { msg: string } = await response.json();
-        return setFormState({
+        const msg = await response.text();
+        setFormState({
           loading: false,
           success: false,
-          msg: j.msg.toLowerCase(),
+          msg: msg.toLowerCase(),
         });
+        break;
       }
 
       case 400: {
-        const j: { field: string; msg: string } = await response.json();
-        switch (j.field) {
-          case "phoneNumber": {
-            setPhoneValidationMsg(j.msg.toLowerCase());
-            setFormState({ loading: false, success: false, msg: "" });
-            break;
+        const errors: { errors: { field: string; msg: string }[] } =
+          await response.json();
+        for (const error of errors.errors) {
+          switch (error.field) {
+            case "phoneNumber": {
+              setPhoneValidationMsg(error.msg.toLowerCase());
+              setFormState({ loading: false, success: false, msg: "" });
+              break;
+            }
+            case "email": {
+              setEmailValidationMsg(error.msg.toLowerCase());
+              setFormState({ loading: false, success: false, msg: "" });
+              break;
+            }
+            case "username": {
+              setUsernameValidationMsg(error.msg.toLowerCase());
+              setFormState({ loading: false, success: false, msg: "" });
+              break;
+            }
+            case "password": {
+              setPasswordValidationMsg(error.msg.toLowerCase());
+              setFormState({ loading: false, success: false, msg: "" });
+              break;
+            }
+            default:
+              return setFormState({
+                loading: false,
+                success: false,
+                msg: "invalid field, please retry.",
+              });
           }
-          case "email": {
-            setEmailValidationMsg(j.msg.toLowerCase());
-            setFormState({ loading: false, success: false, msg: "" });
-            break;
-          }
-          case "username": {
-            setUsernameValidationMsg(j.msg.toLowerCase());
-            setFormState({ loading: false, success: false, msg: "" });
-            break;
-          }
-          case "password": {
-            setPasswordValidationMsg(j.msg.toLowerCase());
-            setFormState({ loading: false, success: false, msg: "" });
-            break;
-          }
-          default:
-            return setFormState({
-              loading: false,
-              success: false,
-              msg: "invalid field, please retry.",
-            });
         }
+        break;
       }
 
       case 200: {
@@ -97,6 +103,7 @@ export function SignupBox() {
           success: true,
           msg: "signup complete, welcome!",
         });
+        break;
       }
     }
   }
@@ -114,7 +121,10 @@ export function SignupBox() {
             autoComplete="off"
             placeholder="ex. kaspar"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setUsernameValidationMsg("");
+            }}
           />
           <span
             className={`flex flex-col justify-center m-1 text-red-600 content-center`}
@@ -132,7 +142,10 @@ export function SignupBox() {
             autoComplete="off"
             placeholder="ex. +1 (000) 111-2222"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setPhoneValidationMsg("");
+            }}
           />
           <span
             className={`flex flex-col justify-center m-1 text-red-600 content-center`}
@@ -148,7 +161,10 @@ export function SignupBox() {
             autoComplete="off"
             placeholder="ex. kaspar@typesofants.org"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailValidationMsg("");
+            }}
           />
           <span
             className={`flex flex-col justify-center m-1 text-red-600 content-center`}
@@ -163,7 +179,10 @@ export function SignupBox() {
             autoComplete="off"
             name="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setPasswordValidationMsg("");
+            }}
           />
           <span
             className={`flex flex-col justify-center m-1 text-red-600 content-center`}
