@@ -2,9 +2,9 @@ use fixture::{authn_test_router, test_router};
 use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
 
-use ant_on_the_web::users::{
-    GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest, UserTaken,
-    ValidationMessage,
+use ant_on_the_web::{
+    err::ValidationError,
+    users::{GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest},
 };
 
 mod fixture;
@@ -43,9 +43,10 @@ async fn users_signup_returns_400_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "username");
-        assert_eq!(j.msg, "Field must be between 3 and 16 characters.");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "username");
+        assert_eq!(err.msg, "Field must be between 3 and 16 characters.");
     }
 
     {
@@ -63,9 +64,10 @@ async fn users_signup_returns_400_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "username");
-        assert_eq!(j.msg, "Field must be between 3 and 16 characters.");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "username");
+        assert_eq!(err.msg, "Field must be between 3 and 16 characters.");
     }
 
     {
@@ -83,10 +85,11 @@ async fn users_signup_returns_400_if_username_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "username");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "username");
         assert_eq!(
-            j.msg,
+            err.msg,
             "Field must contain only lowercase characters (a-z) and numbers (0-9)."
         );
     }
@@ -110,9 +113,65 @@ async fn users_signup_returns_400_if_phone_number_invalid() {
         .await;
 
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-    let j: ValidationMessage = res.json().await;
-    assert_eq!(j.field, "phoneNumber");
-    assert_eq!(j.msg, "Field invalid.");
+    let j: ValidationError = res.json().await;
+    let err = j.errors.first().unwrap();
+    assert_eq!(err.field, "phoneNumber");
+    assert_eq!(err.msg, "Field invalid.");
+}
+
+#[tokio::test]
+async fn users_signup_returns_400_with_multiple_errors() {
+    let fixture = test_router().await;
+
+    {
+        let req = SignupRequest {
+            username: "BAD__CHARACTERS__ERROR__AND__TOO_LONG".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "not a number".to_string(),
+            password: "my-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        let j: ValidationError = res.json().await;
+
+        assert_eq!(j.errors.len(), 4);
+
+        let e_password = j.errors.iter().find(|f| f.field == "password").unwrap();
+        assert_eq!(e_password.field, "password");
+        assert_eq!(e_password.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+
+        let e_phone = j.errors.iter().find(|f| f.field == "phoneNumber").unwrap();
+        assert_eq!(e_phone.field, "phoneNumber");
+        assert_eq!(e_phone.msg, "Field invalid.");
+
+        let e_username_len = j
+            .errors
+            .iter()
+            .find(|f| f.field == "username" && f.msg.contains("between"))
+            .unwrap();
+        assert_eq!(e_username_len.field, "username");
+        assert_eq!(
+            e_username_len.msg,
+            "Field must be between 3 and 16 characters."
+        );
+
+        let e_username_chars = j
+            .errors
+            .iter()
+            .find(|f| f.field == "username" && f.msg.contains("contain"))
+            .unwrap();
+        assert_eq!(e_username_chars.field, "username");
+        assert_eq!(
+            e_username_chars.msg,
+            "Field must contain only lowercase characters (a-z) and numbers (0-9)."
+        );
+    }
 }
 
 #[tokio::test]
@@ -134,9 +193,11 @@ async fn users_signup_returns_400_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "password");
-        assert_eq!(j.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+
+        assert_eq!(err.field, "password");
+        assert_eq!(err.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
     }
 
     {
@@ -154,9 +215,10 @@ async fn users_signup_returns_400_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "password");
-        assert_eq!(j.msg, "Field must be between 8 and 64 characters.");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "password");
+        assert_eq!(err.msg, "Field must be between 8 and 64 characters.");
     }
 
     {
@@ -174,9 +236,10 @@ async fn users_signup_returns_400_if_password_invalid() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let j: ValidationMessage = res.json().await;
-        assert_eq!(j.field, "password");
-        assert_eq!(j.msg, "Field must be between 8 and 64 characters.");
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "password");
+        assert_eq!(err.msg, "Field must be between 8 and 64 characters.");
     }
 }
 
@@ -200,8 +263,7 @@ async fn users_signup_returns_409_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        let j: UserTaken = res.json().await;
-        assert_eq!(j.msg, "User already exists.");
+        assert_eq!(res.text().await, "User already exists.");
     }
 
     {
@@ -219,8 +281,7 @@ async fn users_signup_returns_409_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        let j: UserTaken = res.json().await;
-        assert_eq!(j.msg, "User already exists.");
+        assert_eq!(res.text().await, "User already exists.");
     }
 
     {
@@ -238,8 +299,7 @@ async fn users_signup_returns_409_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        let j: UserTaken = res.json().await;
-        assert_eq!(j.msg, "User already exists.");
+        assert_eq!(res.text().await, "User already exists.");
     }
 }
 
@@ -305,8 +365,7 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        let j: UserTaken = res.json().await;
-        assert_eq!(j.msg, "User already exists.");
+        assert_eq!(res.text().await, "User already exists.");
     }
 }
 

@@ -24,6 +24,7 @@ mod types;
 pub use crate::routes::ants;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;
+pub use crate::routes::lib::err;
 pub use crate::routes::metrics;
 pub use crate::routes::tests;
 pub use crate::routes::users;

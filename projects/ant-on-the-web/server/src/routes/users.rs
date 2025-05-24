@@ -1,11 +1,13 @@
 use std::str::FromStr;
 
-use crate::types::{DbRouter, DbState};
+use crate::{
+    err::ValidationError, routes::lib::err::ValidationMessage, types::{DbRouter, DbState}
+};
 use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -13,9 +15,12 @@ use axum_extra::routing::RouterExt;
 use http::header;
 use jsonwebtoken::Header;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
-use super::lib::auth::{authenticate, make_cookie, AuthClaims, AuthError, AUTH_KEYS};
+use super::lib::{
+    auth::{authenticate, make_cookie, AuthClaims, AUTH_KEYS},
+    err::AntOnTheWebError,
+};
 
 #[derive(Deserialize)]
 pub struct EmailRequest {
@@ -24,7 +29,7 @@ pub struct EmailRequest {
 async fn add_anonymous_email(
     State(dao): DbState,
     Json(EmailRequest { email }): Json<EmailRequest>,
-) -> Result<impl IntoResponse, UsersError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     debug!("Subscribing with email {}", email);
 
     let exists = {
@@ -81,7 +86,7 @@ async fn get_user_by_name(
     auth: AuthClaims,
     path: Option<Path<String>>,
     State(dao): DbState,
-) -> Result<impl IntoResponse, UsersError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN
     let user = authenticate(&auth, &dao).await?;
 
@@ -96,7 +101,9 @@ async fn get_user_by_name(
 
     // AuthZ
     if user.username != user_name {
-        return Err(UsersError::AccessDenied(Some(user.user_id.to_string())));
+        return Err(AntOnTheWebError::AccessDenied(Some(
+            user.user_id.to_string(),
+        )));
     }
     info!("Granted access to {}", user.user_id);
 
@@ -108,7 +115,10 @@ async fn get_user_by_name(
     ));
 }
 
-async fn logout(auth: AuthClaims, State(dao): DbState) -> Result<impl IntoResponse, UsersError> {
+async fn logout(
+    auth: AuthClaims,
+    State(dao): DbState,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
     let mut cookie_expiration = make_cookie("".to_string());
@@ -158,38 +168,41 @@ pub struct LoginResponse {
 async fn login(
     State(dao): DbState,
     Json(login_request): Json<LoginRequest>,
-) -> Result<impl IntoResponse, UsersError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let users = dao.users.read().await;
-    let user: Option<User> = match &login_request.method {
+    let user: Result<Option<User>, ValidationMessage> = match &login_request.method {
         LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
             Err(e) => {
                 info!("Field method.email invalid: {}", e);
-                return Ok((StatusCode::BAD_REQUEST, "Field method.email invalid.").into_response());
+                Err(ValidationMessage::invalid("method.email"))
             }
-            Ok(email) => users.get_one_by_email(&email).await?,
+            Ok(email) => Ok(users.get_one_by_email(&email).await?),
         },
         LoginMethod::Phone(phone) => match canonicalize_phone_number(phone.as_str()) {
             Err(e) => {
                 info!("Field method.phone invalid: {}", e);
-                return Ok((StatusCode::BAD_REQUEST, "Field method.phone invalid.").into_response());
+                Err(ValidationMessage::invalid("method.phone"))
             }
-            Ok(phone) => users.get_one_by_phone_number(&phone).await?,
+            Ok(phone) => Ok(users.get_one_by_phone_number(&phone).await?),
         },
-        LoginMethod::Username(username) => users.get_one_by_user_name(&username).await?,
+        LoginMethod::Username(username) => Ok(users.get_one_by_user_name(&username).await?),
     };
 
     let user = match user {
-        None => {
-            return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
+        Err(v) => {
+            return Err(AntOnTheWebError::ValidationError(ValidationError{errors: vec![v]}));
         }
-        Some(user) => user,
+        Ok(None) => {
+            return Err(AntOnTheWebError::AccessDenied(None));
+        }
+        Ok(Some(user)) => user,
     };
 
     if !verify_password_hash(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )? {
-        return Ok((StatusCode::UNAUTHORIZED, "Access denied.").into_response());
+        return Err(AntOnTheWebError::AccessDenied(None));
     }
 
     debug!("Password verified, generating jwt token...");
@@ -247,69 +260,77 @@ pub struct SignupRequest {
 async fn signup_request(
     State(dao): DbState,
     Json(signup_request): Json<SignupRequest>,
-) -> Result<impl IntoResponse, UsersError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     info!("Validating signup request...");
-    let (canonical_email, canonical_phone_number) = {
+
+    let validations = {
+        let mut validations: Vec<ValidationMessage> = vec![];
+
         let canonical_phone_number =
             match canonicalize_phone_number(signup_request.phone_number.as_str()) {
+                Ok(phone) => Ok(phone),
                 Err(e) => {
                     info!(
                         "Signup request phone number {} was invalid: {}",
                         signup_request.phone_number, e
                     );
-                    return Err(UsersError::ValidationError(ValidationMessage {
-                        field: "phoneNumber".to_string(),
-                        msg: "Field invalid.".to_string(),
-                    }));
+                    validations.push(ValidationMessage::invalid("phoneNumber"));
+                    Err(())
                 }
-                Ok(phone_number) => phone_number,
             };
 
         let canonical_email = match canonicalize_email(&signup_request.email.as_str()) {
+            Ok(email) => Ok(email),
             Err(e) => {
                 info!("Signup request email {}: {}", signup_request.email, e);
-                return Err(UsersError::ValidationError(ValidationMessage {
-                    field: "email".to_string(),
-                    msg: "Field invalid.".to_string(),
-                }));
+                validations.push(ValidationMessage::invalid("email"));
+                Err(())
             }
-            Ok(email) => email,
         };
 
         let username_len = signup_request.username.len();
         if username_len < 3 || username_len > 16 {
-            return Err(UsersError::ValidationError(ValidationMessage {
-                field: "username".to_string(),
-                msg: "Field must be between 3 and 16 characters.".to_string(),
-            }));
+            validations.push(ValidationMessage::new(
+                "username",
+                "Field must be between 3 and 16 characters.",
+            ));
         }
 
         let username_regex =
             regex::Regex::new(r"^[a-z0-9]{3,16}$").expect("invalid username regex");
         if !username_regex.is_match(&signup_request.username) {
-            return Err(UsersError::ValidationError(ValidationMessage {
-                field: "username".to_string(),
-                msg: "Field must contain only lowercase characters (a-z) and numbers (0-9)."
-                    .to_string(),
-            }));
+            validations.push(ValidationMessage::new(
+                "username",
+                "Field must contain only lowercase characters (a-z) and numbers (0-9).",
+            ));
         }
 
         let password_len = signup_request.password.len();
         if password_len < 8 || password_len > 64 {
-            return Err(UsersError::ValidationError(ValidationMessage {
-                field: "password".to_string(),
-                msg: "Field must be between 8 and 64 characters.".to_string(),
-            }));
+            validations.push(ValidationMessage::new(
+                "password",
+                "Field must be between 8 and 64 characters.",
+            ));
         }
 
         if !signup_request.password.contains("ant") {
-            return Err(UsersError::ValidationError(ValidationMessage {
-                field: "password".to_string(),
-                msg: "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.".to_string() 
-                    }));
+            validations.push(ValidationMessage::new( 
+                 "password",
+                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
+            ));
         }
 
-        (canonical_email, canonical_phone_number)
+        match validations.as_slice() {
+            &[] => Ok((canonical_email.unwrap(), canonical_phone_number.unwrap())),
+            _ => Err(validations),
+        }
+    };
+
+    let (canonical_email, canonical_phone_number) = match validations {
+        Err(v) => {
+            return Err(AntOnTheWebError::ValidationError(ValidationError { errors: v }));
+        }
+        Ok(data) => data,
     };
 
     {
@@ -329,9 +350,7 @@ async fn signup_request(
             .await?
             .is_some();
         if by_email || by_username || by_phone {
-            return Err(UsersError::ConflictError(UserTaken {
-                msg: "User already exists.".to_string(),
-            }));
+            return Err(AntOnTheWebError::ConflictError("User already exists."));
         }
     }
 
@@ -372,72 +391,4 @@ pub fn router() -> DbRouter {
                 "GET /user/{user_name}",
             ])
         })
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ValidationMessage {
-    pub field: String,
-    pub msg: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserTaken {
-    pub msg: String,
-}
-
-enum UsersError {
-    AccessDenied(Option<String>),
-    InternalServerError(anyhow::Error),
-    ValidationError(ValidationMessage),
-    ConflictError(UserTaken),
-}
-
-impl IntoResponse for UsersError {
-    fn into_response(self) -> Response {
-        match self {
-            UsersError::InternalServerError(e) => {
-                error!("UsersError::InternalServerError {}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong, please retry.",
-                )
-            }
-            .into_response(),
-
-            UsersError::AccessDenied(identity) => {
-                warn!("Access denied to identity: {:?}", identity);
-                (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
-            }
-
-            UsersError::ValidationError(msg) => {
-                warn!("UsersError::ValidationError {:?}", msg);
-                (StatusCode::BAD_REQUEST, Json(msg))
-            }
-            .into_response(),
-
-            UsersError::ConflictError(taken) => {
-                warn!("UsersError::ConflictError {:?}", taken);
-                (StatusCode::CONFLICT, Json(taken))
-            }
-            .into_response(),
-        }
-    }
-}
-
-impl From<AuthError> for UsersError {
-    fn from(value: AuthError) -> Self {
-        match value {
-            AuthError::AccessDenied(e) => UsersError::AccessDenied(e),
-            AuthError::InternalServerError(e) => UsersError::InternalServerError(e),
-        }
-    }
-}
-
-impl<E> From<E> for UsersError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self::InternalServerError(err.into())
-    }
 }
