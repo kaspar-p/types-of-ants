@@ -40,6 +40,7 @@ use http::StatusCode;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
+#[derive(Clone)]
 pub struct TestClient {
     client: reqwest::Client,
     addr: SocketAddr,
@@ -117,7 +118,13 @@ pub struct RequestBuilder {
 impl RequestBuilder {
     pub async fn send(self) -> TestResponse {
         TestResponse {
-            response: self.builder.send().await.unwrap(),
+            response: self
+                .builder
+                .header("X-Forwarded-For", "192.168.0.1")
+                .header("X-Real-IP", "192.168.0.1")
+                .send()
+                .await
+                .unwrap(),
         }
     }
 

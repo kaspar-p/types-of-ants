@@ -1,17 +1,21 @@
 use ant_data_farm::AntDataFarmClient;
-use axum::{routing::get, Router};
+use axum::{response::IntoResponse, routing::get, Router};
 use axum_extra::routing::RouterExt;
-use http::header;
+use http::{header, Response, StatusCode};
 use hyper::http::Method;
 use std::sync::Arc;
 use tower::ServiceBuilder;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorError,
+    GovernorLayer,
+};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::{AllowOrigin, CorsLayer},
     services::ServeDir,
     trace::TraceLayer,
 };
-use tracing::debug;
+use tracing::{debug, error};
 
 mod clients;
 mod routes;
@@ -42,7 +46,36 @@ fn origins() -> AllowOrigin {
     }
 }
 
+fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
+    match err {
+        GovernorError::TooManyRequests {
+            wait_time: _,
+            headers: _,
+        } => (StatusCode::TOO_MANY_REQUESTS, "Throttling limit reached.").into_response(),
+        err => {
+            error!("throttling failed {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Something went wrong, please retry.",
+            )
+                .into_response()
+        }
+    }
+}
+
 pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Router, anyhow::Error> {
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            // 10 TPS
+            .period(std::time::Duration::from_millis(100))
+            .burst_size(25)
+            .use_headers()
+            .key_extractor(SmartIpKeyExtractor) // Limit based on X-Real-IP Header
+            .error_handler(|err| handle_throttling_error(&err))
+            .finish()
+            .unwrap(),
+    );
+
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(origins())
@@ -88,7 +121,10 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(cors),
-        );
+        )
+        .layer(GovernorLayer {
+            config: governor_conf,
+        });
 
     return Ok(app);
 }
