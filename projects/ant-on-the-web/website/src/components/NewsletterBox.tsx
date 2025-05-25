@@ -1,3 +1,5 @@
+"use client";
+
 import { newsletterSignup } from "@/server/posts";
 import { useHandle } from "@/utils/useHandle";
 import { useState } from "react";

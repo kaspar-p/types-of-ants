@@ -49,17 +49,15 @@ export function Header() {
           </h3>
           <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
             <div className="text-center flex flex-row space-x-2 align-center justify-center">
-              {user.loggedIn ? (
-                <>
-                  <button onClick={() => push("/profile")}>profile</button>
-                  <button onClick={() => handleLogout()}>logout</button>
-                </>
-              ) : (
+              {!user.loggedIn && (
                 <button onClick={() => push("/login")}>log in / signup</button>
               )}
               <button onClick={() => push("/")}>home</button>
               {user.loggedIn && (
-                <button onClick={() => push("/feed")}>feed</button>
+                <>
+                  <button onClick={() => push("/profile")}>profile</button>
+                  <button onClick={() => push("/feed")}>feed</button>
+                </>
               )}
               <button onClick={() => push("/info")}>contact me</button>
               <button
@@ -69,6 +67,9 @@ export function Header() {
               >
                 read the code
               </button>
+              {user.loggedIn && (
+                <button onClick={() => handleLogout()}>logout</button>
+              )}
             </div>
           </div>
         </div>

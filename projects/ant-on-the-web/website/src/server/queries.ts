@@ -89,9 +89,32 @@ const queries = {
     schema: z.object({
       user: z.object({
         userId: z.string(),
+        username: z.string(),
+        emails: z.array(z.string()),
+        joined: z.number(),
+        phoneNumber: z.string(),
       }),
     }),
-    transformer: (d: { user: { userId: string } }) => d,
+    transformer: (d: {
+      user: {
+        userId: string;
+        phoneNumber: string;
+        emails: string[];
+        joined: number;
+        username: string;
+      };
+    }): {
+      user: {
+        userId: string;
+        phoneNumber: string;
+        emails: string[];
+        joined: Date;
+        username: string;
+      };
+    } => ({
+      ...d,
+      user: { ...d.user, joined: new Date(d.user.joined * 1000) },
+    }),
   },
 } as const;
 
@@ -147,4 +170,6 @@ async function constructQuery2<Q extends Query>(
 
   return response;
 }
+
 export const getUser = () => constructQuery2(queries.getUser);
+export const getUserSchema = queries.getUser;

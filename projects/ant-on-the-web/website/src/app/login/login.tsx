@@ -1,8 +1,8 @@
 import { login } from "@/server/posts";
 import { useContext, useState } from "react";
 import { UserContext } from "../../state/userContext";
-import { useRouter } from "next/router";
-import { getUser } from "@/server/queries";
+import { useRouter } from "next/navigation";
+import { getUser, getUserSchema } from "@/server/queries";
 
 export const LoginBox = () => {
   const [loginUnique, setLoginUnique] = useState("");
@@ -14,7 +14,7 @@ export const LoginBox = () => {
 
   const { setUser } = useContext(UserContext);
 
-  // const { push } = useRouter();
+  const { push } = useRouter();
 
   const [formState, setFormState] = useState<
     { loading: false; success: boolean; msg: string } | { loading: true }
@@ -86,9 +86,11 @@ export const LoginBox = () => {
           success: true,
           msg: "login complete, welcome!",
         });
-        const user = await (await getUser()).json();
-        setUser(user);
-        // push("/");
+        const user = getUserSchema.transformer(
+          getUserSchema.schema.parse(await (await getUser()).json())
+        );
+        setUser({ loggedIn: true, user: user.user });
+        push("/");
         return;
       }
     }
