@@ -1,58 +1,24 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
-function usage() {
-  echo "[ERROR] Usage: $0 \\
-              <ants.txt path> \\
-              <releases dir> \\
-              <README.md path> \\
-              <index_template.html path> \\
-              <index.html path>"
-}
+repo_root="$(git rev-parse --show-toplevel)"
 
-export ANTS_TXT_PATH=$1
-if [[ -z "$ANTS_TXT_PATH" ]]; then
-  usage
-  exit 1
-fi
+readme_path="$repo_root/README.md"
+index_html_path="$repo_root/index.html"
 
-export RELEASES_DIR=$2
-if [[ -z "$RELEASES_DIR" ]]; then
-  usage
-  exit 1
-fi
+tmp_dir="/tmp/typesofants"
+mkdir -p "$tmp_dir"
 
-export README_PATH=$3
-if [[ -z "$README_PATH" ]]; then
-  usage
-  exit 1
-fi
-
-export HTML_TEMPLATE_PATH=$4
-if [[ -z "$HTML_TEMPLATE_PATH" ]]; then
-  usage
-  exit 1
-fi
-
-export INDEX_HTML_PATH=$5
-if [[ -z "$INDEX_HTML_PATH" ]]; then
-  usage
-  exit 1
-fi
-
-export TMP_DIR="/tmp/typesofants"
-mkdir -p "$TMP_DIR"
-
-export OLD_README="$TMP_DIR/README_OLD.md"
-cp "$README_PATH" "$OLD_README"
-export OLD_INDEX="$TMP_DIR/index_OLD.html"
-cp "$INDEX_HTML_PATH" "$OLD_INDEX"
+old_readme="$tmp_dir/README_OLD.md"
+cp "$readme_path" "$old_readme"
+old_index="$tmp_dir/index_OLD.html"
+cp "$index_html_path" "$old_index"
 
 echo "Running generation..."
 
-python3 static_site/generate/generate_page.py "$ANTS_TXT_PATH" "$RELEASES_DIR" "$HTML_TEMPLATE_PATH" "$INDEX_HTML_PATH"
-python3 static_site/generate/generate_readme.py "$ANTS_TXT_PATH" "$README_PATH"
+python3 static_site/generate/generate_page.py "$repo_root"
+python3 static_site/generate/generate_readme.py "$repo_root"
 
 function join_by {
   local d=${1-} f=${2-}
@@ -63,12 +29,12 @@ function join_by {
 
 diffed=()
 
-diff_readme_result=$(diff "$README_PATH" "$OLD_README")
+diff_readme_result="$(diff "$readme_path" "$old_readme")"
 if [[ "$diff_readme_result" != "" ]]; then
     diffed+=("README.md")
 fi
 
-diff_index_result=$(diff "$INDEX_HTML_PATH" "$OLD_INDEX")
+diff_index_result="$(diff "$index_html_path" "$old_index")"
 if [[ "$diff_index_result" != "" ]]; then
     diffed+=("index.html")
 fi
@@ -81,4 +47,4 @@ else
     echo "Updated $comma_space_delimited"
 fi
 
-rm "$OLD_README" "$OLD_INDEX"
+rm "$old_readme" "$old_index"

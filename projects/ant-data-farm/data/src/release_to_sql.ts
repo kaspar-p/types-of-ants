@@ -5,7 +5,7 @@ import {
   antsToSql,
   releaseSql,
   migrationSql,
-} from "./sql";
+} from "./sql.js";
 import assert from "assert";
 
 type ReleasesFile = {

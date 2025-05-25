@@ -12,15 +12,18 @@ ant who _knows_ it's being followed by other ants
 orange ant
 teal ant
 cyan ant
+ant who wants the ant suggestions' first letters to spell something out
 ant who is worried about you
 croissant
 ant that reads ant suggestions (meta ant)
 formica fusca
 ant refusing to get better
 sugar ant
+ant stuck in a revolving door
 ant smushed in my book (real)
 ant who does the got milk? ads
 non-edible ant
+fast ant
 light purple ant
 king ant
 sugar ant
@@ -34,6 +37,7 @@ royal purple ant
 lime green ant
 merchant
 ant losing thousands in the stock market
+argon2 ant
 slate gray ant
 ant who remembered your birthday
 platinum blond ant
@@ -42,6 +46,7 @@ wild wacky ant (woah)
 ham ant
 space gray ant
 silly ant
+ant who doesn't give the pretty girls at work attention (satisfied at home)
 ant on the moon (space ant)
 summa cum laude ant
 ant who is a huge baseball fan
@@ -49,6 +54,7 @@ ant that overslept
 eboy ant
 ant with anger issues
 a cry for help disguised as an ant suggestion
+ant excitedly telling the other ants about a new food source (ant poison bait trap)
 ant on a hunger strike
 ant who don't know what they been told
 vampire ant (mosquito)
@@ -57,6 +63,7 @@ ant queen but recently birthed and no subjects
 ant cowboy (yeehaw)
 forest green ant
 ant in the bathroom at my job (many of these)
+fat ant
 ant who won't stop eating batteries
 navy blue ant
 politically active ant
@@ -96,6 +103,7 @@ ant under the sea
 miscreant
 ant who brought you a present
 ant on strike three
+jack antonoff
 rouge ant
 weather girl ant
 ant that doesn't think before it acts
@@ -117,6 +125,7 @@ dead ant
 prisoner ant
 ant king (king of the ants)
 misinformant
+ant wilson (supabase)
 antigone (sophocles)
 ant from a bug's life (the movie)
 ant who is sad about roe v. wade
@@ -125,6 +134,7 @@ ant who signed up for the newsletter (happy ant)
 ant with an ego
 white ant
 ant that created this website
+ant with a name too controversial for this cowardly site
 ant on twitter! @typesofants
 light blue ant
 ant just going through the motions
@@ -194,6 +204,7 @@ ant hitting 3s
 broad shouldered ant
 developer ant
 cream ant
+anthropic
 ant who likes nirvana
 monthly newsletter ant
 orchid ant
@@ -201,6 +212,7 @@ ant letting his friends down
 dead ant
 tsa agent ant
 doorhead ant
+hockey bro ant
 replicant (replicant)
 the smelliest ant ever sniffed
 ant learning networking
@@ -223,6 +235,7 @@ ant in the wrong place at the wrong time
 soviet ant
 turquoise ant
 uncreative ant
+ant who is friendly to you but has to ask its buddy for your name when you leave
 ant checked out from reality
 wittle ant
 ant taking everything too serious
@@ -274,6 +287,7 @@ ant drowning in a single droplet of water
 married ant
 single ant
 ant colony
+ant going to montreal
 ant with daddy issues
 ant but it's really hungry
 ant hogging all the fully loaded nachos
@@ -281,6 +295,7 @@ ant on the wrong side of the field
 ant playing handball (european)
 sky blue ant
 ant that put cosmos out of business
+ethically sourced ant
 ant that games every night and has no life
 an ant that categorizes ants (scientist)
 ant with leverage over you (blackmail ant)
@@ -304,6 +319,7 @@ anthony
 aquamarine ant
 azure ant
 ant that needs better hobbies
+ant who loves tests
 ant that believes in second chances
 ant carrying another ant
 peach ant
@@ -314,6 +330,7 @@ arsonist ant
 frightened ant
 hungwy ant
 data analyst ant
+half ant (anterior)
 ant sleeping on the couch
 scarlet ant
 african ant
@@ -324,6 +341,7 @@ ant on the sidewalk
 ant doing the crossword
 gay ant
 ant doctor
+ant running the mile in school
 ant in my pants
 ant who doesn't get it
 ant who likes sports
@@ -343,12 +361,16 @@ ant who colors the internet (rgb ant)
 ant going potty
 ant who gave up
 ant in a hat
+ant in therapy (progressing)
+ant in therapy (regressing)
 ant hivemind
 ant k-i-s-s-i-n-g in a tree
+hashed ant
 ant who wants to move
 ant with a pet guy
 mouco ant
 ant that is secretly in love with its best friend
+hyundai sonanta
 ant with pipes
 ant being tracked by the nsa
 ant living in your snoopy mug (houze)
@@ -356,6 +378,8 @@ ant who isn't depressed so much as sentient
 ant that reacts unsavorily to sunlight
 truant
 ant in spanish (hormiga)
+cryptographically signed ant
+squished ant
 ant who swears it was self defense
 aggressive ant
 antman
@@ -398,6 +422,7 @@ uncle ant
 merchant
 scantinavian
 ant refuting the allegations
+ant stuck in a json web token
 ukrainian ant
 ant with stinky feet
 belarusian ant
@@ -419,6 +444,7 @@ ant that is soo one shot
 ant bursting through the wall like the kool-aid man
 antelope
 ant on the can
+ant playing warzone
 french ant
 reformed ant (stole your lunch, won't do it again)
 ant with a bf that hasn't asked her if she wants to be his valentine
@@ -428,8 +454,10 @@ defiant
 ashamed ant
 ant that got dress-coded (spaghetti straps)
 ant on a mental health journey
+ant with huge eyeballs
 ant that likes stranger things
 ant who is bored at work
+ant who can sign up and log in
 ant doing long distance (sad ant)
 ant on a plane
 schizo ant (lots of friends)
@@ -438,6 +466,7 @@ csc324 lab 2 ant (memory commemoration)
 lunar new year ant
 swedish ant
 ant unaware it is about to drown in my bathtub
+ant whose plants keep dying besides its best efforts
 anthropologist (ant that studies humans)
 sir ant (distinguished)
 ant but it's really short
@@ -484,6 +513,7 @@ ant enjoying a cup o' joe
 sickly ant
 harvester ant
 ant driving to graduate school
+ant with a favorite website
 lonely ant
 thankful ant
 ant gone fishin'
@@ -505,6 +535,7 @@ missourian ant
 ant with seven legs (freak of nature)
 antifascist
 sad ant
+ant with two new friends
 ant that needs to shave
 accountant
 accusant (snitch)
@@ -559,6 +590,7 @@ hr specialist ant
 ant on a break
 uhhh idk man there's a lot of ants already
 project manager ant
+jokic ant
 ant with fibromyalgia
 antisocial ant
 ant in the city
@@ -591,6 +623,7 @@ self-conscious ant
 easter egg ant
 ant that chases the bag but the bag is too fast (ants are not fast)
 kaspar ant
+ant on the denver nuggets
 laid off ant
 ant slower than a snail
 fluid dynamic ant
@@ -608,6 +641,7 @@ ant but its a fish
 ameise (german ant)
 ant playing frisbee
 extinct ant
+ant keeping your password safe
 youtuber ant
 ant preaching about the end
 slovak ant
@@ -628,6 +662,7 @@ algorithmic number theory symposium (ants)
 ant on a fridge
 ant in a sandwich (picnic)
 ant with deep knowledge of typesofants.org lore
+ant scared of the guy aboutta be pushed into the anthill
 ant foreclosing on a family
 groovy ant
 ant blending in
@@ -654,7 +689,9 @@ kendrick lamar ant (new album)
 ant in an alley
 ant with some photoshop skills
 drowning ant (help!)
+ant applying for the annual .org impact awards
 harry styles ant (new album)
+nein ant
 caged ant
 ant who wants your lunch
 arsonist ant in a library (time of its life)
@@ -674,20 +711,24 @@ ant that has a bone to pick with you
 ant who is blurring the line between seeing the system for what it is and having a schizo break
 ant encased in concrete
 ant with sponsors
+cognitive decline ant
 glue sniffing ant
 hostage ant
 protestant
 tibetan ant
 nosey ant
+ant who is a pe teacher
 ant who swears he is 6 foot
 vigilante
 ant who can't get a job
 ant with good posture
 extant (the filesystem)
 ant with a cancelled project
+raspberry pi ant (crawling on the wall)
 old ant
 ant that would date me if i was a worm
 ant on a hunger strike
+ant with a reaction picture for every situation
 ant who helped me quit smoking
 ant that supplies ideas for this website
 ant that smokes
@@ -726,7 +767,9 @@ ant who hopes he will be happy one day
 ant smelling the roses
 ant who wants this website to be his full time job
 ant who questions his existence
+anthrax
 ant who wonders if it's all worth it
+monkey type of ant
 ant in a hat
 ant who doesn't feel bad per se just empty and alone
 ant who swears it can change
@@ -773,6 +816,7 @@ ant eating a girl dinner (crumbs)
 ant in a colony (colonialism)
 ant on the moon
 pregnant
+ant giving up
 ant gaming on the down low (watch over what)
 ant that's not ready to be a parent
 ant but its a bee
@@ -786,6 +830,7 @@ slapped silly ant
 self-aware ant
 ant in a uhaul
 politician ant
+ant not listed on typesofants.org
 dishwasher ant
 ant in hawai'i
 ant taking your wealth
@@ -822,6 +867,7 @@ criminalized ant
 antom of the opera
 plumber ant
 crybaby ant
+ant who always loses at board games but still has fun (not real)
 ant taking summer courses
 daytime tv host ant
 ant who drinks too much wine
@@ -842,6 +888,7 @@ ants that sell ant spray to kill other ants
 ant on a journey
 ant who didn't technically commit a crime
 ant with a different mindset
+ant who insists that it's not mad
 ant in your apple
 ant on a stick
 protagonist ant (me)
@@ -890,7 +937,9 @@ climber ant
 ant sinning for the greater good
 zookeeper ant
 snowboarder ant
+ant who just bought a planner it will never use
 ant who wants more updates
+ant who always thinks the waiter is coming to their table
 skier ant
 ant just grabbin' a crumb (hungry)
 ant that eats a ticking time bomb
@@ -902,10 +951,12 @@ war veteran ant
 dejected ant
 ant in the rain
 antagonist
+ant in stardew valley (in your farm)
 ant who is in the military
 plant
 quiet ant
 ant that's gonna do some rapping
+ant taking home pho broth for tomorrow
 found ant
 ant on parole
 ant with nine legs (german)
@@ -937,6 +988,7 @@ ant with no off button
 bourgeoisie ant
 ant on the web
 antoinette (cake enjoyer)
+ant with a tab favicon
 revolutionary ant
 ant who grows
 ant who broke the site (ssl misconfiguration)
@@ -953,6 +1005,7 @@ bedtime ant (snuggles you)
 beautiful ant
 squeaky toy ant
 queen ant
+ant making a march madness bracket
 ant who forgot to water his plant
 ant who's watching
 ant taking bribes

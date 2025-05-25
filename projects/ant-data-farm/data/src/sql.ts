@@ -154,9 +154,9 @@ ${rows}
 }
 
 export function migrationSql(migrationLabel: string) {
-  const value = `    ('${sanitizeForSql(migrationLabel)}')`;
+  const value = `    ('${sanitizeForSql(migrationLabel)}', now(), now())`;
 
-  return `insert into migration (migration_label)
+  return `insert into migration (migration_label, created_at, updated_at)
   values
 ${value}
 ;`;

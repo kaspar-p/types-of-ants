@@ -3,6 +3,7 @@
 """
 
 import sys
+import os
 from lib import TAB, apply_ant_rule
 
 
@@ -23,9 +24,19 @@ def main(ants_txt_path: str, readme_path: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise "Need arguments <ants.txt path> <readme path>"
+    if len(sys.argv) != 2:
+        raise "Need arguments <repository root>"
 
-    ants_txt_path = sys.argv[1]
-    readme_path = sys.argv[2]
+    repo_root = sys.argv[1]
+    if not os.path.isdir(repo_root):
+        raise "Repository root not a directory: " + repo_root
+    
+    ants_txt_path = os.path.join(repo_root, "ants.txt")
+    if not os.path.isfile(ants_txt_path):
+        raise "Could not find ants.txt at: " + ants_txt_path
+
+    readme_path = os.path.join(repo_root, "README.md")
+    if not os.path.isfile(readme_path):
+        raise "Could not find README.md at: " + readme_path
+
     main(ants_txt_path, readme_path)
