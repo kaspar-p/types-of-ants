@@ -74,12 +74,20 @@ export function useHandle<Input>(props: HandleProps<Input>) {
         setValidMsg(props.messages.valid);
         setErrorMsg("");
         createMsgTimeout(setValidMsg);
-        return;
+        break;
+      }
+      case 409: {
+        const msg = await res.text();
+        setValidMsg("");
+        setErrorMsg(msg.toLowerCase());
+        createMsgTimeout(setErrorMsg);
+        break;
       }
       case 400:
-      case 500: {
+      case 500:
+      default: {
         handleError();
-        return;
+        break;
       }
     }
   }
