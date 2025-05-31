@@ -71,14 +71,26 @@ impl DaoTrait<UsersDao, User> for UsersDao {
     }
 
     async fn get_one_by_id(&self, user_id: &UserId) -> Result<Option<User>, anyhow::Error> {
-        let binding = self.database
-        .lock()
-        .await
-        .query(
-            "select user_id, user_name, user_phone_number, user_joined, password_hash from registered_user where user_id = $1 limit 1;",
-            &[&user_id.0],
-        )
-        .await?;
+        let binding = self
+            .database
+            .lock()
+            .await
+            .query(
+                "
+        select
+            user_id,
+            user_name,
+            user_phone_number,
+            user_joined,
+            password_hash
+        from
+            registered_user
+        where
+            user_id = $1
+        limit 1;",
+                &[&user_id.0],
+            )
+            .await?;
 
         let row = binding.first().map(|row: &Row| async move {
             let user_id: UserId = row.get("user_id");
@@ -179,6 +191,7 @@ impl UsersDao {
         phone_number: String,
         email: String,
         password: String,
+        role: String,
     ) -> Result<User, anyhow::Error> {
         info!(
             "Creating user '{}' '{}' '{}'",
@@ -190,12 +203,22 @@ impl UsersDao {
 
         let password_hash = make_password_hash(password.as_str())?;
 
+        let role_id: Uuid = t
+            .query(
+                "select role_id from user_role where role_name = $1 limit 1;",
+                &[&role],
+            )
+            .await?
+            .first()
+            .expect(format!("Could not find ID for role {role}").as_str())
+            .get("role_id");
+
         t.execute(
             "
         insert into registered_user 
-            (user_name, user_phone_number, password_hash)
-        values ($1, $2, $3);",
-            &[&username, &phone_number, &password_hash],
+            (user_name, user_phone_number, password_hash, role_id)
+        values ($1, $2, $3, $4::uuid);",
+            &[&username, &phone_number, &password_hash, &role_id],
         )
         .await?;
 

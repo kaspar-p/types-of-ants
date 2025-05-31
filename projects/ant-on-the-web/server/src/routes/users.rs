@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use super::lib::{
-    auth::{authenticate, make_cookie, AuthClaims, AUTH_KEYS},
+    auth::{authenticate, make_cookie, optional_authenticate, AuthClaims, AUTH_KEYS},
     err::AntOnTheWebError,
 };
 
@@ -35,16 +35,7 @@ async fn subscribe_email(
         email: unsafe_email,
     }): Json<EmailRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    let user = match auth {
-        None => {
-            let users = dao.users.read().await;
-            users
-                .get_one_by_user_name("nobody")
-                .await?
-                .expect("nobody user exists")
-        }
-        Some(auth) => authenticate(&auth, &dao).await?,
-    };
+    let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     let canonical_email = match canonicalize_email(&unsafe_email) {
         Ok(e) => e,
@@ -368,6 +359,7 @@ async fn signup_request(
                 canonical_phone_number,
                 canonical_email,
                 signup_request.password,
+                "user".to_string(),
             )
             .await?;
         info!("Created user {}", user.user_id);

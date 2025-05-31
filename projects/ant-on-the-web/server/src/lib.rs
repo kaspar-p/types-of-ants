@@ -6,10 +6,7 @@ use hyper::http::Method;
 use std::sync::Arc;
 use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
-use tower_governor::{
-    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorError,
-    GovernorLayer,
-};
+use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLayer};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::{AllowOrigin, CorsLayer},
@@ -89,9 +86,9 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
         // .nest("/msg", routes::msg::router())
         .nest("/users", users::router())
         .nest("/hosts", hosts::router())
-        .nest("/tests", tests::router())
-        .nest("/metrics", metrics::router())
-        .nest("/deployments", deployments::router())
+        // .nest("/tests", tests::router())
+        // .nest("/metrics", metrics::router())
+        // .nest("/deployments", deployments::router())
         .with_state(ant_data_farm_client)
         .layer(axum::middleware::from_fn(
             ant_library::middleware_print_request_response,

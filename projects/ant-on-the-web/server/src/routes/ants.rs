@@ -17,7 +17,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use super::lib::auth::{authenticate, AuthClaims, AuthError};
+use super::lib::auth::{optional_authenticate, AuthClaims, AuthError};
 
 const PAGE_SIZE: usize = 1_000_usize;
 
@@ -114,6 +114,9 @@ async fn declined_ants(
 #[derive(Serialize, Deserialize)]
 pub struct ReleasedAntsResponse {
     pub ants: Vec<Ant>,
+
+    #[serde(rename = "hasNextPage")]
+    pub has_next_page: bool,
 }
 async fn released_ants(
     State(dao): DbState,
@@ -131,24 +134,19 @@ async fn released_ants(
         })
         .collect::<Vec<Ant>>();
 
-    let ants_page = released_ants.chunks(PAGE_SIZE).nth(query.page);
-    match ants_page {
-        None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                Json(format!("No page {} exists!", query.page)).into_response(),
-            ))
-        }
-        Some(released_ants) => {
-            return Ok((
-                StatusCode::OK,
-                Json(ReleasedAntsResponse {
-                    ants: released_ants.to_vec(),
-                })
-                .into_response(),
-            ));
-        }
-    }
+    let mut chunks = released_ants.chunks(PAGE_SIZE);
+
+    let has_next_page = (chunks.len() - 1) > query.page;
+    let ants_page = chunks.nth(query.page).unwrap_or(&[]);
+
+    return Ok((
+        StatusCode::OK,
+        Json(ReleasedAntsResponse {
+            ants: ants_page.to_vec(),
+            has_next_page,
+        })
+        .into_response(),
+    ));
 }
 
 #[derive(Serialize, Deserialize)]
@@ -269,16 +267,7 @@ async fn make_suggestion(
     State(dao): DbState,
     Json(suggestion): Json<SuggestionRequest>,
 ) -> Result<impl IntoResponse, AntsError> {
-    let user = match auth {
-        None => {
-            let users = dao.users.read().await;
-            users
-                .get_one_by_user_name("nobody")
-                .await?
-                .expect("nobody user exists")
-        }
-        Some(auth) => authenticate(&auth, &dao).await?,
-    };
+    let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     let mut ants = dao.ants.write().await;
 

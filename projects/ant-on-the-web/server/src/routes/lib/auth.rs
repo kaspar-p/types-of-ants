@@ -195,6 +195,8 @@ where
     }
 }
 
+/// Require that the claims included in the request are valid. Use this for all authenticated routes.
+/// Returns an AuthError if something went wrong, either a DB error or access denial.
 pub async fn authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
@@ -204,6 +206,27 @@ pub async fn authenticate(
     match user {
         None => Err(AuthError::AccessDenied(Some(auth.sub.to_string()))),
         Some(u) => Ok(u),
+    }
+}
+
+/// If the auth claims are present, return the user that is authenticated. If not, returns the
+/// 'nobody' anonymous user.
+///
+/// Returns AccessDenied errors if the user is specified but the claims are tampered or somehow
+/// wrong.
+pub async fn optional_authenticate(
+    auth: Option<&AuthClaims>,
+    dao: &Arc<AntDataFarmClient>,
+) -> Result<User, AuthError> {
+    match auth {
+        None => {
+            let users = dao.users.read().await;
+            Ok(users
+                .get_one_by_user_name("nobody")
+                .await?
+                .expect("nobody user exists"))
+        }
+        Some(auth) => authenticate(&auth, &dao).await,
     }
 }
 

@@ -1,7 +1,4 @@
-use ant_on_the_web::{
-    ants::{ReleasedAntsResponse, SuggestionRequest, TotalResponse},
-    users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest},
-};
+use ant_on_the_web::ants::{ReleasedAntsResponse, SuggestionRequest, TotalResponse};
 use fixture::{authn_test_router, test_router};
 use http::StatusCode;
 use tracing_test::traced_test;
@@ -25,7 +22,30 @@ async fn ants_total_matches_ants_released() {
     assert_eq!(total_res.status(), StatusCode::OK);
     let total: TotalResponse = total_res.json().await;
 
-    assert_eq!(total.total, ants.ants.len());
+    assert!(ants.ants.len() <= 1000); // page size
+    assert!(ants.ants.len() <= total.total);
+
+    let mut running_total = ants.ants.len();
+    let mut has_next_page = true;
+    let mut next_page = 1;
+    while has_next_page {
+        let ants_res = fixture
+            .client
+            .get(format!("/api/ants/released-ants?page={next_page}").as_str())
+            .send()
+            .await;
+        assert_eq!(ants_res.status(), StatusCode::OK);
+        let ants: ReleasedAntsResponse = ants_res.json().await;
+
+        running_total += ants.ants.len();
+        if ants.has_next_page {
+            next_page += 1;
+        } else {
+            has_next_page = false;
+        }
+    }
+
+    assert_eq!(running_total, total.total);
 }
 
 #[tokio::test]

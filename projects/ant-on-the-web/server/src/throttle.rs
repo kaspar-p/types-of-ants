@@ -24,6 +24,11 @@ impl ThrottleExtractor {
     }
 }
 
+/// We throttle based on the "smart IP" of the requester, the IP put into the X-Forwarded-For or X-Real-IP headers
+/// because those get populated via the nginx gateway.
+///
+/// However, development doesn't go through that gateway and we still want the same properties, so if we fail to
+/// find the IP, we instead have a global throttling key that everyone uses.
 impl KeyExtractor for ThrottleExtractor {
     type Key = ThrottleKey;
 
