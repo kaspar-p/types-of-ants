@@ -1,4 +1,3 @@
-use ant_data_farm::AntDataFarmClient;
 use axum::{response::IntoResponse, routing::get, Router};
 use axum_extra::routing::RouterExt;
 use http::{header, Response, StatusCode};
@@ -18,8 +17,9 @@ use tracing::debug;
 mod clients;
 mod routes;
 mod throttle;
-mod types;
+pub mod types;
 
+pub use crate::clients::sms;
 use crate::err::AntOnTheWebError;
 pub use crate::routes::ants;
 pub use crate::routes::deployments;
@@ -60,7 +60,7 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
     }
 }
 
-pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Router, anyhow::Error> {
+pub fn make_routes(state: types::InnerApiState) -> Result<Router, anyhow::Error> {
     debug!("Initializing API routes...");
 
     let governor_conf = Arc::new(
@@ -89,7 +89,7 @@ pub fn make_routes(ant_data_farm_client: Arc<AntDataFarmClient>) -> Result<Route
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
         // .nest("/deployments", deployments::router())
-        .with_state(ant_data_farm_client)
+        .with_state(state)
         .layer(axum::middleware::from_fn(
             ant_library::middleware_print_request_response,
         ))

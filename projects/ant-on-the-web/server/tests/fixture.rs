@@ -4,6 +4,8 @@ use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
 use ant_library::axum_test_client::TestClient;
 use ant_on_the_web::{
     make_routes,
+    sms::Sms,
+    types::InnerApiState,
     users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest},
 };
 use http::StatusCode;
@@ -49,7 +51,14 @@ pub struct TestFixture {
 /// The database has been bootstrapped with the most modern schema.
 pub async fn test_router() -> TestFixture {
     let (db, db_client) = test_database_client().await;
-    let app = make_routes(Arc::new(db_client)).unwrap();
+    let sms = Sms::new(true);
+
+    let app = make_routes(InnerApiState {
+        dao: Arc::new(db_client),
+        sms: Arc::new(sms),
+    })
+    .unwrap();
+
     return TestFixture {
         client: TestClient::new(app).await,
         _guard: db,

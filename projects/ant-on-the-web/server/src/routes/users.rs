@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::{
     err::ValidationError,
     routes::lib::err::ValidationMessage,
-    types::{DbRouter, DbState},
+    types::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
@@ -30,7 +30,7 @@ pub struct EmailRequest {
 }
 async fn subscribe_email(
     auth: Option<AuthClaims>,
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
     Json(EmailRequest {
         email: unsafe_email,
     }): Json<EmailRequest>,
@@ -76,7 +76,7 @@ pub struct GetUserResponse {
 async fn get_user_by_name(
     auth: AuthClaims,
     path: Option<Path<String>>,
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN
     let user = authenticate(&auth, &dao).await?;
@@ -108,7 +108,7 @@ async fn get_user_by_name(
 
 async fn logout(
     auth: AuthClaims,
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
@@ -157,7 +157,7 @@ pub struct LoginResponse {
     pub access_token: String,
 }
 async fn login(
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let users = dao.users.read().await;
@@ -236,7 +236,7 @@ pub enum VerificationSubmission {
     Phone { otp: String },
 }
 async fn post_verification(
-    State(db): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
     Json(signup_verification_request): Json<VerificationRequest>,
 ) -> impl IntoResponse {
     return (StatusCode::NOT_IMPLEMENTED, "Unimplemented");
@@ -251,7 +251,7 @@ pub struct SignupRequest {
     pub password: String,
 }
 async fn signup_request(
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
     Json(signup_request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     info!("Validating signup request...");
@@ -368,7 +368,7 @@ async fn signup_request(
     return Ok((StatusCode::OK, "Signup completed.").into_response());
 }
 
-pub fn router() -> DbRouter {
+pub fn router() -> ApiRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
         .route_with_tsr("/login", post(login))

@@ -1,8 +1,7 @@
 use axum::Router;
-use axum_extra::routing::RouterExt;
 
-use crate::types::DbRouter;
+use crate::types::ApiRouter;
 
-pub fn router() -> DbRouter {
+pub fn router() -> ApiRouter {
     Router::new()
 }

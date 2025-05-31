@@ -1,4 +1,4 @@
-use crate::types::{DbRouter, DbState};
+use crate::types::{ApiRouter, ApiState, InnerApiState};
 use ant_data_farm::{
     hosts::{Host, HostId},
     DaoTrait,
@@ -22,7 +22,7 @@ pub struct GetHostResponse {
 
 async fn host(
     Path(host_identifier): Path<String>,
-    State(dao): DbState,
+    State(InnerApiState { dao, sms: _ }): ApiState,
 ) -> Result<impl IntoResponse, HostsError> {
     let hosts = dao.hosts.read().await;
 
@@ -50,7 +50,9 @@ pub struct GetHostsResponse {
     pub hosts: Vec<Host>,
 }
 
-async fn all_hosts(State(dao): DbState) -> Result<impl IntoResponse, HostsError> {
+async fn all_hosts(
+    State(InnerApiState { dao, sms: _ }): ApiState,
+) -> Result<impl IntoResponse, HostsError> {
     let hosts = dao.hosts.read().await;
     let all_hosts = hosts.get_all().await?;
     Ok((
@@ -59,7 +61,7 @@ async fn all_hosts(State(dao): DbState) -> Result<impl IntoResponse, HostsError>
     ))
 }
 
-pub fn router() -> DbRouter {
+pub fn router() -> ApiRouter {
     Router::new()
         .route_with_tsr("/host/{host}", get(host))
         .route_with_tsr("/hosts", get(all_hosts))

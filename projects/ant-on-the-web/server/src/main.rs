@@ -1,5 +1,6 @@
 use ant_data_farm::AntDataFarmClient;
 use ant_library::get_mode;
+use ant_on_the_web::{sms::Sms, types::InnerApiState};
 use std::{net::SocketAddr, sync::Arc};
 use tracing::debug;
 
@@ -14,7 +15,9 @@ async fn main() {
             .expect("Connected to db!"),
     );
 
-    let app = ant_on_the_web::make_routes(dao).expect("route init");
+    let sms = Arc::new(Sms::new(false));
+
+    let app = ant_on_the_web::make_routes(InnerApiState { dao, sms }).expect("route init");
 
     let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
         .expect("ANT_ON_THE_WEB_PORT environment variable not found")
