@@ -118,6 +118,8 @@ impl VerificationsDao {
     /// When a user signs up or changes their phone number, create a verification attempt row
     /// in the database for this user and phone number.
     ///
+    /// Assumes that there are no ongoing verifications, cancel others before beginning this one.
+    ///
     /// Returns the Verification ID.
     pub async fn start_phone_number_verification(
         &mut self,

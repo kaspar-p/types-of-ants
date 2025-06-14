@@ -7,8 +7,8 @@ use ant_on_the_web::{
     sms::SmsSender,
     state::InnerApiState,
     users::{
-        LoginMethod, LoginRequest, LoginResponse, SignupRequest, VerificationRequest,
-        VerificationResponse, VerificationSubmission,
+        LoginMethod, LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
+        VerificationAttemptResponse, VerificationSubmission,
     },
 };
 use http::StatusCode;
@@ -84,9 +84,7 @@ pub struct TestFixture {
     _guard: PostgreSQL,
 }
 
-/// Get a test webserver connected to a test webserver.
-/// The database has been bootstrapped with the most modern schema.
-pub async fn no_auth_test_router<'a>() -> TestFixture {
+async fn seeded_no_auth_test_router(seed: [u8; 32]) -> TestFixture {
     let (db, db_client) = test_database_client().await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
@@ -97,7 +95,7 @@ pub async fn no_auth_test_router<'a>() -> TestFixture {
         sms: Arc::new(sms),
 
         // Deterministic seed for testing.
-        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed([123; 32]))),
+        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed(seed))),
     };
     let app = make_routes(&state).unwrap();
 
@@ -108,15 +106,21 @@ pub async fn no_auth_test_router<'a>() -> TestFixture {
     };
 }
 
+/// Get a test webserver connected to a test webserver.
+/// The database has been bootstrapped with the most modern schema.
+pub async fn no_auth_test_router() -> TestFixture {
+    seeded_no_auth_test_router([123; 32]).await
+}
+
 /// Get a test webserver and database, along with a valid COOKIE header value.
 pub async fn authn_test_router() -> (TestFixture, String) {
-    let (fixture, cookie) = authn_no_verify_test_router().await;
+    let (fixture, cookie) = authn_no_verify_test_router(None).await;
 
     // based on the deterministic testing rng
     let otp = "ANT-qg7i2";
 
     let token = {
-        let req = VerificationRequest {
+        let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
                 otp: otp.to_string(),
             },
@@ -124,7 +128,7 @@ pub async fn authn_test_router() -> (TestFixture, String) {
 
         let res = fixture
             .client
-            .post("/api/users/verification")
+            .post("/api/users/verification-attempt")
             .header("Cookie", cookie.as_str())
             .json(&req)
             .send()
@@ -132,7 +136,7 @@ pub async fn authn_test_router() -> (TestFixture, String) {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let res: VerificationResponse = res.json().await;
+        let res: VerificationAttemptResponse = res.json().await;
         res.token
     };
 
@@ -140,8 +144,8 @@ pub async fn authn_test_router() -> (TestFixture, String) {
 }
 
 /// Get a router and cookie pair that has not perform 2fa verification yet.
-pub async fn authn_no_verify_test_router() -> (TestFixture, String) {
-    let fixture = no_auth_test_router().await;
+pub async fn authn_no_verify_test_router(seed: Option<[u8; 32]>) -> (TestFixture, String) {
+    let fixture = seeded_no_auth_test_router(seed.unwrap_or([123; 32])).await;
 
     {
         let req = SignupRequest {

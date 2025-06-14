@@ -25,7 +25,7 @@ use super::lib::{
         AUTH_KEYS,
     },
     err::AntOnTheWebError,
-    two_factor::VerificationState,
+    two_factor::{VerificationMethod, VerificationState},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -234,18 +234,48 @@ pub enum VerificationSubmission {
 
 #[derive(Serialize, Deserialize)]
 pub struct VerificationRequest {
+    pub method: VerificationMethod,
+}
+
+async fn create_two_factor_verification(
+    auth: AuthClaims,
+    State(InnerApiState { dao, sms, rng }): ApiState,
+    Json(verification_request): Json<VerificationRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    // AuthN: Allow users who are not fully authenticated because they can choose to
+    // to resend their validation codes during their initial validation
+    let user = authenticate_for_two_factor(&auth, &dao).await?;
+
+    match verification_request.method {
+        VerificationMethod::Phone(_) => {
+            {
+                let mut rng = rng.lock().await;
+                two_factor::resend_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user)
+                    .await?;
+            }
+
+            return Ok((StatusCode::OK, "One-time code resent.").into_response());
+        }
+        VerificationMethod::Email(_) => {
+            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VerificationAttemptRequest {
     pub submission: VerificationSubmission,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VerificationResponse {
+pub struct VerificationAttemptResponse {
     pub token: String,
 }
 
-async fn two_factor_verification(
+async fn two_factor_verification_attempt(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
-    Json(signup_verification_request): Json<VerificationRequest>,
+    Json(signup_verification_request): Json<VerificationAttemptRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let user = authenticate_for_two_factor(&auth, &dao).await?;
 
@@ -275,7 +305,7 @@ async fn two_factor_verification(
             return Ok((
                 StatusCode::OK,
                 [(header::SET_COOKIE, cookie.to_string())], // Overwrite the old cookie with a new 2fa cookie
-                Json(VerificationResponse { token: jwt.clone() }),
+                Json(VerificationAttemptResponse { token: jwt.clone() }),
             )
                 .into_response());
         }
@@ -428,7 +458,11 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))
-        .route_with_tsr("/verification", post(two_factor_verification))
+        .route_with_tsr("/verification", post(create_two_factor_verification))
+        .route_with_tsr(
+            "/verification-attempt",
+            post(two_factor_verification_attempt),
+        )
         .route_with_tsr("/user", get(get_user_by_name))
         .route_with_tsr("/user/{user_name}", get(get_user_by_name))
         .fallback(|| async {
@@ -438,6 +472,7 @@ pub fn router() -> ApiRouter {
                 "POST /logout",
                 "POST /signup",
                 "POST /verification",
+                "POST /verification-attempt",
                 "GET /user",
                 "GET /user/{user_name}",
             ])

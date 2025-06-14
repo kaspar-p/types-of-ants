@@ -15,7 +15,9 @@ pub struct VerificationStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum VerificationMethod {
+    #[serde(rename = "email")]
     Email(String),
+    #[serde(rename = "phone")]
     Phone(String),
 }
 
@@ -87,6 +89,21 @@ pub async fn send_phone_verification_code(
     info!("Phone verification started, waiting user's response.");
 
     Ok(())
+}
+
+pub async fn resend_phone_verification_code(
+    dao: &AntDataFarmClient,
+    sms: &dyn SmsSender,
+    rng: &mut StdRng,
+    user: &User,
+) -> Result<(), AntOnTheWebError> {
+    dao.verifications
+        .write()
+        .await
+        .cancel_outstanding_phone_number_verifications(&user.user_id, &user.phone_number)
+        .await?;
+
+    return send_phone_verification_code(dao, sms, rng, user).await;
 }
 
 #[derive(Serialize, Deserialize)]
