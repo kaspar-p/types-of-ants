@@ -1,9 +1,17 @@
+use std::any::Any;
+
 use tracing::debug;
 use twilio::{Client, OutboundMessage};
 
+#[async_trait::async_trait]
+pub trait SmsSender: Any + Send + Sync {
+    /// Send an SMS message to `to_phone` with the `content` as body. Return a unique identifier
+    /// for the message if there is one, likely from the sms provider.
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error>;
+}
+
 pub struct Sms {
     source_phone: String,
-    is_dry_run: bool,
 
     client: Client,
 }
@@ -13,9 +21,8 @@ pub enum SmsError {
 }
 
 impl Sms {
-    pub fn new(is_dry_run: bool) -> Self {
+    pub fn new() -> Self {
         Sms {
-            is_dry_run,
             source_phone: dotenv::var("TWILIO_PHONE_NUMBER").unwrap(),
             client: twilio::Client::new(
                 dotenv::var("TWILIO_ACCOUNT_ID").unwrap().as_str(),
@@ -23,12 +30,11 @@ impl Sms {
             ),
         }
     }
+}
 
-    pub async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, SmsError> {
-        if self.is_dry_run {
-            return Ok("send-id".to_string());
-        }
-
+#[async_trait::async_trait]
+impl SmsSender for Sms {
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error> {
         debug!("Sending SMS {to_phone} ::: {content}");
         let msg = self
             .client
@@ -38,7 +44,7 @@ impl Sms {
                 body: content,
             })
             .await
-            .map_err(|e| SmsError::InternalServerError(e))?;
+            .map_err(|e| anyhow::anyhow!(e))?;
         debug!("Sent SMS {:?}", msg);
 
         Ok(msg.sid)

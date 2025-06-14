@@ -1,4 +1,4 @@
-use crate::types::{ApiRouter, ApiState, InnerApiState};
+use crate::state::{ApiRouter, ApiState, InnerApiState};
 use ant_data_farm::{
     ants::{Ant, AntStatus},
     releases::Release,
@@ -26,7 +26,7 @@ pub struct AllAntsResponse {
     pub ants: Vec<Ant>,
 }
 async fn all_ants(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await.get_all().await?;
     Ok((
@@ -46,7 +46,7 @@ struct UnreleasedAntsResponse {
 }
 
 async fn unreleased_ants(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
@@ -84,7 +84,7 @@ async fn unreleased_ants(
 }
 
 async fn declined_ants(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
@@ -121,7 +121,7 @@ pub struct ReleasedAntsResponse {
     pub has_next_page: bool,
 }
 async fn released_ants(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
@@ -155,7 +155,7 @@ async fn released_ants(
 struct LatestReleaseResponse {
     release: Release,
 }
-async fn latest_release(State(InnerApiState { dao, sms: _ }): ApiState) -> impl IntoResponse {
+async fn latest_release(State(InnerApiState { dao, .. }): ApiState) -> impl IntoResponse {
     match dao.releases.read().await.get_latest_release().await {
         Err(_) => (StatusCode::NOT_FOUND).into_response(),
         Ok(latest_release) => (
@@ -172,9 +172,7 @@ async fn latest_release(State(InnerApiState { dao, sms: _ }): ApiState) -> impl 
 pub struct TotalResponse {
     pub total: usize,
 }
-async fn total(
-    State(InnerApiState { dao, sms: _ }): ApiState,
-) -> Result<impl IntoResponse, AntsError> {
+async fn total(State(InnerApiState { dao, .. }): ApiState) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
     let total = ants.get_all_released().await?.len();
     Ok((StatusCode::OK, Json(TotalResponse { total })))
@@ -188,7 +186,7 @@ struct LatestAntsResponse {
     pub ants: Vec<Ant>,
 }
 async fn latest_ants(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
@@ -236,7 +234,7 @@ struct FeedResponse {
 }
 
 async fn feed(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     query: Query<FeedInput>,
 ) -> Result<impl IntoResponse, AntsError> {
     let ants = dao.ants.read().await;
@@ -273,7 +271,7 @@ pub struct SuggestionResponse {
 
 async fn make_suggestion(
     auth: Option<AuthClaims>,
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     Json(suggestion): Json<SuggestionRequest>,
 ) -> Result<impl IntoResponse, AntsError> {
     let user = optional_authenticate(auth.as_ref(), &dao).await?;

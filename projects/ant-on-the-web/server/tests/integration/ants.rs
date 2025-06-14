@@ -1,14 +1,12 @@
+use crate::fixture::{authn_test_router, no_auth_test_router};
 use ant_on_the_web::ants::{ReleasedAntsResponse, SuggestionRequest, TotalResponse};
-use fixture::{authn_test_router, test_router};
 use http::StatusCode;
 use tracing_test::traced_test;
-
-mod fixture;
 
 #[tokio::test]
 #[traced_test]
 async fn ants_total_matches_ants_released() {
-    let fixture = test_router().await;
+    let fixture = no_auth_test_router().await;
 
     let ants_res = fixture
         .client
@@ -71,7 +69,7 @@ async fn ants_suggest_returns_200_with_user_if_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_even_if_not_authenticated() {
-    let fixture = test_router().await;
+    let fixture = no_auth_test_router().await;
 
     let req = SuggestionRequest {
         suggestion_content: "some ant content".to_string(),

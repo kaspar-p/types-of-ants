@@ -30,6 +30,9 @@ pub static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
     AuthKeys::new(secret.as_bytes())
 });
 
+/// The cookie is a secret artifact that (if correct), proves the user is who they say they are.
+const AUTH_COOKIE_NAME: &str = "typesofants_auth";
+
 pub struct AuthKeys {
     pub encoding: EncodingKey,
     pub decoding: DecodingKey,
@@ -49,7 +52,14 @@ pub struct AuthClaims {
     /// JWT subject, as per standard.
     pub sub: UserId,
     /// JWT expiration, as per standard.
-    exp: usize,
+    exp: u64,
+    /// Whether the user still needs to perform 2fa
+    #[serde(default = "default_needs_2fa")] // backwards compat
+    pub needs_2fa: bool,
+}
+
+fn default_needs_2fa() -> bool {
+    true
 }
 
 impl AuthClaims {
@@ -57,6 +67,14 @@ impl AuthClaims {
         AuthClaims {
             sub: user_id,
             exp: 2000000000, // may 2033, my problem then!
+            needs_2fa: true,
+        }
+    }
+
+    pub fn two_factor_verified(user_id: UserId) -> Self {
+        AuthClaims {
+            needs_2fa: false,
+            ..Self::new(user_id)
         }
     }
 }
@@ -74,7 +92,7 @@ where
         parts: &mut http::request::Parts,
         _state: &S,
     ) -> Result<Option<Self>, Self::Rejection> {
-        // Extract the Bearer token header
+        // Extract the Cookie header
         let cookie = match parts.extract::<TypedHeader<headers::Cookie>>().await.ok() {
             Some(TypedHeader(cookie)) if cookie.len() != 0 => cookie,
             None | Some(_) => {
@@ -84,10 +102,10 @@ where
         };
 
         // If the user specifies a cookie, it has to have the right properties.
-        let jwt = match cookie.get("typesofants_auth") {
+        let jwt = match cookie.get(AUTH_COOKIE_NAME) {
             Some(cookie) => cookie,
             None => {
-                warn!("Cookie {:?} had no 'typesofants_auth' key", cookie);
+                warn!("Cookie {:?} had no '{}' key", cookie, AUTH_COOKIE_NAME);
                 return Err((
                     StatusCode::BAD_REQUEST,
                     "Invalid authorization token.".to_string(),
@@ -130,10 +148,10 @@ where
                 );
             })?;
 
-        let jwt = match cookie.get("typesofants_auth") {
+        let jwt = match cookie.get(AUTH_COOKIE_NAME) {
             Some(cookie) => cookie,
             None => {
-                warn!("No 'typesofants_auth' cookie found.");
+                warn!("No '{}' cookie found.", AUTH_COOKIE_NAME);
                 return Err((
                     StatusCode::BAD_REQUEST,
                     "Invalid authorization token.".to_string(),
@@ -195,9 +213,10 @@ where
     }
 }
 
-/// Require that the claims included in the request are valid. Use this for all authenticated routes.
-/// Returns an AuthError if something went wrong, either a DB error or access denial.
-pub async fn authenticate(
+/// This function allows any user in that has successfully signed up, but may not have performed
+/// their two-factor verification. This should be used for routes required to start/finish the
+/// two-factor verification flows.
+pub async fn authenticate_for_two_factor(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
@@ -206,6 +225,27 @@ pub async fn authenticate(
     match user {
         None => Err(AuthError::AccessDenied(Some(auth.sub.to_string()))),
         Some(u) => Ok(u),
+    }
+}
+
+/// Require that the claims included in the request are valid. Use this for all authenticated routes.
+/// Returns an AuthError if something went wrong, either a DB error or access denial.
+/// This authentication state is the final one for the user, and requires they are 2FA verified.
+pub async fn authenticate(
+    auth: &AuthClaims,
+    dao: &Arc<AntDataFarmClient>,
+) -> Result<User, AuthError> {
+    let user = authenticate_for_two_factor(&auth, &dao).await?;
+
+    // We let the user in only if they don't need 2fa. This comes from AuthClaims and is signed
+    // by the server's key, so we can trust that the server wrote this during /login, but it
+    // never got replaced during /verification
+    if auth.needs_2fa {
+        return Err(AuthError::AccessDenied(Some(
+            "user is not two-factor verified".to_string(),
+        )));
+    } else {
+        return Ok(user);
     }
 }
 
@@ -232,7 +272,7 @@ pub async fn optional_authenticate(
 
 pub fn make_cookie(jwt: String) -> Cookie<'static> {
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
-    Cookie::build(("typesofants_auth", jwt.clone()))
+    Cookie::build((AUTH_COOKIE_NAME, jwt.clone()))
         .secure(true)
         .http_only(true)
         .permanent()

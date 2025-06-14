@@ -52,6 +52,7 @@ async fn user_gets_created() {
             "(111) 222-3333".to_string(),
             "email@domain.com".to_string(),
             "integ-user-password".to_string(),
+            "user".to_string(),
         )
         .await
         .unwrap();

@@ -201,7 +201,7 @@ impl UsersDao {
         let mut db = self.database.lock().await;
         let t = db.transaction().await?;
 
-        let password_hash = make_password_hash(password.as_str())?;
+        let password_hash = make_password_hash(&password)?;
 
         let role_id: Uuid = t
             .query(
@@ -242,9 +242,9 @@ impl UsersDao {
         .await?;
 
         let user = User {
-            username,
-            emails: vec![email],
-            phone_number,
+            username: username.to_string(),
+            emails: vec![email.to_string()],
+            phone_number: phone_number.to_string(),
             password_hash,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
@@ -257,8 +257,8 @@ impl UsersDao {
 
     pub async fn add_email_to_user(
         &mut self,
-        user_id: UserId,
-        email: String,
+        user_id: &UserId,
+        email: &str,
     ) -> Result<(), anyhow::Error> {
         let res_affected = self
             .database

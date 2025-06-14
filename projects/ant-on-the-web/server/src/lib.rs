@@ -2,6 +2,7 @@ use axum::{response::IntoResponse, routing::get, Router};
 use axum_extra::routing::RouterExt;
 use http::{header, Response, StatusCode};
 use hyper::http::Method;
+use routes::lib::err::AntOnTheWebError;
 use std::sync::Arc;
 use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
@@ -16,11 +17,10 @@ use tracing::debug;
 
 mod clients;
 mod routes;
+pub mod state;
 mod throttle;
-pub mod types;
 
 pub use crate::clients::sms;
-use crate::err::AntOnTheWebError;
 pub use crate::routes::ants;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;
@@ -60,10 +60,10 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
     }
 }
 
-pub fn make_routes(state: types::InnerApiState) -> Result<Router, anyhow::Error> {
+pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error> {
     debug!("Initializing API routes...");
 
-    let governor_conf = Arc::new(
+    let throttling = Arc::new(
         GovernorConfigBuilder::default()
             // 10 TPS
             .period(std::time::Duration::from_millis(100))
@@ -89,7 +89,7 @@ pub fn make_routes(state: types::InnerApiState) -> Result<Router, anyhow::Error>
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
         // .nest("/deployments", deployments::router())
-        .with_state(state)
+        .with_state(state.clone())
         .layer(axum::middleware::from_fn(
             ant_library::middleware_print_request_response,
         ))
@@ -119,9 +119,7 @@ pub fn make_routes(state: types::InnerApiState) -> Result<Router, anyhow::Error>
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(cors)
-                .layer(GovernorLayer {
-                    config: governor_conf,
-                }),
+                .layer(GovernorLayer { config: throttling }),
         );
 
     return Ok(app);

@@ -1,6 +1,6 @@
 use axum::Router;
 
-use crate::types::ApiRouter;
+use crate::state::ApiRouter;
 
 pub fn router() -> ApiRouter {
     Router::new()

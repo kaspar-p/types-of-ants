@@ -4,12 +4,17 @@ use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
 use ant_library::axum_test_client::TestClient;
 use ant_on_the_web::{
     make_routes,
-    sms::Sms,
-    types::InnerApiState,
-    users::{LoginMethod, LoginRequest, LoginResponse, SignupRequest},
+    sms::SmsSender,
+    state::InnerApiState,
+    users::{
+        LoginMethod, LoginRequest, LoginResponse, SignupRequest, VerificationRequest,
+        VerificationResponse, VerificationSubmission,
+    },
 };
 use http::StatusCode;
 use postgresql_embedded::PostgreSQL;
+use rand::SeedableRng;
+use tokio::sync::Mutex;
 
 async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
     let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
@@ -42,32 +47,101 @@ async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
     return (pg, client);
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TestMsg {
+    pub to_phone: String,
+    pub content: String,
+}
+
+pub struct TestSmsSender {
+    pub msgs: Arc<Mutex<Vec<TestMsg>>>,
+}
+
+impl TestSmsSender {
+    pub async fn all_msgs(&self) -> Vec<TestMsg> {
+        let msgs = self.msgs.lock().await;
+
+        return msgs.iter().map(|m| m.clone()).collect::<Vec<TestMsg>>();
+    }
+}
+
+#[async_trait::async_trait]
+impl SmsSender for TestSmsSender {
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error> {
+        let mut msgs = self.msgs.lock().await;
+        msgs.push(TestMsg {
+            to_phone: to_phone.to_string(),
+            content: content.to_string(),
+        });
+
+        Ok("send-id".to_string())
+    }
+}
+
 pub struct TestFixture {
     pub client: TestClient,
+    pub state: InnerApiState,
     _guard: PostgreSQL,
 }
 
 /// Get a test webserver connected to a test webserver.
 /// The database has been bootstrapped with the most modern schema.
-pub async fn test_router() -> TestFixture {
+pub async fn no_auth_test_router<'a>() -> TestFixture {
     let (db, db_client) = test_database_client().await;
-    let sms = Sms::new(true);
+    let sms = TestSmsSender {
+        msgs: Arc::new(Mutex::new(vec![])),
+    };
 
-    let app = make_routes(InnerApiState {
+    let state = InnerApiState {
         dao: Arc::new(db_client),
         sms: Arc::new(sms),
-    })
-    .unwrap();
+
+        // Deterministic seed for testing.
+        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed([123; 32]))),
+    };
+    let app = make_routes(&state).unwrap();
 
     return TestFixture {
         client: TestClient::new(app).await,
+        state: state,
         _guard: db,
     };
 }
 
 /// Get a test webserver and database, along with a valid COOKIE header value.
 pub async fn authn_test_router() -> (TestFixture, String) {
-    let fixture = test_router().await;
+    let (fixture, cookie) = authn_no_verify_test_router().await;
+
+    // based on the deterministic testing rng
+    let otp = "ANT-qg7i2";
+
+    let token = {
+        let req = VerificationRequest {
+            submission: VerificationSubmission::Phone {
+                otp: otp.to_string(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res: VerificationResponse = res.json().await;
+        res.token
+    };
+
+    return (fixture, format!("typesofants_auth={}", token));
+}
+
+/// Get a router and cookie pair that has not perform 2fa verification yet.
+pub async fn authn_no_verify_test_router() -> (TestFixture, String) {
+    let fixture = no_auth_test_router().await;
 
     {
         let req = SignupRequest {

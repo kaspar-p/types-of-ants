@@ -7,16 +7,19 @@ pub use crate::dao::daos::hosts;
 pub use crate::dao::daos::releases;
 pub use crate::dao::daos::tweets;
 pub use crate::dao::daos::users;
+pub use crate::dao::daos::verifications;
 
 use crate::{
-    dao::daos::{ants::AntsDao, hosts::HostsDao, releases::ReleasesDao, users::UsersDao},
+    dao::daos::{
+        ants::AntsDao, hosts::HostsDao, releases::ReleasesDao, tweets::TweetsDao, users::UsersDao,
+        verifications::VerificationsDao,
+    },
     dao::db::Database,
     types::ConnectionPool,
 };
 use bb8::Pool;
 use bb8::PooledConnection;
 use bb8_postgres::PostgresConnectionManager;
-use dao::daos::tweets::TweetsDao;
 use std::fs::read_dir;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -103,12 +106,12 @@ pub struct AntDataFarmClient {
     pub ants: RwLock<AntsDao>,
     pub releases: RwLock<ReleasesDao>,
     pub users: RwLock<UsersDao>,
+    pub verifications: RwLock<VerificationsDao>,
     pub tweets: RwLock<TweetsDao>,
     pub hosts: RwLock<HostsDao>,
     // pub deployments: DeploymentsDao,
     // pub metrics: MetricsDao,
     // pub tests: TestsDao,
-    pool: ConnectionPool,
 }
 
 impl AntDataFarmClient {
@@ -144,15 +147,16 @@ impl AntDataFarmClient {
         let ants = RwLock::new(AntsDao::new(database.clone()).await?);
         let releases = RwLock::new(ReleasesDao::new(database.clone()).await);
         let users = RwLock::new(UsersDao::new(database.clone()).await?);
+        let verifications = RwLock::new(VerificationsDao::new(database.clone()));
         let tweets = RwLock::new(TweetsDao::new(database.clone()));
         let hosts = RwLock::new(HostsDao::new(database.clone()).await?);
 
         Ok(AntDataFarmClient {
-            pool,
             ants,
             releases,
             tweets,
             users,
+            verifications,
             hosts,
         })
     }

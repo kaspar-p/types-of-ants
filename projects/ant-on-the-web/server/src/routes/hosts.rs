@@ -1,4 +1,4 @@
-use crate::types::{ApiRouter, ApiState, InnerApiState};
+use crate::state::{ApiRouter, ApiState, InnerApiState};
 use ant_data_farm::{
     hosts::{Host, HostId},
     DaoTrait,
@@ -22,7 +22,7 @@ pub struct GetHostResponse {
 
 async fn host(
     Path(host_identifier): Path<String>,
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, HostsError> {
     let hosts = dao.hosts.read().await;
 
@@ -51,7 +51,7 @@ pub struct GetHostsResponse {
 }
 
 async fn all_hosts(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, HostsError> {
     let hosts = dao.hosts.read().await;
     let all_hosts = hosts.get_all().await?;

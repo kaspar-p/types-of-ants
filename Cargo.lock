@@ -79,6 +79,7 @@ dependencies = [
  "sha2",
  "testcontainers",
  "thiserror 2.0.12",
+ "time",
  "tokio",
  "tokio-postgres",
  "tower",
@@ -192,6 +193,7 @@ dependencies = [
  "ant-library",
  "anyhow",
  "argon2",
+ "async-trait",
  "axum",
  "axum-extra",
  "axum-macros",
@@ -210,6 +212,7 @@ dependencies = [
  "phonenumber",
  "postgres-types",
  "postgresql_embedded",
+ "rand 0.9.1",
  "regex",
  "serde",
  "serde_derive",
@@ -2791,6 +2794,7 @@ dependencies = [
  "postgres-protocol",
  "serde",
  "serde_json",
+ "time",
  "uuid",
 ]
 

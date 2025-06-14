@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use crate::{
     err::ValidationError,
-    routes::lib::err::ValidationMessage,
-    types::{ApiRouter, ApiState, InnerApiState},
+    routes::lib::{err::ValidationMessage, two_factor},
+    state::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
@@ -20,8 +20,12 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use super::lib::{
-    auth::{authenticate, make_cookie, optional_authenticate, AuthClaims, AUTH_KEYS},
+    auth::{
+        authenticate, authenticate_for_two_factor, make_cookie, optional_authenticate, AuthClaims,
+        AUTH_KEYS,
+    },
     err::AntOnTheWebError,
+    two_factor::VerificationState,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -30,7 +34,7 @@ pub struct EmailRequest {
 }
 async fn subscribe_email(
     auth: Option<AuthClaims>,
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     Json(EmailRequest {
         email: unsafe_email,
     }): Json<EmailRequest>,
@@ -63,7 +67,7 @@ async fn subscribe_email(
 
     let mut user_write = dao.users.write().await;
     user_write
-        .add_email_to_user(user.user_id, canonical_email)
+        .add_email_to_user(&user.user_id, &canonical_email)
         .await?;
 
     return Ok((StatusCode::OK, "Subscribed!"));
@@ -76,7 +80,7 @@ pub struct GetUserResponse {
 async fn get_user_by_name(
     auth: AuthClaims,
     path: Option<Path<String>>,
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN
     let user = authenticate(&auth, &dao).await?;
@@ -108,7 +112,7 @@ async fn get_user_by_name(
 
 async fn logout(
     auth: AuthClaims,
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
@@ -157,7 +161,7 @@ pub struct LoginResponse {
     pub access_token: String,
 }
 async fn login(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let users = dao.users.read().await;
@@ -198,11 +202,11 @@ async fn login(
         return Err(AntOnTheWebError::AccessDenied(None));
     }
 
+    // TODO: two-factor verify on login (to a method they have verified)
+
     debug!("Password verified, generating jwt token...");
     let claims = AuthClaims::new(user.user_id.clone());
     let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
-
-    // TODO: Verify with two-factor
 
     debug!("Making JWT cookie for the browser...");
     let cookie = make_cookie(jwt.clone());
@@ -219,27 +223,63 @@ async fn login(
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VerificationRequest {
-    pub submission: VerificationSubmission,
-}
-
-#[derive(Serialize, Deserialize)]
 #[serde(tag = "method")]
 pub enum VerificationSubmission {
-    #[serde(rename = "username")]
-    Username { otp: String },
-
     #[serde(rename = "email")]
     Email { otp: String },
 
     #[serde(rename = "phone")]
     Phone { otp: String },
 }
-async fn post_verification(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+
+#[derive(Serialize, Deserialize)]
+pub struct VerificationRequest {
+    pub submission: VerificationSubmission,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VerificationResponse {
+    pub token: String,
+}
+
+async fn two_factor_verification(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
     Json(signup_verification_request): Json<VerificationRequest>,
-) -> impl IntoResponse {
-    return (StatusCode::NOT_IMPLEMENTED, "Unimplemented");
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = authenticate_for_two_factor(&auth, &dao).await?;
+
+    let verification = match signup_verification_request.submission {
+        VerificationSubmission::Phone { otp } => {
+            two_factor::receive_phone_verification_code(&dao, &user, &otp).await?
+        }
+        VerificationSubmission::Email { otp: _ } => {
+            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
+        }
+    };
+
+    match verification {
+        VerificationState::NoVerificationFound
+        | VerificationState::HasMoreAttempts
+        | VerificationState::OutOfAttempts => {
+            return Ok((StatusCode::BAD_REQUEST, Json(verification)).into_response())
+        }
+
+        VerificationState::Verified => {
+            let claims = AuthClaims::two_factor_verified(user.user_id.clone());
+            let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+
+            debug!("Making JWT cookie for the browser...");
+            let cookie = make_cookie(jwt.clone());
+
+            return Ok((
+                StatusCode::OK,
+                [(header::SET_COOKIE, cookie.to_string())], // Overwrite the old cookie with a new 2fa cookie
+                Json(VerificationResponse { token: jwt.clone() }),
+            )
+                .into_response());
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -251,7 +291,7 @@ pub struct SignupRequest {
     pub password: String,
 }
 async fn signup_request(
-    State(InnerApiState { dao, sms: _ }): ApiState,
+    State(InnerApiState { dao, sms, rng }): ApiState,
     Json(signup_request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     info!("Validating signup request...");
@@ -349,7 +389,7 @@ async fn signup_request(
         }
     }
 
-    {
+    let user = {
         // Make user
         info!("User does not exist, creating...");
         let mut write_users = dao.users.write().await;
@@ -363,7 +403,21 @@ async fn signup_request(
             )
             .await?;
         info!("Created user {}", user.user_id);
+
+        user
+    };
+
+    // Start verifying their two-factor phone number
+    // This process happens async, but they won't be able to login until it's verified.
+    // The UI just has to accept the 200 OK and continue the user into some fields where they can
+    // attempt to fullfil the OTP for each method.
+    {
+        let mut rng = rng.lock().await;
+        two_factor::send_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user).await?;
     }
+
+    // TODO: Start verifying their two-factor email address
+    {}
 
     return Ok((StatusCode::OK, "Signup completed.").into_response());
 }
@@ -374,7 +428,7 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))
-        // .route_with_tsr("/verification", post(verification))
+        .route_with_tsr("/verification", post(two_factor_verification))
         .route_with_tsr("/user", get(get_user_by_name))
         .route_with_tsr("/user/{user_name}", get(get_user_by_name))
         .fallback(|| async {
@@ -383,6 +437,7 @@ pub fn router() -> ApiRouter {
                 "POST /login",
                 "POST /logout",
                 "POST /signup",
+                "POST /verification",
                 "GET /user",
                 "GET /user/{user_name}",
             ])
