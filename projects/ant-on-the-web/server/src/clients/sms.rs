@@ -1,13 +1,13 @@
 use std::any::Any;
 
-use tracing::debug;
-use twilio::{Client, OutboundMessage};
+use tracing::{debug, error, info};
+use twilio::{Client, OutboundMessage, TwilioError};
 
 #[async_trait::async_trait]
 pub trait SmsSender: Any + Send + Sync {
     /// Send an SMS message to `to_phone` with the `content` as body. Return a unique identifier
     /// for the message if there is one, likely from the sms provider.
-    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error>;
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, SmsError>;
 }
 
 pub struct Sms {
@@ -17,7 +17,8 @@ pub struct Sms {
 }
 
 pub enum SmsError {
-    InternalServerError(twilio::TwilioError),
+    InternalServerError(anyhow::Error),
+    BadPhoneNumber,
 }
 
 impl Sms {
@@ -34,17 +35,30 @@ impl Sms {
 
 #[async_trait::async_trait]
 impl SmsSender for Sms {
-    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error> {
-        debug!("Sending SMS {to_phone} ::: {content}");
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, SmsError> {
+        debug!("Sending SMS {to_phone}: {content}");
         let msg = self
             .client
             .send_message(OutboundMessage {
                 from: &self.source_phone,
-                to: to_phone,
-                body: content,
+                to: "+19704812142",
+                body: "hello",
             })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
+            .await;
+        let msg = match msg {
+            Ok(msg) => msg,
+            Err(e) => match e {
+                TwilioError::BadRequest => {
+                    info!("sending sms to that number failed");
+                    return Err(SmsError::BadPhoneNumber);
+                }
+                _ => {
+                    error!("sending sms failed: {}", e);
+                    return Err(SmsError::InternalServerError(anyhow::anyhow!(e)));
+                }
+            },
+        };
+
         debug!("Sent SMS {:?}", msg);
 
         Ok(msg.sid)

@@ -16,7 +16,7 @@ async fn main() {
         dao: Arc::new(
             AntDataFarmClient::new(None)
                 .await
-                .expect("Connected to db!"),
+                .expect("db connection failed"),
         ),
 
         // Twilio client for sending data.
@@ -25,7 +25,7 @@ async fn main() {
         // Choose OS RNG to seed the std PRNG
         rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_rng(&mut rand::rng()))),
     };
-    let app = ant_on_the_web::make_routes(&state).expect("route init");
+    let app = ant_on_the_web::make_routes(&state).expect("route init failed");
 
     let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
         .expect("ANT_ON_THE_WEB_PORT environment variable not found")
@@ -37,5 +37,5 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect(format!("failed to bind server to {port}").as_str());
-    axum::serve(listener, app).await.expect("Server failed!");
+    axum::serve(listener, app).await.expect("server failed");
 }

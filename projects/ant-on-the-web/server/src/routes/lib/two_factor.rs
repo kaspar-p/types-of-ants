@@ -1,4 +1,7 @@
-use crate::sms::SmsSender;
+use crate::{
+    err::{ValidationError, ValidationMessage},
+    sms::{SmsError, SmsSender},
+};
 
 use super::err::AntOnTheWebError;
 use ant_data_farm::{users::User, verifications::VerificationResult, AntDataFarmClient};
@@ -81,7 +84,19 @@ pub async fn send_phone_verification_code(
 
     let content = format!("[typesofants.org] your one-time code is: {otp}");
 
-    let send_id = sms.send_msg(&user.phone_number, &content).await?;
+    let send_id = sms
+        .send_msg(&user.phone_number, &content)
+        .await
+        .map_err(|e| match e {
+            SmsError::BadPhoneNumber => AntOnTheWebError::ValidationError(ValidationError {
+                errors: vec![ValidationMessage::new(
+                    "phone",
+                    "Phone number cannot receive messages",
+                )],
+            }),
+            SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
+        })?;
+
     write_verifications
         .update_phone_number_verification_with_send_id(&verification, &send_id)
         .await?;

@@ -4,7 +4,7 @@ use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
 use ant_library::axum_test_client::TestClient;
 use ant_on_the_web::{
     make_routes,
-    sms::SmsSender,
+    sms::{SmsError, SmsSender},
     state::InnerApiState,
     users::{
         LoginMethod, LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
@@ -69,7 +69,7 @@ impl TestSmsSender {
 
 #[async_trait::async_trait]
 impl SmsSender for TestSmsSender {
-    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, anyhow::Error> {
+    async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, SmsError> {
         let mut msgs = self.msgs.lock().await;
         msgs.push(TestMsg {
             to_phone: to_phone.to_string(),
