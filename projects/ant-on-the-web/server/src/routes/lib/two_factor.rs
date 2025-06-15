@@ -65,7 +65,7 @@ pub async fn send_phone_verification_code(
 ) -> Result<(), AntOnTheWebError> {
     let mut write_verifications = dao.verifications.write().await;
     let dist = rand::distr::Alphanumeric;
-    let otp = "ANT-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
+    let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
 
     info!("Starting phone number verification for {}", &user.user_id);
     let verification = write_verifications

@@ -16,6 +16,8 @@ use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
 use tokio::sync::Mutex;
 
+use crate::fixture_sms::first_sms_otp;
+
 async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
     let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
         temporary: true,
@@ -116,13 +118,10 @@ pub async fn test_router_no_auth() -> TestFixture {
 pub async fn test_router_auth() -> (TestFixture, String) {
     let (fixture, cookie) = test_router_weak_auth(None).await;
 
-    // based on the deterministic testing rng
-    let otp = "ANT-qg7i2";
-
     let token = {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
-                otp: otp.to_string(),
+                otp: first_sms_otp(),
             },
         };
 
