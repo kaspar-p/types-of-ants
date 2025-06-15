@@ -1,8 +1,6 @@
 use std::any::Any;
 
-use crate::fixture::{
-    authn_no_verify_test_router, authn_test_router, no_auth_test_router, TestSmsSender,
-};
+use crate::fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth, TestSmsSender};
 use ant_on_the_web::{
     two_factor::VerificationMethod,
     users::{
@@ -15,7 +13,7 @@ use tracing_test::traced_test;
 #[tokio::test]
 #[traced_test]
 async fn users_signup_returns_200_and_sends_one_time_codes() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -52,7 +50,7 @@ async fn users_signup_returns_200_and_sends_one_time_codes() {
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = VerificationAttemptRequest {
@@ -76,7 +74,7 @@ async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_200_with_different_cookie_headers() {
-    let (fixture, cookie) = authn_no_verify_test_router(None).await;
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     // based on the deterministic testing rng
     let otp = "ANT-qg7i2";
@@ -109,7 +107,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
 #[traced_test]
 async fn users_verification_attempt_returns_200_with_different_cookie_headers_even_if_already_authn(
 ) {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     // based on the deterministic testing rng
     let otp = "ANT-qg7i2";
@@ -141,7 +139,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts() {
-    let (fixture, cookie) = authn_no_verify_test_router(None).await;
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     for _ in 0..10 {
         let req = VerificationAttemptRequest {
@@ -186,8 +184,156 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
 
 #[tokio::test]
 #[traced_test]
+async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
+    let fixture = test_router_no_auth().await;
+
+    let cookie = {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let cookie = res
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(res.text().await, "Signup completed.");
+
+        cookie
+    };
+
+    let correct_otp = "ANT-qg7i2"; // based on the deterministic testing rng
+    {
+        let req = VerificationAttemptRequest {
+            submission: VerificationSubmission::Phone {
+                otp: correct_otp.to_string(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification-attempt")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert_ne!(new_cookie, cookie);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_verification_returns_200_after_only_signup_no_login() {
+    let fixture = test_router_no_auth().await;
+
+    let cookie = {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            email: "email@domain.com".to_string(),
+            phone_number: "+1 (111) 222-3333".to_string(),
+            password: "my-ant-password".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let cookie = res
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(res.text().await, "Signup completed.");
+
+        cookie
+    };
+
+    {
+        let req = VerificationRequest {
+            method: VerificationMethod::Phone("+1 (111) 222-3333".to_string()),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let sms = fixture.state.sms.as_ref() as &dyn Any;
+        let sms = sms.downcast_ref::<TestSmsSender>().unwrap();
+
+        let msgs = sms.all_msgs().await;
+        assert_eq!(msgs.len(), 2); // one for the original signup, one for the /verification request
+
+        let msg = msgs.get(0).unwrap();
+        assert_eq!(msg.to_phone, "+11112223333");
+        assert_eq!(
+            msg.content,
+            "[typesofants.org] your one-time code is: ANT-qg7i2"
+        );
+
+        let msg = msgs.get(1).unwrap();
+        assert_eq!(msg.to_phone, "+11112223333");
+        assert_eq!(
+            msg.content,
+            "[typesofants.org] your one-time code is: ANT-g5qp3"
+        );
+    }
+
+    let correct_otp = "ANT-g5qp3"; // based on the deterministic testing rng
+    {
+        let req = VerificationAttemptRequest {
+            submission: VerificationSubmission::Phone {
+                otp: correct_otp.to_string(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification-attempt")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert_ne!(new_cookie, cookie);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
 async fn users_verification_returns_200_and_sends_new_code() {
-    let (fixture, cookie) = authn_no_verify_test_router(None).await;
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     {
         let req = VerificationRequest {
@@ -229,7 +375,7 @@ async fn users_verification_returns_200_and_sends_new_code() {
 #[tokio::test]
 #[traced_test]
 async fn users_verification_returns_200_and_cancels_previous_codes() {
-    let (fixture, cookie) = authn_no_verify_test_router(None).await;
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     {
         let req = VerificationRequest {

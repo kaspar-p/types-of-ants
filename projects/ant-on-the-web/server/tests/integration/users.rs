@@ -1,4 +1,4 @@
-use crate::fixture::{authn_test_router, no_auth_test_router};
+use crate::fixture::{test_router_auth, test_router_no_auth};
 use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
 
@@ -11,7 +11,7 @@ use ant_on_the_web::{
 
 #[tokio::test]
 async fn users_signup_returns_400_if_not_json() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     let res = fixture
         .client
@@ -26,7 +26,7 @@ async fn users_signup_returns_400_if_not_json() {
 
 #[tokio::test]
 async fn users_signup_returns_400_if_username_invalid() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -97,7 +97,7 @@ async fn users_signup_returns_400_if_username_invalid() {
 
 #[tokio::test]
 async fn users_signup_returns_400_if_phone_number_invalid() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     let req = SignupRequest {
         username: "user".to_string(),
@@ -121,7 +121,7 @@ async fn users_signup_returns_400_if_phone_number_invalid() {
 
 #[tokio::test]
 async fn users_signup_returns_400_with_multiple_errors() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -176,7 +176,7 @@ async fn users_signup_returns_400_with_multiple_errors() {
 
 #[tokio::test]
 async fn users_signup_returns_400_if_password_invalid() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -246,7 +246,7 @@ async fn users_signup_returns_400_if_password_invalid() {
 #[tokio::test]
 #[traced_test]
 async fn users_signup_returns_409_if_user_already_exists() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -306,7 +306,7 @@ async fn users_signup_returns_409_if_user_already_exists() {
 #[tokio::test]
 #[traced_test]
 async fn users_signup_succeeds() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -323,14 +323,20 @@ async fn users_signup_succeeds() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
+
+        let cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert!(cookie.contains("typesofants_auth="));
+        assert!(cookie.contains("HttpOnly"));
+
+        let text = res.text().await;
+        assert_eq!(text, "Signup completed.");
     }
 }
 
 #[tokio::test]
 #[traced_test]
 async fn users_signup_returns_409_if_user_already_signed_up() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -372,7 +378,7 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
 #[tokio::test]
 #[traced_test]
 async fn users_login_returns_401_if_no_corresponding_user() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     // Username
     {
@@ -429,7 +435,7 @@ async fn users_login_returns_401_if_no_corresponding_user() {
 #[tokio::test]
 #[traced_test]
 async fn users_logout_returns_4xx_if_not_authenticated() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let res = fixture.client.post("/api/users/logout").send().await;
@@ -454,7 +460,7 @@ async fn users_logout_returns_4xx_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn users_logout_returns_200_if_authenticated() {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     {
         let res = fixture
@@ -479,7 +485,7 @@ async fn users_logout_returns_200_if_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn users_login_returns_401_if_wrong_fields() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -557,7 +563,7 @@ async fn users_login_returns_401_if_wrong_fields() {
 #[tokio::test]
 #[traced_test]
 async fn users_login_returns_200_with_cookie_headers() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -603,7 +609,7 @@ async fn users_login_returns_200_with_cookie_headers() {
 #[tokio::test]
 #[traced_test]
 async fn users_login_returns_200_returns_bearer_token() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     {
         let req = SignupRequest {
@@ -684,7 +690,7 @@ async fn users_login_returns_200_returns_bearer_token() {
 #[tokio::test]
 #[traced_test]
 async fn users_user_returns_401_if_token_has_been_tampered_with() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     // Hit authenticated endpoint /users/user/{user_name}
     {
@@ -703,7 +709,7 @@ async fn users_user_returns_401_if_token_has_been_tampered_with() {
 #[tokio::test]
 #[traced_test]
 async fn users_user_returns_400_if_missing_token() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     // No Cookie header at all
     {
@@ -730,7 +736,7 @@ async fn users_user_returns_400_if_missing_token() {
 #[tokio::test]
 #[traced_test]
 async fn users_user_returns_200_if_authn_token_right() {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     // Hit authenticated endpoint /users/user/{user_name}
     {
@@ -753,7 +759,7 @@ async fn users_user_returns_200_if_authn_token_right() {
 #[tokio::test]
 #[traced_test]
 async fn users_subscribe_newsletter_returns_400_if_malformed_email() {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     {
         let req = EmailRequest {
@@ -778,7 +784,7 @@ async fn users_subscribe_newsletter_returns_400_if_malformed_email() {
 #[tokio::test]
 #[traced_test]
 async fn users_subscribe_newsletter_returns_409_if_email_already_registered() {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     {
         let req = EmailRequest {
@@ -815,7 +821,7 @@ async fn users_subscribe_newsletter_returns_409_if_email_already_registered() {
 #[tokio::test]
 #[traced_test]
 async fn users_subscribe_newsletter_returns_200_for_unauthenticated_calls() {
-    let (fixture, _) = authn_test_router().await;
+    let (fixture, _) = test_router_auth().await;
 
     {
         let req = EmailRequest {
@@ -835,7 +841,7 @@ async fn users_subscribe_newsletter_returns_200_for_unauthenticated_calls() {
 #[tokio::test]
 #[traced_test]
 async fn users_subscribe_newsletter_returns_409_if_email_taken_by_another_user() {
-    let (fixture, cookie) = authn_test_router().await;
+    let (fixture, cookie) = test_router_auth().await;
 
     {
         let req = EmailRequest {

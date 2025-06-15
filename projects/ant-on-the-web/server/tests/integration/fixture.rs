@@ -84,7 +84,7 @@ pub struct TestFixture {
     _guard: PostgreSQL,
 }
 
-async fn seeded_no_auth_test_router(seed: [u8; 32]) -> TestFixture {
+async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
     let (db, db_client) = test_database_client().await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
@@ -108,13 +108,13 @@ async fn seeded_no_auth_test_router(seed: [u8; 32]) -> TestFixture {
 
 /// Get a test webserver connected to a test webserver.
 /// The database has been bootstrapped with the most modern schema.
-pub async fn no_auth_test_router() -> TestFixture {
-    seeded_no_auth_test_router([123; 32]).await
+pub async fn test_router_no_auth() -> TestFixture {
+    test_router_seeded_no_auth([123; 32]).await
 }
 
 /// Get a test webserver and database, along with a valid COOKIE header value.
-pub async fn authn_test_router() -> (TestFixture, String) {
-    let (fixture, cookie) = authn_no_verify_test_router(None).await;
+pub async fn test_router_auth() -> (TestFixture, String) {
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     // based on the deterministic testing rng
     let otp = "ANT-qg7i2";
@@ -144,8 +144,8 @@ pub async fn authn_test_router() -> (TestFixture, String) {
 }
 
 /// Get a router and cookie pair that has not perform 2fa verification yet.
-pub async fn authn_no_verify_test_router(seed: Option<[u8; 32]>) -> (TestFixture, String) {
-    let fixture = seeded_no_auth_test_router(seed.unwrap_or([123; 32])).await;
+pub async fn test_router_weak_auth(seed: Option<[u8; 32]>) -> (TestFixture, String) {
+    let fixture = test_router_seeded_no_auth(seed.unwrap_or([123; 32])).await;
 
     {
         let req = SignupRequest {

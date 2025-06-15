@@ -18,11 +18,15 @@ use axum_extra::{
     extract::cookie::{Cookie, SameSite},
     headers, TypedHeader,
 };
-use jsonwebtoken::{decode, DecodingKey, EncodingKey, Validation};
+use cookie::{
+    time::{Duration, OffsetDateTime},
+    CookieBuilder,
+};
+use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-pub static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
+static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
     debug!("Initializing jwt secret...");
     let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
 
@@ -51,9 +55,16 @@ impl AuthKeys {
 pub struct AuthClaims {
     /// JWT subject, as per standard.
     pub sub: UserId,
+
     /// JWT expiration, as per standard.
     exp: u64,
+
     /// Whether the user still needs to perform 2fa
+    /// This is stored (signed) as a cookie in the user's browser so that the /login
+    /// route can authenticate the user for some user-specific routes, but they don't
+    /// yet have full access.
+    /// This field being `true` means the user has yet to perform 2fa, and they should
+    /// only be able to access routes to resend 2fa codes, submit 2fa codes, and logout.
     #[serde(default = "default_needs_2fa")] // backwards compat
     pub needs_2fa: bool,
 }
@@ -216,7 +227,9 @@ where
 /// This function allows any user in that has successfully signed up, but may not have performed
 /// their two-factor verification. This should be used for routes required to start/finish the
 /// two-factor verification flows.
-pub async fn authenticate_for_two_factor(
+///
+/// Unless this is a route that deals with auth, you should use [`authenticate`].
+pub async fn weakly_authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
@@ -235,7 +248,7 @@ pub async fn authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
-    let user = authenticate_for_two_factor(&auth, &dao).await?;
+    let user = weakly_authenticate(&auth, &dao).await?;
 
     // We let the user in only if they don't need 2fa. This comes from AuthClaims and is signed
     // by the server's key, so we can trust that the server wrote this during /login, but it
@@ -254,6 +267,8 @@ pub async fn authenticate(
 ///
 /// Returns AccessDenied errors if the user is specified but the claims are tampered or somehow
 /// wrong.
+///
+/// This is used in public APIs, for private user-specific APIs default to using [`authenticate`].
 pub async fn optional_authenticate(
     auth: Option<&AuthClaims>,
     dao: &Arc<AntDataFarmClient>,
@@ -270,7 +285,34 @@ pub async fn optional_authenticate(
     }
 }
 
-pub fn make_cookie(jwt: String) -> Cookie<'static> {
+/// This function should be used to _weakly_ authenticate the user. They might be signed in
+/// but they have yet to complete the 2fa flow. They should only be able to access routes
+/// for submitting 2fa codes, resending them, or logging out.
+pub fn make_weak_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>), anyhow::Error> {
+    debug!("Making JWT weak cookie for the browser...");
+    let claims = AuthClaims::new(user_id);
+    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+
+    let cookie = cookie_defaults(jwt.clone())
+        .expires(OffsetDateTime::now_utc().saturating_add(Duration::minutes(15)))
+        .build();
+
+    Ok((jwt, cookie))
+}
+
+/// This function should be used to fully authenticate the user, after they have performed the 2fa flow
+/// This cookie is a secret that should allow the user to hit every route they can, with no restrictions.
+pub fn make_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>), anyhow::Error> {
+    let claims: AuthClaims = AuthClaims::two_factor_verified(user_id);
+    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+
+    debug!("Making JWT auth cookie for the browser...");
+    let cookie = cookie_defaults(jwt.clone()).build();
+
+    Ok((jwt, cookie))
+}
+
+pub fn cookie_defaults(jwt: String) -> CookieBuilder<'static> {
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
     Cookie::build((AUTH_COOKIE_NAME, jwt.clone()))
         .secure(true)
@@ -281,5 +323,4 @@ pub fn make_cookie(jwt: String) -> Cookie<'static> {
             Mode::Dev => SameSite::None,
             Mode::Prod => SameSite::Strict,
         })
-        .build()
 }

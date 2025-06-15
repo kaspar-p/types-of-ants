@@ -1,9 +1,9 @@
-use crate::fixture::no_auth_test_router;
+use crate::fixture::test_router_no_auth;
 use http::StatusCode;
 
 #[tokio::test]
 async fn ping_works() {
-    let fixture = no_auth_test_router().await;
+    let fixture = test_router_no_auth().await;
 
     let res = fixture.client.get("/ping").send().await;
 

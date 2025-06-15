@@ -200,6 +200,7 @@ dependencies = [
  "bb8",
  "bb8-postgres",
  "chrono",
+ "cookie",
  "dotenv",
  "double-map",
  "email_address",

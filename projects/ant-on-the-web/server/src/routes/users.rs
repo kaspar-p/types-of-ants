@@ -2,7 +2,11 @@ use std::str::FromStr;
 
 use crate::{
     err::ValidationError,
-    routes::lib::{err::ValidationMessage, two_factor},
+    routes::lib::{
+        auth::{make_auth_cookie, make_weak_auth_cookie},
+        err::ValidationMessage,
+        two_factor,
+    },
     state::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::users::{verify_password_hash, User, UserId};
@@ -15,15 +19,11 @@ use axum::{
 };
 use axum_extra::routing::RouterExt;
 use http::header;
-use jsonwebtoken::Header;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use super::lib::{
-    auth::{
-        authenticate, authenticate_for_two_factor, make_cookie, optional_authenticate, AuthClaims,
-        AUTH_KEYS,
-    },
+    auth::{authenticate, cookie_defaults, optional_authenticate, weakly_authenticate, AuthClaims},
     err::AntOnTheWebError,
     two_factor::{VerificationMethod, VerificationState},
 };
@@ -116,7 +116,7 @@ async fn logout(
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
-    let mut cookie_expiration = make_cookie("".to_string());
+    let mut cookie_expiration = cookie_defaults("".to_string()).build();
     cookie_expiration.make_removal();
 
     return Ok((
@@ -205,11 +205,7 @@ async fn login(
     // TODO: two-factor verify on login (to a method they have verified)
 
     debug!("Password verified, generating jwt token...");
-    let claims = AuthClaims::new(user.user_id.clone());
-    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
-
-    debug!("Making JWT cookie for the browser...");
-    let cookie = make_cookie(jwt.clone());
+    let (jwt, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
 
     return Ok((
         StatusCode::OK,
@@ -244,7 +240,7 @@ async fn create_two_factor_verification(
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow users who are not fully authenticated because they can choose to
     // to resend their validation codes during their initial validation
-    let user = authenticate_for_two_factor(&auth, &dao).await?;
+    let user = weakly_authenticate(&auth, &dao).await?;
 
     match verification_request.method {
         VerificationMethod::Phone(_) => {
@@ -277,7 +273,7 @@ async fn two_factor_verification_attempt(
     State(InnerApiState { dao, .. }): ApiState,
     Json(signup_verification_request): Json<VerificationAttemptRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    let user = authenticate_for_two_factor(&auth, &dao).await?;
+    let user = weakly_authenticate(&auth, &dao).await?;
 
     let verification = match signup_verification_request.submission {
         VerificationSubmission::Phone { otp } => {
@@ -296,11 +292,9 @@ async fn two_factor_verification_attempt(
         }
 
         VerificationState::Verified => {
-            let claims = AuthClaims::two_factor_verified(user.user_id.clone());
-            let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+            info!("Verification succeeded, user authenticated");
 
-            debug!("Making JWT cookie for the browser...");
-            let cookie = make_cookie(jwt.clone());
+            let (jwt, cookie) = make_auth_cookie(user.user_id.clone())?;
 
             return Ok((
                 StatusCode::OK,
@@ -449,7 +443,15 @@ async fn signup_request(
     // TODO: Start verifying their two-factor email address
     {}
 
-    return Ok((StatusCode::OK, "Signup completed.").into_response());
+    // Make a weak auth token for the user for 2fa routes
+    let (_, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
+
+    return Ok((
+        StatusCode::OK,
+        [(header::SET_COOKIE, cookie.to_string())],
+        "Signup completed.",
+    )
+        .into_response());
 }
 
 pub fn router() -> ApiRouter {
