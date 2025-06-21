@@ -23,8 +23,8 @@ pub struct User {
 
     pub username: String,
 
-    #[serde(rename = "phoneNumber")]
-    pub phone_number: String,
+    #[serde(rename = "phoneNumbers")]
+    pub phone_numbers: Vec<String>,
 
     #[serde(skip)]
     pub password_hash: String,
@@ -35,7 +35,7 @@ pub struct User {
     pub joined: DateTime<Utc>,
 }
 
-async fn construct_emails_for_user(db: Arc<Mutex<Database>>, user_id: UserId) -> Vec<String> {
+async fn construct_emails_for_user(db: &Arc<Mutex<Database>>, user_id: &UserId) -> Vec<String> {
     db.lock()
         .await
         .query(
@@ -49,18 +49,35 @@ async fn construct_emails_for_user(db: Arc<Mutex<Database>>, user_id: UserId) ->
         .collect::<Vec<String>>()
 }
 
+async fn construct_phone_numbers_for_user(
+    db: &Arc<Mutex<Database>>,
+    user_id: &UserId,
+) -> Vec<String> {
+    db.lock()
+        .await
+        .query(
+            "select phone_number from registered_user_phone_number where user_id = $1;",
+            &[&user_id.0],
+        )
+        .await
+        .unwrap_or_else(|_| panic!("Failed to get user phone number data!"))
+        .iter()
+        .map(|row| row.get("phone_number"))
+        .collect::<Vec<String>>()
+}
+
 pub struct UsersDao {
     database: Arc<Mutex<Database>>,
 }
 
-fn row_to_user(user_row: &Row, emails: Vec<String>) -> User {
+fn row_to_user(user_row: &Row, emails: Vec<String>, phone_numbers: Vec<String>) -> User {
     User {
         user_id: user_row.get("user_id"),
         username: user_row.get("user_name"),
-        phone_number: user_row.get("user_phone_number"),
         password_hash: user_row.get("password_hash"),
-        emails,
         joined: user_row.get("user_joined"),
+        phone_numbers,
+        emails,
     }
 }
 
@@ -80,7 +97,6 @@ impl DaoTrait<UsersDao, User> for UsersDao {
         select
             user_id,
             user_name,
-            user_phone_number,
             user_joined,
             password_hash
         from
@@ -95,8 +111,9 @@ impl DaoTrait<UsersDao, User> for UsersDao {
         let row = binding.first().map(|row: &Row| async move {
             let user_id: UserId = row.get("user_id");
             let in_db = self.database.clone();
-            let emails = construct_emails_for_user(in_db, user_id).await;
-            row_to_user(row, emails)
+            let emails = construct_emails_for_user(&in_db, &user_id).await;
+            let phone_numbers = construct_phone_numbers_for_user(&in_db, &user_id).await;
+            row_to_user(row, emails, phone_numbers)
         });
 
         match row {
@@ -111,7 +128,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             .lock()
             .await
             .query(
-                "select user_id, user_name, user_phone_number, user_joined, password_hash from registered_user;",
+                "select user_id, user_name, user_joined, password_hash from registered_user;",
                 &[],
             )
             .await?;
@@ -119,9 +136,10 @@ impl DaoTrait<UsersDao, User> for UsersDao {
         Ok(future::join_all(rows.iter().map(|row| async move {
             let user_id: UserId = row.get("user_id");
             let in_db = self.database.clone();
-            let emails = construct_emails_for_user(in_db, user_id).await;
+            let emails = construct_emails_for_user(&in_db, &user_id).await;
+            let phone_numbers = construct_phone_numbers_for_user(&in_db, &user_id).await;
 
-            row_to_user(row, emails)
+            row_to_user(row, emails, phone_numbers)
         }))
         .await)
     }
@@ -188,15 +206,10 @@ impl UsersDao {
     pub async fn create_user(
         &mut self,
         username: String,
-        phone_number: String,
-        email: String,
         password: String,
         role: String,
     ) -> Result<User, anyhow::Error> {
-        info!(
-            "Creating user '{}' '{}' '{}'",
-            username, phone_number, email
-        );
+        info!("Creating user '{}'", username);
 
         let mut db = self.database.lock().await;
         let t = db.transaction().await?;
@@ -215,10 +228,10 @@ impl UsersDao {
 
         t.execute(
             "
-        insert into registered_user 
-            (user_name, user_phone_number, password_hash, role_id)
-        values ($1, $2, $3, $4::uuid);",
-            &[&username, &phone_number, &password_hash, &role_id],
+        insert into registered_user
+            (user_name, password_hash, role_id)
+        values ($1, $2, $3::uuid);",
+            &[&username, &password_hash, &role_id],
         )
         .await?;
 
@@ -232,19 +245,10 @@ impl UsersDao {
             .expect("No user_id for user we just created.")
             .get("user_id");
 
-        t.execute(
-            "
-        insert into registered_user_email
-            (user_id, user_email)
-        values ($1, $2);",
-            &[&user_id, &email],
-        )
-        .await?;
-
         let user = User {
             username: username.to_string(),
-            emails: vec![email.to_string()],
-            phone_number: phone_number.to_string(),
+            emails: vec![],
+            phone_numbers: vec![],
             password_hash,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
@@ -253,6 +257,34 @@ impl UsersDao {
         t.commit().await?;
 
         return Ok(user);
+    }
+
+    pub async fn add_phone_number_to_user(
+        &mut self,
+        user_id: &UserId,
+        phone_number: &str,
+    ) -> Result<(), anyhow::Error> {
+        let res_affected = self
+            .database
+            .lock()
+            .await
+            .execute(
+                "
+                insert into
+                registered_user_phone_number
+                    (user_id, phone_number)
+                values
+                    ($1::uuid, $2)
+                limit 1",
+                &[&user_id.0, &phone_number],
+            )
+            .await?;
+
+        if res_affected != 1 {
+            debug!("SQL insert for user email failed!");
+            return Err(anyhow::Error::msg("More than 1 affected"));
+        }
+        Ok(())
     }
 
     pub async fn add_email_to_user(
@@ -265,7 +297,13 @@ impl UsersDao {
             .lock()
             .await
             .execute(
-                "insert into registered_user_email (user_id, user_email) values ($1::uuid, $2) limit 1",
+                "
+                insert into
+                registered_user_email
+                    (user_id, user_email)
+                values
+                    ($1::uuid, $2)
+                limit 1",
                 &[&user_id.0, &email],
             )
             .await?;
@@ -283,7 +321,7 @@ impl UsersDao {
             .await?
             .into_iter()
             .map(|user| user)
-            .find(|user| user.emails.contains(&String::from(email)));
+            .find(|user| user.emails.contains(&email.to_string()));
         Ok(user)
     }
 
@@ -296,7 +334,7 @@ impl UsersDao {
             .await?
             .into_iter()
             .map(|user| user)
-            .find(|user| user.phone_number == phone_number);
+            .find(|user| user.phone_numbers.contains(&phone_number.to_string()));
 
         Ok(user)
     }

@@ -7,7 +7,8 @@ use ant_on_the_web::{
     sms::{SmsError, SmsSender},
     state::InnerApiState,
     users::{
-        LoginMethod, LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
+        AddPhoneNumberRequest, AddPhoneNumberResolution, AddPhoneNumberResponse, LoginMethod,
+        LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
         VerificationAttemptResponse, VerificationSubmission,
     },
 };
@@ -118,9 +119,29 @@ pub async fn test_router_no_auth() -> TestFixture {
 pub async fn test_router_auth() -> (TestFixture, String) {
     let (fixture, cookie) = test_router_weak_auth(None).await;
 
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: "+1 (111) 222-3333".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(body.resolution, AddPhoneNumberResolution::Added);
+    };
+
     let token = {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
         };
@@ -149,8 +170,6 @@ pub async fn test_router_weak_auth(seed: Option<[u8; 32]>) -> (TestFixture, Stri
     {
         let req = SignupRequest {
             username: "user".to_string(),
-            email: "email@domain.com".to_string(),
-            phone_number: "+1 (111) 222-3333".to_string(),
             password: "my-ant-password".to_string(),
         };
         let res = fixture

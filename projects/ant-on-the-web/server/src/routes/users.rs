@@ -25,7 +25,7 @@ use tracing::{debug, info};
 use super::lib::{
     auth::{authenticate, cookie_defaults, optional_authenticate, weakly_authenticate, AuthClaims},
     err::AntOnTheWebError,
-    two_factor::{VerificationMethod, VerificationState},
+    two_factor::VerificationState,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -45,9 +45,9 @@ async fn subscribe_email(
         Ok(e) => e,
         Err(e) => {
             info!("email invalid {e}");
-            return Err(AntOnTheWebError::ValidationError(ValidationError {
-                errors: vec![ValidationMessage::invalid("email")],
-            }));
+            return Err(AntOnTheWebError::Validation(ValidationError::one(
+                ValidationMessage::invalid("email"),
+            )));
         }
     };
 
@@ -164,6 +164,8 @@ async fn login(
     State(InnerApiState { dao, .. }): ApiState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
+    // AuthN: This is the starting entry point for AuthN, so we don't need any auth claims here
+
     let users = dao.users.read().await;
     let user: Result<Option<User>, ValidationMessage> = match &login_request.method {
         LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
@@ -185,11 +187,10 @@ async fn login(
 
     let user = match user {
         Err(v) => {
-            return Err(AntOnTheWebError::ValidationError(ValidationError {
-                errors: vec![v],
-            }));
+            return Err(AntOnTheWebError::Validation(ValidationError::one(v)));
         }
         Ok(None) => {
+            info!("No user found for method {:?}", &login_request.method);
             return Err(AntOnTheWebError::AccessDenied(None));
         }
         Ok(Some(user)) => user,
@@ -199,11 +200,12 @@ async fn login(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )? {
+        info!("Password invalid for method {:?}", &login_request.method);
         return Err(AntOnTheWebError::AccessDenied(None));
     }
 
-    // TODO: two-factor verify on login (to a method they have verified)
-
+    // AuthN: Make weak auth cookie because the user still has to 2fa verify. Strong tokens are vended
+    // only by the 2fa verification endpoints
     debug!("Password verified, generating jwt token...");
     let (jwt, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
 
@@ -222,40 +224,14 @@ async fn login(
 #[serde(tag = "method")]
 pub enum VerificationSubmission {
     #[serde(rename = "email")]
-    Email { otp: String },
+    Email { email: String, otp: String },
 
     #[serde(rename = "phone")]
-    Phone { otp: String },
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct VerificationRequest {
-    pub method: VerificationMethod,
-}
-
-async fn create_two_factor_verification(
-    auth: AuthClaims,
-    State(InnerApiState { dao, sms, rng }): ApiState,
-    Json(verification_request): Json<VerificationRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
-    // AuthN: Allow users who are not fully authenticated because they can choose to
-    // to resend their validation codes during their initial validation
-    let user = weakly_authenticate(&auth, &dao).await?;
-
-    match verification_request.method {
-        VerificationMethod::Phone(_) => {
-            {
-                let mut rng = rng.lock().await;
-                two_factor::resend_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user)
-                    .await?;
-            }
-
-            return Ok((StatusCode::OK, "One-time code resent.").into_response());
-        }
-        VerificationMethod::Email(_) => {
-            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
-        }
-    }
+    Phone {
+        #[serde(rename = "phoneNumber")]
+        phone_number: String,
+        otp: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -271,15 +247,31 @@ pub struct VerificationAttemptResponse {
 async fn two_factor_verification_attempt(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
-    Json(signup_verification_request): Json<VerificationAttemptRequest>,
+    Json(req): Json<VerificationAttemptRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
+    // AuthN: Allow weak validations here because the user has to exist, but if this is their first
+    // phone number/email 2fa then they won't be able to be strongly authenticated.
     let user = weakly_authenticate(&auth, &dao).await?;
 
-    let verification = match signup_verification_request.submission {
-        VerificationSubmission::Phone { otp } => {
-            two_factor::receive_phone_verification_code(&dao, &user, &otp).await?
+    let canonical = match &req.submission {
+        VerificationSubmission::Phone { phone_number, .. } => {
+            canonicalize_phone_number(&phone_number).map_err(|_| {
+                AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+                    "submission.phoneNumber",
+                )))
+            })?
         }
-        VerificationSubmission::Email { otp: _ } => {
+        VerificationSubmission::Email { email: _, otp: _ } => {
+            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
+        }
+    };
+
+    let verification = match &req.submission {
+        VerificationSubmission::Phone { otp, .. } => {
+            two_factor::receive_phone_verification_code(&dao, &user.user_id, &canonical, &otp)
+                .await?
+        }
+        VerificationSubmission::Email { email: _, otp: _ } => {
             return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
         }
     };
@@ -294,6 +286,20 @@ async fn two_factor_verification_attempt(
         VerificationState::Verified => {
             info!("Verification succeeded, user authenticated");
 
+            // Add that contact method to the user since it's now verified
+            match &req.submission {
+                VerificationSubmission::Phone { .. } => {
+                    dao.users
+                        .write()
+                        .await
+                        .add_phone_number_to_user(&user.user_id, &canonical)
+                        .await?;
+                }
+                VerificationSubmission::Email { email, .. } => {
+                    todo!("email not yet supported");
+                }
+            }
+
             let (jwt, cookie) = make_auth_cookie(user.user_id.clone())?;
 
             return Ok((
@@ -307,43 +313,192 @@ async fn two_factor_verification_attempt(
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SignupRequest {
-    pub username: String,
-    pub email: String,
+pub struct AddPhoneNumberRequest {
     #[serde(rename = "phoneNumber")]
     pub phone_number: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "resolution")]
+pub enum AddPhoneNumberResolution {
+    #[serde(rename = "added")]
+    Added,
+    #[serde(rename = "alreadyAdded")]
+    AlreadyAdded,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddPhoneNumberResponse {
+    pub resolution: AddPhoneNumberResolution,
+}
+
+async fn add_phone_number(
+    auth: AuthClaims,
+    State(InnerApiState { dao, sms, rng }): ApiState,
+    Json(req): Json<AddPhoneNumberRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    // AuthN: Allow weak authentication here because during signup process they need to be able
+    // to add a phone number to get it validated.
+    let user = weakly_authenticate(&auth, &dao).await?;
+
+    info!("User adding phone number");
+    let validations = {
+        let mut validations: Vec<ValidationMessage> = vec![];
+
+        let canonical_phone_number = match canonicalize_phone_number(req.phone_number.as_str()) {
+            Ok(phone) => Ok(phone),
+            Err(e) => {
+                info!("phone number {} was invalid: {}", req.phone_number, e);
+                validations.push(ValidationMessage::invalid("phoneNumber"));
+                Err(())
+            }
+        };
+
+        match validations.as_slice() {
+            &[] => Ok(canonical_phone_number.unwrap()),
+            _ => Err(validations),
+        }
+    };
+
+    let canonical_phone_number =
+        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
+
+    {
+        let by_phone_number = dao
+            .users
+            .read()
+            .await
+            .get_one_by_phone_number(&canonical_phone_number)
+            .await?;
+
+        let _ = match by_phone_number {
+            None => (),
+            Some(other) if other.user_id == user.user_id => {
+                return Ok((
+                    StatusCode::OK,
+                    Json(AddPhoneNumberResponse {
+                        resolution: AddPhoneNumberResolution::AlreadyAdded,
+                    }),
+                )
+                    .into_response())
+            }
+            Some(_) => {
+                return Ok((StatusCode::CONFLICT, "Phone number already exists.").into_response())
+            }
+        };
+    }
+
+    // Start verifying their two-factor phone number
+    // This process happens async, but they won't be able to login until it's verified.
+    // The UI just has to accept the 200 OK and continue the user into some fields where they can
+    // attempt to fulfill the OTP for each method.
+    {
+        let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
+
+        two_factor::resend_phone_verification_code(
+            &dao,
+            sms.as_ref(),
+            &mut rng,
+            &user.user_id,
+            &canonical_phone_number,
+        )
+        .await?;
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(AddPhoneNumberResponse {
+            resolution: AddPhoneNumberResolution::Added,
+        }),
+    )
+        .into_response())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddEmailRequest {
+    pub email: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "resolution")]
+pub enum AddEmailResponse {
+    #[serde(rename = "added")]
+    Added,
+
+    #[serde(rename = "alreadyAdded")]
+    AlreadyAdded,
+}
+
+async fn add_email(
+    auth: AuthClaims,
+    State(InnerApiState { dao, rng, .. }): ApiState,
+    Json(req): Json<AddEmailRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    // AuthN: Allow weak authentication here because during signup process they need to be able
+    // to add an email to get it validated.
+    let user = weakly_authenticate(&auth, &dao).await?;
+
+    info!("User adding email");
+
+    let validations = {
+        let mut validations: Vec<ValidationMessage> = vec![];
+
+        let canonical_email = match canonicalize_email(&req.email) {
+            Ok(phone) => Ok(phone),
+            Err(e) => {
+                info!("email {} was invalid: {}", req.email, e);
+                validations.push(ValidationMessage::invalid("email"));
+                Err(())
+            }
+        };
+
+        match validations.as_slice() {
+            &[] => Ok(canonical_email.unwrap()),
+            _ => Err(validations),
+        }
+    };
+
+    let canonical_email =
+        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
+
+    {
+        let by_email = dao
+            .users
+            .read()
+            .await
+            .get_one_by_email(&canonical_email)
+            .await?;
+
+        let _ = match by_email {
+            None => (),
+            Some(other) if other.user_id == user.user_id => {
+                return Ok((StatusCode::OK, Json(AddEmailResponse::AlreadyAdded)).into_response())
+            }
+            Some(_) => return Ok((StatusCode::CONFLICT, "Email already exists.").into_response()),
+        };
+    }
+
+    {
+        // TODO: Start verifying their two-factor email
+    }
+
+    Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SignupRequest {
+    pub username: String,
     pub password: String,
 }
+
 async fn signup_request(
-    State(InnerApiState { dao, sms, rng }): ApiState,
+    State(InnerApiState { dao, .. }): ApiState,
     Json(signup_request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     info!("Validating signup request...");
 
     let validations = {
         let mut validations: Vec<ValidationMessage> = vec![];
-
-        let canonical_phone_number =
-            match canonicalize_phone_number(signup_request.phone_number.as_str()) {
-                Ok(phone) => Ok(phone),
-                Err(e) => {
-                    info!(
-                        "Signup request phone number {} was invalid: {}",
-                        signup_request.phone_number, e
-                    );
-                    validations.push(ValidationMessage::invalid("phoneNumber"));
-                    Err(())
-                }
-            };
-
-        let canonical_email = match canonicalize_email(&signup_request.email.as_str()) {
-            Ok(email) => Ok(email),
-            Err(e) => {
-                info!("Signup request email {}: {}", signup_request.email, e);
-                validations.push(ValidationMessage::invalid("email"));
-                Err(())
-            }
-        };
 
         let username_len = signup_request.username.len();
         if username_len < 3 || username_len > 16 {
@@ -378,37 +533,30 @@ async fn signup_request(
         }
 
         match validations.as_slice() {
-            &[] => Ok((canonical_email.unwrap(), canonical_phone_number.unwrap())),
+            &[] => Ok(()),
             _ => Err(validations),
         }
     };
 
-    let (canonical_email, canonical_phone_number) = match validations {
-        Err(v) => {
-            return Err(AntOnTheWebError::ValidationError(ValidationError {
-                errors: v,
-            }));
-        }
-        Ok(data) => data,
-    };
+    let _ = validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
 
     {
         info!("Checking if user already exists...");
         let read_users = dao.users.read().await;
 
-        let by_email = read_users
-            .get_one_by_email(&canonical_email)
-            .await?
-            .is_some();
+        // let by_email = read_users
+        //     .get_one_by_email(&canonical_email)
+        //     .await?
+        //     .is_some();
         let by_username = read_users
             .get_one_by_user_name(&signup_request.username)
             .await?
             .is_some();
-        let by_phone = read_users
-            .get_one_by_phone_number(&canonical_phone_number)
-            .await?
-            .is_some();
-        if by_email || by_username || by_phone {
+        // let by_phone = read_users
+        //     .get_one_by_phone_number(&canonical_phone_number)
+        //     .await?
+        //     .is_some();
+        if by_username {
             return Err(AntOnTheWebError::ConflictError("User already exists."));
         }
     }
@@ -420,8 +568,8 @@ async fn signup_request(
         let user = write_users
             .create_user(
                 signup_request.username,
-                canonical_phone_number,
-                canonical_email,
+                // canonical_phone_number,
+                // canonical_email,
                 signup_request.password,
                 "user".to_string(),
             )
@@ -431,17 +579,17 @@ async fn signup_request(
         user
     };
 
-    // Start verifying their two-factor phone number
-    // This process happens async, but they won't be able to login until it's verified.
-    // The UI just has to accept the 200 OK and continue the user into some fields where they can
-    // attempt to fullfil the OTP for each method.
-    {
-        let mut rng = rng.lock().await;
-        two_factor::send_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user).await?;
-    }
+    // // Start verifying their two-factor phone number
+    // // This process happens async, but they won't be able to login until it's verified.
+    // // The UI just has to accept the 200 OK and continue the user into some fields where they can
+    // // attempt to fullfil the OTP for each method.
+    // {
+    //     let mut rng = rng.lock().await;
+    //     two_factor::send_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user).await?;
+    // }
 
-    // TODO: Start verifying their two-factor email address
-    {}
+    // // TODO: Start verifying their two-factor email address
+    // {}
 
     // Make a weak auth token for the user for 2fa routes
     let (_, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
@@ -457,10 +605,11 @@ async fn signup_request(
 pub fn router() -> ApiRouter {
     Router::new()
         .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
+        .route_with_tsr("/phone-number", post(add_phone_number))
+        .route_with_tsr("/email", post(add_email))
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))
-        .route_with_tsr("/verification", post(create_two_factor_verification))
         .route_with_tsr(
             "/verification-attempt",
             post(two_factor_verification_attempt),
@@ -473,7 +622,8 @@ pub fn router() -> ApiRouter {
                 "POST /login",
                 "POST /logout",
                 "POST /signup",
-                "POST /verification",
+                "POST /email",
+                "POST /phone-number",
                 "POST /verification-attempt",
                 "GET /user",
                 "GET /user/{user_name}",

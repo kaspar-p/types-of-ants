@@ -49,8 +49,6 @@ async fn user_gets_created() {
     users
         .create_user(
             "integ-user".to_string(),
-            "(111) 222-3333".to_string(),
-            "email@domain.com".to_string(),
             "integ-user-password".to_string(),
             "user".to_string(),
         )
@@ -63,7 +61,6 @@ async fn user_gets_created() {
         .unwrap()
         .unwrap();
     assert_eq!(user_by_name.username, "integ-user");
-    assert_eq!(user_by_name.phone_number, "(111) 222-3333");
 
     let user_by_phone = users
         .get_one_by_phone_number("(111) 222-3333")
@@ -71,7 +68,6 @@ async fn user_gets_created() {
         .unwrap()
         .unwrap();
     assert_eq!(user_by_phone.username, "integ-user");
-    assert_eq!(user_by_phone.phone_number, "(111) 222-3333");
 
     let user_by_email = users
         .get_one_by_email("email@domain.com")
@@ -79,7 +75,6 @@ async fn user_gets_created() {
         .unwrap()
         .unwrap();
     assert_eq!(user_by_email.username, "integ-user");
-    assert_eq!(user_by_email.phone_number, "(111) 222-3333");
 }
 
 #[rstest::rstest(logging as _logging)]

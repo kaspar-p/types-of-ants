@@ -35,10 +35,21 @@ pub struct ValidationError {
     pub errors: Vec<ValidationMessage>,
 }
 
+impl ValidationError {
+    pub fn one(error: ValidationMessage) -> Self {
+        ValidationError {
+            errors: vec![error],
+        }
+    }
+    pub fn many(errors: Vec<ValidationMessage>) -> Self {
+        ValidationError { errors }
+    }
+}
+
 pub enum AntOnTheWebError {
     AccessDenied(Option<String>),
     InternalServerError(Option<anyhow::Error>),
-    ValidationError(ValidationError),
+    Validation(ValidationError),
     ConflictError(&'static str),
 }
 
@@ -59,7 +70,7 @@ impl IntoResponse for AntOnTheWebError {
                 (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
             }
 
-            AntOnTheWebError::ValidationError(msg) => {
+            AntOnTheWebError::Validation(msg) => {
                 warn!("AntOnTheWebError::ValidationError: {:?}", msg);
                 (StatusCode::BAD_REQUEST, Json(msg)).into_response()
             }

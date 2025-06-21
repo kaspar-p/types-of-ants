@@ -4,7 +4,7 @@ use crate::{
 };
 
 use super::err::AntOnTheWebError;
-use ant_data_farm::{users::User, verifications::VerificationResult, AntDataFarmClient};
+use ant_data_farm::{users::UserId, verifications::VerificationResult, AntDataFarmClient};
 use chrono::Duration;
 use rand::{distr::SampleString, rngs::StdRng};
 use serde::{Deserialize, Serialize};
@@ -24,39 +24,39 @@ pub enum VerificationMethod {
     Phone(String),
 }
 
-pub async fn user_is_two_factor_verified(
-    dao: &AntDataFarmClient,
-    user: &User,
-) -> Result<VerificationStatus, anyhow::Error> {
-    let verifications = dao.verifications.read().await;
+// pub async fn user_is_two_factor_verified(
+//     dao: &AntDataFarmClient,
+//     user: &User,
+// ) -> Result<VerificationStatus, anyhow::Error> {
+//     let verifications = dao.verifications.read().await;
 
-    let mut verified: Vec<VerificationMethod> = vec![];
-    let mut not_verified: Vec<VerificationMethod> = vec![];
-    if !verifications
-        .is_phone_number_verified(&user.user_id, &user.phone_number)
-        .await?
-    {
-        not_verified.push(VerificationMethod::Phone(user.phone_number.clone()));
-    } else {
-        verified.push(VerificationMethod::Phone(user.phone_number.clone()));
-    }
+//     let mut verified: Vec<VerificationMethod> = vec![];
+//     let mut not_verified: Vec<VerificationMethod> = vec![];
+//     if !verifications
+//         .is_phone_number_verified(&user.user_id, &user.phone_number)
+//         .await?
+//     {
+//         not_verified.push(VerificationMethod::Phone(user.phone_number.clone()));
+//     } else {
+//         verified.push(VerificationMethod::Phone(user.phone_number.clone()));
+//     }
 
-    for email in &user.emails {
-        if !verifications
-            .is_email_verified(&user.user_id, &email)
-            .await?
-        {
-            not_verified.push(VerificationMethod::Email(email.clone()));
-        } else {
-            verified.push(VerificationMethod::Email(email.clone()));
-        }
-    }
+//     for email in &user.emails {
+//         if !verifications
+//             .is_email_verified(&user.user_id, &email)
+//             .await?
+//         {
+//             not_verified.push(VerificationMethod::Email(email.clone()));
+//         } else {
+//             verified.push(VerificationMethod::Email(email.clone()));
+//         }
+//     }
 
-    return Ok(VerificationStatus {
-        verified,
-        not_verified,
-    });
-}
+//     return Ok(VerificationStatus {
+//         verified,
+//         not_verified,
+//     });
+// }
 
 /// Send a verification message to the user's phone number.
 /// Assumes that there are no previous verification requests out, it is invalid to have more than 1 at a time.
@@ -64,20 +64,16 @@ pub async fn send_phone_verification_code(
     dao: &AntDataFarmClient,
     sms: &dyn SmsSender,
     rng: &mut StdRng,
-    user: &User,
+    user_id: &UserId,
+    phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {
     let mut write_verifications = dao.verifications.write().await;
     let dist = rand::distr::Alphanumeric;
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
 
-    info!("Starting phone number verification for {}", &user.user_id);
+    info!("Starting phone number verification for {}", &user_id);
     let verification = write_verifications
-        .start_phone_number_verification(
-            &user.user_id,
-            &user.phone_number,
-            Duration::minutes(5),
-            &otp,
-        )
+        .start_phone_number_verification(&user_id, &phone_number, Duration::minutes(5), &otp)
         .await?;
 
     info!("Sending one-time password: {otp}");
@@ -85,15 +81,12 @@ pub async fn send_phone_verification_code(
     let content = format!("[typesofants.org] your one-time code is: {otp}");
 
     let send_id = sms
-        .send_msg(&user.phone_number, &content)
+        .send_msg(&phone_number, &content)
         .await
         .map_err(|e| match e {
-            SmsError::BadPhoneNumber => AntOnTheWebError::ValidationError(ValidationError {
-                errors: vec![ValidationMessage::new(
-                    "phone",
-                    "Phone number cannot receive messages",
-                )],
-            }),
+            SmsError::BadPhoneNumber => AntOnTheWebError::Validation(ValidationError::one(
+                ValidationMessage::new("phone", "Phone number cannot receive messages"),
+            )),
             SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
         })?;
 
@@ -110,15 +103,16 @@ pub async fn resend_phone_verification_code(
     dao: &AntDataFarmClient,
     sms: &dyn SmsSender,
     rng: &mut StdRng,
-    user: &User,
+    user_id: &UserId,
+    phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {
     dao.verifications
         .write()
         .await
-        .cancel_outstanding_phone_number_verifications(&user.user_id, &user.phone_number)
+        .cancel_outstanding_phone_number_verifications(user_id, phone_number)
         .await?;
 
-    return send_phone_verification_code(dao, sms, rng, user).await;
+    return send_phone_verification_code(dao, sms, rng, user_id, phone_number).await;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -143,13 +137,14 @@ pub enum VerificationState {
 /// verification, that's what this is for.
 pub async fn receive_phone_verification_code(
     dao: &AntDataFarmClient,
-    user: &User,
+    user_id: &UserId,
+    phone_number: &str,
     otp_attempt: &str,
 ) -> Result<VerificationState, AntOnTheWebError> {
     let mut write_verifications = dao.verifications.write().await;
 
     let verified = write_verifications
-        .attempt_phone_number_verification(&user.phone_number, &otp_attempt)
+        .attempt_phone_number_verification(&phone_number, &otp_attempt)
         .await?;
 
     match verified {
@@ -159,10 +154,7 @@ pub async fn receive_phone_verification_code(
             if attempts >= 5 {
                 info!("Too many attempts, cancelling verifications");
                 write_verifications
-                    .cancel_outstanding_phone_number_verifications(
-                        &user.user_id,
-                        &user.phone_number,
-                    )
+                    .cancel_outstanding_phone_number_verifications(&user_id, &phone_number)
                     .await?;
 
                 return Ok(VerificationState::OutOfAttempts);

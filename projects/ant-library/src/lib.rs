@@ -96,7 +96,9 @@ pub async fn middleware_print_request_response(
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let redact = req.uri().path().contains("signup") || req.uri().path().contains("login");
+    let redact = req.uri().path().contains("/signup")
+        || req.uri().path().contains("/login")
+        || req.uri().path().contains("/verification-attempt");
 
     let (parts, body) = req.into_parts();
     let bytes = buffer_and_print("request", body, redact).await?;

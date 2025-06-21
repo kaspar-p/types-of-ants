@@ -4,54 +4,12 @@ use crate::{
     fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth, TestSmsSender},
     fixture_sms::{first_sms_otp, second_sms_otp},
 };
-use ant_on_the_web::{
-    two_factor::VerificationMethod,
-    users::{
-        SignupRequest, VerificationAttemptRequest, VerificationRequest, VerificationSubmission,
-    },
+use ant_on_the_web::users::{
+    AddPhoneNumberRequest, AddPhoneNumberResolution, AddPhoneNumberResponse, GetUserResponse,
+    SignupRequest, VerificationAttemptRequest, VerificationSubmission,
 };
 use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
-
-#[tokio::test]
-#[traced_test]
-async fn users_signup_returns_200_and_sends_one_time_codes() {
-    let fixture = test_router_no_auth().await;
-
-    {
-        let req = SignupRequest {
-            username: "user1".to_string(),
-            email: "email1@domain.com".to_string(),
-            phone_number: "+1 (212) 323-5445".to_string(),
-            password: "my-ant-password".to_string(),
-        };
-        let res = fixture
-            .client
-            .post("/api/users/signup")
-            .json(&req)
-            .send()
-            .await;
-
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
-    }
-
-    let sms = fixture.state.sms.as_ref() as &dyn Any;
-    let sms = sms.downcast_ref::<TestSmsSender>().unwrap();
-
-    let msgs = sms.all_msgs().await;
-    assert_eq!(msgs.len(), 1);
-
-    let msg = msgs.first().unwrap();
-    assert_eq!(msg.to_phone, "+12123235445");
-    assert_eq!(
-        msg.content,
-        format!(
-            "[typesofants.org] your one-time code is: {}",
-            first_sms_otp()
-        )
-    );
-}
 
 #[tokio::test]
 #[traced_test]
@@ -61,6 +19,7 @@ async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: "+1 (111) 222-3333".to_string(),
                 otp: "otp".to_string(),
             },
         };
@@ -82,9 +41,27 @@ async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
 async fn users_verification_attempt_returns_200_with_different_cookie_headers() {
     let (fixture, cookie) = test_router_weak_auth(None).await;
 
+    let phone = "+1 (111) 222-3333".to_string();
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: phone.clone(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: phone.clone(),
                 otp: first_sms_otp(),
             },
         };
@@ -92,10 +69,12 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
 
         let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
         assert!(new_cookie.contains("typesofants_auth="));
@@ -112,22 +91,50 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 ) {
     let (fixture, cookie) = test_router_auth().await;
 
+    let phone = "+1 (111) 222-4444".to_string();
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: phone.clone(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+    }
+
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
-                otp: first_sms_otp(),
+                phone_number: phone.clone(),
+                otp: second_sms_otp(), // one for initial auth, second one for this request
             },
         };
 
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let new_cookie = res
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
         assert!(new_cookie.contains("typesofants_auth="));
         assert!(new_cookie.contains("HttpOnly"));
 
@@ -138,12 +145,12 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 
 #[tokio::test]
 #[traced_test]
-async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts() {
+async fn users_verification_attempt_returns_400_for_unknown_phone_number() {
     let (fixture, cookie) = test_router_weak_auth(None).await;
-
-    for _ in 0..10 {
+    {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: "+1 (111) 222-4444".to_string(),
                 otp: "wrong".to_string(),
             },
         };
@@ -151,7 +158,51 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts() {
+    let (fixture, cookie) = test_router_weak_auth(None).await;
+
+    let phone = "+1 (111) 222-3333".to_string();
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: phone.clone(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+    }
+
+    for _ in 0..10 {
+        let req = VerificationAttemptRequest {
+            submission: VerificationSubmission::Phone {
+                phone_number: phone.clone(),
+                otp: "wrong".to_string(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification-attempt")
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
@@ -163,6 +214,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: phone.clone(),
                 otp: first_sms_otp(),
             },
         };
@@ -170,7 +222,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
@@ -187,8 +239,6 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
     let cookie = {
         let req = SignupRequest {
             username: "user".to_string(),
-            email: "email@domain.com".to_string(),
-            phone_number: "+1 (111) 222-3333".to_string(),
             password: "my-ant-password".to_string(),
         };
         let res = fixture
@@ -212,9 +262,27 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
         cookie
     };
 
+    let phone = "+1 (111) 222-3333".to_string();
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: phone.clone(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
+                phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
         };
@@ -222,28 +290,101 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = res
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
         assert_ne!(new_cookie, cookie);
     }
 }
 
 #[tokio::test]
 #[traced_test]
-async fn users_verification_returns_200_after_only_signup_no_login() {
+async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() {
+    let (fixture, cookie) = test_router_weak_auth(None).await;
+
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: "+1 (111) 222-3333".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+    }
+
+    let cookie = {
+        let req = VerificationAttemptRequest {
+            submission: VerificationSubmission::Phone {
+                phone_number: "+1 (111) 222-3333".to_string(),
+                otp: first_sms_otp(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification-attempt")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let new_cookie = res
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert_ne!(new_cookie, cookie);
+
+        new_cookie
+    };
+
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res: GetUserResponse = res.json().await;
+        assert!(res.user.phone_numbers.contains(&"+11112223333".to_string()));
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_phone_number_returns_200_after_only_signup_no_login() {
     let fixture = test_router_no_auth().await;
 
     let cookie = {
         let req = SignupRequest {
             username: "user".to_string(),
-            email: "email@domain.com".to_string(),
-            phone_number: "+1 (111) 222-3333".to_string(),
             password: "my-ant-password".to_string(),
         };
         let res = fixture
@@ -268,25 +409,28 @@ async fn users_verification_returns_200_after_only_signup_no_login() {
     };
 
     {
-        let req = VerificationRequest {
-            method: VerificationMethod::Phone("+1 (111) 222-3333".to_string()),
+        let req = AddPhoneNumberRequest {
+            phone_number: "+1 (111) 222-3333".to_string(),
         };
 
         let res = fixture
             .client
-            .post("/api/users/verification")
-            .header("Cookie", cookie.as_str())
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
 
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+
         let sms = fixture.state.sms.as_ref() as &dyn Any;
         let sms = sms.downcast_ref::<TestSmsSender>().unwrap();
 
         let msgs = sms.all_msgs().await;
-        assert_eq!(msgs.len(), 2); // one for the original signup, one for the /verification request
+        assert_eq!(msgs.len(), 1);
 
         let msg = msgs.get(0).unwrap();
         assert_eq!(msg.to_phone, "+11112223333");
@@ -297,29 +441,20 @@ async fn users_verification_returns_200_after_only_signup_no_login() {
                 first_sms_otp()
             )
         );
-
-        let msg = msgs.get(1).unwrap();
-        assert_eq!(msg.to_phone, "+11112223333");
-        assert_eq!(
-            msg.content,
-            format!(
-                "[typesofants.org] your one-time code is: {}",
-                second_sms_otp()
-            )
-        );
     }
 
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
-                otp: second_sms_otp(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                otp: first_sms_otp(),
             },
         };
 
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
@@ -333,29 +468,32 @@ async fn users_verification_returns_200_after_only_signup_no_login() {
 
 #[tokio::test]
 #[traced_test]
-async fn users_verification_returns_200_and_sends_new_code() {
+async fn users_phone_number_returns_200_and_sends_new_code() {
     let (fixture, cookie) = test_router_weak_auth(None).await;
 
     {
-        let req = VerificationRequest {
-            method: VerificationMethod::Phone("+1 (111) 222-3333".to_string()),
+        let req = AddPhoneNumberRequest {
+            phone_number: "+1 (111) 222-3333".to_string(),
         };
 
         let res = fixture
             .client
-            .post("/api/users/verification")
-            .header("Cookie", cookie.as_str())
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
 
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+
         let sms = fixture.state.sms.as_ref() as &dyn Any;
         let sms = sms.downcast_ref::<TestSmsSender>().unwrap();
 
         let msgs = sms.all_msgs().await;
-        assert_eq!(msgs.len(), 2); // one for the original signup, one for the /verification request
+        assert_eq!(msgs.len(), 1);
 
         let msg = msgs.get(0).unwrap();
         assert_eq!(msg.to_phone, "+11112223333");
@@ -366,54 +504,50 @@ async fn users_verification_returns_200_and_sends_new_code() {
                 first_sms_otp()
             )
         );
-
-        let msg = msgs.get(1).unwrap();
-        assert_eq!(msg.to_phone, "+11112223333");
-        assert_eq!(
-            msg.content,
-            format!(
-                "[typesofants.org] your one-time code is: {}",
-                second_sms_otp()
-            )
-        );
     }
 }
 
 #[tokio::test]
 #[traced_test]
-async fn users_verification_returns_200_and_cancels_previous_codes() {
+async fn users_phone_number_returns_200_and_cancels_previous_codes() {
     let (fixture, cookie) = test_router_weak_auth(None).await;
 
-    {
-        let req = VerificationRequest {
-            method: VerificationMethod::Phone("+1 (111) 222-3333".to_string()),
+    // old one, sends first code
+    let f = || async {
+        let req = AddPhoneNumberRequest {
+            phone_number: "+1 (111) 222-3333".to_string(),
         };
 
         let res = fixture
             .client
-            .post("/api/users/verification")
-            .header("Cookie", cookie.as_str())
+            .post("/api/users/phone-number")
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-    }
 
-    let previous_correct_otp = first_sms_otp();
+        let res: AddPhoneNumberResponse = res.json().await;
+        assert_eq!(res.resolution, AddPhoneNumberResolution::Added);
+    };
+
+    f().await; // send first code
+    f().await; // send second, cancel first
 
     // The previous correct one now fails
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
-                otp: previous_correct_otp.to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                otp: first_sms_otp(),
             },
         };
 
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
@@ -421,20 +555,19 @@ async fn users_verification_returns_200_and_cancels_previous_codes() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     }
 
-    let actual_correct_otp = second_sms_otp();
-
     // The actual correct one succeeds
     {
         let req = VerificationAttemptRequest {
             submission: VerificationSubmission::Phone {
-                otp: actual_correct_otp.to_string(),
+                phone_number: "+1 (111) 222-3333".to_string(),
+                otp: second_sms_otp(),
             },
         };
 
         let res = fixture
             .client
             .post("/api/users/verification-attempt")
-            .header("Cookie", cookie.as_str())
+            .header("Cookie", &cookie)
             .json(&req)
             .send()
             .await;
