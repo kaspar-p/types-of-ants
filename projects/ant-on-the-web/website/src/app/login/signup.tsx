@@ -1,5 +1,6 @@
 import { signup } from "@/server/posts";
-import { useState } from "react";
+import { UserContext } from "@/state/userContext";
+import { useContext, useState } from "react";
 
 export function SignupBox() {
   const [formState, setFormState] = useState<
@@ -9,14 +10,10 @@ export function SignupBox() {
   const [username, setUsername] = useState("");
   const [usernameValidationMsg, setUsernameValidationMsg] = useState("");
 
-  const [phone, setPhone] = useState("");
-  const [phoneValidationMsg, setPhoneValidationMsg] = useState("");
-
-  const [email, setEmail] = useState("");
-  const [emailValidationMsg, setEmailValidationMsg] = useState("");
-
   const [password, setPassword] = useState("");
   const [passwordValidationMsg, setPasswordValidationMsg] = useState("");
+
+  const { user, setUser } = useContext(UserContext);
 
   async function handle(e: any) {
     e.preventDefault();
@@ -24,8 +21,6 @@ export function SignupBox() {
     setFormState({ loading: true });
     const response = await signup({
       username: username,
-      phoneNumber: phone,
-      email: email,
       password: password,
     });
 
@@ -55,16 +50,6 @@ export function SignupBox() {
           await response.json();
         for (const error of errors.errors) {
           switch (error.field) {
-            case "phoneNumber": {
-              setPhoneValidationMsg(error.msg.toLowerCase());
-              setFormState({ loading: false, success: false, msg: "" });
-              break;
-            }
-            case "email": {
-              setEmailValidationMsg(error.msg.toLowerCase());
-              setFormState({ loading: false, success: false, msg: "" });
-              break;
-            }
             case "username": {
               setUsernameValidationMsg(error.msg.toLowerCase());
               setFormState({ loading: false, success: false, msg: "" });
@@ -89,12 +74,8 @@ export function SignupBox() {
       case 200: {
         const j = await response.text();
 
-        setPhone("");
-        setPhoneValidationMsg("");
         setUsername("");
         setUsernameValidationMsg("");
-        setEmail("");
-        setEmailValidationMsg("");
         setPassword("");
         setPasswordValidationMsg("");
 
@@ -103,6 +84,8 @@ export function SignupBox() {
           success: true,
           msg: "signup complete, welcome!",
         });
+
+        setUser({ weakAuth: true, loggedIn: false });
         break;
       }
     }
@@ -131,47 +114,6 @@ export function SignupBox() {
           >
             {usernameValidationMsg}
           </span>
-
-          <span className="flex flex-col justify-center">
-            your phone number:{" "}
-          </span>
-          <input
-            className="m-1"
-            type="text"
-            name="phoneNumber"
-            autoComplete="off"
-            placeholder="ex. +1 (000) 111-2222"
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setPhoneValidationMsg("");
-            }}
-          />
-          <span
-            className={`flex flex-col justify-center m-1 text-red-600 content-center`}
-          >
-            {phoneValidationMsg}
-          </span>
-
-          <span className="flex flex-col justify-center">your email: </span>
-          <input
-            className="m-1"
-            type="text"
-            name="email"
-            autoComplete="off"
-            placeholder="ex. kaspar@typesofants.org"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setEmailValidationMsg("");
-            }}
-          />
-          <span
-            className={`flex flex-col justify-center m-1 text-red-600 content-center`}
-          >
-            {emailValidationMsg}
-          </span>
-
           <span className="flex flex-col justify-center">your password: </span>
           <input
             className="m-1"

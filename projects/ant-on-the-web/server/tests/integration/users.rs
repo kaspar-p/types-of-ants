@@ -101,6 +101,7 @@ async fn users_phone_number_returns_4xx_if_not_authenticated() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "not a phone number".to_string(),
+            force_send: true,
         };
         let res = fixture
             .client
@@ -115,6 +116,7 @@ async fn users_phone_number_returns_4xx_if_not_authenticated() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "not a phone number".to_string(),
+            force_send: true,
         };
         let res = fixture
             .client
@@ -134,6 +136,7 @@ async fn users_phone_number_returns_400_if_invalid() {
 
     let req = AddPhoneNumberRequest {
         phone_number: "not a phone number".to_string(),
+        force_send: true,
     };
     let res = fixture
         .client
@@ -158,6 +161,7 @@ async fn users_phone_number_returns_409_if_already_taken() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (222) 333-4444".to_string(), // The 'nobody' user phone number
+            force_send: true,
         };
         let res = fixture
             .client
@@ -181,6 +185,7 @@ async fn users_phone_number_returns_200_if_already_added() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
+            force_send: true,
         };
         let res = fixture
             .client
@@ -751,6 +756,7 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
             {
                 let req = AddPhoneNumberRequest {
                     phone_number: phone.clone(),
+                    force_send: true,
                 };
 
                 let res = fixture
@@ -767,7 +773,7 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
             // 2fa validate the phone number
             {
                 let req = VerificationAttemptRequest {
-                    submission: VerificationSubmission::Phone {
+                    method: VerificationSubmission::Phone {
                         phone_number: phone.clone(),
                         otp: first_sms_otp(),
                     },

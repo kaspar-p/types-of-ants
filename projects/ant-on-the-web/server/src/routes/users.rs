@@ -9,7 +9,10 @@ use crate::{
     },
     state::{ApiRouter, ApiState, InnerApiState},
 };
-use ant_data_farm::users::{verify_password_hash, User, UserId};
+use ant_data_farm::{
+    users::{verify_password_hash, User, UserId},
+    DaoTrait,
+};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -221,7 +224,6 @@ async fn login(
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "method")]
 pub enum VerificationSubmission {
     #[serde(rename = "email")]
     Email { email: String, otp: String },
@@ -236,7 +238,7 @@ pub enum VerificationSubmission {
 
 #[derive(Serialize, Deserialize)]
 pub struct VerificationAttemptRequest {
-    pub submission: VerificationSubmission,
+    pub method: VerificationSubmission,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -253,7 +255,7 @@ async fn two_factor_verification_attempt(
     // phone number/email 2fa then they won't be able to be strongly authenticated.
     let user = weakly_authenticate(&auth, &dao).await?;
 
-    let canonical = match &req.submission {
+    let canonical = match &req.method {
         VerificationSubmission::Phone { phone_number, .. } => {
             canonicalize_phone_number(&phone_number).map_err(|_| {
                 AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
@@ -266,7 +268,7 @@ async fn two_factor_verification_attempt(
         }
     };
 
-    let verification = match &req.submission {
+    let verification = match &req.method {
         VerificationSubmission::Phone { otp, .. } => {
             two_factor::receive_phone_verification_code(&dao, &user.user_id, &canonical, &otp)
                 .await?
@@ -287,25 +289,36 @@ async fn two_factor_verification_attempt(
             info!("Verification succeeded, user authenticated");
 
             // Add that contact method to the user since it's now verified
-            match &req.submission {
+            match &req.method {
                 VerificationSubmission::Phone { .. } => {
-                    dao.users
-                        .write()
-                        .await
-                        .add_phone_number_to_user(&user.user_id, &canonical)
-                        .await?;
+                    if !user.phone_numbers.contains(&canonical) {
+                        info!(
+                            "Adding phone number {} to user {}",
+                            &canonical, &user.username
+                        );
+                        dao.users
+                            .write()
+                            .await
+                            .add_phone_number_to_user(&user.user_id, &canonical)
+                            .await?;
+                    } else {
+                        info!(
+                            "Phone number {} already added to user {}",
+                            &canonical, &user.username
+                        );
+                    }
                 }
                 VerificationSubmission::Email { email, .. } => {
                     todo!("email not yet supported");
                 }
             }
 
-            let (jwt, cookie) = make_auth_cookie(user.user_id.clone())?;
+            let (_, cookie) = make_auth_cookie(user.user_id.clone())?;
 
             return Ok((
                 StatusCode::OK,
                 [(header::SET_COOKIE, cookie.to_string())], // Overwrite the old cookie with a new 2fa cookie
-                Json(VerificationAttemptResponse { token: jwt.clone() }),
+                Json("Verification successful."),
             )
                 .into_response());
         }
@@ -316,6 +329,9 @@ async fn two_factor_verification_attempt(
 pub struct AddPhoneNumberRequest {
     #[serde(rename = "phoneNumber")]
     pub phone_number: String,
+
+    #[serde(rename = "forceSend")]
+    pub force_send: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -374,13 +390,15 @@ async fn add_phone_number(
         let _ = match by_phone_number {
             None => (),
             Some(other) if other.user_id == user.user_id => {
-                return Ok((
-                    StatusCode::OK,
-                    Json(AddPhoneNumberResponse {
-                        resolution: AddPhoneNumberResolution::AlreadyAdded,
-                    }),
-                )
-                    .into_response())
+                if !req.force_send {
+                    return Ok((
+                        StatusCode::OK,
+                        Json(AddPhoneNumberResponse {
+                            resolution: AddPhoneNumberResolution::AlreadyAdded,
+                        }),
+                    )
+                        .into_response());
+                }
             }
             Some(_) => {
                 return Ok((StatusCode::CONFLICT, "Phone number already exists.").into_response())

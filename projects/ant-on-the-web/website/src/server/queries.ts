@@ -92,13 +92,13 @@ const queries = {
         username: z.string(),
         emails: z.array(z.string()),
         joined: z.number(),
-        phoneNumber: z.string(),
+        phoneNumbers: z.array(z.string()),
       }),
     }),
     transformer: (d: {
       user: {
         userId: string;
-        phoneNumber: string;
+        phoneNumbers: string[];
         emails: string[];
         joined: number;
         username: string;
@@ -106,7 +106,7 @@ const queries = {
     }): {
       user: {
         userId: string;
-        phoneNumber: string;
+        phoneNumbers: string[];
         emails: string[];
         joined: Date;
         username: string;

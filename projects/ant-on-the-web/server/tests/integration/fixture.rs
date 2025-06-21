@@ -122,6 +122,7 @@ pub async fn test_router_auth() -> (TestFixture, String) {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
+            force_send: true,
         };
 
         let res = fixture
@@ -140,7 +141,7 @@ pub async fn test_router_auth() -> (TestFixture, String) {
 
     let token = {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },

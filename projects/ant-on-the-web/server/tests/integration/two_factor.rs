@@ -18,7 +18,7 @@ async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
 
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: "otp".to_string(),
             },
@@ -45,6 +45,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
+            force_send: true,
         };
 
         let res = fixture
@@ -60,7 +61,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
 
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: phone.clone(),
                 otp: first_sms_otp(),
             },
@@ -95,6 +96,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
+            force_send: true,
         };
 
         let res = fixture
@@ -112,7 +114,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: phone.clone(),
                 otp: second_sms_otp(), // one for initial auth, second one for this request
             },
@@ -149,7 +151,7 @@ async fn users_verification_attempt_returns_400_for_unknown_phone_number() {
     let (fixture, cookie) = test_router_weak_auth(None).await;
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-4444".to_string(),
                 otp: "wrong".to_string(),
             },
@@ -176,6 +178,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
+            force_send: true,
         };
 
         let res = fixture
@@ -193,7 +196,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
 
     for _ in 0..10 {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: phone.clone(),
                 otp: "wrong".to_string(),
             },
@@ -213,7 +216,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
     // Even the correct one fails after too many bad attempts
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: phone.clone(),
                 otp: first_sms_otp(),
             },
@@ -266,6 +269,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
+            force_send: true,
         };
 
         let res = fixture
@@ -281,7 +285,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
 
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
@@ -316,6 +320,7 @@ async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() 
     {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
+            force_send: true,
         };
 
         let res = fixture
@@ -334,7 +339,7 @@ async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() 
 
     let cookie = {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
@@ -411,6 +416,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
+            force_send: true,
         };
 
         let res = fixture
@@ -445,7 +451,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
 
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
@@ -474,6 +480,7 @@ async fn users_phone_number_returns_200_and_sends_new_code() {
     {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
+            force_send: true,
         };
 
         let res = fixture
@@ -516,6 +523,7 @@ async fn users_phone_number_returns_200_and_cancels_previous_codes() {
     let f = || async {
         let req = AddPhoneNumberRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
+            force_send: true,
         };
 
         let res = fixture
@@ -538,7 +546,7 @@ async fn users_phone_number_returns_200_and_cancels_previous_codes() {
     // The previous correct one now fails
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: first_sms_otp(),
             },
@@ -558,7 +566,7 @@ async fn users_phone_number_returns_200_and_cancels_previous_codes() {
     // The actual correct one succeeds
     {
         let req = VerificationAttemptRequest {
-            submission: VerificationSubmission::Phone {
+            method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
                 otp: second_sms_otp(),
             },

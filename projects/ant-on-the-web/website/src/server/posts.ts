@@ -12,8 +12,6 @@ const posts = {
     path: "/api/users/signup",
     inputDataSchema: z.object({
       username: z.string(),
-      email: z.string(),
-      phoneNumber: z.string(),
       password: z.string(),
     }),
   },
@@ -31,6 +29,32 @@ const posts = {
   logout: {
     path: "/api/users/logout",
     inputDataSchema: z.object({}),
+  },
+  addPhoneNumber: {
+    path: "/api/users/phone-number",
+    inputDataSchema: z.object({
+      phoneNumber: z.string(),
+      forceSend: z.boolean(),
+    }),
+  },
+  verificationAttempt: {
+    path: "/api/users/verification-attempt",
+    inputDataSchema: z.object({
+      method: z.union([
+        z.object({
+          email: z.object({
+            email: z.string(),
+            otp: z.string(),
+          }),
+        }),
+        z.object({
+          phone: z.object({
+            phoneNumber: z.string(),
+            otp: z.string(),
+          }),
+        }),
+      ]),
+    }),
   },
   newsletterSignup: {
     path: "/api/users/subscribe-newsletter",
@@ -73,3 +97,9 @@ export const signup = (
 export const logout = () => constructPost(posts.logout, {});
 export const login = (inputData: z.infer<typeof posts.login.inputDataSchema>) =>
   constructPost(posts.login, inputData);
+export const addPhoneNumber = (
+  inputData: z.infer<typeof posts.addPhoneNumber.inputDataSchema>
+) => constructPost(posts.addPhoneNumber, inputData);
+export const verificationAttempt = (
+  inputData: z.infer<typeof posts.verificationAttempt.inputDataSchema>
+) => constructPost(posts.verificationAttempt, inputData);
