@@ -3,11 +3,16 @@
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { getUser } from "@/server/queries";
 import { UserContext } from "@/state/userContext";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useContext } from "react";
+
+const formatPhoneNumber = (p: string): string => {
+  const r = /^\+(\d)(\d{3})(\d{3})(\d{4})$/;
+  const matches = r.exec(p);
+  if (!matches) return p;
+  return `+${matches[1]} (${matches[2]}) ${matches[3]}-${matches[4]}`;
+};
 
 export default function ProfilePage() {
   const { user } = useContext(UserContext);
@@ -30,7 +35,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="m-3">
-            {user.loggedIn ? (
+            {user.weakAuth && user.loggedIn ? (
               <div className="flex flex-col">
                 <span className="min-w-min">
                   username: <span>{user.user.username}</span>
@@ -41,8 +46,30 @@ export default function ProfilePage() {
                 </span>
 
                 <span className="min-w-min">
-                  email{user.user.emails.length > 1 ? "s" : ""}:{" "}
-                  <span>{user.user.emails.join(", ")}</span>
+                  {user.user.emails.length > 0 ? (
+                    <>
+                      email{user.user.emails.length > 1 ? "s" : ""}:{" "}
+                      <span>{user.user.emails.join(", ")}</span>
+                    </>
+                  ) : (
+                    <>emails: none!</>
+                  )}
+                </span>
+
+                <span className="min-w-min">
+                  {user.user.phoneNumbers.length > 0 ? (
+                    <>
+                      phone number{user.user.phoneNumbers.length > 1 ? "s" : ""}
+                      :{" "}
+                      <span>
+                        {user.user.phoneNumbers
+                          .map((p) => formatPhoneNumber(p))
+                          .join(", ")}
+                      </span>
+                    </>
+                  ) : (
+                    <>phone numbers: none!</>
+                  )}
                 </span>
 
                 <span className="min-w-min">
