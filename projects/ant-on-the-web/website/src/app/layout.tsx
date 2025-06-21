@@ -16,7 +16,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, setUser] = useState<TUserContext>({ loggedIn: false });
+  const [user, setUser] = useState<TUserContext>({ weakAuth: false });
 
   useEffect(() => {
     async function checkLoggedIn() {
@@ -26,6 +26,7 @@ export default function RootLayout({
           getUserSchema.schema.parse(await res.json())
         );
         setUser({
+          weakAuth: true,
           loggedIn: true,
           user: user.user,
         });

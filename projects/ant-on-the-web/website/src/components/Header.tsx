@@ -5,8 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import React, { useContext } from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { useRouter } from "next/navigation";
-import { TUserContext, UserContext } from "@/state/userContext";
+import { UserContext } from "@/state/userContext";
 import { logout } from "@/server/posts";
+import Link from "next/link";
 
 export function Header() {
   const { user, setUser } = useContext(UserContext);
@@ -25,7 +26,7 @@ export function Header() {
 
   const handleLogout = async () => {
     await logout();
-    setUser({ loggedIn: false });
+    setUser({ weakAuth: false });
   };
 
   return (
@@ -49,27 +50,55 @@ export function Header() {
           </h3>
           <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
             <div className="text-center flex flex-row space-x-2 align-center justify-center">
-              {!user.loggedIn && (
-                <button onClick={() => push("/login")}>log in / signup</button>
+              {!(user.weakAuth && user.loggedIn) && (
+                <button
+                  className="cursor-pointer"
+                  onClick={() => push("/login")}
+                >
+                  log in / signup
+                </button>
               )}
-              <button onClick={() => push("/")}>home</button>
-              {user.loggedIn && (
+              <button className="cursor-pointer" onClick={() => push("/")}>
+                home
+              </button>
+              {user.weakAuth && user.loggedIn && (
                 <>
-                  <button onClick={() => push("/profile")}>profile</button>
-                  <button onClick={() => push("/feed")}>feed</button>
+                  <button
+                    className="cursor-pointer"
+                    onClick={() => push("/profile")}
+                  >
+                    profile
+                  </button>
+                  <button
+                    className="cursor-pointer"
+                    onClick={() => push("/feed")}
+                  >
+                    feed
+                  </button>
                 </>
               )}
-              <button onClick={() => push("/info")}>contact me</button>
-              <button
-                onClick={() =>
-                  push("https://www.github.com/kaspar-p/types-of-ants")
-                }
-              >
-                read the code
+              <button className="cursor-pointer" onClick={() => push("/info")}>
+                contact me
               </button>
-              {user.loggedIn && (
-                <button onClick={() => handleLogout()}>logout</button>
+
+              {user.weakAuth && user.loggedIn && (
+                <button
+                  className="cursor-pointer"
+                  onClick={() => handleLogout()}
+                >
+                  logout
+                </button>
               )}
+            </div>
+            <div className="text-center flex flex-row space-x-2 align-center justify-center">
+              <Link href="https://twitter.com/typesofants">
+                <button className="cursor-pointer">twitter @typesofants</button>
+              </Link>
+              <Link href="https://github.com/kaspar-p/types-of-ants">
+                <button className="cursor-pointer">
+                  ant who wants to read the code
+                </button>
+              </Link>
             </div>
           </div>
         </div>
