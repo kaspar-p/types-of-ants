@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Marquee from "react-fast-marquee";
 import { getLatestAnts } from "../server/queries";
 import { useQuery } from "@tanstack/react-query";
@@ -22,8 +22,9 @@ function formatDate(d: Date): string {
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-type AntBannerProps = {};
-export function AntBanner(props: AntBannerProps) {
+export function AntBanner() {
+  const [scroll, setScroll] = useState<boolean>(true);
+
   const {
     isLoading,
     isError,
@@ -43,6 +44,9 @@ export function AntBanner(props: AntBannerProps) {
             borderRadius: "6px",
             padding: "12px",
           }}
+          onClick={() => setScroll((s) => !s)}
+          onMouseEnter={() => setScroll(false)}
+          onMouseLeave={() => setScroll(true)}
         >
           <>
             <div>
@@ -51,7 +55,7 @@ export function AntBanner(props: AntBannerProps) {
             </div>
             <Marquee
               autoFill
-              pauseOnHover
+              play={scroll}
               speed={75}
               className="items-center flex justify-between"
             >
