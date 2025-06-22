@@ -1,11 +1,12 @@
 "use client";
 
+import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { UserContext } from "@/state/userContext";
 import Link from "next/link";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 
 const formatPhoneNumber = (p: string): string => {
   const r = /^\+(\d)(\d{3})(\d{3})(\d{4})$/;
@@ -16,6 +17,8 @@ const formatPhoneNumber = (p: string): string => {
 
 export default function ProfilePage() {
   const { user } = useContext(UserContext);
+
+  const [changingPassword, setChangingPassword] = useState<boolean>(false);
 
   return (
     <ErrorBoundary isError={false}>
@@ -35,17 +38,22 @@ export default function ProfilePage() {
           </div>
 
           <div className="m-3">
-            {user.weakAuth && user.loggedIn ? (
-              <div className="flex flex-col">
-                <span className="min-w-min">
+            {!(user.weakAuth && user.loggedIn) ? (
+              <h3>
+                seems like you aren&apos;t logged in:{" "}
+                <Link href={"/login"}>/login</Link>
+              </h3>
+            ) : (
+              <div className="flex flex-col md:w-12 xl:w-3/12">
+                <span className="min-w-min m-1">
                   username: <span>{user.user.username}</span>
                 </span>
 
-                <span className="min-w-min">
-                  id: <span>{user.user.userId}</span>
+                <span className="min-w-min m-1">
+                  id: <code className="bg-slate-200">{user.user.userId}</code>
                 </span>
 
-                <span className="min-w-min">
+                <span className="min-w-min m-1">
                   {user.user.emails.length > 0 ? (
                     <>
                       email{user.user.emails.length > 1 ? "s" : ""}:{" "}
@@ -56,7 +64,7 @@ export default function ProfilePage() {
                   )}
                 </span>
 
-                <span className="min-w-min">
+                <span className="min-w-min m-1">
                   {user.user.phoneNumbers.length > 0 ? (
                     <>
                       phone number{user.user.phoneNumbers.length > 1 ? "s" : ""}
@@ -72,15 +80,25 @@ export default function ProfilePage() {
                   )}
                 </span>
 
-                <span className="min-w-min">
+                <span className="min-w-min m-1">
                   created: <span>{user.user.joined.toLocaleString()}</span>
                 </span>
+
+                <button
+                  className="min-w-min m-1"
+                  onClick={() => setChangingPassword((s) => !s)}
+                >
+                  change password?
+                </button>
+                {changingPassword && (
+                  <ChangePasswordsBox
+                    secret={""}
+                    onValid={() => {
+                      setTimeout(() => setChangingPassword(false), 3000);
+                    }}
+                  />
+                )}
               </div>
-            ) : (
-              <h3>
-                seems like you aren&apos;t logged in:{" "}
-                <Link href={"/login"}>/login</Link>
-              </h3>
             )}
           </div>
         </div>

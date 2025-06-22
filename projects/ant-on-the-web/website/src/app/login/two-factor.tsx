@@ -64,7 +64,7 @@ export const TwoFactorVerificationBox = () => {
         break;
       }
       case 200: {
-        console.log(res.status, await res.json());
+        console.log(res.status);
         setKey("");
 
         const user = getUserSchema.transformer(

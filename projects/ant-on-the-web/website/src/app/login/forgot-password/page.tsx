@@ -1,5 +1,6 @@
 "use client";
 
+import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
 import { useTimedText } from "@/components/useTimedText";
 import {
   password,
@@ -88,6 +89,10 @@ export default function Page() {
           msg: "one-time code valid!",
         });
         setStep(2);
+        break;
+      }
+      case 400: {
+        setSecretRequestValidationMsg({ valid: false, msg: "invalid code." });
         break;
       }
       default: {
@@ -208,6 +213,7 @@ export default function Page() {
                   value={otp}
                   onChange={(e) => {
                     setOtp(e.target.value);
+                    setSecretRequestValidationMsg({ valid: false, msg: "" });
                   }}
                 />
                 <span
@@ -231,64 +237,7 @@ export default function Page() {
         )}
 
         {step >= 2 && (
-          <>
-            <h2>enter new password</h2>
-            <div>change the password for your account</div>
-
-            <form autoComplete="off" onSubmit={(e) => handleNewPasswords(e)}>
-              <div className="grid grid-cols-3 gap-0">
-                <span className="flex flex-col justify-center">password:</span>
-                <input
-                  className="m-1"
-                  type="text"
-                  name="password1"
-                  autoComplete="off"
-                  placeholder=""
-                  value={password1}
-                  onChange={(e) => {
-                    setPassword1(e.target.value);
-                    setPasswordValidationMsg({ valid: false, msg: "" });
-                  }}
-                />
-                <span
-                  className={`flex flex-col justify-center m-1 text-red-600 content-center`}
-                >
-                  {" "}
-                </span>
-
-                <span className="flex flex-col justify-center">
-                  repeat password:
-                </span>
-                <input
-                  className="m-1"
-                  type="text"
-                  name="password2"
-                  autoComplete="off"
-                  placeholder=""
-                  value={password2}
-                  onChange={(e) => {
-                    setPassword2(e.target.value);
-                    setPasswordValidationMsg({ valid: false, msg: "" });
-                  }}
-                />
-                <span
-                  className={`flex flex-col justify-center m-1 text-red-600 content-center`}
-                >
-                  {" "}
-                </span>
-              </div>
-              <div className="w-8/12">
-                <input type="submit" value="change password" />
-                <span
-                  className={`flex flex-col justify-center m-1 text-${
-                    passwordValidationMsg.valid ? "green" : "red"
-                  }-600 content-center`}
-                >
-                  {passwordValidationMsg.msg}
-                </span>
-              </div>
-            </form>
-          </>
+          <ChangePasswordsBox secret={secret} onValid={() => setStep(3)} />
         )}
 
         {step >= 3 && <Link href="/login">go back and log in</Link>}
