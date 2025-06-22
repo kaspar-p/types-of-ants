@@ -84,7 +84,10 @@ export const TwoFactorVerificationBox = () => {
 
   return (
     <div>
-      <div className="mb-2">verify your details:</div>
+      <div className="mb-2">
+        enter your preferred two-factor authentication message. you will receive
+        an SMS text message or email with a one-time code.
+      </div>
       <form autoComplete="off" onSubmit={(event) => handleSend(event)}>
         <div className="grid grid-cols-3 gap-0">
           <select name="method">
