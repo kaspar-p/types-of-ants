@@ -12,7 +12,7 @@ import { TUserContext, UserContext } from "../state/userContext";
 
 export default function Home() {
   const [page, setPage] = useState(0);
-  const [user, setUser] = useState<TUserContext>({ loggedIn: false });
+  const [user, setUser] = useState<TUserContext>({ weakAuth: false });
 
   const {
     isLoading,
