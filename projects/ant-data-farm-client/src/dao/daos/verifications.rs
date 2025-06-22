@@ -3,7 +3,7 @@ use crate::dao::db::Database;
 use chrono::Duration;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 pub struct VerificationsDao {
@@ -11,8 +11,13 @@ pub struct VerificationsDao {
 }
 
 pub enum VerificationResult {
+    /// The user `user_id` has been verified.
+    Success { user_id: UserId },
+
+    /// No such verification was in the database
     NoVerificationFound,
-    Success,
+
+    /// The verification attempt was wrong, current count is `attempts`
     Failed { attempts: i32 },
 }
 
@@ -77,11 +82,11 @@ impl VerificationsDao {
         Ok(verifications.len() == 1)
     }
 
-    /// Cancel all outstanding phone number verifications on behalf of a user.
+    /// Cancel all outstanding phone number verifications for a phone number.
+    /// Phone numbers are unique, so they only belong to a single user.
     /// This might be done when they click "resend".
     pub async fn cancel_outstanding_phone_number_verifications(
         &mut self,
-        user_id: &UserId,
         phone_number: &str,
     ) -> Result<(), anyhow::Error> {
         let mut db = self.database.lock().await;
@@ -95,19 +100,20 @@ impl VerificationsDao {
                 is_cancelled = true,
                 cancelled_at = now()
             where
-                user_id = $1::uuid and
                 verification_method = 'phone' and
-                unique_key = $2 and
+                unique_key = $1 and
                 is_verified = false and
                 now() <= created_at + (expiration_seconds * interval '1 second')
             ",
-                &[&user_id.0, &phone_number],
+                &[&phone_number],
             )
             .await?;
 
         if rows > 1 {
             t.rollback().await?;
-            return Err(anyhow::Error::msg(format!("Cancelling outstanding phone number verifications updated too many {user_id} {phone_number}")));
+            return Err(anyhow::Error::msg(format!(
+                "Cancelling outstanding phone number verifications updated too many {phone_number}"
+            )));
         }
 
         t.commit().await?;
@@ -199,6 +205,7 @@ impl VerificationsDao {
             verification_method = 'phone' and
             unique_key = $1 and
             is_cancelled = false and
+            is_verified = false and
             now() <= created_at + (expiration_seconds * interval '1 second')
         ",
                 &[&phone_number],
@@ -216,9 +223,13 @@ impl VerificationsDao {
         let otp: String = row.get("one_time_code");
         let verification_id: Uuid = row.get("verification_id");
 
+        info!("comparing attempt {attempt} to {otp} for {verification_id}");
+
         if otp == attempt {
-            t.execute(
-                "
+            info!("otp attempt succeeded, marking {verification_id} as verified");
+            let row = t
+                .query_one(
+                    "
             update verification_attempt
             set
                 verification_attempts = verification_attempts + 1,
@@ -226,15 +237,19 @@ impl VerificationsDao {
                 verified_at = now()
             where
                 verification_id = $1::uuid
+            returning user_id
             ",
-                &[&verification_id],
-            )
-            .await?;
+                    &[&verification_id],
+                )
+                .await?;
+
+            let user_id: UserId = row.get("user_id");
 
             t.commit().await?;
 
-            return Ok(VerificationResult::Success);
+            return Ok(VerificationResult::Success { user_id });
         } else {
+            info!("otp attempt failed, incrementing row of {verification_id}");
             let attempt_row = t
                 .query_one(
                     "

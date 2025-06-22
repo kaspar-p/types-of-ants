@@ -60,7 +60,7 @@ pub enum VerificationMethod {
 
 /// Send a verification message to the user's phone number.
 /// Assumes that there are no previous verification requests out, it is invalid to have more than 1 at a time.
-pub async fn send_phone_verification_code(
+async fn send_phone_verification_code(
     dao: &AntDataFarmClient,
     sms: &dyn SmsSender,
     rng: &mut StdRng,
@@ -109,58 +109,52 @@ pub async fn resend_phone_verification_code(
     dao.verifications
         .write()
         .await
-        .cancel_outstanding_phone_number_verifications(user_id, phone_number)
+        .cancel_outstanding_phone_number_verifications(phone_number)
         .await?;
 
     return send_phone_verification_code(dao, sms, rng, user_id, phone_number).await;
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "problem")]
-pub enum VerificationState {
-    #[serde(rename = "verified")]
-    Verified,
-    #[serde(rename = "outOfAttempts")]
-    OutOfAttempts,
-    #[serde(rename = "hasMoreAttempts")]
-    HasMoreAttempts,
-    #[serde(rename = "noVerificationFound")]
-    NoVerificationFound,
+pub enum VerificationReceipt {
+    Success { user_id: UserId },
+    Failed,
 }
 
-/// Based on the received phone verification request, return an HTTP response.
+/// Based on the received phone verification request.
 /// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
 /// so that the user can "resend".
 ///
-/// Requires the user to be authenticated for this request to ensure no one is spoofing verification
-/// attempts. The API that runs this code should allow callers that have not finished their 2FA
-/// verification, that's what this is for.
+/// Returns true if the user is verified, false if not. The user may have more attempts or not,
+/// if the return value is false.
+///
+/// This is a dangerous function, use only when user is authenticated or similar requirements.
 pub async fn receive_phone_verification_code(
     dao: &AntDataFarmClient,
-    user_id: &UserId,
     phone_number: &str,
     otp_attempt: &str,
-) -> Result<VerificationState, AntOnTheWebError> {
+) -> Result<VerificationReceipt, anyhow::Error> {
     let mut write_verifications = dao.verifications.write().await;
 
+    info!("Attempting to verify 2fa attempt");
     let verified = write_verifications
         .attempt_phone_number_verification(&phone_number, &otp_attempt)
         .await?;
 
     match verified {
-        VerificationResult::Success => Ok(VerificationState::Verified),
-        VerificationResult::NoVerificationFound => Ok(VerificationState::NoVerificationFound),
+        VerificationResult::Success { user_id } => Ok(VerificationReceipt::Success { user_id }),
+        VerificationResult::NoVerificationFound => {
+            info!("No such verification found");
+            return Ok(VerificationReceipt::Failed);
+        }
         VerificationResult::Failed { attempts } => {
             if attempts >= 5 {
                 info!("Too many attempts, cancelling verifications");
                 write_verifications
-                    .cancel_outstanding_phone_number_verifications(&user_id, &phone_number)
+                    .cancel_outstanding_phone_number_verifications(&phone_number)
                     .await?;
-
-                return Ok(VerificationState::OutOfAttempts);
-            } else {
-                return Ok(VerificationState::HasMoreAttempts);
             }
+            info!("two-factor attempt failed");
+            return Ok(VerificationReceipt::Failed);
         }
     }
 }

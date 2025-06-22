@@ -46,6 +46,7 @@ impl ValidationError {
     }
 }
 
+#[derive(Debug)]
 pub enum AntOnTheWebError {
     AccessDenied(Option<String>),
     InternalServerError(Option<anyhow::Error>),

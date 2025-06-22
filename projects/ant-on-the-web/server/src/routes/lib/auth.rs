@@ -1,7 +1,4 @@
-use std::{
-    fmt,
-    sync::{Arc, LazyLock},
-};
+use std::{fmt, sync::Arc};
 
 use ant_data_farm::{
     users::{User, UserId},
@@ -22,41 +19,22 @@ use cookie::{
     time::{Duration, OffsetDateTime},
     CookieBuilder,
 };
-use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-static AUTH_KEYS: LazyLock<AuthKeys> = LazyLock::new(|| {
-    debug!("Initializing jwt secret...");
-    let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
-
-    debug!("jwt secret initialized...");
-    AuthKeys::new(secret.as_bytes())
-});
+use super::jwt;
 
 /// The cookie is a secret artifact that (if correct), proves the user is who they say they are.
 const AUTH_COOKIE_NAME: &str = "typesofants_auth";
-
-pub struct AuthKeys {
-    pub encoding: EncodingKey,
-    pub decoding: DecodingKey,
-}
-
-impl AuthKeys {
-    pub fn new(secret: &[u8]) -> Self {
-        AuthKeys {
-            encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret),
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthClaims {
     /// JWT subject, as per standard.
     pub sub: UserId,
 
-    /// JWT expiration, as per standard.
+    /// JWT expiration, Unix seconds timestamp, from the standard.
+    /// Must also be u64 because the Validation tries to parse as that:
+    /// https://docs.rs/jsonwebtoken/latest/src/jsonwebtoken/validation.rs.html#188
     exp: u64,
 
     /// Whether the user still needs to perform 2fa
@@ -125,13 +103,12 @@ where
         };
 
         // Decode claim data
-        let claim_data = decode::<AuthClaims>(jwt, &AUTH_KEYS.decoding, &Validation::default())
-            .map_err(|e| {
-                warn!("Unauthorized access attempted: {e}");
-                return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-            })?;
+        let claim_data = jwt::decode_jwt::<AuthClaims>(jwt).map_err(|e| {
+            warn!("decode jwt failed: {e:?}");
+            return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+        })?;
 
-        return Ok(Some(claim_data.claims));
+        return Ok(Some(claim_data));
     }
 }
 
@@ -171,13 +148,12 @@ where
         };
 
         // Decode claim data
-        let claim_data = decode::<AuthClaims>(jwt, &AUTH_KEYS.decoding, &Validation::default())
-            .map_err(|e| {
-                warn!("Unauthorized access attempted: {e}");
-                return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-            })?;
+        let claim_data = jwt::decode_jwt::<AuthClaims>(jwt).map_err(|e| {
+            warn!("decode jwt failed: {e:?}");
+            return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+        })?;
 
-        return Ok(claim_data.claims);
+        return Ok(claim_data);
     }
 }
 
@@ -291,7 +267,7 @@ pub async fn optional_authenticate(
 pub fn make_weak_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>), anyhow::Error> {
     debug!("Making JWT weak cookie for the browser...");
     let claims = AuthClaims::new(user_id);
-    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+    let jwt = jwt::encode_jwt(&claims)?;
 
     let cookie = cookie_defaults(jwt.clone())
         .expires(OffsetDateTime::now_utc().saturating_add(Duration::minutes(15)))
@@ -304,7 +280,7 @@ pub fn make_weak_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>
 /// This cookie is a secret that should allow the user to hit every route they can, with no restrictions.
 pub fn make_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>), anyhow::Error> {
     let claims: AuthClaims = AuthClaims::two_factor_verified(user_id);
-    let jwt = jsonwebtoken::encode(&Header::default(), &claims, &AUTH_KEYS.encoding)?;
+    let jwt = jwt::encode_jwt(&claims)?;
 
     debug!("Making JWT auth cookie for the browser...");
     let cookie = cookie_defaults(jwt.clone()).build();

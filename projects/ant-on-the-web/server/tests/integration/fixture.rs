@@ -9,10 +9,10 @@ use ant_on_the_web::{
     users::{
         AddPhoneNumberRequest, AddPhoneNumberResolution, AddPhoneNumberResponse, LoginMethod,
         LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
-        VerificationAttemptResponse, VerificationSubmission,
+        VerificationSubmission,
     },
 };
-use http::StatusCode;
+use http::{header::SET_COOKIE, StatusCode};
 use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
 use tokio::sync::Mutex;
@@ -57,7 +57,7 @@ pub struct TestMsg {
 }
 
 pub struct TestSmsSender {
-    pub msgs: Arc<Mutex<Vec<TestMsg>>>,
+    msgs: Arc<Mutex<Vec<TestMsg>>>,
 }
 
 impl TestSmsSender {
@@ -139,7 +139,7 @@ pub async fn test_router_auth() -> (TestFixture, String) {
         assert_eq!(body.resolution, AddPhoneNumberResolution::Added);
     };
 
-    let token = {
+    let cookie = {
         let req = VerificationAttemptRequest {
             method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
@@ -157,11 +157,15 @@ pub async fn test_router_auth() -> (TestFixture, String) {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let res: VerificationAttemptResponse = res.json().await;
-        res.token
+        res.headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
     };
 
-    return (fixture, format!("typesofants_auth={}", token));
+    return (fixture, cookie);
 }
 
 /// Get a router and cookie pair that has not perform 2fa verification yet.

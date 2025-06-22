@@ -259,6 +259,31 @@ impl UsersDao {
         return Ok(user);
     }
 
+    pub async fn overwrite_user_password(
+        &mut self,
+        user_id: &UserId,
+        new_password: &str,
+    ) -> Result<(), anyhow::Error> {
+        let db = self.database.lock().await;
+        let password_hash = make_password_hash(&new_password)?;
+
+        db.query_one(
+            "
+        update registered_user
+        set
+            password_hash = $1,
+            updated_at = now()
+        where
+            user_id = $2::uuid
+        returning user_id
+        ",
+            &[&password_hash, &user_id.0],
+        )
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn add_phone_number_to_user(
         &mut self,
         user_id: &UserId,

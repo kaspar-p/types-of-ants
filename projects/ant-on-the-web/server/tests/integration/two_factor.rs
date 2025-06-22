@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::{
-    fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth, TestSmsSender},
+    fixture::{test_router_no_auth, test_router_weak_auth, TestSmsSender},
     fixture_sms::{first_sms_otp, second_sms_otp},
 };
 use ant_on_the_web::users::{
@@ -90,7 +90,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
 #[traced_test]
 async fn users_verification_attempt_returns_200_with_different_cookie_headers_even_if_already_authn(
 ) {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_weak_auth(None).await;
 
     let phone = "+1 (111) 222-4444".to_string();
     {
@@ -116,7 +116,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
         let req = VerificationAttemptRequest {
             method: VerificationSubmission::Phone {
                 phone_number: phone.clone(),
-                otp: second_sms_otp(), // one for initial auth, second one for this request
+                otp: first_sms_otp(),
             },
         };
 

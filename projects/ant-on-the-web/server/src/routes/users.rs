@@ -8,11 +8,9 @@ use crate::{
         two_factor,
     },
     state::{ApiRouter, ApiState, InnerApiState},
+    two_factor::VerificationReceipt,
 };
-use ant_data_farm::{
-    users::{verify_password_hash, User, UserId},
-    DaoTrait,
-};
+use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -21,6 +19,7 @@ use axum::{
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
+use chrono::{Duration, Utc};
 use http::header;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
@@ -28,7 +27,7 @@ use tracing::{debug, info};
 use super::lib::{
     auth::{authenticate, cookie_defaults, optional_authenticate, weakly_authenticate, AuthClaims},
     err::AntOnTheWebError,
-    two_factor::VerificationState,
+    jwt::{decode_jwt, encode_jwt},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -129,7 +128,7 @@ async fn logout(
     ));
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LoginMethod {
     #[serde(rename = "username")]
     Username(String),
@@ -139,7 +138,7 @@ pub enum LoginMethod {
     Phone(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoginRequest {
     pub method: LoginMethod,
     pub password: String,
@@ -170,7 +169,7 @@ async fn login(
     // AuthN: This is the starting entry point for AuthN, so we don't need any auth claims here
 
     let users = dao.users.read().await;
-    let user: Result<Option<User>, ValidationMessage> = match &login_request.method {
+    let user: Result<Option<User>, ValidationMessage> = match login_request.method {
         LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
             Err(e) => {
                 info!("Field method.email invalid: {}", e);
@@ -178,7 +177,7 @@ async fn login(
             }
             Ok(email) => Ok(users.get_one_by_email(&email).await?),
         },
-        LoginMethod::Phone(phone) => match canonicalize_phone_number(phone.as_str()) {
+        LoginMethod::Phone(phone) => match canonicalize_phone_number(&phone) {
             Err(e) => {
                 info!("Field method.phone invalid: {}", e);
                 Err(ValidationMessage::invalid("method.phone"))
@@ -193,7 +192,7 @@ async fn login(
             return Err(AntOnTheWebError::Validation(ValidationError::one(v)));
         }
         Ok(None) => {
-            info!("No user found for method {:?}", &login_request.method);
+            info!("No user found");
             return Err(AntOnTheWebError::AccessDenied(None));
         }
         Ok(Some(user)) => user,
@@ -203,7 +202,7 @@ async fn login(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )? {
-        info!("Password invalid for method {:?}", &login_request.method);
+        info!("Password invalid");
         return Err(AntOnTheWebError::AccessDenied(None));
     }
 
@@ -241,11 +240,6 @@ pub struct VerificationAttemptRequest {
     pub method: VerificationSubmission,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct VerificationAttemptResponse {
-    pub token: String,
-}
-
 async fn two_factor_verification_attempt(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
@@ -270,8 +264,7 @@ async fn two_factor_verification_attempt(
 
     let verification = match &req.method {
         VerificationSubmission::Phone { otp, .. } => {
-            two_factor::receive_phone_verification_code(&dao, &user.user_id, &canonical, &otp)
-                .await?
+            two_factor::receive_phone_verification_code(&dao, &canonical, &otp).await?
         }
         VerificationSubmission::Email { email: _, otp: _ } => {
             return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
@@ -279,13 +272,11 @@ async fn two_factor_verification_attempt(
     };
 
     match verification {
-        VerificationState::NoVerificationFound
-        | VerificationState::HasMoreAttempts
-        | VerificationState::OutOfAttempts => {
-            return Ok((StatusCode::BAD_REQUEST, Json(verification)).into_response())
+        VerificationReceipt::Failed => {
+            return Ok((StatusCode::BAD_REQUEST, Json(false)).into_response())
         }
 
-        VerificationState::Verified => {
+        VerificationReceipt::Success { user_id: _ } => {
             info!("Verification succeeded, user authenticated");
 
             // Add that contact method to the user since it's now verified
@@ -309,7 +300,7 @@ async fn two_factor_verification_attempt(
                     }
                 }
                 VerificationSubmission::Email { email, .. } => {
-                    todo!("email not yet supported");
+                    return Ok((StatusCode::NOT_IMPLEMENTED, "Not implemented.").into_response());
                 }
             }
 
@@ -318,7 +309,7 @@ async fn two_factor_verification_attempt(
             return Ok((
                 StatusCode::OK,
                 [(header::SET_COOKIE, cookie.to_string())], // Overwrite the old cookie with a new 2fa cookie
-                Json("Verification successful."),
+                "Verification successful.",
             )
                 .into_response());
         }
@@ -379,7 +370,7 @@ async fn add_phone_number(
     let canonical_phone_number =
         validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
 
-    {
+    let already_added = {
         let by_phone_number = dao
             .users
             .read()
@@ -387,30 +378,19 @@ async fn add_phone_number(
             .get_one_by_phone_number(&canonical_phone_number)
             .await?;
 
-        let _ = match by_phone_number {
-            None => (),
-            Some(other) if other.user_id == user.user_id => {
-                if !req.force_send {
-                    return Ok((
-                        StatusCode::OK,
-                        Json(AddPhoneNumberResponse {
-                            resolution: AddPhoneNumberResolution::AlreadyAdded,
-                        }),
-                    )
-                        .into_response());
-                }
-            }
+        let already_added = match by_phone_number {
+            None => false,
+            Some(other) if other.user_id == user.user_id => true,
             Some(_) => {
                 return Ok((StatusCode::CONFLICT, "Phone number already exists.").into_response())
             }
         };
-    }
 
-    // Start verifying their two-factor phone number
-    // This process happens async, but they won't be able to login until it's verified.
-    // The UI just has to accept the 200 OK and continue the user into some fields where they can
-    // attempt to fulfill the OTP for each method.
-    {
+        already_added
+    };
+
+    // Send the SMS containing the one-time password
+    if !already_added || (already_added && req.force_send) {
         let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
 
         two_factor::resend_phone_verification_code(
@@ -423,13 +403,23 @@ async fn add_phone_number(
         .await?;
     }
 
-    Ok((
-        StatusCode::OK,
-        Json(AddPhoneNumberResponse {
-            resolution: AddPhoneNumberResolution::Added,
-        }),
-    )
-        .into_response())
+    if already_added {
+        Ok((
+            StatusCode::OK,
+            Json(AddPhoneNumberResponse {
+                resolution: AddPhoneNumberResolution::AlreadyAdded,
+            }),
+        )
+            .into_response())
+    } else {
+        Ok((
+            StatusCode::OK,
+            Json(AddPhoneNumberResponse {
+                resolution: AddPhoneNumberResolution::Added,
+            }),
+        )
+            .into_response())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -501,6 +491,164 @@ async fn add_email(
     }
 
     Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PasswordResetCodeRequest {
+    pub username: String,
+
+    #[serde(rename = "phoneNumber")]
+    pub phone_number: String,
+}
+
+/// The first step in the password reset process, the user submits their information and receives
+/// a one-time code if they exist.
+async fn get_password_reset_code(
+    State(InnerApiState { dao, rng, sms }): ApiState,
+    Json(req): Json<PasswordResetCodeRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let phone_number = canonicalize_phone_number(&req.phone_number).map_err(|_| {
+        AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+            "phoneNumber",
+        )))
+    })?;
+
+    let users = dao.users.read().await;
+
+    let user = users.get_one_by_user_name(&req.username).await?;
+    match user {
+        Some(u) if u.phone_numbers.contains(&phone_number) => {
+            let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
+
+            match two_factor::resend_phone_verification_code(
+                &dao,
+                sms.as_ref(),
+                &mut rng,
+                &u.user_id,
+                &phone_number,
+            )
+            .await
+            {
+                Ok(_) => Ok(()),
+                Err(AntOnTheWebError::InternalServerError(s)) => {
+                    Err(AntOnTheWebError::InternalServerError(s))
+                }
+                Err(e) => {
+                    debug!(
+                        "Swallowing validation error in password reset API to prevent leaks: {e:?}"
+                    );
+                    Ok(())
+                }
+            }?;
+        }
+        Some(_) => {
+            info!(
+                "user '{}' did not have phone number '{}'",
+                req.username, phone_number
+            );
+        }
+        None => {
+            info!("no user '{}'", req.username);
+        }
+    }
+
+    // Important, return the same response no matter if the user is wrong or right.
+    return Ok((StatusCode::OK, "One-time code sent.").into_response());
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PasswordResetSecretRequest {
+    #[serde(rename = "phoneNumber")]
+    pub phone_number: String,
+
+    pub otp: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PasswordResetSecretResponse {
+    pub secret: String,
+}
+
+/// The second step in the password reset process. The user gives a one-time code and the server
+/// returns a secret that they can later use alongside their new password to verify.
+async fn get_password_reset_secret(
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<PasswordResetSecretRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let phone_number = canonicalize_phone_number(&req.phone_number)?;
+
+    match two_factor::receive_phone_verification_code(&dao, &phone_number, &req.otp).await? {
+        VerificationReceipt::Failed => {
+            return Ok((StatusCode::BAD_REQUEST, "Invalid code.").into_response());
+        }
+
+        VerificationReceipt::Success { user_id } => {
+            let secret_claims = PasswordResetClaims::new(user_id, phone_number);
+            let jwt = encode_jwt(&secret_claims)?;
+
+            return Ok((
+                StatusCode::OK,
+                Json(PasswordResetSecretResponse { secret: jwt }),
+            )
+                .into_response());
+        }
+    };
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PasswordResetClaims {
+    /// jwt subject, from the standard
+    pub sub: UserId,
+
+    /// jwt expiration (unix seconds timestamp) from the standard
+    /// Must be u64 or won't be decodable:
+    /// https://docs.rs/jsonwebtoken/latest/src/jsonwebtoken/validation.rs.html#188
+    exp: u64,
+
+    /// EXTRA
+    /// the phone number they performed the otp process with
+    pub phone_number: String,
+}
+
+impl PasswordResetClaims {
+    pub fn new(user_id: UserId, phone_number: String) -> Self {
+        Self {
+            sub: user_id,
+            exp: (Utc::now() + Duration::minutes(15)).timestamp() as u64,
+            phone_number,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PasswordRequest {
+    pub secret: String,
+    pub password1: String,
+    pub password2: String,
+}
+
+/// The third and final step in the password reset process. The user returns the secret and their
+/// new password, and the server overwrites that user's password.
+async fn password(
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<PasswordRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    if req.password1 != req.password2 {
+        return Err(AntOnTheWebError::Validation(ValidationError::one(
+            ValidationMessage::new("password", "Passwords must match"),
+        )));
+    }
+
+    let claims = decode_jwt::<PasswordResetClaims>(&req.secret)?;
+    let user_id = claims.sub;
+
+    dao.users
+        .write()
+        .await
+        .overwrite_user_password(&user_id, &req.password1)
+        .await?;
+
+    return Ok((StatusCode::OK, "Password reset.").into_response());
 }
 
 #[derive(Serialize, Deserialize)]
@@ -597,18 +745,6 @@ async fn signup_request(
         user
     };
 
-    // // Start verifying their two-factor phone number
-    // // This process happens async, but they won't be able to login until it's verified.
-    // // The UI just has to accept the 200 OK and continue the user into some fields where they can
-    // // attempt to fullfil the OTP for each method.
-    // {
-    //     let mut rng = rng.lock().await;
-    //     two_factor::send_phone_verification_code(&dao, sms.as_ref(), &mut rng, &user).await?;
-    // }
-
-    // // TODO: Start verifying their two-factor email address
-    // {}
-
     // Make a weak auth token for the user for 2fa routes
     let (_, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
 
@@ -625,6 +761,9 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
         .route_with_tsr("/phone-number", post(add_phone_number))
         .route_with_tsr("/email", post(add_email))
+        .route_with_tsr("/password-reset-code", get(get_password_reset_code))
+        .route_with_tsr("/password-reset-secret", get(get_password_reset_secret))
+        .route_with_tsr("/password", post(password))
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
         .route_with_tsr("/signup", post(signup_request))
@@ -637,11 +776,14 @@ pub fn router() -> ApiRouter {
         .fallback(|| async {
             ant_library::api_fallback(&[
                 "POST /subscribe-newsletter",
+                "POST /phone-number",
+                "POST /email",
+                "GET /password-reset-code",
+                "GET /password-reset-secret",
+                "POST /password",
                 "POST /login",
                 "POST /logout",
                 "POST /signup",
-                "POST /email",
-                "POST /phone-number",
                 "POST /verification-attempt",
                 "GET /user",
                 "GET /user/{user_name}",
