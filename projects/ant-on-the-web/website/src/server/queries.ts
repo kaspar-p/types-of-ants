@@ -116,6 +116,15 @@ const queries = {
       user: { ...d.user, joined: new Date(d.user.joined * 1000) },
     }),
   },
+  getPasswordResetCode: {
+    name: "getPasswordResetCode",
+    path: "/api/users/password-reset-code",
+    transformer: (d: any) => d,
+    inputSchema: z.object({
+      username: z.string(),
+      phoneNumber: z.string(),
+    }),
+  },
 } as const;
 
 type Query = (typeof queries)[keyof typeof queries];

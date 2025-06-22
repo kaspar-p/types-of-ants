@@ -503,7 +503,7 @@ pub struct PasswordResetCodeRequest {
 
 /// The first step in the password reset process, the user submits their information and receives
 /// a one-time code if they exist.
-async fn get_password_reset_code(
+async fn password_reset_code(
     State(InnerApiState { dao, rng, sms }): ApiState,
     Json(req): Json<PasswordResetCodeRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
@@ -571,7 +571,7 @@ pub struct PasswordResetSecretResponse {
 
 /// The second step in the password reset process. The user gives a one-time code and the server
 /// returns a secret that they can later use alongside their new password to verify.
-async fn get_password_reset_secret(
+async fn password_reset_secret(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<PasswordResetSecretRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
@@ -812,8 +812,8 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
         .route_with_tsr("/phone-number", post(add_phone_number))
         .route_with_tsr("/email", post(add_email))
-        .route_with_tsr("/password-reset-code", get(get_password_reset_code))
-        .route_with_tsr("/password-reset-secret", get(get_password_reset_secret))
+        .route_with_tsr("/password-reset-code", post(password_reset_code))
+        .route_with_tsr("/password-reset-secret", post(password_reset_secret))
         .route_with_tsr("/password", post(password))
         .route_with_tsr("/login", post(login))
         .route_with_tsr("/logout", post(logout))
@@ -829,8 +829,8 @@ pub fn router() -> ApiRouter {
                 "POST /subscribe-newsletter",
                 "POST /phone-number",
                 "POST /email",
-                "GET /password-reset-code",
-                "GET /password-reset-secret",
+                "POST /password-reset-code",
+                "POST /password-reset-secret",
                 "POST /password",
                 "POST /login",
                 "POST /logout",

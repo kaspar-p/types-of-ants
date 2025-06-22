@@ -56,6 +56,28 @@ const posts = {
       ]),
     }),
   },
+  passwordResetCode: {
+    path: "/api/users/password-reset-code",
+    inputDataSchema: z.object({
+      username: z.string(),
+      phoneNumber: z.string(),
+    }),
+  },
+  passwordResetSecret: {
+    path: "/api/users/password-reset-secret",
+    inputDataSchema: z.object({
+      phoneNumber: z.string(),
+      otp: z.string(),
+    }),
+  },
+  password: {
+    path: "/api/users/password",
+    inputDataSchema: z.object({
+      secret: z.string(),
+      password1: z.string(),
+      password2: z.string(),
+    }),
+  },
   newsletterSignup: {
     path: "/api/users/subscribe-newsletter",
     inputDataSchema: z.object({
@@ -103,3 +125,12 @@ export const addPhoneNumber = (
 export const verificationAttempt = (
   inputData: z.infer<typeof posts.verificationAttempt.inputDataSchema>
 ) => constructPost(posts.verificationAttempt, inputData);
+export const passwordResetCode = (
+  inputData: z.infer<typeof posts.passwordResetCode.inputDataSchema>
+) => constructPost(posts.passwordResetCode, inputData);
+export const passwordResetSecret = (
+  inputData: z.infer<typeof posts.passwordResetSecret.inputDataSchema>
+) => constructPost(posts.passwordResetSecret, inputData);
+export const password = (
+  inputData: z.infer<typeof posts.password.inputDataSchema>
+) => constructPost(posts.password, inputData);

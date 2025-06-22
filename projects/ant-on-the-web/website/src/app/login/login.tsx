@@ -3,6 +3,7 @@ import { useContext, useState } from "react";
 import { UserContext } from "../../state/userContext";
 import { useRouter } from "next/navigation";
 import { getUser, getUserSchema } from "@/server/queries";
+import Link from "next/link";
 
 export const LoginBox = () => {
   const [loginUnique, setLoginUnique] = useState("");
@@ -130,6 +131,9 @@ export const LoginBox = () => {
           </span>
         </div>
 
+        <div className="flex flex-row justify-start w-8/12">
+          <Link href="/login/forgot-password">forgot your password?</Link>
+        </div>
         <div className="flex flex-row justify-center w-8/12">
           <input type="submit" className="w-full m-1" value="login" />
         </div>

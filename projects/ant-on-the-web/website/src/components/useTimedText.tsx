@@ -18,7 +18,10 @@ export function useTimedText(
   const setTimedText = (t: Setter<string>) => {
     setText(t);
 
-    if (t === "") return;
+    if (t === "") {
+      setPreviousTimeout(undefined);
+      return;
+    }
 
     setPreviousTimeout(
       setTimeout(() => {

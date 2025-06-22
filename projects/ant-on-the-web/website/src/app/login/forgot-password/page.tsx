@@ -1,0 +1,298 @@
+"use client";
+
+import { useTimedText } from "@/components/useTimedText";
+import {
+  password,
+  passwordResetCode,
+  passwordResetSecret,
+} from "@/server/posts";
+import Link from "next/link";
+import { FormEvent, useState } from "react";
+
+export default function Page() {
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+
+  const [username, setUsername] = useState("");
+  const [usernameValidationMsg, setUsernameValidationMsg] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumberValidationMsg, setPhoneNumberValidationMsg] = useState("");
+  const [codeRequestValidationMsg, setCodeRequestValidationMsg] = useState<{
+    valid: boolean;
+    msg: string;
+  }>({ valid: false, msg: "" });
+
+  const [otp, setOtp] = useState("");
+  const [secretRequestValidationMsg, setSecretRequestValidationMsg] = useState<{
+    valid: boolean;
+    msg: string;
+  }>({ valid: false, msg: "" });
+
+  const [secret, setSecret] = useState("");
+  const [password1, setPassword1] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [passwordValidationMsg, setPasswordValidationMsg] = useState<{
+    valid: boolean;
+    msg: string;
+  }>({ valid: false, msg: "" });
+
+  async function handleCodeRequest(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const res = await passwordResetCode({ username, phoneNumber });
+    switch (res.status) {
+      case 200: {
+        setCodeRequestValidationMsg({
+          valid: true,
+          msg: "one-time code sent!",
+        });
+        setStep(1);
+        break;
+      }
+      case 400: {
+        const e: { errors: { field: string; msg: string }[] } =
+          await res.json();
+        for (const err of e.errors) {
+          switch (err.field) {
+            case "phoneNumber": {
+              setPhoneNumberValidationMsg(err.msg.toLocaleLowerCase());
+              break;
+            }
+            case "username": {
+              setUsernameValidationMsg(err.msg.toLocaleLowerCase());
+              break;
+            }
+          }
+        }
+        break;
+      }
+      default: {
+        setCodeRequestValidationMsg({
+          valid: false,
+          msg: "something went wrong, please retry",
+        });
+        break;
+      }
+    }
+  }
+
+  async function handleSecretRequest(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const res = await passwordResetSecret({ phoneNumber, otp });
+    switch (res.status) {
+      case 200: {
+        const body: { secret: string } = await res.json();
+        setSecret(body.secret);
+        setSecretRequestValidationMsg({
+          valid: true,
+          msg: "one-time code valid!",
+        });
+        setStep(2);
+        break;
+      }
+      default: {
+        setSecretRequestValidationMsg({
+          valid: false,
+          msg: "something went wrong, please retry",
+        });
+        break;
+      }
+    }
+  }
+
+  async function handleNewPasswords(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const res = await password({ secret, password1, password2 });
+
+    switch (res.status) {
+      case 400: {
+        const e: { errors: { field: string; msg: string }[] } =
+          await res.json();
+
+        setPasswordValidationMsg({
+          valid: false,
+          msg: e.errors[0].msg.toLocaleLowerCase(),
+        });
+
+        break;
+      }
+      case 200: {
+        setPasswordValidationMsg({ valid: true, msg: "password changed!" });
+        setStep(3);
+        break;
+      }
+    }
+  }
+
+  return (
+    <div className="h-full w-full flex flex-col md:flex-row justify-center">
+      <div className="m-4 w-full md:w-8/12 xl:w-3/12">
+        <h2>reset your password</h2>
+        <div>
+          enter your details to reset your password. you will receive a one-time
+          code.
+        </div>
+
+        <form autoComplete="off" onSubmit={(e) => handleCodeRequest(e)}>
+          <div className="grid grid-cols-3 gap-0">
+            <span className="flex flex-col justify-center">your username:</span>
+            <input
+              className="m-1"
+              type="text"
+              name="username"
+              autoComplete="off"
+              placeholder="kaspar"
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setUsernameValidationMsg("");
+              }}
+            />
+            <span
+              className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+            >
+              {usernameValidationMsg}
+            </span>
+
+            <span className="flex flex-col justify-center">
+              your phone number:
+            </span>
+            <input
+              className="m-1"
+              type="text"
+              name="phoneNumber"
+              autoComplete="off"
+              placeholder="+1 (000) 111-2222"
+              value={phoneNumber}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value);
+                setPhoneNumberValidationMsg("");
+              }}
+            />
+            <span
+              className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+            >
+              {phoneNumberValidationMsg}
+            </span>
+          </div>
+
+          <div className="w-8/12">
+            <input type="submit" value="send one-time code" />
+            <span
+              className={`flex flex-col justify-center m-1 text-${
+                codeRequestValidationMsg.valid ? "green" : "red"
+              }-600 content-center`}
+            >
+              {codeRequestValidationMsg.msg}
+            </span>
+          </div>
+        </form>
+
+        {step >= 1 && (
+          <>
+            <h2>submit your one-time code</h2>
+            <div>enter the one-time code sent to your phone.</div>
+
+            <form autoComplete="off" onSubmit={(e) => handleSecretRequest(e)}>
+              <div className="grid grid-cols-3 gap-0">
+                <span className="flex flex-col justify-center">
+                  one-time code:
+                </span>
+                <input
+                  className="m-1"
+                  type="text"
+                  name="otp"
+                  autoComplete="off"
+                  placeholder=""
+                  value={otp}
+                  onChange={(e) => {
+                    setOtp(e.target.value);
+                  }}
+                />
+                <span
+                  className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+                >
+                  {" "}
+                </span>
+              </div>
+              <div className="w-8/12">
+                <input type="submit" value="submit one-time code" />
+                <span
+                  className={`flex flex-col justify-center m-1 text-${
+                    secretRequestValidationMsg.valid ? "green" : "red"
+                  }-600 content-center`}
+                >
+                  {secretRequestValidationMsg.msg}
+                </span>
+              </div>
+            </form>
+          </>
+        )}
+
+        {step >= 2 && (
+          <>
+            <h2>enter new password</h2>
+            <div>change the password for your account</div>
+
+            <form autoComplete="off" onSubmit={(e) => handleNewPasswords(e)}>
+              <div className="grid grid-cols-3 gap-0">
+                <span className="flex flex-col justify-center">password:</span>
+                <input
+                  className="m-1"
+                  type="text"
+                  name="password1"
+                  autoComplete="off"
+                  placeholder=""
+                  value={password1}
+                  onChange={(e) => {
+                    setPassword1(e.target.value);
+                    setPasswordValidationMsg({ valid: false, msg: "" });
+                  }}
+                />
+                <span
+                  className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+                >
+                  {" "}
+                </span>
+
+                <span className="flex flex-col justify-center">
+                  repeat password:
+                </span>
+                <input
+                  className="m-1"
+                  type="text"
+                  name="password2"
+                  autoComplete="off"
+                  placeholder=""
+                  value={password2}
+                  onChange={(e) => {
+                    setPassword2(e.target.value);
+                    setPasswordValidationMsg({ valid: false, msg: "" });
+                  }}
+                />
+                <span
+                  className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+                >
+                  {" "}
+                </span>
+              </div>
+              <div className="w-8/12">
+                <input type="submit" value="change password" />
+                <span
+                  className={`flex flex-col justify-center m-1 text-${
+                    passwordValidationMsg.valid ? "green" : "red"
+                  }-600 content-center`}
+                >
+                  {passwordValidationMsg.msg}
+                </span>
+              </div>
+            </form>
+          </>
+        )}
+
+        {step >= 3 && <Link href="/login">go back and log in</Link>}
+      </div>
+    </div>
+  );
+}

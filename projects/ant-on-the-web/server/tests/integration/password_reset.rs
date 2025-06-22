@@ -24,7 +24,7 @@ async fn users_password_reset_code_returns_400_if_phone_number_or_invalid() {
         };
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -45,7 +45,7 @@ async fn users_password_reset_code_returns_200_and_sends_no_messages_if_user_doe
         };
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -87,7 +87,7 @@ async fn users_password_reset_code_returns_200_and_sends_code_if_user_exists() {
         };
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -124,7 +124,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -141,7 +141,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -161,7 +161,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -183,7 +183,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_wrong() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -205,7 +205,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_cancelled() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -222,7 +222,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_cancelled() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -246,7 +246,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -262,7 +262,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -279,7 +279,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -303,7 +303,7 @@ async fn users_password_reset_secret_returns_200_with_secret_if_otp_is_correct()
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -319,7 +319,7 @@ async fn users_password_reset_secret_returns_200_with_secret_if_otp_is_correct()
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
@@ -451,7 +451,7 @@ async fn users_password_returns_200_and_resets_password() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-code")
+            .post("/api/users/password-reset-code")
             .json(&req)
             .send()
             .await;
@@ -468,7 +468,7 @@ async fn users_password_returns_200_and_resets_password() {
 
         let res = fixture
             .client
-            .get("/api/users/password-reset-secret")
+            .post("/api/users/password-reset-secret")
             .json(&req)
             .send()
             .await;
