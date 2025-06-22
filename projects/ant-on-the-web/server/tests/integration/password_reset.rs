@@ -394,6 +394,24 @@ async fn users_password_returns_400_if_password_attempts_are_not_valid_passwords
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     }
+
+    // passwords match but are invalid
+    {
+        let req = PasswordRequest {
+            password1: "pass".to_string(),
+            password2: "pass".to_string(),
+            secret: "".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/password")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
 }
 
 #[tokio::test]
@@ -475,6 +493,47 @@ async fn users_password_returns_200_and_resets_password() {
             .client
             .post("/api/users/password")
             .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // try to login with that new password
+    {
+        let req = LoginRequest {
+            method: ant_on_the_web::users::LoginMethod::Username("user".to_string()),
+            password: "ant-password1".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/login")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_password_returns_200_if_authenticated_with_no_secret() {
+    let (fixture, cookie) = test_router_auth().await;
+
+    {
+        let req = PasswordRequest {
+            password1: "ant-password1".to_string(),
+            password2: "ant-password1".to_string(),
+            secret: "".to_string(),
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/password")
+            .json(&req)
+            .header("Cookie", &cookie)
             .send()
             .await;
 

@@ -629,26 +629,82 @@ pub struct PasswordRequest {
 
 /// The third and final step in the password reset process. The user returns the secret and their
 /// new password, and the server overwrites that user's password.
+///
+/// The auth claims are optional because if they aren't included, it's a "forgot my password"
+/// but if they are, it's just changing your password.
 async fn password(
+    auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<PasswordRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    if req.password1 != req.password2 {
-        return Err(AntOnTheWebError::Validation(ValidationError::one(
-            ValidationMessage::new("password", "Passwords must match"),
-        )));
+    {
+        let mut validations: Vec<ValidationMessage> = vec![];
+        if req.password1 != req.password2 {
+            validations.push(ValidationMessage::new("password", "Passwords must match"));
+        }
+
+        validations.append(&mut validate_password(&req.password1));
+
+        if validations.len() > 0 {
+            return Err(AntOnTheWebError::Validation(ValidationError::many(
+                validations,
+            )));
+        }
     }
 
-    let claims = decode_jwt::<PasswordResetClaims>(&req.secret)?;
-    let user_id = claims.sub;
+    match auth {
+        Some(auth) => {
+            let user = authenticate(&auth, &dao).await?;
 
-    dao.users
-        .write()
-        .await
-        .overwrite_user_password(&user_id, &req.password1)
-        .await?;
+            dao.users
+                .write()
+                .await
+                .overwrite_user_password(&user.user_id, &req.password1)
+                .await?;
 
-    return Ok((StatusCode::OK, "Password reset.").into_response());
+            return Ok((StatusCode::OK, "Password changed.").into_response());
+        }
+
+        None => {
+            if req.password1 != req.password2 {
+                return Err(AntOnTheWebError::Validation(ValidationError::one(
+                    ValidationMessage::new("password", "Passwords must match"),
+                )));
+            }
+
+            let claims = decode_jwt::<PasswordResetClaims>(&req.secret)?;
+            let user_id = claims.sub;
+
+            dao.users
+                .write()
+                .await
+                .overwrite_user_password(&user_id, &req.password1)
+                .await?;
+
+            return Ok((StatusCode::OK, "Password changed.").into_response());
+        }
+    }
+}
+
+fn validate_password(password: &str) -> Vec<ValidationMessage> {
+    let mut validations: Vec<ValidationMessage> = vec![];
+
+    let password_len = password.len();
+    if password_len < 8 || password_len > 64 {
+        validations.push(ValidationMessage::new(
+            "password",
+            "Field must be between 8 and 64 characters.",
+        ));
+    }
+
+    if !password.contains("ant") {
+        validations.push(ValidationMessage::new(
+                 "password",
+                                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
+            ));
+    }
+
+    return validations;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -691,12 +747,7 @@ async fn signup_request(
             ));
         }
 
-        if !signup_request.password.contains("ant") {
-            validations.push(ValidationMessage::new(
-                 "password",
-                                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
-            ));
-        }
+        validations.append(&mut validate_password(&signup_request.password));
 
         match validations.as_slice() {
             &[] => Ok(()),
