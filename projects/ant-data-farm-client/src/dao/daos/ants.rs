@@ -111,6 +111,7 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                     left join ant_declined on ant.ant_id = ant_declined.ant_id
                     left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
                     left join registered_user on ant.ant_user_id = registered_user.user_id
+            order by ant_release.ant_content_hash
             ",
                 &[],
             )

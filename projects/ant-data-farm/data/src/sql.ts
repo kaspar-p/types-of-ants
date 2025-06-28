@@ -15,7 +15,7 @@ export function hashCode(str: string): number {
   return (hash >>> 0) % (Math.pow(2, 31) - 1);
 }
 
-function sanitizeForSql(content: string): string {
+export function sanitizeForSql(content: string): string {
   return content.replace(/'/g, "''");
 }
 
