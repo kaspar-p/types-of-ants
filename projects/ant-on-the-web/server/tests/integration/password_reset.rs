@@ -9,7 +9,7 @@ use tracing_test::traced_test;
 
 use crate::{
     fixture::{test_router_auth, test_router_no_auth, TestSmsSender},
-    fixture_sms::second_sms_otp,
+    fixture_sms::{second_otp, third_otp},
 };
 
 #[tokio::test]
@@ -102,10 +102,7 @@ async fn users_password_reset_code_returns_200_and_sends_code_if_user_exists() {
         assert_eq!(msgs.get(1).unwrap().to_phone, "+11112223333");
         assert_eq!(
             msgs.get(1).unwrap().content,
-            format!(
-                "[typesofants.org] your one-time code is: {}",
-                second_sms_otp()
-            )
+            format!("[typesofants.org] your one-time code is: {}", third_otp())
         );
     }
 }
@@ -136,7 +133,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: third_otp(),
         };
 
         let res = fixture
@@ -156,7 +153,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: third_otp(),
         };
 
         let res = fixture
@@ -217,7 +214,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_cancelled() {
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: second_otp(),
         };
 
         let res = fixture
@@ -257,7 +254,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: third_otp(),
         };
 
         let res = fixture
@@ -274,7 +271,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: second_otp(),
         };
 
         let res = fixture
@@ -314,7 +311,7 @@ async fn users_password_reset_secret_returns_200_with_secret_if_otp_is_correct()
     {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: third_otp(),
         };
 
         let res = fixture
@@ -463,7 +460,7 @@ async fn users_password_returns_200_and_resets_password() {
     let secret = {
         let req = PasswordResetSecretRequest {
             phone_number: "+1 (111) 222-3333".to_string(),
-            otp: second_sms_otp(),
+            otp: third_otp(),
         };
 
         let res = fixture

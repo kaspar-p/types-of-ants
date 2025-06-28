@@ -7,9 +7,9 @@ use ant_on_the_web::{
     sms::{SmsError, SmsSender},
     state::InnerApiState,
     users::{
-        AddPhoneNumberRequest, AddPhoneNumberResolution, AddPhoneNumberResponse, LoginMethod,
-        LoginRequest, LoginResponse, SignupRequest, VerificationAttemptRequest,
-        VerificationSubmission,
+        AddEmailRequest, AddEmailResponse, AddPhoneNumberRequest, AddPhoneNumberResponse,
+        AddResolution, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
+        VerificationAttemptRequest, VerificationSubmission,
     },
 };
 use http::{header::SET_COOKIE, StatusCode};
@@ -17,7 +17,8 @@ use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
 use tokio::sync::Mutex;
 
-use crate::fixture_sms::first_sms_otp;
+use crate::fixture_sms::first_otp;
+use crate::{fixture_email::TestEmailSender, fixture_sms::second_otp};
 
 async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
     let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
@@ -96,6 +97,7 @@ async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
     let state = InnerApiState {
         dao: Arc::new(db_client),
         sms: Arc::new(sms),
+        email: Arc::new(TestEmailSender::new()),
 
         // Deterministic seed for testing.
         rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed(seed))),
@@ -136,14 +138,60 @@ pub async fn test_router_auth() -> (TestFixture, String) {
         assert_eq!(res.status(), StatusCode::OK);
 
         let body: AddPhoneNumberResponse = res.json().await;
-        assert_eq!(body.resolution, AddPhoneNumberResolution::Added);
+        assert_eq!(body.resolution, AddResolution::Added);
     };
 
     let cookie = {
         let req = VerificationAttemptRequest {
             method: VerificationSubmission::Phone {
                 phone_number: "+1 (111) 222-3333".to_string(),
-                otp: first_sms_otp(),
+                otp: first_otp(),
+            },
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/verification-attempt")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        res.headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+    };
+
+    {
+        let req = AddEmailRequest {
+            email: "email@domain.com".to_string(),
+            force_send: true,
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/email")
+            .header("Cookie", cookie.as_str())
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: AddEmailResponse = res.json().await;
+        assert_eq!(body.resolution, AddResolution::Added);
+    };
+
+    let cookie = {
+        let req = VerificationAttemptRequest {
+            method: VerificationSubmission::Email {
+                email: "email@domain.com".to_string(),
+                otp: second_otp(),
             },
         };
 

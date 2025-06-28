@@ -1,5 +1,6 @@
 pub mod ants;
 pub mod fixture;
+pub mod fixture_email;
 pub mod fixture_sms;
 pub mod hosts;
 pub mod password_reset;

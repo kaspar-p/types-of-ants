@@ -85,9 +85,10 @@ impl VerificationsDao {
     /// Cancel all outstanding phone number verifications for a phone number.
     /// Phone numbers are unique, so they only belong to a single user.
     /// This might be done when they click "resend".
-    pub async fn cancel_outstanding_phone_number_verifications(
+    async fn cancel_outstanding_verifications(
         &mut self,
-        phone_number: &str,
+        method: &str,
+        identifier: &str,
     ) -> Result<(), anyhow::Error> {
         let mut db = self.database.lock().await;
         let t = db.transaction().await?;
@@ -100,25 +101,88 @@ impl VerificationsDao {
                 is_cancelled = true,
                 cancelled_at = now()
             where
-                verification_method = 'phone' and
-                unique_key = $1 and
+                verification_method = $1 and
+                unique_key = $2 and
                 is_verified = false and
                 now() <= created_at + (expiration_seconds * interval '1 second')
             ",
-                &[&phone_number],
+                &[&method, &identifier],
             )
             .await?;
 
         if rows > 1 {
             t.rollback().await?;
             return Err(anyhow::Error::msg(format!(
-                "Cancelling outstanding phone number verifications updated too many {phone_number}"
+                "Cancelling outstanding {method} verifications updated too many {identifier}"
             )));
         }
 
         t.commit().await?;
 
         Ok(())
+    }
+
+    /// Cancel all outstanding phone number verifications for a phone number.
+    /// Phone numbers are unique, so they only belong to a single user.
+    /// This might be done when they click "resend".
+    pub async fn cancel_outstanding_phone_number_verifications(
+        &mut self,
+        phone_number: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.cancel_outstanding_verifications("phone", phone_number)
+            .await
+    }
+
+    /// Cancel all outstanding email verifications for an email address.
+    /// Emails are unique, so they only belong to a single user.
+    /// This might be done when they click "resend".
+    pub async fn cancel_outstanding_email_verifications(
+        &mut self,
+        email: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.cancel_outstanding_verifications("email", email).await
+    }
+
+    /// When a user signs up or changes their phone number, create a verification attempt row
+    /// in the database for this user and phone number.
+    ///
+    /// Assumes that there are no ongoing verifications, cancel others before beginning this one.
+    ///
+    /// Returns the Verification ID.
+    async fn start_verification(
+        &mut self,
+        user_id: &UserId,
+        method: &str,
+        identifier: &str,
+        expiration: Duration,
+        otp: &str,
+    ) -> Result<Uuid, anyhow::Error> {
+        let mut db = self.database.lock().await;
+        let t = db.transaction().await?;
+
+        let verification_id: Uuid = t
+            .query_one(
+                "
+        insert into verification_attempt
+            (user_id, unique_key, verification_method, expiration_seconds, one_time_code)
+        values
+            ($1::uuid, $2, $3, $4, $5)
+        returning verification_id
+        ",
+                &[
+                    &user_id.0,
+                    &identifier,
+                    &method,
+                    &expiration.num_seconds(),
+                    &otp,
+                ],
+            )
+            .await?
+            .get("verification_id");
+
+        t.commit().await?;
+
+        return Ok(verification_id);
     }
 
     /// When a user signs up or changes their phone number, create a verification attempt row
@@ -134,31 +198,30 @@ impl VerificationsDao {
         expiration: Duration,
         otp: &str,
     ) -> Result<Uuid, anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await?;
+        self.start_verification(user_id, "phone", phone_number, expiration, otp)
+            .await
+    }
 
-        let verification_id: Uuid = t
-            .query_one(
-                "
-        insert into verification_attempt
-            (user_id, unique_key, verification_method, expiration_seconds, one_time_code)
-        values
-            ($1::uuid, $2, 'phone', $3, $4)
-        returning verification_id
-        ",
-                &[&user_id.0, &phone_number, &expiration.num_seconds(), &otp],
-            )
-            .await?
-            .get("verification_id");
-
-        t.commit().await?;
-
-        return Ok(verification_id);
+    /// When a user signs up or changes their phone number, create a verification attempt row
+    /// in the database for this user and phone number.
+    ///
+    /// Assumes that there are no ongoing verifications, cancel others before beginning this one.
+    ///
+    /// Returns the Verification ID.
+    pub async fn start_email_verification(
+        &mut self,
+        user_id: &UserId,
+        email: &str,
+        expiration: Duration,
+        otp: &str,
+    ) -> Result<Uuid, anyhow::Error> {
+        self.start_verification(user_id, "email", email, expiration, otp)
+            .await
     }
 
     /// For a verification request, once the request is sent and there is some unique ID to associate
     /// that came from the SMS/Email provider, save that into the DB.
-    pub async fn update_phone_number_verification_with_send_id(
+    pub async fn update_verification_with_send_id(
         &mut self,
         verification_attempt_id: &Uuid,
         send_id: &str,
@@ -178,17 +241,10 @@ impl VerificationsDao {
         Ok(())
     }
 
-    /// When the user has attempted to verify their phone number, check whether the one-time pad
-    /// actually matches what we expect.
-    ///
-    /// If it is, then updates the row to mark the phone number as verified, and when the verification
-    /// happened. Returns `true`.
-    ///
-    /// If the attempt does not match, returns `false` and the application should ask the user to retry.
-    /// Also returns false if there was no verification that matched for those details, or might be expired.
-    pub async fn attempt_phone_number_verification(
+    async fn attempt_verification(
         &mut self,
-        phone_number: &str,
+        method: &str,
+        identifier: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
         let mut db = self.database.lock().await;
@@ -202,19 +258,19 @@ impl VerificationsDao {
         from
             verification_attempt
         where
-            verification_method = 'phone' and
-            unique_key = $1 and
+            verification_method = $1 and
+            unique_key = $2 and
             is_cancelled = false and
             is_verified = false and
             now() <= created_at + (expiration_seconds * interval '1 second')
         ",
-                &[&phone_number],
+                &[&method, &identifier],
             )
             .await?;
 
         let row = match verification {
             None => {
-                debug!("No unexpired verification for {phone_number} found.");
+                debug!("No unexpired verification for {identifier} found.");
                 return Ok(VerificationResult::NoVerificationFound);
             }
             Some(row) => row,
@@ -270,5 +326,38 @@ impl VerificationsDao {
 
             return Ok(VerificationResult::Failed { attempts });
         }
+    }
+
+    /// When the user has attempted to verify their phone number, check whether the one-time pad
+    /// actually matches what we expect.
+    ///
+    /// If it is, then updates the row to mark the phone number as verified, and when the verification
+    /// happened. Returns `true`.
+    ///
+    /// If the attempt does not match, returns `false` and the application should ask the user to retry.
+    /// Also returns false if there was no verification that matched for those details, or might be expired.
+    pub async fn attempt_phone_number_verification(
+        &mut self,
+        phone_number: &str,
+        attempt: &str,
+    ) -> Result<VerificationResult, anyhow::Error> {
+        self.attempt_verification("phone", phone_number, attempt)
+            .await
+    }
+
+    /// When the user has attempted to verify their email, check whether the one-time pad
+    /// actually matches what we expect.
+    ///
+    /// If it is, then updates the row to mark the phone number as verified, and when the verification
+    /// happened. Returns `true`.
+    ///
+    /// If the attempt does not match, returns `false` and the application should ask the user to retry.
+    /// Also returns false if there was no verification that matched for those details, or might be expired.
+    pub async fn attempt_email_verification(
+        &mut self,
+        email: &str,
+        attempt: &str,
+    ) -> Result<VerificationResult, anyhow::Error> {
+        self.attempt_verification("email", email, attempt).await
     }
 }

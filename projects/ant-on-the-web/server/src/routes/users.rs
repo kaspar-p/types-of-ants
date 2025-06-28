@@ -260,8 +260,12 @@ async fn two_factor_verification_attempt(
                 )))
             })?
         }
-        VerificationSubmission::Email { email: _, otp: _ } => {
-            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
+        VerificationSubmission::Email { email, otp: _ } => {
+            canonicalize_email(&email).map_err(|e| {
+                AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+                    "submission.email",
+                )))
+            })?
         }
     };
 
@@ -280,8 +284,8 @@ async fn two_factor_verification_attempt(
         VerificationSubmission::Phone { otp, .. } => {
             two_factor::receive_phone_verification_code(&dao, &canonical, &otp).await?
         }
-        VerificationSubmission::Email { email: _, otp: _ } => {
-            return Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response());
+        VerificationSubmission::Email { otp, .. } => {
+            two_factor::receive_email_verification_code(&dao, &canonical, &otp).await?
         }
     };
 
@@ -313,8 +317,20 @@ async fn two_factor_verification_attempt(
                         );
                     }
                 }
-                VerificationSubmission::Email { email, .. } => {
-                    return Ok((StatusCode::NOT_IMPLEMENTED, "Not implemented.").into_response());
+                VerificationSubmission::Email { .. } => {
+                    if !user.emails.contains(&canonical) {
+                        info!("Adding email {} to user {}", &canonical, &user.username);
+                        dao.users
+                            .write()
+                            .await
+                            .add_email_to_user(&user.user_id, &canonical)
+                            .await?;
+                    } else {
+                        info!(
+                            "Email {} already added to user {}",
+                            &canonical, &user.username
+                        );
+                    }
                 }
             }
 
@@ -341,7 +357,7 @@ pub struct AddPhoneNumberRequest {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "resolution")]
-pub enum AddPhoneNumberResolution {
+pub enum AddResolution {
     #[serde(rename = "added")]
     Added,
     #[serde(rename = "alreadyAdded")]
@@ -350,12 +366,12 @@ pub enum AddPhoneNumberResolution {
 
 #[derive(Serialize, Deserialize)]
 pub struct AddPhoneNumberResponse {
-    pub resolution: AddPhoneNumberResolution,
+    pub resolution: AddResolution,
 }
 
 async fn add_phone_number(
     auth: AuthClaims,
-    State(InnerApiState { dao, sms, rng }): ApiState,
+    State(InnerApiState { dao, sms, rng, .. }): ApiState,
     Json(req): Json<AddPhoneNumberRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
@@ -427,7 +443,7 @@ async fn add_phone_number(
         Ok((
             StatusCode::OK,
             Json(AddPhoneNumberResponse {
-                resolution: AddPhoneNumberResolution::AlreadyAdded,
+                resolution: AddResolution::AlreadyAdded,
             }),
         )
             .into_response())
@@ -435,7 +451,7 @@ async fn add_phone_number(
         Ok((
             StatusCode::OK,
             Json(AddPhoneNumberResponse {
-                resolution: AddPhoneNumberResolution::Added,
+                resolution: AddResolution::Added,
             }),
         )
             .into_response())
@@ -445,21 +461,20 @@ async fn add_phone_number(
 #[derive(Serialize, Deserialize)]
 pub struct AddEmailRequest {
     pub email: String,
+    #[serde(rename = "forceSend")]
+    pub force_send: bool,
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "resolution")]
-pub enum AddEmailResponse {
-    #[serde(rename = "added")]
-    Added,
-
-    #[serde(rename = "alreadyAdded")]
-    AlreadyAdded,
+pub struct AddEmailResponse {
+    pub resolution: AddResolution,
 }
 
 async fn add_email(
     auth: AuthClaims,
-    State(InnerApiState { dao, rng, .. }): ApiState,
+    State(InnerApiState {
+        dao, rng, email, ..
+    }): ApiState,
     Json(req): Json<AddEmailRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
@@ -493,7 +508,7 @@ async fn add_email(
     let method = two_factor::VerificationMethod::Email(canonical_email.clone());
     let user = authenticate_or_weak_matching_method(&auth, &dao, &method, user).await?;
 
-    {
+    let already_added = {
         let by_email = dao
             .users
             .read()
@@ -501,20 +516,43 @@ async fn add_email(
             .get_one_by_email(&canonical_email)
             .await?;
 
-        let _ = match by_email {
-            None => (),
-            Some(other) if other.user_id == user.user_id => {
-                return Ok((StatusCode::OK, Json(AddEmailResponse::AlreadyAdded)).into_response())
-            }
+        match by_email {
+            None => false,
+            Some(other) if other.user_id == user.user_id => true,
             Some(_) => return Ok((StatusCode::CONFLICT, "Email already exists.").into_response()),
-        };
+        }
+    };
+
+    if !already_added || (already_added && req.force_send) {
+        info!("Sending email verification code");
+        let mut rng = rng.lock().await;
+        two_factor::resend_email_verification_code(
+            &dao,
+            email.as_ref(),
+            &mut rng,
+            &user.user_id,
+            &canonical_email,
+        )
+        .await?
     }
 
-    {
-        // TODO: Start verifying their two-factor email
+    if already_added {
+        Ok((
+            StatusCode::OK,
+            Json(AddEmailResponse {
+                resolution: AddResolution::AlreadyAdded,
+            }),
+        )
+            .into_response())
+    } else {
+        Ok((
+            StatusCode::OK,
+            Json(AddEmailResponse {
+                resolution: AddResolution::Added,
+            }),
+        )
+            .into_response())
     }
-
-    Ok((StatusCode::NOT_IMPLEMENTED, "unimplemented").into_response())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -528,7 +566,7 @@ pub struct PasswordResetCodeRequest {
 /// The first step in the password reset process, the user submits their information and receives
 /// a one-time code if they exist.
 async fn password_reset_code(
-    State(InnerApiState { dao, rng, sms }): ApiState,
+    State(InnerApiState { dao, rng, sms, .. }): ApiState,
     Json(req): Json<PasswordResetCodeRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let phone_number = canonicalize_phone_number(&req.phone_number).map_err(|_| {

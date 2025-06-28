@@ -1,6 +1,6 @@
 use crate::{
     fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth},
-    fixture_sms::first_sms_otp,
+    fixture_sms::first_otp,
 };
 use http::{header::SET_COOKIE, StatusCode};
 use tracing_test::traced_test;
@@ -8,7 +8,7 @@ use tracing_test::traced_test;
 use ant_on_the_web::{
     err::ValidationError,
     users::{
-        AddEmailRequest, AddPhoneNumberRequest, AddPhoneNumberResolution, AddPhoneNumberResponse,
+        AddEmailRequest, AddPhoneNumberRequest, AddPhoneNumberResponse, AddResolution,
         EmailRequest, GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
         VerificationAttemptRequest, VerificationSubmission,
     },
@@ -200,7 +200,7 @@ async fn users_phone_number_returns_200_if_already_added() {
 
         assert_eq!(res.status(), StatusCode::OK);
         let res: AddPhoneNumberResponse = res.json().await;
-        assert_eq!(res.resolution, AddPhoneNumberResolution::AlreadyAdded);
+        assert_eq!(res.resolution, AddResolution::AlreadyAdded);
     }
 }
 
@@ -211,6 +211,7 @@ async fn users_email_returns_4xx_if_not_authenticated() {
     {
         let req = AddEmailRequest {
             email: "email@domain.com".to_string(),
+            force_send: true,
         };
         let res = fixture
             .client
@@ -225,6 +226,7 @@ async fn users_email_returns_4xx_if_not_authenticated() {
     {
         let req = AddEmailRequest {
             email: "email@domain.com".to_string(),
+            force_send: true,
         };
         let res = fixture
             .client
@@ -244,6 +246,7 @@ async fn users_email_returns_400_if_invalid() {
 
     let req = AddEmailRequest {
         email: "not a valid email".to_string(),
+        force_send: true,
     };
     let res = fixture
         .client
@@ -268,6 +271,7 @@ async fn users_email_returns_409_if_already_taken() {
     {
         let req = AddEmailRequest {
             email: "nobody@typesofants.org".to_string(), // the 'nobody' user email
+            force_send: true,
         };
         let res = fixture
             .client
@@ -809,7 +813,7 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
                 let req = VerificationAttemptRequest {
                     method: VerificationSubmission::Phone {
                         phone_number: phone.clone(),
-                        otp: first_sms_otp(),
+                        otp: first_otp(),
                     },
                 };
 
@@ -1035,7 +1039,7 @@ async fn users_user_returns_200_if_authn_token_right() {
 
         assert_eq!(res.status(), StatusCode::OK);
         let res: GetUserResponse = res.json().await;
-        assert_eq!(res.user.emails.len(), 0);
+        assert_eq!(res.user.emails.len(), 1);
         assert_eq!(res.user.phone_numbers.len(), 1);
         assert_eq!(res.user.username, "user");
         assert_ne!(res.user.password_hash, "my-ant-password");

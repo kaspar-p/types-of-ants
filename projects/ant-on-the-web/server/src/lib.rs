@@ -20,7 +20,9 @@ mod routes;
 pub mod state;
 mod throttle;
 
+pub use crate::clients::email;
 pub use crate::clients::sms;
+
 pub use crate::routes::ants;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;

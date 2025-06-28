@@ -3,12 +3,13 @@ use axum::{extract::State, Router};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::clients::sms::SmsSender;
+use crate::clients::{email::EmailSender, sms::SmsSender};
 
 #[derive(Clone)]
 pub struct InnerApiState {
     pub dao: Arc<AntDataFarmClient>,
     pub sms: Arc<dyn SmsSender>,
+    pub email: Arc<dyn EmailSender>,
     pub rng: Arc<Mutex<rand::rngs::StdRng>>,
 }
 
