@@ -1,13 +1,14 @@
 "use client";
 
 import { useTimedText } from "@/components/useTimedText";
-import { addPhoneNumber, verificationAttempt } from "@/server/posts";
+import { addEmail, addPhoneNumber, verificationAttempt } from "@/server/posts";
 import { getUser, getUserSchema } from "@/server/queries";
 import { UserContext } from "@/state/userContext";
 import { useRouter } from "next/navigation";
 import { FormEvent, useContext, useState } from "react";
 
 export const TwoFactorVerificationBox = () => {
+  const [option, setOption] = useState<"email" | "phone">("email");
   const [key, setKey] = useState<string>("");
   const [keyValidationMsg, setKeyValidationMsg] = useTimedText("");
   const [keySuccessMsg, setKeySuccessMsg] = useTimedText("");
@@ -20,11 +21,20 @@ export const TwoFactorVerificationBox = () => {
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const res = await addPhoneNumber({ phoneNumber: key, forceSend: true });
+    const res =
+      option === "phone"
+        ? await addPhoneNumber({ phoneNumber: key, forceSend: true })
+        : await addEmail({ email: key, forceSend: true });
     switch (res.status) {
       case 500: {
         const msg = await res.text();
         setKeyValidationMsg(msg);
+        break;
+      }
+      case 401: {
+        setKeyValidationMsg(
+          `unverified ${option === "email" ? "email" : "phone number"}`
+        );
         break;
       }
       case 400: {
@@ -54,7 +64,10 @@ export const TwoFactorVerificationBox = () => {
     event.preventDefault();
 
     const res = await verificationAttempt({
-      method: { phone: { phoneNumber: key, otp: otp } },
+      method:
+        option === "phone"
+          ? { phone: { phoneNumber: key, otp } }
+          : { email: { email: key, otp } },
     });
 
     switch (res.status) {
@@ -90,9 +103,13 @@ export const TwoFactorVerificationBox = () => {
       </div>
       <form autoComplete="off" onSubmit={(event) => handleSend(event)}>
         <div className="grid grid-cols-3 gap-0">
-          <select name="method">
+          <select
+            name="method"
+            defaultValue={"email"}
+            onChange={(e) => setOption(e.target.value as "phone" | "email")}
+          >
+            <option>email</option>
             <option>phone</option>
-            {/* <option>email</option> */}
           </select>
 
           <input
@@ -100,7 +117,9 @@ export const TwoFactorVerificationBox = () => {
             type="text"
             name="key"
             autoComplete="off"
-            placeholder="+1 (000) 111-2222"
+            placeholder={
+              option === "email" ? "email@domain.com" : "+1 (000) 111-2222"
+            }
             value={key}
             onChange={(e) => {
               setKey(e.target.value);

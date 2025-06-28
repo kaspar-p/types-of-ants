@@ -15,6 +15,8 @@ export const LoginBox = () => {
 
   const { setUser } = useContext(UserContext);
 
+  const { push } = useRouter();
+
   const [formState, setFormState] = useState<
     { loading: false; success: boolean; msg: string } | { loading: true }
   >({ loading: false, success: false, msg: "" });
@@ -86,6 +88,9 @@ export const LoginBox = () => {
           msg: "login complete, welcome!",
         });
         setUser({ weakAuth: true, loggedIn: false });
+
+        push("/login/two-factor");
+
         return;
       }
     }

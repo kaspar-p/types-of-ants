@@ -965,9 +965,9 @@ async fn users_email_returns_200_and_sends_new_code() {
             format!(
                 "hello,
 
-your login or signin request generated a one-time code: {}
-if you did not generate this code, someone may be trying to
-access your account, please reset your password.
+a login or sign-in request generated a one-time code: {}
+
+if you did not generate this code, someone may be trying to access your account, please reset your password as soon as possible.
 
 with love,
     the typesofants.org team",

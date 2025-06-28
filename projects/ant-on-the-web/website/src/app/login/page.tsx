@@ -1,13 +1,20 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { SignupBox } from "./signup";
 import { LoginBox } from "./login";
-import { TwoFactorVerificationBox } from "./two-factor";
 import { UserContext } from "@/state/userContext";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const { user, setUser } = useContext(UserContext);
+  const { user } = useContext(UserContext);
+  const { push } = useRouter();
+
+  useEffect(() => {
+    if (user.weakAuth && user.loggedIn) {
+      push("/");
+    }
+  });
 
   return (
     <div className="h-full w-full flex flex-col md:flex-row justify-center">
@@ -15,22 +22,10 @@ export default function LoginPage() {
         <div className="m-4 w-full md:w-8/12 xl:w-3/12">
           <h2>login</h2>
           <LoginBox />
-          {user.weakAuth && (
-            <>
-              <h2>two-factor</h2>
-              <TwoFactorVerificationBox />
-            </>
-          )}
         </div>
         <div className="m-4 w-full md:w-8/12 xl:w-3/12">
           <h2>signup</h2>
           <SignupBox />
-          {user.weakAuth && (
-            <>
-              <h2>two-factor</h2>
-              <TwoFactorVerificationBox />
-            </>
-          )}
         </div>
       </>
     </div>

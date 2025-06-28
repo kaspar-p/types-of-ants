@@ -38,6 +38,13 @@ const posts = {
       forceSend: z.boolean(),
     }),
   },
+  addEmail: {
+    path: "/api/users/email",
+    inputDataSchema: z.object({
+      email: z.string(),
+      forceSend: z.boolean(),
+    }),
+  },
   verificationAttempt: {
     path: "/api/users/verification-attempt",
     inputDataSchema: z.object({
@@ -123,6 +130,9 @@ export const login = (inputData: z.infer<typeof posts.login.inputDataSchema>) =>
 export const addPhoneNumber = (
   inputData: z.infer<typeof posts.addPhoneNumber.inputDataSchema>
 ) => constructPost(posts.addPhoneNumber, inputData);
+export const addEmail = (
+  inputData: z.infer<typeof posts.addEmail.inputDataSchema>
+) => constructPost(posts.addEmail, inputData);
 export const verificationAttempt = (
   inputData: z.infer<typeof posts.verificationAttempt.inputDataSchema>
 ) => constructPost(posts.verificationAttempt, inputData);

@@ -1,5 +1,6 @@
 import { signup } from "@/server/posts";
 import { UserContext } from "@/state/userContext";
+import { useRouter } from "next/navigation";
 import { useContext, useState } from "react";
 
 export function SignupBox() {
@@ -15,6 +16,8 @@ export function SignupBox() {
   const [passwordValidationMsg, setPasswordValidationMsg] = useState("");
 
   const { user, setUser } = useContext(UserContext);
+
+  const { push } = useRouter();
 
   async function handle(e: any) {
     e.preventDefault();
@@ -84,6 +87,8 @@ export function SignupBox() {
         });
 
         setUser({ weakAuth: true, loggedIn: false });
+
+        push("/login/two-factor");
         break;
       }
     }
