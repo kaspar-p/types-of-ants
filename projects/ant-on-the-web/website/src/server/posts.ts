@@ -13,6 +13,7 @@ const posts = {
     inputDataSchema: z.object({
       username: z.string(),
       password: z.string(),
+      password2: z.string(),
     }),
   },
   login: {

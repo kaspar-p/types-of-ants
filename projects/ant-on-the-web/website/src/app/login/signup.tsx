@@ -11,6 +11,7 @@ export function SignupBox() {
   const [usernameValidationMsg, setUsernameValidationMsg] = useState("");
 
   const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
   const [passwordValidationMsg, setPasswordValidationMsg] = useState("");
 
   const { user, setUser } = useContext(UserContext);
@@ -19,10 +20,7 @@ export function SignupBox() {
     e.preventDefault();
 
     setFormState({ loading: true });
-    const response = await signup({
-      username: username,
-      password: password,
-    });
+    const response = await signup({ username, password, password2 });
 
     switch (response.status) {
       default:
@@ -130,6 +128,26 @@ export function SignupBox() {
             className={`flex flex-col justify-center m-1 text-red-600 content-center`}
           >
             {passwordValidationMsg}
+          </span>
+
+          <span className="flex flex-col justify-center">
+            repeat password:{" "}
+          </span>
+          <input
+            className="m-1"
+            type="password"
+            autoComplete="off"
+            name="password2"
+            value={password2}
+            onChange={(e) => {
+              setPassword2(e.target.value);
+              setPasswordValidationMsg("");
+            }}
+          />
+          <span
+            className={`flex flex-col justify-center m-1 text-red-600 content-center`}
+          >
+            {" "}
           </span>
         </div>
 
