@@ -25,7 +25,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use super::lib::{
-    auth::{authenticate, cookie_defaults, optional_authenticate, weakly_authenticate, AuthClaims},
+    auth::{
+        authenticate, authenticate_or_weak_matching_method, cookie_defaults, optional_authenticate,
+        weakly_authenticate, AuthClaims,
+    },
     err::AntOnTheWebError,
     jwt::{decode_jwt, encode_jwt},
 };
@@ -262,6 +265,17 @@ async fn two_factor_verification_attempt(
         }
     };
 
+    let method = match &req.method {
+        VerificationSubmission::Email { .. } => {
+            two_factor::VerificationMethod::Email(canonical.clone())
+        }
+        VerificationSubmission::Phone { .. } => {
+            two_factor::VerificationMethod::Phone(canonical.clone())
+        }
+    };
+
+    let user = authenticate_or_weak_matching_method(&auth, &dao, &method, user).await?;
+
     let verification = match &req.method {
         VerificationSubmission::Phone { otp, .. } => {
             two_factor::receive_phone_verification_code(&dao, &canonical, &otp).await?
@@ -350,26 +364,31 @@ async fn add_phone_number(
     let user = weakly_authenticate(&auth, &dao).await?;
 
     info!("User adding phone number");
-    let validations = {
-        let mut validations: Vec<ValidationMessage> = vec![];
+    let canonical_phone_number = {
+        let validations = {
+            let mut validations: Vec<ValidationMessage> = vec![];
 
-        let canonical_phone_number = match canonicalize_phone_number(req.phone_number.as_str()) {
-            Ok(phone) => Ok(phone),
-            Err(e) => {
-                info!("phone number {} was invalid: {}", req.phone_number, e);
-                validations.push(ValidationMessage::invalid("phoneNumber"));
-                Err(())
+            let canonical_phone_number = match canonicalize_phone_number(req.phone_number.as_str())
+            {
+                Ok(phone) => Ok(phone),
+                Err(e) => {
+                    info!("phone number {} was invalid: {}", req.phone_number, e);
+                    validations.push(ValidationMessage::invalid("phoneNumber"));
+                    Err(())
+                }
+            };
+
+            match validations.as_slice() {
+                &[] => Ok(canonical_phone_number.unwrap()),
+                _ => Err(validations),
             }
         };
 
-        match validations.as_slice() {
-            &[] => Ok(canonical_phone_number.unwrap()),
-            _ => Err(validations),
-        }
+        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?
     };
 
-    let canonical_phone_number =
-        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
+    let method = two_factor::VerificationMethod::Phone(canonical_phone_number.clone());
+    let user = authenticate_or_weak_matching_method(&auth, &dao, &method, user).await?;
 
     let already_added = {
         let by_phone_number = dao
@@ -449,26 +468,30 @@ async fn add_email(
 
     info!("User adding email");
 
-    let validations = {
-        let mut validations: Vec<ValidationMessage> = vec![];
+    let canonical_email = {
+        let validations = {
+            let mut validations: Vec<ValidationMessage> = vec![];
 
-        let canonical_email = match canonicalize_email(&req.email) {
-            Ok(phone) => Ok(phone),
-            Err(e) => {
-                info!("email {} was invalid: {}", req.email, e);
-                validations.push(ValidationMessage::invalid("email"));
-                Err(())
+            let canonical_email = match canonicalize_email(&req.email) {
+                Ok(phone) => Ok(phone),
+                Err(e) => {
+                    info!("email {} was invalid: {}", req.email, e);
+                    validations.push(ValidationMessage::invalid("email"));
+                    Err(())
+                }
+            };
+
+            match validations.as_slice() {
+                &[] => Ok(canonical_email.unwrap()),
+                _ => Err(validations),
             }
         };
 
-        match validations.as_slice() {
-            &[] => Ok(canonical_email.unwrap()),
-            _ => Err(validations),
-        }
+        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?
     };
 
-    let canonical_email =
-        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
+    let method = two_factor::VerificationMethod::Email(canonical_email.clone());
+    let user = authenticate_or_weak_matching_method(&auth, &dao, &method, user).await?;
 
     {
         let by_email = dao

@@ -20,7 +20,7 @@ pub struct VerificationStatus {
     pub verified: Vec<VerificationMethod>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VerificationMethod {
     #[serde(rename = "email")]
     Email(String),

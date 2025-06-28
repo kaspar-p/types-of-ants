@@ -22,7 +22,10 @@ use cookie::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-use super::{jwt, two_factor};
+use super::{
+    jwt,
+    two_factor::{self, VerificationMethod},
+};
 
 /// The cookie is a secret artifact that (if correct), proves the user is who they say they are.
 const AUTH_COOKIE_NAME: &str = "typesofants_auth";
@@ -204,6 +207,8 @@ where
 /// their two-factor verification. This should be used for routes required to start/finish the
 /// two-factor verification flows.
 ///
+/// The `method` is used to ensure that the weak authentication is only valid for
+///
 /// Unless this is a route that deals with auth, you should use [`authenticate`].
 pub async fn weakly_authenticate(
     auth: &AuthClaims,
@@ -217,23 +222,47 @@ pub async fn weakly_authenticate(
 
     match user {
         None => Err(AuthError::AccessDenied(Some(auth.sub.to_string()))),
-        Some(user) => {
-            let verifications = two_factor::user_is_two_factor_verified(&dao, &user).await?;
-            if verifications.verified.is_empty() {
-                info!(
-                    "Allowing WEAK authentication for user {}:{} with verifications {:?}",
-                    user.user_id, user.username, verifications
-                );
-                return Ok(user);
-            } else {
-                info!(
-                    "Routing to STRONG authentication for user {}:{} with verifications {:?}",
-                    user.user_id, user.username, verifications
-                );
-                return upgrade_weak_auth(&auth, user);
-            }
-        }
+        Some(user) => Ok(user),
     }
+}
+
+/// Routes like POST /users/phone-number should either allow strongly auth'd users (for adding new phone numbers)
+/// in all circumstances, or should allow weakly auth'd users if they are using a phone number/email that is
+/// already registered under that user, or if they have no phone numbers/emails at all.
+pub async fn authenticate_or_weak_matching_method(
+    auth: &AuthClaims,
+    dao: &AntDataFarmClient,
+    attempt: &VerificationMethod,
+    user: User,
+) -> Result<User, AuthError> {
+    // All strong auth is also weak auth, let them in.
+    if !auth.needs_2fa {
+        info!("Allow STRONG auth user '{}'.", user.username);
+        return Ok(user);
+    }
+
+    let verifications = two_factor::user_is_two_factor_verified(&dao, &user).await?;
+    if verifications.verified.is_empty() {
+        info!("Allow WEAK auth for '{}', no verifications.", user.username);
+        return Ok(user);
+    }
+
+    // Allow the user in because they have weak auth and they are doing 2fa with a registered attempt
+    if verifications.verified.contains(&attempt) {
+        info!(
+            "Allow WEAK authentication user {}:{} with verifications {:?} because attempt {:?} matches",
+            user.user_id, user.username, verifications, attempt
+        );
+        return Ok(user);
+    }
+
+    info!(
+        "Rejecting user {}:{} with verifications {:?} and attempt {:?}",
+        user.user_id, user.username, verifications, attempt
+    );
+    return Err(AuthError::AccessDenied(Some(
+        "rejecting user for bad weak matching attempt".to_string(),
+    )));
 }
 
 fn upgrade_weak_auth(auth: &AuthClaims, user: User) -> Result<User, AuthError> {

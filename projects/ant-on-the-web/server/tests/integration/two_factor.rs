@@ -317,10 +317,13 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
 /// ensuring that the /phone-number endpoint that allow users to
 /// associate new phone numbers only accepts weak auth if the user has never
 /// associated a phone number, effectively they are not done signing up.
+/// It should return a 400 if the user doing /phone-number is attempting
+/// with a number they don't already have associated.
 /// TODO: same for /email when it exists.
 #[tokio::test]
 #[traced_test]
-async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_verified() {
+async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_verified_with_different_number(
+) {
     // The user has completed signup with 2fa
     let (fixture, _) = test_router_auth().await;
 
@@ -350,7 +353,27 @@ async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_v
         cookie
     };
 
+    // existing phone number works
     let phone = "+1 (111) 222-3333".to_string();
+    {
+        let req = AddPhoneNumberRequest {
+            phone_number: phone.clone(),
+            force_send: true,
+        };
+
+        let res = fixture
+            .client
+            .post("/api/users/phone-number")
+            .header("Cookie", &weak_auth_cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // new phone number does not work
+    let phone = "+1 (999) 888-7777".to_string();
     {
         let req = AddPhoneNumberRequest {
             phone_number: phone.clone(),
@@ -406,11 +429,11 @@ async fn users_verification_attempt_returns_401_if_weak_auth_when_user_has_alrea
         cookie
     };
 
-    // requires strong auth now
+    // unknown number returns 400
     {
         let req = VerificationAttemptRequest {
             method: VerificationSubmission::Phone {
-                phone_number: "+1 (111) 222-3333".to_string(),
+                phone_number: "+1 (999) 888-7777".to_string(),
                 otp: "some-msg".to_string(),
             },
         };
@@ -424,6 +447,46 @@ async fn users_verification_attempt_returns_401_if_weak_auth_when_user_has_alrea
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    // existing (correct) number returns 200
+    {
+        let phone = "+1 (111) 222-3333".to_string();
+        {
+            let req = AddPhoneNumberRequest {
+                phone_number: phone.clone(),
+                force_send: true,
+            };
+
+            let res = fixture
+                .client
+                .post("/api/users/phone-number")
+                .header("Cookie", &weak_auth_cookie)
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+
+        {
+            let req = VerificationAttemptRequest {
+                method: VerificationSubmission::Phone {
+                    phone_number: phone.clone(),
+                    otp: second_sms_otp(),
+                },
+            };
+
+            let res = fixture
+                .client
+                .post("/api/users/verification-attempt")
+                .header("Cookie", &weak_auth_cookie)
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+        }
     }
 }
 
