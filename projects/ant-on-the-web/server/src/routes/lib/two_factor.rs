@@ -5,7 +5,7 @@ use crate::{
 
 use super::err::AntOnTheWebError;
 use ant_data_farm::{
-    users::{make_password_hash, UserId},
+    users::{make_password_hash, User, UserId},
     verifications::VerificationResult,
     AntDataFarmClient,
 };
@@ -28,39 +28,42 @@ pub enum VerificationMethod {
     Phone(String),
 }
 
-// pub async fn user_is_two_factor_verified(
-//     dao: &AntDataFarmClient,
-//     user: &User,
-// ) -> Result<VerificationStatus, anyhow::Error> {
-//     let verifications = dao.verifications.read().await;
+pub async fn user_is_two_factor_verified(
+    dao: &AntDataFarmClient,
+    user: &User,
+) -> Result<VerificationStatus, anyhow::Error> {
+    let verifications = dao.verifications.read().await;
 
-//     let mut verified: Vec<VerificationMethod> = vec![];
-//     let mut not_verified: Vec<VerificationMethod> = vec![];
-//     if !verifications
-//         .is_phone_number_verified(&user.user_id, &user.phone_number)
-//         .await?
-//     {
-//         not_verified.push(VerificationMethod::Phone(user.phone_number.clone()));
-//     } else {
-//         verified.push(VerificationMethod::Phone(user.phone_number.clone()));
-//     }
+    let mut verified: Vec<VerificationMethod> = vec![];
+    let mut not_verified: Vec<VerificationMethod> = vec![];
 
-//     for email in &user.emails {
-//         if !verifications
-//             .is_email_verified(&user.user_id, &email)
-//             .await?
-//         {
-//             not_verified.push(VerificationMethod::Email(email.clone()));
-//         } else {
-//             verified.push(VerificationMethod::Email(email.clone()));
-//         }
-//     }
+    for phone_number in &user.phone_numbers {
+        if !verifications
+            .is_phone_number_verified(&user.user_id, &phone_number)
+            .await?
+        {
+            not_verified.push(VerificationMethod::Phone(phone_number.clone()));
+        } else {
+            verified.push(VerificationMethod::Phone(phone_number.clone()));
+        }
+    }
 
-//     return Ok(VerificationStatus {
-//         verified,
-//         not_verified,
-//     });
-// }
+    for email in &user.emails {
+        if !verifications
+            .is_email_verified(&user.user_id, &email)
+            .await?
+        {
+            not_verified.push(VerificationMethod::Email(email.clone()));
+        } else {
+            verified.push(VerificationMethod::Email(email.clone()));
+        }
+    }
+
+    return Ok(VerificationStatus {
+        verified,
+        not_verified,
+    });
+}
 
 /// Send a verification message to the user's phone number.
 /// Assumes that there are no previous verification requests out, it is invalid to have more than 1 at a time.

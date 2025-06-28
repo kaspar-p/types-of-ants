@@ -345,7 +345,8 @@ async fn add_phone_number(
     Json(req): Json<AddPhoneNumberRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
-    // to add a phone number to get it validated.
+    // to add a phone number to get it validated. However, we only allow the user to be weakly
+    // authenticated if they don't have any phone numbers or emails associated.
     let user = weakly_authenticate(&auth, &dao).await?;
 
     info!("User adding phone number");

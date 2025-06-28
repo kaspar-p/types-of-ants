@@ -22,7 +22,7 @@ use cookie::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-use super::jwt;
+use super::{jwt, two_factor};
 
 /// The cookie is a secret artifact that (if correct), proves the user is who they say they are.
 const AUTH_COOKIE_NAME: &str = "typesofants_auth";
@@ -209,23 +209,34 @@ pub async fn weakly_authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
-    let users = dao.users.read().await;
-    let user = users.get_one_by_id(&auth.sub).await?;
+    let user = {
+        let users = dao.users.read().await;
+        let user = users.get_one_by_id(&auth.sub).await?;
+        user
+    };
+
     match user {
         None => Err(AuthError::AccessDenied(Some(auth.sub.to_string()))),
-        Some(u) => Ok(u),
+        Some(user) => {
+            let verifications = two_factor::user_is_two_factor_verified(&dao, &user).await?;
+            if verifications.verified.is_empty() {
+                info!(
+                    "Allowing WEAK authentication for user {}:{} with verifications {:?}",
+                    user.user_id, user.username, verifications
+                );
+                return Ok(user);
+            } else {
+                info!(
+                    "Routing to STRONG authentication for user {}:{} with verifications {:?}",
+                    user.user_id, user.username, verifications
+                );
+                return upgrade_weak_auth(&auth, user);
+            }
+        }
     }
 }
 
-/// Require that the claims included in the request are valid. Use this for all authenticated routes.
-/// Returns an AuthError if something went wrong, either a DB error or access denial.
-/// This authentication state is the final one for the user, and requires they are 2FA verified.
-pub async fn authenticate(
-    auth: &AuthClaims,
-    dao: &Arc<AntDataFarmClient>,
-) -> Result<User, AuthError> {
-    let user = weakly_authenticate(&auth, &dao).await?;
-
+fn upgrade_weak_auth(auth: &AuthClaims, user: User) -> Result<User, AuthError> {
     // We let the user in only if they don't need 2fa. This comes from AuthClaims and is signed
     // by the server's key, so we can trust that the server wrote this during /login, but it
     // never got replaced during /verification
@@ -236,6 +247,16 @@ pub async fn authenticate(
     } else {
         return Ok(user);
     }
+}
+
+/// Require that the claims included in the request are valid. Use this for all authenticated routes.
+/// Returns an AuthError if something went wrong, either a DB error or access denial.
+/// This authentication state is the final one for the user, and requires they are 2FA verified.
+pub async fn authenticate(
+    auth: &AuthClaims,
+    dao: &Arc<AntDataFarmClient>,
+) -> Result<User, AuthError> {
+    return upgrade_weak_auth(&auth, weakly_authenticate(&auth, &dao).await?);
 }
 
 /// If the auth claims are present, return the user that is authenticated. If not, returns the
