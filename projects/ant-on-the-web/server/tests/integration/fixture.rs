@@ -176,6 +176,7 @@ pub async fn test_router_weak_auth(seed: Option<[u8; 32]>) -> (TestFixture, Stri
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client

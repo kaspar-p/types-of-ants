@@ -243,6 +243,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -505,6 +506,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client

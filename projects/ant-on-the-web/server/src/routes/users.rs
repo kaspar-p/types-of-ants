@@ -712,6 +712,7 @@ fn validate_password(password: &str) -> Vec<ValidationMessage> {
 pub struct SignupRequest {
     pub username: String,
     pub password: String,
+    pub password2: String,
 }
 
 async fn signup_request(
@@ -740,12 +741,8 @@ async fn signup_request(
             ));
         }
 
-        let password_len = signup_request.password.len();
-        if password_len < 8 || password_len > 64 {
-            validations.push(ValidationMessage::new(
-                "password",
-                "Field must be between 8 and 64 characters.",
-            ));
+        if signup_request.password != signup_request.password2 {
+            validations.push(ValidationMessage::new("password", "Passwords must match."));
         }
 
         validations.append(&mut validate_password(&signup_request.password));
@@ -762,18 +759,11 @@ async fn signup_request(
         info!("Checking if user already exists...");
         let read_users = dao.users.read().await;
 
-        // let by_email = read_users
-        //     .get_one_by_email(&canonical_email)
-        //     .await?
-        //     .is_some();
         let by_username = read_users
             .get_one_by_user_name(&signup_request.username)
             .await?
             .is_some();
-        // let by_phone = read_users
-        //     .get_one_by_phone_number(&canonical_phone_number)
-        //     .await?
-        //     .is_some();
+
         if by_username {
             return Err(AntOnTheWebError::ConflictError("User already exists."));
         }
@@ -786,8 +776,6 @@ async fn signup_request(
         let user = write_users
             .create_user(
                 signup_request.username,
-                // canonical_phone_number,
-                // canonical_email,
                 signup_request.password,
                 "user".to_string(),
             )

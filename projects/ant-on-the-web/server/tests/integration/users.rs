@@ -37,6 +37,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         let req = SignupRequest {
             username: "".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -56,6 +57,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         let req = SignupRequest {
             username: "reallylongusernamethatbreaksthevalidationcode".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -75,6 +77,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         let req = SignupRequest {
             username: "-_*090][]".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -287,6 +290,7 @@ async fn users_signup_returns_400_with_multiple_errors() {
         let req = SignupRequest {
             username: "BAD__CHARACTERS__ERROR__AND__TOO_LONG".to_string(),
             password: "my-password".to_string(),
+            password2: "my-password".to_string(),
         };
         let res = fixture
             .client
@@ -336,6 +340,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-password".to_string(),
+            password2: "my-password".to_string(),
         };
         let res = fixture
             .client
@@ -356,6 +361,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "1234567".to_string(),
+            password2: "1234567".to_string(),
         };
         let res = fixture
             .client
@@ -375,6 +381,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "four".repeat(100).to_string(),
+            password2: "four".repeat(100).to_string(),
         };
         let res = fixture
             .client
@@ -389,6 +396,26 @@ async fn users_signup_returns_400_if_password_invalid() {
         assert_eq!(err.field, "password");
         assert_eq!(err.msg, "Field must be between 8 and 64 characters.");
     }
+
+    {
+        let req = SignupRequest {
+            username: "user".to_string(),
+            password: "ant-something".to_string(),
+            password2: "ant-different".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/signup")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        let j: ValidationError = res.json().await;
+        let err = j.errors.first().unwrap();
+        assert_eq!(err.field, "password");
+        assert_eq!(err.msg, "Passwords must match.");
+    }
 }
 
 #[tokio::test]
@@ -400,6 +427,7 @@ async fn users_signup_returns_409_if_user_already_exists() {
         let req = SignupRequest {
             username: "nobody".to_string(), // existing username
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -422,6 +450,7 @@ async fn users_signup_succeeds() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -450,6 +479,7 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -466,6 +496,7 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -595,6 +626,7 @@ async fn users_login_returns_401_if_wrong_fields() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -671,6 +703,7 @@ async fn users_login_returns_200_with_cookie_headers() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
@@ -727,6 +760,7 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
             let req = SignupRequest {
                 username: user.clone(),
                 password: pw.clone(),
+                password2: pw.clone(),
             };
             let res = fixture
                 .client
@@ -864,6 +898,7 @@ async fn users_login_returns_200_if_user_never_verified_2fa() {
         let req = SignupRequest {
             username: "user".to_string(),
             password: "my-ant-password".to_string(),
+            password2: "my-ant-password".to_string(),
         };
         let res = fixture
             .client
