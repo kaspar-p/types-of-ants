@@ -4,7 +4,11 @@ use crate::{
 };
 
 use super::err::AntOnTheWebError;
-use ant_data_farm::{users::UserId, verifications::VerificationResult, AntDataFarmClient};
+use ant_data_farm::{
+    users::{make_password_hash, UserId},
+    verifications::VerificationResult,
+    AntDataFarmClient,
+};
 use chrono::Duration;
 use rand::{distr::SampleString, rngs::StdRng};
 use serde::{Deserialize, Serialize};
@@ -69,15 +73,16 @@ async fn send_phone_verification_code(
 ) -> Result<(), AntOnTheWebError> {
     let mut write_verifications = dao.verifications.write().await;
     let dist = rand::distr::Alphanumeric;
+
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
+    let otp_hash = make_password_hash(&otp)?;
 
     info!("Starting phone number verification for {}", &user_id);
     let verification = write_verifications
-        .start_phone_number_verification(&user_id, &phone_number, Duration::minutes(5), &otp)
+        .start_phone_number_verification(&user_id, &phone_number, Duration::minutes(5), &otp_hash)
         .await?;
 
-    info!("Sending one-time password: {otp}");
-
+    info!("Sending one-time password. Omitting logging it.");
     let content = format!("[typesofants.org] your one-time code is: {otp}");
 
     let send_id = sms

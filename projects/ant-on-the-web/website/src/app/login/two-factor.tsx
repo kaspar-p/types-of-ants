@@ -100,7 +100,7 @@ export const TwoFactorVerificationBox = () => {
             type="text"
             name="key"
             autoComplete="off"
-            placeholder=""
+            placeholder="+1 (000) 111-2222"
             value={key}
             onChange={(e) => {
               setKey(e.target.value);

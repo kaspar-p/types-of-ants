@@ -1,5 +1,5 @@
 pub use super::lib::Id as UserId;
-use crate::dao::db::Database;
+use crate::{dao::db::Database, users::verify_password_hash};
 use chrono::Duration;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -223,9 +223,9 @@ impl VerificationsDao {
         let otp: String = row.get("one_time_code");
         let verification_id: Uuid = row.get("verification_id");
 
-        info!("comparing attempt {attempt} to {otp} for {verification_id}");
+        info!("comparing attempt to {otp} for {verification_id}");
 
-        if otp == attempt {
+        if verify_password_hash(&attempt, &otp)? {
             info!("otp attempt succeeded, marking {verification_id} as verified");
             let row = t
                 .query_one(

@@ -145,7 +145,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
     }
 }
 
-fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
+pub fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
 
