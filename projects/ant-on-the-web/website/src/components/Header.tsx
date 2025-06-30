@@ -1,6 +1,6 @@
 "use client";
 
-import { getLatestRelease, getTotalAnts } from "@/server/queries";
+import { getTotalAnts, getVersion } from "@/server/queries";
 import { useQuery } from "@tanstack/react-query";
 import React, { useContext } from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
@@ -19,9 +19,9 @@ export function Header() {
     queryFn: () => getTotalAnts(),
   });
 
-  const latestReleaseResult = useQuery({
-    queryKey: ["releaseNumber"],
-    queryFn: getLatestRelease,
+  const version = useQuery({
+    queryKey: ["version"],
+    queryFn: getVersion,
   });
 
   const handleLogout = async () => {
@@ -30,19 +30,14 @@ export function Header() {
   };
 
   return (
-    <ErrorBoundary
-      isError={totalAntsResult.isError || latestReleaseResult.isError}
-    >
+    <ErrorBoundary isError={totalAntsResult.isError || version.isError}>
       <LoadingBoundary
-        isLoading={totalAntsResult.isLoading || latestReleaseResult.isLoading}
+        isLoading={totalAntsResult.isLoading || version.isLoading}
       >
         <div className="p-5" style={{ fontFamily: "serif" }}>
           <div className="flex flex-row align-center justify-center">
             <h1 className="mb-0 pb-5">
-              types of ants{" "}
-              <span className="text-sm">
-                v{latestReleaseResult.data?.release.releaseNumber}
-              </span>
+              types of ants <span className="text-sm">v1.{version.data}</span>
             </h1>
           </div>
           <h3 className="text-center m-0">

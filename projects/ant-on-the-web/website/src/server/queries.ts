@@ -11,6 +11,13 @@ export type Ant = z.infer<typeof antSchema>;
 export type Ants = Ant[];
 
 const queries = {
+  getVersion: {
+    name: "getVersion",
+    path: "/api/version",
+    schema: z.string(),
+    transformer: (d: string): string => d,
+    isJson: false,
+  },
   getLatestRelease: {
     name: "getLatestRelease",
     path: "/api/ants/latest-release",
@@ -148,11 +155,20 @@ async function constructQuery<Q extends Query>(
     }
   }
 
-  const data = await (await fetch(endpoint, getFetchOptions())).json();
+  const res = await fetch(endpoint, getFetchOptions());
+
+  let data: any;
+  if ("isJson" in query && !query.isJson) {
+    data = await res.text();
+  } else {
+    data = await res.json();
+  }
+
   const transformedData = query.transformer(data);
   return transformedData as any as QueryRet<Q>;
 }
 
+export const getVersion = () => constructQuery(queries.getVersion);
 export const getLatestAnts = () => constructQuery(queries.getLatestAnts);
 export const getTotalAnts = () => constructQuery(queries.getTotalAnts);
 export const getReleasedAnts = (page: number) =>
