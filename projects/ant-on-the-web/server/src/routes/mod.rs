@@ -6,3 +6,4 @@ pub mod metrics;
 pub mod msg;
 pub mod tests;
 pub mod users;
+pub mod version;

@@ -2,7 +2,7 @@ use axum::{response::IntoResponse, routing::get, Router};
 use axum_extra::routing::RouterExt;
 use http::{header, Response, StatusCode};
 use hyper::http::Method;
-use routes::lib::err::AntOnTheWebError;
+use routes::{lib::err::AntOnTheWebError, version};
 use std::sync::Arc;
 use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
@@ -85,6 +85,7 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
         .allow_headers([header::CONTENT_TYPE]);
 
     let api_routes = Router::new()
+        .merge(version::router())
         .nest("/ants", ants::router())
         // .nest("/msg", routes::msg::router())
         .nest("/users", users::router())
@@ -102,12 +103,13 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
         // ))
         .fallback(|| async {
             ant_library::api_fallback(&[
-                "/ants",
-                "/users",
-                "/hosts",
-                "/tests",
-                "/metrics",
-                "/deployments",
+                "GET /version",
+                "nested: /ants",
+                "nested: /users",
+                "nested: /hosts",
+                "nested: /tests",
+                "nested: /metrics",
+                "nested: /deployments",
             ])
         });
 
