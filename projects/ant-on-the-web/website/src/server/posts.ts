@@ -101,10 +101,12 @@ async function constructPost<Q extends Query>(
   inputData: z.infer<Q["inputDataSchema"]>
 ): Promise<Response> {
   const { path, inputDataSchema } = query;
-  console.log("POST: ", query.path);
 
   const input = inputDataSchema.parse(inputData);
   const endpoint = getEndpoint(path);
+
+  console.log("POST: ", endpoint.toString());
+
   return await fetch(endpoint, {
     method: "POST",
     headers: {

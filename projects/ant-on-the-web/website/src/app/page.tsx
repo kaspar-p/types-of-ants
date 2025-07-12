@@ -1,26 +1,34 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AntBanner } from "../components/AntBanner";
 import { escapeAnt } from "../utils/utils";
 import { getReleasedAnts } from "../server/queries";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { SuggestionBox } from "../components/SuggestionBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { TUserContext, UserContext } from "../state/userContext";
 
 export default function Home() {
-  const [page, setPage] = useState(0);
   const [user, setUser] = useState<TUserContext>({ weakAuth: false });
 
   const {
     isLoading,
     isError,
     data: releasedAnts,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
     queryKey: ["releasedAnts"],
-    queryFn: () => getReleasedAnts(page),
+    queryFn: (ctx) => getReleasedAnts(ctx.pageParam ?? 0),
+    getNextPageParam: (receivedPage, allPages) =>
+      receivedPage.hasNextPage ? allPages.length : undefined,
+    keepPreviousData: true,
+  });
+
+  useEffect(() => {
+    if (hasNextPage) fetchNextPage();
   });
 
   return (
@@ -41,9 +49,11 @@ export default function Home() {
           </div>
           <AntBanner />
           <div id="ant-filler">
-            {releasedAnts?.ants.map((ant, i) => (
-              <div key={i}>{escapeAnt(ant)}</div>
-            ))}
+            {releasedAnts?.pages.map((page, pageNum) =>
+              page.ants.map((ant, i) => (
+                <div key={pageNum * 1000 + i}>{escapeAnt(ant)}</div>
+              ))
+            )}
           </div>
         </UserContext.Provider>
       </LoadingBoundary>

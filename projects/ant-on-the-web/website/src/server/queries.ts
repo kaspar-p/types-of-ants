@@ -85,9 +85,14 @@ const queries = {
     queryParams: ["page"],
     schema: z.object({
       ants: z.array(antSchema),
+      hasNextPage: z.boolean(),
     }),
-    transformer: (data: { ants: Ants }): { ants: string[] } => ({
+    transformer: (data: {
+      ants: Ants;
+      hasNextPage: boolean;
+    }): { ants: string[]; hasNextPage: boolean } => ({
       ants: data.ants.map((ant) => ant.antName),
+      hasNextPage: data.hasNextPage,
     }),
   },
   getUser: {
@@ -144,7 +149,6 @@ async function constructQuery<Q extends Query>(
   query: Q,
   inputData?: QueryParams<Q>
 ): Promise<ReturnType<Q["transformer"]>> {
-  console.log("GET: ", query.path);
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
@@ -154,6 +158,8 @@ async function constructQuery<Q extends Query>(
       );
     }
   }
+
+  console.log("GET: ", endpoint.toString());
 
   const res = await fetch(endpoint, getFetchOptions());
 
@@ -181,7 +187,6 @@ async function constructQuery2<Q extends Query>(
   query: Q,
   inputData?: QueryParams<Q>
 ): Promise<Response> {
-  console.log("GET: ", query.path);
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
@@ -191,6 +196,8 @@ async function constructQuery2<Q extends Query>(
       );
     }
   }
+
+  console.log("GET: ", endpoint.toString());
   const response = await fetch(endpoint, getFetchOptions());
 
   return response;
