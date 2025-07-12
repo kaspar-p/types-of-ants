@@ -37,7 +37,8 @@ export function Header() {
         <div className="p-5" style={{ fontFamily: "serif" }}>
           <div className="flex flex-row align-center justify-center">
             <h1 className="mb-0 pb-5">
-              types of ants <span className="text-sm">v1.{version.data}</span>
+              types of ants{" "}
+              <span className="text-xs font-mono">v1.{version.data}</span>
             </h1>
           </div>
           <h3 className="text-center m-0">

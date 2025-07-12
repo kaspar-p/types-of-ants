@@ -44,7 +44,6 @@ export function AntBanner() {
             borderRadius: "6px",
             padding: "12px",
           }}
-          onClick={() => setScroll((s) => !s)}
           onMouseEnter={() => setScroll(false)}
           onMouseLeave={() => setScroll(true)}
         >
