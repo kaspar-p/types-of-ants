@@ -32,8 +32,8 @@ http {
             proxy_pass http://fleet;
         }
 
-        ssl_certificate     /ant-on-the-web/{{FQDN}}/cert.pem;
-        ssl_certificate_key /ant-on-the-web/{{FQDN}}/key.pem;
+        ssl_certificate     /run/secrets/tls_public_key;
+        ssl_certificate_key /run/secrets/tls_private_key;
         
         # SSL configuration
         ssl_session_cache shared:le_nginx_SSL:10m;

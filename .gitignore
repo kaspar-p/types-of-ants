@@ -23,8 +23,10 @@ gradlew.bat
 
 # secrets
 *.env*
-secrets/*
-!secrets/.gitkeep
+*.secret
+*.pem
+*.key
+!secrets/*/build.env
 
 # Added by cargo
 target

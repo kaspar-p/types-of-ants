@@ -11,18 +11,22 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 set -euo pipefail
 
 function usage() {
-  log "USAGE: $0 <project-name>"
+  log "USAGE: $0 <project-name> <deploy-environment>
+          project-name: 'ant-gateway', 'ant-data-farm', ...
+          deploy-environment: 'beta', 'prod', 'dev'          
+"
   exit 1
 }
 
 set +u
 project="$1"
+deploy_env="$2"
 if [[ "$DEBUG" != "" ]]; then
  set -x
 fi
 set -u
 
-if [[ -z "$project" ]]; then
+if [[ -z "$1" ]] || [[ -z "$2" ]]; then
   usage
 fi
 
@@ -35,20 +39,32 @@ commit_number="$(git rev-list --count HEAD)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
 install_version="$commit_datetime-$commit_sha-v$commit_number"
 
+log "RESOLVING ENVIRONMENT [$project]..."
+
+# Expose the environment ('beta', 'prod', ...) for other commands to pick up.
+build_env="${repository_root}/secrets/${deploy_env}/build.env"
+# shellcheck disable=SC1090
+source "$build_env"
+
 log "BUILDING [$project]..."
 
 # Build the project
-run_command docker-compose build "$project"
+run_command docker-compose config "${project}"
+run_command docker-compose build "${project}"
 
 log "INSTALLING [$project]..."
 
 install_dir="$HOME/service/$project/$install_version"
 run_command mkdir -p "$install_dir"
 
-# Copy secrets into the install dir dir
+# Copy secrets into the install dir
 secrets_dir="$repository_root"
-run_command cp "$secrets_dir/.env" "$install_dir"
-echo "GIT_COMMIT_NUMBER=${commit_number}" >> "${install_dir}/.env"
+rm -f "${install_dir}/.env"
+{
+  cat "${build_env}"
+  cat "${secrets_dir}/.env"
+  echo "GIT_COMMIT_NUMBER=${commit_number}"
+} >> "${install_dir}/.env"
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"

@@ -4,7 +4,7 @@ use axum_extra::routing::RouterExt;
 use crate::state::ApiRouter;
 
 async fn current_version() -> impl IntoResponse {
-    dotenv::var("GIT_COMMIT_NUMBER").expect("No GIT_COMMIT_NUMBER environment variable found.")
+    ant_library::manifest_file::read_local_manifest_file().commit_number
 }
 
 pub fn router() -> ApiRouter {

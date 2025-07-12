@@ -11,18 +11,22 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 set -euo pipefail
 
 function usage() {
-  log "USAGE: $0 <project-name>"
+  log "USAGE: $0 <project-name> <deploy-environment>
+          project-name: 'ant-gateway', 'ant-data-farm', ...
+          deploy-environment: 'beta', 'prod', 'dev'          
+"
   exit 1
 }
 
 set +u
 project="$1"
+deploy_env="$2"
 if [[ "$DEBUG" != "" ]]; then
  set -x
 fi
 set -u
 
-if [[ -z "$project" ]]; then
+if [[ -z "$1" ]] || [[ -z "$2" ]]; then
   usage
 fi
 
@@ -34,6 +38,13 @@ commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "${co
 commit_number="$(git rev-list --count HEAD)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
 install_version="${commit_datetime}-${commit_sha}-v${commit_number}"
+
+log "RESOLVING ENVIRONMENT [$project]..."
+
+# Expose the environment ('beta', 'prod', ...) for other commands to pick up.
+build_env="${repository_root}/secrets/${deploy_env}/build.env"
+# shellcheck disable=SC1090
+source "$build_env"
 
 # Some projects require this for generating deterministic build hashes
 export commit_sha
@@ -50,8 +61,12 @@ run_command mkdir -p "$install_dir"
 
 # Copy secrets into the install dir dir
 secrets_dir="$repository_root"
-run_command cp "$secrets_dir/.env" "$install_dir"
-echo "GIT_COMMIT_NUMBER=${commit_number}" >> "${install_dir}/.env"
+rm -f "${install_dir}/.env"
+{
+  cat "${build_env}"
+  cat "${secrets_dir}/.env"
+  echo "GIT_COMMIT_NUMBER=${commit_number}"
+} >> "${install_dir}/.env"
 
 # Copy all other build/ files into the install dir
 build_dir="$project_src/build"

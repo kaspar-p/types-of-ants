@@ -9,13 +9,17 @@ services:
     restart: always
     ports:
       - "7000:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
-    env_file: ./.env.db
     environment:
+      POSTGRES_DB_FILE: /run/secrets/postgres_db
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       PGDATA: /var/lib/postgresql/data/
     volumes:
       - ./projects/ant-data-farm/database-files:/var/lib/postgresql/data
     secrets:
-      - database_creds
+      - postgres_db
+      - postgres_user
+      - postgres_password
 
   ant-gateway:
     container_name: ant-gateway
@@ -23,17 +27,22 @@ services:
       context: ./projects/ant-gateway
       dockerfile: Dockerfile
       args:
-        - FQDN=beta.typesofants.org
-        - ANT_WORKER_NUM_ONE=001
-        - ANT_WORKER_NUM_TWO=001
-        - ANT_WORKER_NUM_THREE=002
-        - WEBSERVER_PORT=3231
-        - SSL_CERT_PATH=./data/beta.typesofants.org/cert.pem
-        - SSL_KEY_PATH=./secrets/ssl/beta.typesofants.org/key.pem
+        - FQDN=${ANT_GATEWAY_FQDN:-localhost}
+        - ANT_WORKER_NUM=${ANT_ON_THE_WEB_WORKER_NUM:-002}
+        - WEBSERVER_PORT=${ANT_ON_THE_WEB_PORT:-3231}
     restart: always
     ports:
       - "80:80"
       - "443:443"
+    secrets:
+      - tls_public_key
+      - tls_private_key
+
+  ant-renewing-certificates:
+    container_name: ant-renewing-certificates
+    build:
+      context: ./projects/ant-renewing-certificates
+      dockerfile: Dockerfile
 
   ant-naming-domains:
     image: linuxserver/ddclient:arm64v8-4.0.0
@@ -51,7 +60,15 @@ services:
       - cloudflare_api_token
 
 secrets:
-  database_creds:
-    file: ./.env.db
+  postgres_db:
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_db.secret
+  postgres_user:
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_user.secret
+  postgres_password:
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_password.secret
+  tls_public_key:
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/tls_cert.pem
+  tls_private_key:
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/tls_key.pem
   cloudflare_api_token:
-    file: ./secrets/cloudflare_api_token.secret
+    file: ./secrets/${TYPESOFANTS_ENV:-dev}/cloudflare.secret
