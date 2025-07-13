@@ -45,10 +45,12 @@ log "RESOLVING ENVIRONMENT [$project]..."
 build_env="${repository_root}/secrets/${deploy_env}/build.env"
 # shellcheck disable=SC1090
 source "$build_env"
+export VERSION="$install_version"
 
 log "BUILDING [$project]..."
 
 # Build the project
+run_command make -C "$project_src" release
 run_command docker-compose config "${project}"
 run_command docker-compose build "${project}"
 
@@ -65,6 +67,11 @@ rm -f "${install_dir}/.env"
   cat "${secrets_dir}/.env"
   echo "GIT_COMMIT_NUMBER=${commit_number}"
 } >> "${install_dir}/.env"
+
+# Copy all other build/ files into the install dir
+build_dir="$project_src/build"
+build_mode="release"
+run_command cp -R "$build_dir/$build_mode/." "$install_dir"
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"

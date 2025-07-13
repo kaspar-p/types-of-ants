@@ -2,10 +2,12 @@ PROJECT = ant-gateway
 
 -include ../../Makefile.common
 
-all:
-	docker-compose build ant-gateway
+all: release
 
-release: all
-install: all
+release:
+	mkdir -p build
 
-.PHONY: all release install
+clean:
+	rm -rf build
+
+.PHONY: all clean
