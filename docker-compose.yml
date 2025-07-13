@@ -16,23 +16,29 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       PGDATA: /var/lib/postgresql/data/
     volumes:
-      - ./projects/ant-data-farm/database-files:/var/lib/postgresql/data
+      - ${INSTALL_DIR}/database-files/:/var/lib/postgresql/data
     secrets:
       - postgres_db
       - postgres_user
       - postgres_password
 
   ant-gateway:
-    image: nginx
-    platform: linux/arm64
+    image: ant-gateway:${VERSION}
+    build:
+      context: ./projects/ant-gateway
+      dockerfile: Dockerfile
+      tags:
+        - ant-gateway:latest
+        - ant-gateway:${VERSION}
     container_name: ant-gateway
     restart: always
     environment:
       VERSION: ${VERSION}
+      ANT_GATEWAY_FQDN: ${ANT_GATEWAY_FQDN}
       ANT_ON_THE_WEB_WORKER_NUM: ${ANT_ON_THE_WEB_WORKER_NUM}
-      WEBSERVER_PORT: ${WEBSERVER_PORT:-3231}
+      ANT_ON_THE_WEB_PORT: ${ANT_ON_THE_WEB_PORT}
     volumes:
-      - ./projects/ant-gateway/templates/:/etc/nginx/templates
+      - ${INSTALL_DIR}/templates/:/etc/nginx/templates
     ports:
       - "80:80"
       - "443:443"
@@ -57,21 +63,21 @@ services:
       TZ: Etc/UTC
       FILE__CLOUDFLARE_API_TOKEN: /run/secrets/cloudflare_api_token
     volumes:
-      - ./projects/ant-naming-domains/config:/config
+      - ${INSTALL_DIR}/config:/config
     restart: always
     secrets:
       - cloudflare_api_token
 
 secrets:
   postgres_db:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_db.secret
+    file: ${INSTALL_DIR}/secrets/postgres_db.secret
   postgres_user:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_user.secret
+    file: ${INSTALL_DIR}/secrets/postgres_user.secret
   postgres_password:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/postgres_password.secret
+    file: ${INSTALL_DIR}/secrets/postgres_password.secret
   tls_cert:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/tls_cert.pem
+    file: ${INSTALL_DIR}/secrets/tls_cert.pem
   tls_cert_key:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/tls_key.pem
+    file: ${INSTALL_DIR}/secrets/tls_key.pem
   cloudflare_api_token:
-    file: ./secrets/${TYPESOFANTS_ENV:-dev}/cloudflare.secret
+    file: ${INSTALL_DIR}/secrets/cloudflare.secret

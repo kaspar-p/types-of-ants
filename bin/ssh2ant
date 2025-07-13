@@ -1,15 +1,3 @@
 #!/bin/bash
 
-set -euo pipefail
-
-user='ant'
-host="$(anthost "$1")"
-key="$HOME/.ssh/id_typesofants_ed25519"
-
-echo "[INFO] Attempting to SSH to $user@$host"
-echo "[INFO] Using SSH key $key"
-
-ip="$(dig +short "$host")"
-echo "[INFO] Resolved $host to $ip"
-
-ssh -i "$key" "$user@$ip"
+ssh -i "$HOME/.ssh/id_typesofants_ed25519" "ant@$(dig +short "$(anthost "$1")")" "${@:2}"
