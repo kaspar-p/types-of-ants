@@ -37,8 +37,6 @@ services:
       ANT_GATEWAY_FQDN: ${ANT_GATEWAY_FQDN}
       ANT_ON_THE_WEB_WORKER_NUM: ${ANT_ON_THE_WEB_WORKER_NUM}
       ANT_ON_THE_WEB_PORT: ${ANT_ON_THE_WEB_PORT}
-    volumes:
-      - ${INSTALL_DIR}/templates/:/etc/nginx/templates
     ports:
       - "80:80"
       - "443:443"

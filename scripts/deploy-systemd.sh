@@ -38,7 +38,8 @@ install_dir="$remote_home/service/$project/$version"
 new_unit_path="$install_dir/$project.service"
 
 run_command ssh2ant "$ant_worker_num" "
-  systemctl --user enable $new_unit_path;
+  systemctl --user disable '$project.service';
+  systemctl --user enable '$new_unit_path';
   systemctl --user daemon-reload;
   systemctl --user restart '$project.service';
 "
