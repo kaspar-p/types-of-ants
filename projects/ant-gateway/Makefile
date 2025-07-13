@@ -5,7 +5,7 @@ PROJECT = ant-gateway
 all: release
 
 release:
-	mkdir -p build
+	mkdir -p build/release
 
 clean:
 	rm -rf build

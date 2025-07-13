@@ -20,3 +20,8 @@ Documenting the steps performed to promote beta to production.
 1. Deploy `ant-on-the-web` on prod ws machine, 000.
 1. Deploy `ant-gateway` with `typesofants.org` on prod gateway machine, 001.
    1. Should already be port-forwarding and exposed.
+
+### Deploying `ant-gateway` to 002
+
+1. Log on
+1.

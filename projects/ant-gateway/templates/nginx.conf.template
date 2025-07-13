@@ -1,12 +1,12 @@
 upstream fleet {
-    server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${WEBSERVER_PORT};
-    # server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${WEBSERVER_PORT};
-    # server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${WEBSERVER_PORT};
+    server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${ANT_ON_THE_WEB_PORT};
+    # server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${ANT_ON_THE_WEB_PORT};
+    # server antworker${ANT_ON_THE_WEB_WORKER_NUM}.hosts.typesofants.org:${ANT_ON_THE_WEB_PORT};
 }
 
 server {
     listen 80;
-    server_name ${FQDN};
+    server_name ${ANT_GATEWAY_FQDN};
     return 301 https://$host$request_uri;
 }
 
@@ -14,7 +14,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;
-    server_name ${FQDN};
+    server_name ${ANT_GATEWAY_FQDN};
 
     location / {
         proxy_set_header X-Real-IP $remote_addr;
