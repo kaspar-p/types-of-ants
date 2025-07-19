@@ -39,8 +39,7 @@ pub struct DatabaseCredentials {
 pub struct DatabaseConfig {
     pub port: Option<u16>,
     /// The credentials to connect to the database.
-    /// If omitted, tries to get credentials from $DB_PG_NAME, DB_PG_PASSWORD,
-    /// and DB_PG_USER environment variables
+    /// If omitted, tries to get credentials from ant_library::secret::load_secret and the local fs.
     pub creds: Option<DatabaseCredentials>,
     /// The IP-address host of the database.
     /// If omitted, checks for a $DB_HOST variable, then tries localhost.
@@ -49,23 +48,22 @@ pub struct DatabaseConfig {
     pub migration_dir: Option<PathBuf>,
 }
 
-fn get_credentials_from_env() -> Result<DatabaseCredentials, dotenv::Error> {
-    dotenv::dotenv()?;
+fn get_credentials_from_env() -> Result<DatabaseCredentials, anyhow::Error> {
     Ok(DatabaseCredentials {
-        database_name: dotenv::var("DB_PG_NAME")?,
-        database_user: dotenv::var("DB_PG_USER")?,
-        database_password: dotenv::var("DB_PG_PASSWORD")?,
+        database_name: ant_library::secret::load_secret("postgres_db")?,
+        database_user: ant_library::secret::load_secret("postgres_user")?,
+        database_password: ant_library::secret::load_secret("postgres_password")?,
     })
 }
 
 fn get_port_from_env() -> Option<u16> {
     dotenv::dotenv().ok()?;
-    dotenv::var("DB_PG_PORT").ok()?.parse::<u16>().ok()
+    dotenv::var("ANT_DATA_FARM_PORT").ok()?.parse::<u16>().ok()
 }
 
 fn get_host_from_env() -> Option<String> {
     dotenv::dotenv().ok()?;
-    dotenv::var("DB_HOST").ok()
+    dotenv::var("ANT_DATA_FARM_HOST").ok()
 }
 
 async fn database_connection(

@@ -78,10 +78,10 @@ pub async fn deploy_project(
 
     let host = Host::new(
         "localhost".to_owned(),
-        dotenv::var("HOST_AGENT_PORT")
-            .expect("No HOST_AGENT_PORT environment variable found")
+        dotenv::var("ANT_HOST_AGENT_PORT")
+            .expect("No ANT_HOST_AGENT_PORT environment variable found")
             .parse::<u16>()
-            .expect("HOST_AGENT_PORT was not u16"),
+            .expect("ANT_HOST_AGENT_PORT was not u16"),
     );
     let daemon = match HostAgentClient::connect(host.clone()) {
         Err(e) => {

@@ -9,5 +9,8 @@ EnvironmentFile={{INSTALL_DIR}}/.env
 WorkingDirectory={{INSTALL_DIR}}
 Restart=always
 
+LoadCredentialEncrypted=tls_cert.pem:{{INSTALL_DIR}}/secrets/tls_cert.pem
+LoadCredentialEncrypted=tls_key.pem:{{INSTALL_DIR}}/secrets/tls_key.pem
+
 [Install]
 WantedBy=multi-user.target

@@ -25,10 +25,13 @@ pub struct MailjetEmailSender {
 
 impl MailjetEmailSender {
     pub fn new() -> Self {
-        let public_key = dotenv::var("MAILJET_API_KEY").expect("No MAILJET_API_KEY.");
-        let private_key = dotenv::var("MAILJET_SECRET_KEY").expect("No MAILJET_SECRET_KEY.");
-        let sender_email = dotenv::var("MAILJET_SENDER_EMAIL").expect("No MAILJET_SENDER_EMAIL.");
-        let sender_from = dotenv::var("MAILJET_SENDER_FROM").expect("No MAILJET_SENDER_FROM.");
+        let public_key = ant_library::secret::load_secret("mailjet_api_key").unwrap();
+        let private_key = ant_library::secret::load_secret("mailjet_secret_key").unwrap();
+
+        let sender_email = dotenv::var("ANT_ON_THE_WEB_MAILJET_SENDER_EMAIL")
+            .expect("No ANT_ON_THE_WEB_MAILJET_SENDER_EMAIL.");
+        let sender_from = dotenv::var("ANT_ON_THE_WEB_MAILJET_SENDER_FROM")
+            .expect("No ANT_ON_THE_WEB_MAILJET_SENDER_FROM.");
 
         Self {
             client: mailjet_rs::Client::new(

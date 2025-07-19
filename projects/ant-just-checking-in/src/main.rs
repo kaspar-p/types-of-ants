@@ -10,14 +10,14 @@ use tracing::error;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-fn get_config() -> Result<DatabaseConfig, dotenv::Error> {
+fn get_config() -> Result<DatabaseConfig, anyhow::Error> {
     Ok(DatabaseConfig {
         creds: Some(DatabaseCredentials {
-            database_name: dotenv::var("DB_PG_NAME")?,
-            database_user: dotenv::var("DB_PG_USER")?,
-            database_password: dotenv::var("DB_PG_PASSWORD")?,
+            database_name: ant_library::secret::load_secret("postgres_db")?,
+            database_user: ant_library::secret::load_secret("postgres_user")?,
+            database_password: ant_library::secret::load_secret("postgres_password")?,
         }),
-        host: Some(dotenv::var("DB_HOST")?),
+        host: Some(dotenv::var("ANT_DATA_FARM_HOST")?),
         port: Some(7000),
         migration_dir: None,
     })

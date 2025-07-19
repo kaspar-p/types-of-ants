@@ -188,26 +188,26 @@ pub struct Config {
     pub database: DatabaseConfig,
 }
 
-pub fn get_config() -> Result<Config, dotenv::Error> {
+pub fn get_config() -> Result<Config, anyhow::Error> {
     info!("Loading creds from env...");
     dotenv::dotenv()?;
 
     let config = Config {
         twitter: TwitterCredentials {
             handle: dotenv::var("TWITTER_API_ACCOUNT_HANDLE")?,
-            consumer_key: dotenv::var("TWITTER_API_CONSUMER_KEY")?,
-            consumer_secret: dotenv::var("TWITTER_API_CONSUMER_SECRET")?,
-            access_token: dotenv::var("TWITTER_API_ACCESS_TOKEN")?,
-            access_token_secret: dotenv::var("TWITTER_API_ACCESS_TOKEN_SECRET")?,
+            consumer_key: ant_library::secret::load_secret("twitter_consumer_key")?,
+            consumer_secret: ant_library::secret::load_secret("twitter_consumer_secret")?,
+            access_token: ant_library::secret::load_secret("twitter_access_token")?,
+            access_token_secret: ant_library::secret::load_secret("twitter_access_token_secret")?,
         },
         database: DatabaseConfig {
             creds: Some(DatabaseCredentials {
-                database_name: dotenv::var("DB_PG_NAME")?,
-                database_user: dotenv::var("DB_PG_USER")?,
-                database_password: dotenv::var("DB_PG_PASSWORD")?,
+                database_name: ant_library::secret::load_secret("postgres_db")?,
+                database_user: ant_library::secret::load_secret("postgres_user")?,
+                database_password: ant_library::secret::load_secret("postgres_password")?,
             }),
-            host: Some(dotenv::var("DB_HOST")?),
-            port: Some(7000),
+            host: Some(dotenv::var("ANT_DATA_FARM_HOST")?),
+            port: Some(dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?),
             migration_dir: None,
         },
     };

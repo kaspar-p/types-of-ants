@@ -8,7 +8,7 @@ use super::err::AntOnTheWebError;
 
 static JWT_SECRET_KEYS: LazyLock<JwtSecretKeys> = LazyLock::new(|| {
     debug!("Initializing jwt secret...");
-    let secret = dotenv::var("ANT_ON_THE_WEB_JWT_SECRET").expect("jwt secret");
+    let secret = ant_library::secret::load_secret("jwt").expect("jwt secret");
 
     debug!("jwt secret initialized...");
     JwtSecretKeys::new(secret.as_bytes())

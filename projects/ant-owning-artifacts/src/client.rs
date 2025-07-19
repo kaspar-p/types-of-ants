@@ -33,7 +33,7 @@ impl AntOwningArtifactsClient {
                 "http://{}:{}",
                 host.unwrap_or("localhost".to_string()),
                 port.unwrap_or(
-                    dotenv::var("HOST_AGENT_PORT")
+                    dotenv::var("ANT_HOST_AGENT_PORT")
                         .expect("Could not find HOST_AGENT_PORT environment variable")
                         .parse::<u16>()
                         .expect("HOST_AGENT_PORT was not u16")

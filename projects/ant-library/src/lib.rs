@@ -13,6 +13,7 @@ use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
 
 pub mod axum_test_client;
 pub mod manifest_file;
+pub mod secret;
 
 /// The standard ping that all typesofants web servers should use.
 pub async fn api_ping() -> (StatusCode, String) {

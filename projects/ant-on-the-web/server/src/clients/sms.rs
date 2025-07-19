@@ -24,10 +24,14 @@ pub enum SmsError {
 impl Sms {
     pub fn new() -> Self {
         Sms {
-            source_phone: dotenv::var("TWILIO_PHONE_NUMBER").unwrap(),
+            source_phone: ant_library::secret::load_secret("twilio_phone_number").unwrap(),
             client: twilio::Client::new(
-                dotenv::var("TWILIO_ACCOUNT_ID").unwrap().as_str(),
-                dotenv::var("TWILIO_AUTH_TOKEN").unwrap().as_str(),
+                ant_library::secret::load_secret("twilio_account_id")
+                    .unwrap()
+                    .as_str(),
+                ant_library::secret::load_secret("twilio_auth_token")
+                    .unwrap()
+                    .as_str(),
             ),
         }
     }

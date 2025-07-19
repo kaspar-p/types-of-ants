@@ -93,7 +93,7 @@ run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${install_dir}
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="${install_dir}/${project}.service"
-HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+INSTALL_DIR="$install_dir" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
   ssh2ant "$ant_worker_num" "tee $new_unit_path"
 
 # Write the installation manifest

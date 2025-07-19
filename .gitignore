@@ -27,6 +27,7 @@ gradlew.bat
 *.pem
 *.key
 !secrets/*/build.env
+!projects/ant-data-farm-client/test-secrets/*.secret
 
 # Added by cargo
 target

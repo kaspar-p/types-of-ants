@@ -50,10 +50,10 @@ pub async fn start_server(port: Option<u16>) -> Result<(), anyhow::Error> {
 
     info!("Starting server...");
     let port = port.unwrap_or(
-        dotenv::var("HOST_AGENT_PORT")
-            .expect("Could not find HOST_AGENT_PORT environment variable")
+        dotenv::var("ANT_HOST_AGENT_PORT")
+            .expect("Could not find ANT_HOST_AGENT_PORT environment variable")
             .parse::<u16>()
-            .expect("HOST_AGENT_PORT environment variable needs to be a valid port!"),
+            .expect("ANT_HOST_AGENT_PORT environment variable needs to be a valid port!"),
     );
     info!("Starting host agent on port {port}");
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

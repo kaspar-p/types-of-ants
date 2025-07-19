@@ -1,6 +1,8 @@
 mod util;
 
-use ant_data_farm::{ants::Tweeted, AntDataFarmClient, DaoTrait, DatabaseConfig};
+use ant_data_farm::{
+    ants::Tweeted, AntDataFarmClient, DaoTrait, DatabaseConfig, DatabaseCredentials,
+};
 use chrono::Duration;
 
 use testcontainers::runners::AsyncRunner;
@@ -16,7 +18,11 @@ async fn more_than_500_ants() {
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
-        creds: None,
+        creds: Some(DatabaseCredentials {
+            database_name: "test".to_string(),
+            database_user: "test".to_string(),
+            database_password: "test".to_string(),
+        }),
         host: None,
         migration_dir: None,
     }))
@@ -37,7 +43,11 @@ async fn user_gets_created() {
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
-        creds: None,
+        creds: Some(DatabaseCredentials {
+            database_name: "test".to_string(),
+            database_user: "test".to_string(),
+            database_password: "test".to_string(),
+        }),
         host: None,
         migration_dir: None,
     }))
@@ -87,7 +97,11 @@ async fn see_scheduled_tweets(_logging: &()) {
     debug!("Ran fixture!");
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
-        creds: None,
+        creds: Some(DatabaseCredentials {
+            database_name: "test".to_string(),
+            database_user: "test".to_string(),
+            database_password: "test".to_string(),
+        }),
         host: None,
         migration_dir: None,
     }))
@@ -115,7 +129,11 @@ async fn add_tweeted(_logging: &()) {
     debug!("Ran fixture!");
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
-        creds: None,
+        creds: Some(DatabaseCredentials {
+            database_name: "test".to_string(),
+            database_user: "test".to_string(),
+            database_password: "test".to_string(),
+        }),
         host: None,
         migration_dir: None,
     }))

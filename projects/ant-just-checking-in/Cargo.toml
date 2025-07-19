@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ant-data-farm = { version = "0.1.0", path = "../ant-data-farm-client" }
 ant-host-agent = { version = "0.1.0", path = "../ant-host-agent" }
+ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.98"
 chrono = "0.4.41"
 cronjob = "0.4.17"

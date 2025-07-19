@@ -19,10 +19,10 @@ pub async fn pinghost_test(enable: bool) -> Vec<StatusData> {
         return vec![];
     }
 
-    let host_agent_port: u16 = dotenv::var("HOST_AGENT_PORT")
-        .expect("Could not find HOST_AGENT_PORT environment variable")
+    let host_agent_port: u16 = dotenv::var("ANT_HOST_AGENT_PORT")
+        .expect("Could not find ANT_HOST_AGENT_PORT environment variable")
         .parse()
-        .expect("HOST_AGENT_PORT environment variable was not u16");
+        .expect("ANT_HOST_AGENT_PORT environment variable was not u16");
 
     let mut metrics: Vec<StatusData> = Vec::new();
     for host in HOSTS {
