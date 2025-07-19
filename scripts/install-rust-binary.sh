@@ -11,9 +11,10 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 set -euo pipefail
 
 function usage() {
-  log "USAGE: $0 <project-name> <deploy-environment>
+  log "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
           project-name: 'ant-gateway', 'ant-data-farm', ...
-          deploy-environment: 'beta', 'prod', 'dev'          
+          deploy-environment: 'beta', 'prod', 'dev'
+          ant-worker-num: 000, 001, ...
 "
   exit 1
 }
@@ -21,15 +22,19 @@ function usage() {
 set +u
 project="$1"
 deploy_env="$2"
+ant_worker_num="$3"
 if [[ "$DEBUG" != "" ]]; then
  set -x
 fi
 set -u
 
-if [[ -z "$1" ]] || [[ -z "$2" ]]; then
+if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
   usage
 fi
 
+remote_user="ant"
+remote_home="/home/$remote_user"
+remote_host="$(anthost "$ant_worker_num")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
@@ -54,33 +59,36 @@ export commit_sha
 log "BUILDING [$project]..."
 
 # Build the project
-run_command make -C "$project_src" release
+target=$(jq -r ".[\"$remote_host\"].[\"rust-target\"]" < "$repository_root/services.jsonc")
+run_command make -C "$project_src" -e TARGET="$target" release
 
-log "INSTALLING [$project]..."
+log "INSTALLING [$project] ONTO [$remote_host]..."
 
-install_dir="$HOME/service/$project/$install_version"
-run_command mkdir -p "$install_dir"
+install_dir="$remote_home/service/$project/$install_version"
+run_command ssh2ant "$ant_worker_num" "
+  mkdir -p $install_dir;
+  mkdir -p $install_dir/secrets;
+"
 
-# Copy secrets into the install dir dir
-secrets_dir="$repository_root"
-rm -f "${install_dir}/.env"
+# Copy secrets into the install dir
+secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_env}"
-  cat "${secrets_dir}/.env"
-  echo "GIT_COMMIT_NUMBER=${commit_number}"
-} >> "${install_dir}/.env"
+} | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
+run_command scp -r "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
 
 # Copy all other build/ files into the install dir
 build_dir="$project_src/build"
 build_mode="release"
-run_command cp -R "$build_dir/$build_mode/." "$install_dir"
+run_command scp -r "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"
-HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" > "$new_unit_path"
+HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+  ssh2ant "$ant_worker_num" "tee ${new_unit_path}"
 
 # Write the installation manifest
-echo "{
+ssh2ant "$ant_worker_num" "echo '{
   \"project\": \"$project\",
   \"project_type\": \"rust-binary\",
   \"version\": \"$install_version\",
@@ -89,7 +97,7 @@ echo "{
   \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"
-}" > "$install_dir/manifest.json"
+}' > '${install_dir}/manifest.json'"
 
 log "INSTALLED [$project] VERSION [$install_version]"
 log "  when:        $(date -Iseconds)"

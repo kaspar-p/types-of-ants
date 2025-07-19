@@ -81,7 +81,6 @@ secrets_dir="${repository_root}/secrets/${deploy_env}"
 rm -f "${install_dir}/.env"
 {
   cat "${build_env}"
-  echo "GIT_COMMIT_NUMBER=${commit_number}"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
 
 # Copy secrets into the install dir

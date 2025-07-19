@@ -77,7 +77,7 @@ async fn database_connection(
         .clone();
     let db_creds = config.creds.clone().unwrap_or_else(|| {
         get_credentials_from_env()
-            .expect("Credentials not explicitly passed in must be in the environment!")
+            .expect("db: credentials not explicitly passed in must be in the environment!")
     });
 
     // TODO: find out a more dynamic way of getting the IP of a host

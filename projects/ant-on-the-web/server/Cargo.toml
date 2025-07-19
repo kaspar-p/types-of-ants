@@ -55,6 +55,7 @@ rand = "0.9.1"
 async-trait = "0.1.88"
 cookie = "0.18.1"
 mailjet-rs = "0.3.0"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 http = "1.3.1"

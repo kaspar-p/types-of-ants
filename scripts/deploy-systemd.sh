@@ -10,14 +10,14 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 set -euo pipefail
 
 function usage() {
-  echo "USAGE: $0 <project-name> <version> <ant-worker-num>"
+  echo "USAGE: $0 <project-name> <ant-worker-num> <version>"
   exit 1
 }
 
 set +u
 project="$1"
-version="$2"
-ant_worker_num="$3"
+ant_worker_num="$2"
+version="$3"
 if [[ "$DEBUG" != "" ]]; then
   set -x
 fi

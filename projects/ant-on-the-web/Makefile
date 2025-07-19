@@ -22,9 +22,9 @@ run: debug
 
 SERVER_SOURCES := $(shell find ./server)
 $(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ $(SERVER_SOURCES)
-	cd ./server && cargo build $(RUST_FLAGS)
+	cd ./server && cross build --target=$(TARGET) $(RUST_FLAGS)
 	mkdir -p $(@D)
-	cp ../../target/$(BUILD_MODE)/$(PROJECT) $@
+	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
 
 WEBSITE_SOURCES := $(shell find ./website)
 $(BUILD_DIR)/%/$(STATIC)/: $(WEBSITE_SOURCES)
