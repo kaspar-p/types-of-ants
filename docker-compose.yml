@@ -2,6 +2,7 @@ version: "3.7"
 
 services:
   ant-data-farm:
+    image: ant-data-farm:${VERSION}
     container_name: ant-data-farm
     build:
       context: ./projects/ant-data-farm
@@ -16,7 +17,7 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       PGDATA: /var/lib/postgresql/data/
     volumes:
-      - ${INSTALL_DIR}/database-files/:/var/lib/postgresql/data
+      - ${PERSIST_DIR}/ant-data-farm/database-files/:/var/lib/postgresql/data
     secrets:
       - postgres_db
       - postgres_user
@@ -24,13 +25,13 @@ services:
 
   ant-gateway:
     image: ant-gateway:${VERSION}
+    container_name: ant-gateway
     build:
       context: ./projects/ant-gateway
       dockerfile: Dockerfile
       tags:
         - ant-gateway:latest
         - ant-gateway:${VERSION}
-    container_name: ant-gateway
     restart: always
     environment:
       VERSION: ${VERSION}

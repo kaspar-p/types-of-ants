@@ -37,12 +37,14 @@ pub struct DatabaseCredentials {
 
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
+    /// The database port.
+    /// If omitted, reads ANT_DATA_FARM_PORT environment variable.
     pub port: Option<u16>,
     /// The credentials to connect to the database.
     /// If omitted, tries to get credentials from ant_library::secret::load_secret and the local fs.
     pub creds: Option<DatabaseCredentials>,
     /// The IP-address host of the database.
-    /// If omitted, checks for a $DB_HOST variable, then tries localhost.
+    /// If omitted, reads ANT_DATA_FARM_HOST environment variable.
     pub host: Option<String>,
     /// On client startup, execute the SQL within the directory to bootstrap schemas and databases.
     pub migration_dir: Option<PathBuf>,
@@ -66,36 +68,56 @@ fn get_host_from_env() -> Option<String> {
     dotenv::var("ANT_DATA_FARM_HOST").ok()
 }
 
+fn make_connection_string(
+    username: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    db_name: &str,
+) -> String {
+    format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
+}
+
 async fn database_connection(
     config: &DatabaseConfig,
 ) -> Result<Pool<PostgresConnectionManager<NoTls>>, dotenv::Error> {
     let port = config
         .port
-        .unwrap_or(get_port_from_env().unwrap_or(7000))
+        .unwrap_or_else(|| get_port_from_env().expect("db: port not in environment"))
         .clone();
-    let db_creds = config.creds.clone().unwrap_or_else(|| {
-        get_credentials_from_env()
-            .expect("db: credentials not explicitly passed in must be in the environment!")
-    });
+    let db_creds = config
+        .creds
+        .clone()
+        .unwrap_or_else(|| get_credentials_from_env().expect("db: credentials not in environment"));
 
-    // TODO: find out a more dynamic way of getting the IP of a host
     let host = config
         .host
         .clone()
-        .unwrap_or_else(|| get_host_from_env().unwrap_or("localhost".to_owned()));
+        .unwrap_or_else(|| get_host_from_env().expect("db: host not in environment"));
 
-    let connection_string = format!(
-        "postgresql://{}:{}@{}:{}/{}",
-        db_creds.database_user, db_creds.database_password, host, port, db_creds.database_name
+    let connection_string = make_connection_string(
+        &db_creds.database_user,
+        &db_creds.database_password,
+        &host,
+        port,
+        &db_creds.database_name,
     );
 
     debug!(
-        "Connecting to database {}:{}/{}",
-        host, port, db_creds.database_name
+        "Connecting to database {}",
+        make_connection_string(
+            "[redacted]",
+            "[redacted]",
+            &host,
+            port,
+            &db_creds.database_name
+        )
     );
     let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls).unwrap();
-    let pool: Pool<PostgresConnectionManager<NoTls>> =
-        Pool::builder().build(manager).await.unwrap();
+    let pool: Pool<PostgresConnectionManager<NoTls>> = Pool::builder()
+        .build(manager)
+        .await
+        .expect("db: connection failed");
 
     Ok(pool)
 }

@@ -56,6 +56,7 @@ export VERSION="$install_version"
 
 install_dir="${remote_home}/service/$project/$install_version"
 export INSTALL_DIR="$install_dir"
+export PERSIST_DIR="${remote_home}/persist"
 
 remote_secrets_dir="${install_dir}/secrets"
 

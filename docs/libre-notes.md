@@ -10,29 +10,52 @@ Following
 <https://medium.com/@johnhebron/setting-up-a-le-potato-raspberry-pi-alternative-with-ubuntu-server-22-04-linux-from-scratch-8b7c22c8e4b1>
 download the version, I did
 `ubuntu-22.04.3-preinstalled-server-arm64+aml-s905x-cc.img.xz` unzipped it with
+sa
 
 ```bash
 unxz ubuntu-22.04.3-preinstalled-server-arm64+aml-s905x-cc.img.xz
 ```
 
 Using Balena Etcher (`brew install balenaetcher`) plug in the microSD card and
-flash it. Plug in Ethernet _before_ power, to initialize on the same wifi. Find
-it with:
+flash it.
+
+Plug in Ethernet _before_ power, to initialize on the network. Find it with:
 
 ```bash
 sudo arp-scan --localnet
 ```
 
-And SSH in with `ubuntu@<ip>`. Mine was `192.168.2.53`. Then change the password
-to any temporary ubuntu password! Then, run (this will take a while):
+or something like
 
 ```bash
-sudo apt update
-sudo apt upgrade
-sudo apt install net-tools
-sudo apt-get install autoconf
-sudo snap install jq docker btop
+$ arp -a | grep ubuntu
+ubuntu-22 (192.168.2.95) at 82:de:6c:c4:68:a9 on en0 ifscope [ethernet]
+```
 
+And SSH in with `ubuntu@<ip>`. Mine was `192.168.2.53`. Then change the password
+to any temporary ubuntu password (`typesofants`)! Then, run (this will take a
+while):
+
+```bash
+sudo apt update && \
+sudo apt upgrade && \
+sudo apt install net-tools dirmngr ca-certificates \
+  software-properties-common apt-transport-https lsb-release curl && \
+sudo apt-get install autoconf && \
+sudo snap install jq docker btop
+```
+
+Install a posgresql client matching the version `ant-data-farm` uses:
+
+```bash
+curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | sudo tee /usr/share/keyrings/postgresql.gpg > /dev/null
+sudo apt update
+sudo apt install -y postgresql-client-15
+```
+
+Optionally (do I still need this?) install `nvm` for node:
+
+```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -53,15 +76,13 @@ sudo hostnamectl set-hostname $ANT_HOSTNAME
 sudo cat /etc/hostname
 ```
 
-and make sure it's the right output. Also `cat /etc/hosts/ and make sure there
-is a line like:
+and make sure it's the right output. Also add a line to `cat /etc/hosts`:
 
 ```txt
 127.0.1.1  $ANT_HOSTNAME
 ```
 
-and that's it! The purpose of this hostname change is for port-forwarding, so
-the same machine is permanently reachable by the same `$ANT_HOSTNAME` string.
+and that's it!
 
 ## User setup
 
@@ -72,6 +93,13 @@ group:
 sudo adduser ant
 sudo usermod -aG ubuntu ant
 sudo groupmod -n ants ubuntu
+```
+
+Add the `ant` user to be able to `sudo` by adding via `visudo`:
+
+```txt
+root  ALL=(ALL:ALL) ALL
+ant   ALL=(ALL:ALL) ALL
 ```
 
 ## Docker installation
@@ -91,7 +119,8 @@ Alternatively, if the `systemctl restart` command doesn't work, this might:
 sudo systemctl restart snap.docker.dockerd.service
 ```
 
-Make sure Docker is up by getting a response from `docker ps`.
+Make sure Docker is up by getting a response from `docker ps`. You might need to
+`sudo reboot`, which is safe at this point.
 
 ## Other tools installation
 
@@ -100,6 +129,7 @@ Install `mo`, a mustache template implementation.
 ```bash
 mkdir -p ~/installs
 mkdir -p ~/secrets
+mkdir -p ~/persist
 
 curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
   -o ~/installs/mo
@@ -110,12 +140,6 @@ source ~/.bashrc
 ```
 
 ## Networking
-
-Add the `ant` user to be able to `sudo` by adding via `visudo`:
-
-```txt
-ant  ALL=(ALL:ALL) ALL
-```
 
 To get DNS working, go to the
 [CloudFlare Domain](https://dash.cloudflare.com/3196bd788e22028260c62531239ac7c2/typesofants.org/dns/records)

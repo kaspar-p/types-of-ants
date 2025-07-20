@@ -6,11 +6,11 @@ PROJECT = ant-on-the-web
 all: debug
 
 debug: BUILD_MODE = debug
-debug: $(BUILD_DIR)/debug/$(PROJECT)
+debug: binary
 
 release: BUILD_MODE = release
 release: RUST_FLAGS += --release
-release: $(BUILD_DIR)/release/$(PROJECT)
+release: binary
 
 clean:
 	rm -rf build
@@ -20,16 +20,17 @@ clean:
 run: debug
 	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
-SERVER_SOURCES := $(shell find ./server)
-$(BUILD_DIR)/%/$(PROJECT): $(BUILD_DIR)/%/$(STATIC)/ $(SERVER_SOURCES)
-	cd ./server && cross build --target=$(TARGET) $(RUST_FLAGS)
+binary: $(BUILD_DIR)/%/$(STATIC)/
+	echo "BUILDING BINARY"
+	cd ./server && cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
 	mkdir -p $(@D)
-	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
+	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
 
 WEBSITE_SOURCES := $(shell find ./website)
 $(BUILD_DIR)/%/$(STATIC)/: $(WEBSITE_SOURCES)
+	echo "BUILDING STATIC CONTENT"
 	$(MAKE) -C ./website
-	mkdir -p $@
-	cp -R ./website/out/* $@
+	mkdir -p $(BUILD_DIR)/$(BUILD_MODE)/$(STATIC)
+	cp -R ./website/out/* $(BUILD_DIR)/$(BUILD_MODE)/$(STATIC)
 
-.PHONY: all clean debug release install
+.PHONY: all clean debug release install binary

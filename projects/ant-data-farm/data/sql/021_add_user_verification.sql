@@ -1,6 +1,5 @@
 BEGIN;
 
-drop table if exists verification;
 create table verification (
   user_id uuid not null, -- The user verifying
   unique_key varchar(256) not null, -- The phone number, email, or other verification method.

@@ -4,7 +4,7 @@ Description=The typesofants web server!
 [Service]
 Type=simple
 EnvironmentFile={{INSTALL_DIR}}/.env
-Environment=TYPESOFANTS_SECRET_DIR=%d
+Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
 ExecStart={{INSTALL_DIR}}/ant-on-the-web
 WorkingDirectory={{INSTALL_DIR}}
 Restart=always

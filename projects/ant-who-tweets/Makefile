@@ -6,22 +6,21 @@ PROJECT = ant-who-tweets
 all: debug
 
 debug: BUILD_MODE = debug
-debug: $(BUILD_DIR)/debug/$(PROJECT)
+debug: binary
 
 release: BUILD_MODE = release
 release: RUST_FLAGS += --release
-release: $(BUILD_DIR)/release/$(PROJECT)
+release: binary
 
 clean:
 	rm -rf build
-# cargo clean
 
 run: debug
 	cd $(BUILD_DIR)/debug/ && ./$(PROJECT)
 
-$(BUILD_DIR)/%/$(PROJECT): src/** Cargo.toml
-	cross build --target=$(TARGET) $(RUST_FLAGS)
+binary:
+	cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
 	mkdir -p $(@D)
 	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
 
-.PHONY: all debug release clean run
+.PHONY: all debug release clean run binary

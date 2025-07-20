@@ -260,8 +260,8 @@ async fn two_factor_verification_attempt(
                 )))
             })?
         }
-        VerificationSubmission::Email { email, otp: _ } => {
-            canonicalize_email(&email).map_err(|e| {
+        VerificationSubmission::Email { email, .. } => {
+            canonicalize_email(&email).map_err(|_| {
                 AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
                     "submission.email",
                 )))

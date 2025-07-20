@@ -1,13 +1,11 @@
 BEGIN;
 
-drop schema if exists typesofants cascade;
-create schema if not exists typesofants;
-set SEARCH_PATH to typesofants;
+create schema typesofants;
+set search_path to typesofants;
+alter database typesofants set search_path to typesofants;
 
-drop domain if exists semver cascade;
 create domain semver as varchar(50);
 
-drop table if exists project cascade;
 create table project (
   project_id uuid unique primary key default gen_random_uuid(), -- The unique project ID
   project_label varchar(255) not null, -- The human-readable label for the project
@@ -21,7 +19,6 @@ values
   ('ant-data-farm', '1.0.0')
 ;
 
-drop table if exists test cascade;
 create table test (
   test_id uuid unique primary key default gen_random_uuid(), -- The unique test ID
   test_label varchar(255) not null, -- The human-readable label for the test
@@ -34,7 +31,6 @@ values
   ('Test the web server for shallow healthy pings', (select project_id from project where project_label = 'ant-on-the-web'))
 ;
 
-drop table if exists test_instance cascade;
 create table test_instance (
   test_instance_id uuid unique primary key default gen_random_uuid(), -- Unique test id
   test_instance_test_id uuid not null, -- The type of test that is currently running. Corresponds to a key in the 'test_type' table.
@@ -44,7 +40,6 @@ create table test_instance (
   constraint fk_test foreign key (test_instance_test_id) references test(test_id)
 );
 
-drop table if exists host cascade;
 create table host (
   host_id uuid unique primary key default gen_random_uuid(), -- The unique machine ID
   host_label varchar(255) not null, -- A human-readable label for the machine, like 'Kaspar's Raspberry Pi'
@@ -56,7 +51,6 @@ values
   ('Kaspar''s Raspberry Pi', 'Kaspar''s house')
 ;
 
-drop table if exists project_instance cascade;
 create table project_instance (
   project_instance_id uuid unique primary key default gen_random_uuid(), -- A unique ID for this project instance, on this machine
   project_instance_project_id uuid not null, -- The project that is currently running
@@ -67,7 +61,6 @@ create table project_instance (
   constraint fk_machine foreign key(project_instance_machine_id) references host(host_id)
 );
 
-drop table if exists deployment_step cascade;
 create table deployment_step (
   deployment_step_id uuid unique primary key default gen_random_uuid(), -- The unique step ID
   deployment_step_label varchar(255) not null -- A human-readable label for the step, like 'prod', 'beta', or 'build'
@@ -80,7 +73,6 @@ values
   ('prod')
 ;
 
-drop table if exists deployment_sequence;
 create table deployment_sequence (
   deployment_sequence_from uuid not null, -- The starting state of the deployment step[]
   deployment_sequence_to uuid not null, -- The ending state of the deployment step
@@ -95,9 +87,8 @@ values
   ((select deployment_step_id from deployment_step where deployment_step_label = 'beta'), (select deployment_step_id from deployment_step where deployment_step_label = 'prod'))
 ;
 
-drop type if exists deployment_status cascade;
 create type deployment_status as enum ('SUCCESS', 'IN PROGRESS', 'FAILED');
-drop table if exists deployment cascade;
+
 create table deployment (
   deployment_id uuid unique primary key default gen_random_uuid(), -- The unique deployment ID
   deployment_project_id uuid not null, -- The project ID for the project getting updated
@@ -111,14 +102,12 @@ create table deployment (
   constraint fk_step foreign key (deployment_step_id) references deployment_step(deployment_step_id)
 );
 
-drop table if exists registered_user cascade;
 create table registered_user (
   user_id uuid unique primary key default gen_random_uuid(), -- The unique user ID
   user_name varchar(255) unique not null, -- The username for the user
   user_joined timestamp with time zone not null default now() -- The time that the user signed up
 );
 
-drop table if exists registered_user_email cascade;
 create table registered_user_email (
   user_id uuid not null, -- The unique user ID
   user_email varchar(255) unique not null, -- The unique email for the user, all linked to the same account
@@ -140,7 +129,6 @@ values
   ((select user_id from registered_user where user_name = 'nobody'), 'nobody@typesofants.org')
 ;
 
-drop table if exists ant cascade;
 create table ant (
   ant_id uuid unique primary key default gen_random_uuid(), -- Unique suggestion id
   ant_user_id uuid not null, -- The user that created the ant
@@ -149,7 +137,6 @@ create table ant (
   constraint fk_user foreign key (ant_user_id) references registered_user(user_id)
 );
 
-drop table if exists favorite cascade;
 create table favorite (
   user_id uuid not null, -- The user who favorited the ant
   ant_id uuid not null, -- The ant that got favorited
@@ -159,7 +146,6 @@ create table favorite (
   constraint fk_ant foreign key (ant_id) references ant(ant_id)
 );
 
-drop table if exists ant_tweeted cascade;
 create table ant_tweeted (
   ant_id uuid not null, -- The ant that got tweeted
   tweeted_at timestamp with time zone not null default now(), -- When the ant got tweeted
@@ -167,7 +153,6 @@ create table ant_tweeted (
   constraint fk_ant foreign key (ant_id) references ant(ant_id)
 );
 
-drop table if exists ant_declined cascade;
 create table ant_declined (
   ant_id uuid primary key not null, -- The ant that got declined
   ant_declined_user_id uuid not null, -- The person that declined the ant
@@ -176,13 +161,11 @@ create table ant_declined (
   constraint fk_user foreign key (ant_declined_user_id) references registered_user(user_id)
 );
 
-drop table if exists release cascade;
 create table release (
   release_number serial primary key not null, -- The release ID
   release_label varchar(255) not null -- The name of the release, e.g. "1" or "initial release" or "birthday release"
 );
 
-drop table if exists ant_release cascade;
 create table ant_release (
   release_number int not null, -- The current release version, always serial, e.g. 58
   ant_content_hash int not null, -- The hashed value of ant_content field. Used for ordering the ants. 32 bit integer.
@@ -192,5 +175,7 @@ create table ant_release (
   constraint fk_release foreign key (release_number) references release(release_number),
   primary key (release_number, ant_id)
 );
+
+show search_path;
 
 COMMIT;
