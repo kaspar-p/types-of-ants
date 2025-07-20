@@ -75,12 +75,12 @@ secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_env}"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
-run_command resync -Pav "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
+run_command rsync -Pa "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
 
 # Copy all other build/ files into the install dir
 build_dir="$project_src/build"
 build_mode="release"
-run_command resync -Pav "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
+run_command rsync -Pa "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"

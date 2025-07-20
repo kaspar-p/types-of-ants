@@ -27,7 +27,9 @@ if [[ -z "$project" ]] || [[ -z "$version" ]] || [[ -z "$ant_worker_num" ]]; the
   usage
 fi
 
-remote_home="/home/ant"
+remote_user="ant"
+remote_home="/home/$remote_user"
+remote_host="$(anthost "$ant_worker_num")"
 
 log "DEPLOYING [$project] VERSION [$version] ONTO [$ant_worker_num] ..."
 
@@ -37,11 +39,17 @@ install_dir="$remote_home/service/$project/$version"
 # Cut over to the systemd service
 new_unit_path="$install_dir/$project.service"
 
-run_command ssh2ant "$ant_worker_num" "
-  systemctl --user disable '$project.service' || true;
-  systemctl --user enable '$new_unit_path';
-  systemctl --user daemon-reload;
-  systemctl --user restart '$project.service';
+
+# run_command systemctl -H "$remote_user@$remote_host" disable "$project.service" || true
+# run_command systemctl -H "$remote_user@$remote_host" enable "$new_unit_path"
+# run_command systemctl -H "$remote_user@$remote_host" daemon-reload
+# run_command systemctl -H "$remote_user@$remote_host" restart "$project.service"
+
+ssh "ant@$remote_host" "
+  sudo -S systemctl disable '$project.service' || true;
+  sudo -S systemctl enable '$new_unit_path';
+  sudo -S systemctl daemon-reload;
+  sudo -S systemctl restart '$project.service';
 "
 
 log "TRANSITIONED [$project] TO [$version]"
