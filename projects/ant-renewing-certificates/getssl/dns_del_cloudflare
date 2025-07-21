@@ -2,7 +2,7 @@
 # either configure here or export environment variables in getssl.cfg
 email=${CF_EMAIL:-''}
 key=${CF_KEY:-''}
-api_token=${CF_API_TOKEN:-"$(cat '/run/secrets/cloudflare_api_token')"}
+api_token=${CF_API_TOKEN:-"$(cat '../secrets/cloudflare.secret')"}
 zone_id=${CF_ZONE_ID:-''}
 
 # This script removes a TXT record from cloudflare DNS for the ACME challenge

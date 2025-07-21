@@ -84,7 +84,7 @@ ssh2ant "$ant_worker_num" "echo '{
   \"project_type\": \"rust-binary\",
   \"version\": \"$install_version\",
   \"commit_sha\": \"$commit_sha\",
-  \"commit_number\": \"$commit_number\"
+  \"commit_number\": \"$commit_number\",
   \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"

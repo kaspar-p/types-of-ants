@@ -107,7 +107,7 @@ ssh2ant "$ant_worker_num" "echo '{
   \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"
-}' > ${install_dir}/manifest.json"
+}' > '${install_dir}/manifest.json'"
 
 log "INSTALLED [$project] VERSION [$install_version] ONTO [$remote_host]"
 log "  when:        $(date -Iseconds)"

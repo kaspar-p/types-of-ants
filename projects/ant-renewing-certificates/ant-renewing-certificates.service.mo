@@ -3,7 +3,7 @@ Description=The typesofants certificate renewer!
 
 [Service]
 Type=oneshot
-ExecStart={{INSTALL_DIR}}/getssl/getssl.sh -w {{INSTALL_DIR}}/getssl {{ANT_RENEWING_CERTIFICATES_FQDN}}
+ExecStart={{INSTALL_DIR}}/getssl/getssl.sh -d -w {{INSTALL_DIR}}/getssl {{ANT_RENEWING_CERTIFICATES_FQDN}}
 EnvironmentFile={{INSTALL_DIR}}/.env
 WorkingDirectory={{INSTALL_DIR}}/getssl
 
