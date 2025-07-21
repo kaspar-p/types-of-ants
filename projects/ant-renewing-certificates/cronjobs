@@ -1,1 +1,0 @@
-23 3 * * * /getssl -a > /proc/1/fd/1 2> /proc/1/fd/2

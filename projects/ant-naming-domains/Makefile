@@ -1,11 +1,11 @@
-PROJECT = ant-gateway
+PROJECT = ant-naming-domains
 
 -include ../../Makefile.common
 
-all:
-	docker-compose build ant-naming-domains
+all: release
 
-release: all
-install: all
+release:
+	mkdir -p ./build/release/config
+	ANT_NAMING_DOMAINS_FQDN=$(ANT_NAMING_DOMAINS_FQDN) mo ./config/ddclient.conf.mo > ./build/release/config/ddclient.conf
 
-.PHONY: all release install
+.PHONY: all release

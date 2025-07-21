@@ -46,10 +46,18 @@ services:
       - tls_cert_key
 
   ant-renewing-certificates:
+    image: ant-renewing-certificates:${VERSION}
     container_name: ant-renewing-certificates
     build:
       context: ./projects/ant-renewing-certificates
       dockerfile: Dockerfile
+      args:
+        - ANT_RENEWING_CERTIFICATES_FQDN=${ANT_RENEWING_CERTIFICATES_FQDN}
+      tags:
+        - ant-renewing-certificates:latest
+        - ant-renewing-certificates:${VERSION}
+    secrets:
+      - cloudflare_api_token
 
   ant-naming-domains:
     image: linuxserver/ddclient:arm64v8-4.0.0
@@ -57,6 +65,7 @@ services:
     container_name: ant-naming-domains
     environment:
       VERSION: ${VERSION}
+      ANT_NAMING_DOMAINS_FQDN: ${ANT_NAMING_DOMAINS_FQDN}
       PUID: 1001
       PGID: 1001
       TZ: Etc/UTC

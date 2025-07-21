@@ -12,4 +12,4 @@ zone=typesofants.org, \
 ttl=1,
 login=token,
 password_env=CLOUDFLARE_API_TOKEN,
-beta.typesofants.org
+{{ANT_NAMING_DOMAINS_FQDN}}

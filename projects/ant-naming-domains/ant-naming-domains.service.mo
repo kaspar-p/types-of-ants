@@ -3,9 +3,9 @@ Description=The typesofants dynamic dns client!
 
 [Service]
 Type=simple
+ExecStart=/snap/bin/docker-compose --project-directory {{INSTALL_DIR}} up --no-build --force-recreate ant-naming-domains
+ExecStop=/snap/bin/docker-compose --project-directory {{INSTALL_DIR}} down ant-naming-domains
 Restart=always
-ExecStart=/snap/bin/docker-compose --project-directory {{HOME}}/types-of-ants/ --file {{HOME}}/types-of-ants/docker-compose.yml up ant-naming-domains
-ExecStop=/snap/bin/docker-compose --project-directory {{HOME}}/types-of-ants/ --file {{HOME}}/types-of-ants/docker-compose.yml down ant-naming-domains
 
 [Install]
 WantedBy=default.target
