@@ -10,15 +10,6 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
 set -euo pipefail
 
-function usage() {
-  log "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
-          project-name: 'ant-gateway', 'ant-data-farm', ...
-          deploy-environment: 'beta', 'prod', 'dev'
-          ant-worker-num: 000, 001, ...
-"
-  exit 1
-}
-
 set +u
 project="$1"
 deploy_env="$2"
@@ -75,12 +66,12 @@ secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_env}"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
-run_command rsync -Pa "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
+run_command rsync -a "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
 
 # Copy all other build/ files into the install dir
 build_dir="$project_src/build"
 build_mode="release"
-run_command rsync -Pa "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
+run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
 
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$install_dir/$project.service"

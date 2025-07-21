@@ -14,6 +14,15 @@ function log() {
   echo "$(_get_log_prefix)" "$@" | tee -a "$(git rev-parse --show-toplevel)/scripts/scripts.log" >> /dev/stderr
 }
 
+function usage() {
+  log "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
+          project-name: 'ant-gateway', 'ant-data-farm', ...
+          deploy-environment: 'beta', 'prod', 'dev'
+          ant-worker-num: 000, 001, ...
+"
+  exit 1
+}
+
 function run_command() {
   "$@" > >(sed "s/^/$(_get_log_prefix)   /") | tee -a "$(git rev-parse --show-toplevel)/scripts/scripts.log" >> /dev/stderr
 }

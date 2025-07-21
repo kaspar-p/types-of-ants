@@ -2,10 +2,15 @@
 Description=The typesofants certificate renewer!
 
 [Service]
-Type=simple
-ExecStart=/snap/bin/docker-compose --project-directory {{INSTALL_DIR}} up --no-build --force-recreate ant-renewing-certificates
-ExecStop=/snap/bin/docker-compose --project-directory {{INSTALL_DIR}} down ant-renewing-certificates
-Restart=always
+Type=oneshot
+ExecStart={{INSTALL_DIR}}/getssl/getssl.sh -w {{INSTALL_DIR}}/getssl {{ANT_RENEWING_CERTIFICATES_FQDN}}
+EnvironmentFile={{INSTALL_DIR}}/.env
+WorkingDirectory={{INSTALL_DIR}}/getssl
+
+[Timer]
+OnUnitInactiveSec=12hours
+RandomizedDelaySec=12hours
+AccuracySec=1s
 
 [Install]
 WantedBy=default.target
