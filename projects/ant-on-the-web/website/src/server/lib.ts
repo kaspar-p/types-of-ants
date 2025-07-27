@@ -14,7 +14,8 @@ function generateBaseUrl(): string {
   let url: string;
   switch (environment) {
     case "prod": {
-      url = `https://typesofants.org`;
+      // Let the browser route itself: https://github.com/whatwg/url/issues/531
+      url = document.baseURI;
       break;
     }
     case "beta": {
@@ -41,7 +42,7 @@ function generateBaseUrl(): string {
 export function getEndpoint(path: string): URL {
   const baseUrl: string = generateBaseUrl();
   if (path[0] !== "/") path = "/" + path;
-  return new URL(baseUrl + path);
+  return new URL(path, baseUrl);
 }
 
 export function getFetchOptions(): { credentials?: "include" } {

@@ -50,6 +50,10 @@ export commit_sha
 log "BUILDING [$project]..."
 
 # Build the project
+build_dir="$project_src/build"
+build_mode="release"
+run_command rm -rf "$build_dir/$build_mode/*"
+
 target=$(jq -r ".[\"$remote_host\"].[\"rust-target\"]" < "$repository_root/services.jsonc")
 make -C "$project_src" -e TARGET="$target" release
 
@@ -69,8 +73,6 @@ secrets_dir="$repository_root/secrets/$deploy_env"
 run_command rsync -a "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
 
 # Copy all other build/ files into the install dir
-build_dir="$project_src/build"
-build_mode="release"
 run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
 
 # Interpret mustache template into the systemctl unit file
