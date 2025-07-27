@@ -42,7 +42,7 @@ commit_sha="$(git log --format='%h' -n 1)"
 commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
 commit_number="$(git rev-list --count HEAD)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
-install_version="$commit_datetime-$commit_sha-v$commit_number"
+install_version="$commit_number-$commit_datetime-$commit_sha"
 
 log "RESOLVING ENVIRONMENT [$project]..."
 
@@ -81,7 +81,7 @@ docker-compose config "${project}" | \
 secrets_dir="${repository_root}/secrets/${deploy_env}"
 rm -f "${install_dir}/.env"
 {
-  cat "${build_env}"
+  cat "${build_cfg}"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
 
 # Copy secrets into the install dir
