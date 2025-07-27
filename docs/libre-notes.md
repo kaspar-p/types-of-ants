@@ -45,24 +45,14 @@ sudo apt-get install autoconf && \
 sudo snap install jq docker btop
 ```
 
-Install a posgresql client matching the version `ant-data-farm` uses:
+Install a postgresql client matching the version `ant-data-farm` uses:
 
 ```bash
-curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | sudo tee /usr/share/keyrings/postgresql.gpg > /dev/null
+sudo apt install dirmngr ca-certificates software-properties-common apt-transport-https lsb-release curl -y
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
 sudo apt update
 sudo apt install -y postgresql-client-15
-```
-
-Optionally (do I still need this?) install `nvm` for node:
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-nvm install --lts
-
-source ~/.bashrc
 ```
 
 And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`.
@@ -100,6 +90,12 @@ Add the `ant` user to be able to `sudo` by adding via `visudo`:
 ```txt
 root  ALL=(ALL:ALL) ALL
 ant   ALL=(ALL:ALL) ALL
+```
+
+Then logout, you can log back in with:
+
+```bash
+ssh2ant <number>
 ```
 
 ## Docker installation
@@ -168,6 +164,14 @@ sudo deluser ubuntu
 sudo deluser pi
 ```
 
+## Reserve the local dynamic IP
+
+To keep this local IP reserved on the network so it doesn't change anymore, go
+to <http://192.168.2.1> > My Devices > Ethernet, and select the current
+antworker.
+
+Make sure to select the IP it is on as _Reserved_.
+
 ## Setup project
 
 First, clone the `types-of-ants` repository:
@@ -199,14 +203,6 @@ machines.
 cargo build
 df
 ```
-
-## Reserve the local dynamic IP
-
-To keep this local IP reserved on the network so it doesn't change anymore, go
-to <http://192.168.2.1> > My Devices > Ethernet, and select the current
-antworker.
-
-Make sure to select the IP it is on as _Reserved_.
 
 ## Daemonization of `ant-host-agent`
 

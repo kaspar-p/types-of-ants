@@ -38,10 +38,10 @@ install_version="${commit_datetime}-${commit_sha}-v${commit_number}"
 log "RESOLVING ENVIRONMENT [$project]..."
 
 # Expose the environment ('beta', 'prod', ...) for other commands to pick up.
-build_env="${repository_root}/secrets/${deploy_env}/build.env"
+build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
 set -o allexport
 # shellcheck disable=SC1090
-source "$build_env"
+source "$build_cfg"
 set +o allexport
 
 # Some projects require this for generating deterministic build hashes

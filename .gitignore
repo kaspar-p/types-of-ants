@@ -30,7 +30,7 @@ images/*
 *.secret
 *.pem
 *.key
-!secrets/*/build.env
+!secrets/*/build.cfg
 !projects/ant-data-farm-client/test-secrets/*.secret
 
 # Added by cargo
