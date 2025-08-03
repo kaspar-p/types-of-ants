@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "7000:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
+      - "${ANT_DATA_FARM_PORT}:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
     environment:
       VERSION: ${VERSION}
       POSTGRES_DB_FILE: /run/secrets/postgres_db
@@ -76,14 +76,14 @@ services:
 
 secrets:
   postgres_db:
-    file: ${INSTALL_DIR}/secrets/postgres_db.secret
+    file: ${SECRETS_DIR}/postgres_db.secret
   postgres_user:
-    file: ${INSTALL_DIR}/secrets/postgres_user.secret
+    file: ${SECRETS_DIR}/postgres_user.secret
   postgres_password:
-    file: ${INSTALL_DIR}/secrets/postgres_password.secret
+    file: ${SECRETS_DIR}/postgres_password.secret
   tls_cert:
-    file: ${INSTALL_DIR}/secrets/tls_cert.pem
+    file: ${SECRETS_DIR}/tls_cert.pem
   tls_cert_key:
-    file: ${INSTALL_DIR}/secrets/tls_key.pem
+    file: ${SECRETS_DIR}/tls_key.pem
   cloudflare_api_token:
-    file: ${INSTALL_DIR}/secrets/cloudflare.secret
+    file: ${SECRETS_DIR}/cloudflare.secret

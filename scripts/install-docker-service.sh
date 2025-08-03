@@ -57,8 +57,7 @@ export VERSION="$install_version"
 install_dir="${remote_home}/service/$project/$install_version"
 export INSTALL_DIR="$install_dir"
 export PERSIST_DIR="${remote_home}/persist"
-
-remote_secrets_dir="${install_dir}/secrets"
+export SECRETS_DIR="$install_dir/secrets"
 
 log "BUILDING [$project]..."
 
@@ -70,7 +69,7 @@ DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose bui
 log "INSTALLING [$project] ONTO [$remote_host]..."
 run_command ssh2ant "$ant_worker_num" "
   mkdir -p ${install_dir};
-  mkdir -p ${remote_secrets_dir}
+  mkdir -p ${SECRETS_DIR}
 "
 
 # Copy dockerfile into install dir
@@ -85,7 +84,7 @@ rm -f "${install_dir}/.env"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
 
 # Copy secrets into the install dir
-run_command scp -r "${secrets_dir}/." "${remote_host}:${remote_secrets_dir}/"
+run_command scp -r "${secrets_dir}/." "${remote_host}:${SECRETS_DIR}/"
 
 # Copy all the docker image and build/ files into the install dir
 build_dir="${project_src}/build"

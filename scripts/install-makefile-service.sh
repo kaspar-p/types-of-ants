@@ -60,6 +60,7 @@ make -C "$project_src" -e TARGET="$target" release
 log "INSTALLING [$project] ONTO [$remote_host]..."
 
 install_dir="$remote_home/service/$project/$install_version"
+remote_secrets_dir="$install_dir/secrets"
 run_command ssh2ant "$ant_worker_num" "
   mkdir -p $install_dir;
   mkdir -p $install_dir/secrets;
@@ -70,7 +71,7 @@ secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_cfg}"
 } | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
-run_command rsync -a "${secrets_dir}/." "${remote_user}@${remote_host}:${install_dir}/secrets"
+run_command rsync -a "${secrets_dir}/." "${remote_user}@${remote_host}:${remote_secrets_dir}"
 
 # Copy all other build/ files into the install dir
 run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
