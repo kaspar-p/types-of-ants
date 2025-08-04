@@ -20,18 +20,17 @@ export default function SmsTermsOfServicePage() {
           When you opt in to SMS communications from typesofants.org, you
           consent to receive recurring messages sent via automated technology to
           the mobile number you provided. These messages may include:
-          <ul>
-            <li>Authentication messages for secure sign-in</li>
-            <li>Product availability updates</li>
-            <li>Order confirmations or delivery notices</li>
-            <li>
-              Marketing messages about promotions, giveaways, or special
-              releases
-            </li>
-            <li>Operational alerts or customer service follow-ups</li>
-          </ul>
-          Consent to receive these messages is not a condition of purchase.
         </p>
+        <ul>
+          <li>Authentication messages for secure sign-in</li>
+          <li>Product availability updates</li>
+          <li>Order confirmations or delivery notices</li>
+          <li>
+            Marketing messages about promotions, giveaways, or special releases
+          </li>
+          <li>Operational alerts or customer service follow-ups</li>
+        </ul>
+        <p>Consent to receive these messages is not a condition of purchase.</p>
       </TermSection>
       <TermSection>
         <TermSectionTitle>how to opt in</TermSectionTitle>

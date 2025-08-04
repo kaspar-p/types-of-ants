@@ -158,41 +158,39 @@ export default function PrivacyPolicyPage() {
           In certain circumstances, we may disclose your personal information to
           third parties for legitimate purposes subject to this Privacy Policy.
           Such circumstances may include:
-          <ul>
-            <li>
-              With vendors and other third parties who perform services on our
-              behalf (e.g. IT management, payment processing, data analytics,
-              customer support, cloud storage, fulfillment and shipping).
-            </li>
-            <li>
-              With business and marketing partners to provide marketing services
-              and advertise to you. Our business and marketing partners will use
-              your information in accordance with their own privacy notices.
-              Depending on where you reside, you may have a right to direct us
-              not to share information about you to show you targeted
-              advertisements and marketing based on your online activity with
-              different merchants and websites. You can exercise your rights to
-              opt-out of those uses here.
-            </li>
-            <li>
-              When you direct, request us or otherwise consent to our disclosure
-              of certain information to third parties, such as to ship you
-              products or through your use of social media widgets or login
-              integrations.
-            </li>
-            <li>
-              With our affiliates or otherwise within our corporate group.
-            </li>
-            <li>
-              In connection with a business transaction such as a merger or
-              bankruptcy, to comply with any applicable legal obligations
-              (including to respond to subpoenas, search warrants and similar
-              requests), to enforce any applicable terms of service or policies,
-              and to protect or defend the Services, our rights, and the rights
-              of our users or others.
-            </li>
-          </ul>
         </p>
+        <ul>
+          <li>
+            With vendors and other third parties who perform services on our
+            behalf (e.g. IT management, payment processing, data analytics,
+            customer support, cloud storage, fulfillment and shipping).
+          </li>
+          <li>
+            With business and marketing partners to provide marketing services
+            and advertise to you. Our business and marketing partners will use
+            your information in accordance with their own privacy notices.
+            Depending on where you reside, you may have a right to direct us not
+            to share information about you to show you targeted advertisements
+            and marketing based on your online activity with different merchants
+            and websites. You can exercise your rights to opt-out of those uses
+            here.
+          </li>
+          <li>
+            When you direct, request us or otherwise consent to our disclosure
+            of certain information to third parties, such as to ship you
+            products or through your use of social media widgets or login
+            integrations.
+          </li>
+          <li>With our affiliates or otherwise within our corporate group.</li>
+          <li>
+            In connection with a business transaction such as a merger or
+            bankruptcy, to comply with any applicable legal obligations
+            (including to respond to subpoenas, search warrants and similar
+            requests), to enforce any applicable terms of service or policies,
+            and to protect or defend the Services, our rights, and the rights of
+            our users or others.
+          </li>
+        </ul>
       </TermSection>
       <TermSection>
         <TermSectionTitle>Third Party Websites and Links</TermSectionTitle>
@@ -252,64 +250,63 @@ export default function PrivacyPolicyPage() {
           listed below in relation to your personal information. However, these
           rights are not absolute, may apply only in certain circumstances and,
           in certain cases, we may decline your request as permitted by law.
-          <ul>
-            <li>
-              Right to Access / Know. You may have a right to request access to
-              personal information that we hold about you.
-            </li>
-            <li>
-              Right to Delete. You may have a right to request that we delete
-              personal information we maintain about you.
-            </li>
-            <li>
-              Right to Correct. You may have a right to request that we correct
-              inaccurate personal information we maintain about you.
-            </li>
-            <li>
-              Right of Portability. You may have a right to receive a copy of
-              the personal information we hold about you and to request that we
-              transfer it to a third party, in certain circumstances and with
-              certain exceptions.
-            </li>
-            <li>
-              Right to Opt out of Sale or Sharing for Targeted Advertising.
-              Depending on where you reside, you may have a right to opt out of
-              the &quot;sale&quot; or &quot;share&quot; of your personal
-              information or to opt out of the processing of your personal
-              information for purposes considered to be &quot;targeted
-              advertising&quot;, as defined in applicable privacy laws. You can
-              exercise your rights to opt-out of those uses here. Please note
-              that if you visit our website with the Global Privacy Control
-              opt-out preference signal enabled, depending on where you are, we
-              will automatically treat this as a request to opt-out for the
-              device and browser that you use to visit the website. To learn
-              more about Global Privacy Control, you can visit
-              https://globalprivacycontrol.org/. Other than the Global Privacy
-              Control, we do not recognize other &quot;Do Not Track&quot;
-              signals that may be sent from your web browser or device.
-            </li>
-            <li>
-              Managing Communication Preferences. We may send you promotional
-              emails, and you may opt out of receiving these at any time by
-              using the unsubscribe option displayed in our emails to you. If
-              you opt out, we may still send you non-promotional emails, such as
-              those about your account or orders that you have made.
-            </li>
-          </ul>
-          <p>
-            You may exercise any of these rights where indicated on the Services
-            or by contacting us using the contact details provided below. We
-            will not discriminate against you for exercising any of these
-            rights. We may need to verify your identity before we can process
-            your requests, as permitted or required under applicable law. In
-            accordance with applicable laws, you may designate an authorized
-            agent to make requests on your behalf to exercise your rights.
-            Before accepting such a request from an agent, we will require that
-            the agent provide proof you have authorized them to act on your
-            behalf, and we may need you to verify your identity directly with
-            us. We will respond to your request in a timely manner as required
-            under applicable law.
-          </p>
+        </p>
+        <ul>
+          <li>
+            Right to Access / Know. You may have a right to request access to
+            personal information that we hold about you.
+          </li>
+          <li>
+            Right to Delete. You may have a right to request that we delete
+            personal information we maintain about you.
+          </li>
+          <li>
+            Right to Correct. You may have a right to request that we correct
+            inaccurate personal information we maintain about you.
+          </li>
+          <li>
+            Right of Portability. You may have a right to receive a copy of the
+            personal information we hold about you and to request that we
+            transfer it to a third party, in certain circumstances and with
+            certain exceptions.
+          </li>
+          <li>
+            Right to Opt out of Sale or Sharing for Targeted Advertising.
+            Depending on where you reside, you may have a right to opt out of
+            the &quot;sale&quot; or &quot;share&quot; of your personal
+            information or to opt out of the processing of your personal
+            information for purposes considered to be &quot;targeted
+            advertising&quot;, as defined in applicable privacy laws. You can
+            exercise your rights to opt-out of those uses here. Please note that
+            if you visit our website with the Global Privacy Control opt-out
+            preference signal enabled, depending on where you are, we will
+            automatically treat this as a request to opt-out for the device and
+            browser that you use to visit the website. To learn more about
+            Global Privacy Control, you can visit
+            https://globalprivacycontrol.org/. Other than the Global Privacy
+            Control, we do not recognize other &quot;Do Not Track&quot; signals
+            that may be sent from your web browser or device.
+          </li>
+          <li>
+            Managing Communication Preferences. We may send you promotional
+            emails, and you may opt out of receiving these at any time by using
+            the unsubscribe option displayed in our emails to you. If you opt
+            out, we may still send you non-promotional emails, such as those
+            about your account or orders that you have made.
+          </li>
+        </ul>
+        <p>
+          You may exercise any of these rights where indicated on the Services
+          or by contacting us using the contact details provided below. We will
+          not discriminate against you for exercising any of these rights. We
+          may need to verify your identity before we can process your requests,
+          as permitted or required under applicable law. In accordance with
+          applicable laws, you may designate an authorized agent to make
+          requests on your behalf to exercise your rights. Before accepting such
+          a request from an agent, we will require that the agent provide proof
+          you have authorized them to act on your behalf, and we may need you to
+          verify your identity directly with us. We will respond to your request
+          in a timely manner as required under applicable law.
         </p>
       </TermSection>
       <TermSection>

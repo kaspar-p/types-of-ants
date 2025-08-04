@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
 export function TermSection(props: { children: React.ReactNode }) {
   return <div className="max-w-3xl">{props.children}</div>;

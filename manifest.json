@@ -1,0 +1,10 @@
+{
+  "project": "ant-on-the-web",
+  "project_type": "rust-binary",
+  "version": "dev",
+  "commit_sha": "sha",
+  "commit_number": "101",
+  "committed_at": "today",
+  "installed_at": "today",
+  "unit_file": "."
+}

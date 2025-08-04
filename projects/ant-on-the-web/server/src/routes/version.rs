@@ -4,7 +4,7 @@ use axum_extra::routing::RouterExt;
 use crate::state::ApiRouter;
 
 async fn current_version() -> impl IntoResponse {
-    ant_library::manifest_file::read_local_manifest_file().commit_number
+    ant_library::manifest_file::read_local_manifest_file(None).commit_number
 }
 
 pub fn router() -> ApiRouter {
