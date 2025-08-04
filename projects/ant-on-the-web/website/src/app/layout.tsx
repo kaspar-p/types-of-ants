@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { getUser, getUserSchema } from "@/server/queries";
 import { TUserContext, UserContext } from "@/state/userContext";
+import Footer from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 const queryClient = new QueryClient();
@@ -39,11 +40,16 @@ export default function RootLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <html lang="en">
-        <body className={inter.className} style={{ fontFamily: "serif" }}>
+        <body
+          className={inter.className + " flex flex-col h-screen m-0"}
+          style={{ fontFamily: "serif" }}
+        >
+          <Header />
           <UserContext.Provider value={{ user, setUser }}>
-            <Header />
-            {children}
+            <div className="mb-auto p-2">{children}</div>
           </UserContext.Provider>
+
+          <Footer />
         </body>
       </html>
     </QueryClientProvider>

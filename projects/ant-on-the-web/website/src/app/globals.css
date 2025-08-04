@@ -10,10 +10,6 @@ body {
   overflow-x: hidden;
 }
 
-.title {
-  text-align: center;
-}
-
 #banner {
   display: block; 
   width: 100%; 

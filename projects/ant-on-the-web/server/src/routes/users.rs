@@ -115,6 +115,49 @@ async fn get_user_by_name(
     ));
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ChangeUsernameRequest {
+    pub username: String,
+}
+
+async fn change_username(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<ChangeUsernameRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = authenticate(&auth, &dao).await?;
+
+    let validations = validate_username(&req.username);
+    if validations.len() > 0 {
+        return Err(AntOnTheWebError::Validation(ValidationError::many(
+            validations,
+        )));
+    }
+
+    let mut users_write = dao.users.write().await;
+
+    let other = users_write.get_one_by_user_name(&req.username).await?;
+
+    match other {
+        Some(other) => {
+            if other.user_id == user.user_id {
+                return Err(AntOnTheWebError::Validation(ValidationError::one(
+                    ValidationMessage::new("username", "Must not be your current username."),
+                )));
+            } else {
+                return Err(AntOnTheWebError::ConflictError("Username already in use."));
+            }
+        }
+        None => {
+            users_write
+                .change_username(&user.user_id, &req.username)
+                .await?;
+
+            Ok((StatusCode::OK, "Username changed."))
+        }
+    }
+}
+
 async fn logout(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
@@ -748,6 +791,28 @@ async fn password(
     }
 }
 
+fn validate_username(username: &str) -> Vec<ValidationMessage> {
+    let mut validations = vec![];
+
+    let username_len = username.len();
+    if username_len < 3 || username_len > 16 {
+        validations.push(ValidationMessage::new(
+            "username",
+            "Field must be between 3 and 16 characters.",
+        ));
+    }
+
+    let username_regex = regex::Regex::new(r"^[a-z0-9]{3,16}$").expect("invalid username regex");
+    if !username_regex.is_match(&username) {
+        validations.push(ValidationMessage::new(
+            "username",
+            "Field must contain only lowercase characters (a-z) and numbers (0-9).",
+        ));
+    }
+
+    return validations;
+}
+
 fn validate_password(password: &str) -> Vec<ValidationMessage> {
     let mut validations: Vec<ValidationMessage> = vec![];
 
@@ -785,22 +850,7 @@ async fn signup_request(
     let validations = {
         let mut validations: Vec<ValidationMessage> = vec![];
 
-        let username_len = signup_request.username.len();
-        if username_len < 3 || username_len > 16 {
-            validations.push(ValidationMessage::new(
-                "username",
-                "Field must be between 3 and 16 characters.",
-            ));
-        }
-
-        let username_regex =
-            regex::Regex::new(r"^[a-z0-9]{3,16}$").expect("invalid username regex");
-        if !username_regex.is_match(&signup_request.username) {
-            validations.push(ValidationMessage::new(
-                "username",
-                "Field must contain only lowercase characters (a-z) and numbers (0-9).",
-            ));
-        }
+        validations.append(&mut validate_username(&signup_request.username));
 
         if signup_request.password != signup_request.password2 {
             validations.push(ValidationMessage::new("password", "Passwords must match."));
@@ -873,6 +923,7 @@ pub fn router() -> ApiRouter {
             post(two_factor_verification_attempt),
         )
         .route_with_tsr("/user", get(get_user_by_name))
+        .route_with_tsr("/username", post(change_username))
         .route_with_tsr("/user/{user_name}", get(get_user_by_name))
         .fallback(|| async {
             ant_library::api_fallback(&[

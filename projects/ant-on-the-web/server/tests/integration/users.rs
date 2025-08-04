@@ -9,8 +9,8 @@ use ant_on_the_web::{
     err::ValidationError,
     users::{
         AddEmailRequest, AddPhoneNumberRequest, AddPhoneNumberResponse, AddResolution,
-        EmailRequest, GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
-        VerificationAttemptRequest, VerificationSubmission,
+        ChangeUsernameRequest, EmailRequest, GetUserResponse, LoginMethod, LoginRequest,
+        LoginResponse, SignupRequest, VerificationAttemptRequest, VerificationSubmission,
     },
 };
 
@@ -1160,5 +1160,150 @@ async fn users_subscribe_newsletter_returns_409_if_email_taken_by_another_user()
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_username_returns_400_if_username_invalid() {
+    let (fixture, cookie) = test_router_auth().await;
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "some-new-username".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "s".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = ChangeUsernameRequest {
+            username:
+                "usernameusernameusernameusernameusernameusernameusernameusernameusernameusername"
+                    .to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_username_returns_4xx_if_not_authenticated() {
+    let fixture = test_router_no_auth().await;
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "other".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "other".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .header("Cookie", "typesofants_auth=other")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_username_returns_409_if_username_already_taken() {
+    let (fixture, cookie) = test_router_auth().await;
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "nobody".to_string(), // existing user
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn users_username_returns_200_if_username_changed_successfully() {
+    let (fixture, cookie) = test_router_auth().await;
+
+    {
+        let req = ChangeUsernameRequest {
+            username: "other".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/users/username")
+            .json(&req)
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: GetUserResponse = res.json().await;
+
+        assert_eq!(body.user.username, "other");
     }
 }

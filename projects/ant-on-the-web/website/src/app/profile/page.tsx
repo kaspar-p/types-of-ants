@@ -1,8 +1,8 @@
 "use client";
 
 import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
-import { NewsletterBox } from "@/components/NewsletterBox";
-import { SuggestionBox } from "@/components/SuggestionBox";
+import ChangeUsernameBox from "@/components/ChangeUsernameBox";
+import InputBanner from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { UserContext } from "@/state/userContext";
 import Link from "next/link";
@@ -19,23 +19,13 @@ export default function ProfilePage() {
   const { user } = useContext(UserContext);
 
   const [changingPassword, setChangingPassword] = useState<boolean>(false);
+  const [changingUsername, setChangingUsername] = useState<boolean>(false);
 
   return (
     <ErrorBoundary isError={false}>
       <LoadingBoundary isLoading={false}>
         <div>
-          <div
-            id="forms-container"
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignSelf: "center",
-            }}
-          >
-            <SuggestionBox />
-            <NewsletterBox />
-          </div>
+          <InputBanner />
 
           <div className="m-3">
             {!(user.weakAuth && user.loggedIn) ? (
@@ -45,9 +35,21 @@ export default function ProfilePage() {
               </h3>
             ) : (
               <div className="flex flex-col md:w-12 xl:w-3/12">
-                <span className="min-w-min m-1">
-                  username: <span>{user.user.username}</span>
-                </span>
+                <div>
+                  <span className="min-w-min m-1">
+                    username: {user.user.username}
+                  </span>
+                  <a
+                    href="javascript:void"
+                    className="min-w-min m-1 ml-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setChangingUsername((s) => !s);
+                    }}
+                  >
+                    change?
+                  </a>
+                </div>
 
                 <span className="min-w-min m-1">
                   id: <code className="bg-slate-200">{user.user.userId}</code>
@@ -67,8 +69,8 @@ export default function ProfilePage() {
                 <span className="min-w-min m-1">
                   {user.user.phoneNumbers.length > 0 ? (
                     <>
-                      phone number{user.user.phoneNumbers.length > 1 ? "s" : ""}
-                      :{" "}
+                      phone number
+                      {user.user.phoneNumbers.length > 1 ? "s" : ""}:{" "}
                       <span>
                         {user.user.phoneNumbers
                           .map((p) => formatPhoneNumber(p))
@@ -95,6 +97,13 @@ export default function ProfilePage() {
                     secret={""}
                     onValid={() => {
                       setTimeout(() => setChangingPassword(false), 3000);
+                    }}
+                  />
+                )}
+                {changingUsername && (
+                  <ChangeUsernameBox
+                    onSuccess={async () => {
+                      setTimeout(() => setChangingUsername(false), 3000);
                     }}
                   />
                 )}

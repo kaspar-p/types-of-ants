@@ -19,7 +19,7 @@ function validator(text: string): { valid: boolean; msg: string } {
 }
 
 export type SuggestionBoxProps = {
-  action?: () => Promise<void> | void;
+  onSuggestion?: () => Promise<void> | void;
 };
 
 export function SuggestionBox(props: SuggestionBoxProps) {
@@ -54,7 +54,7 @@ export function SuggestionBox(props: SuggestionBoxProps) {
         autoComplete="off"
         onSubmit={async (event) => {
           await handle(event);
-          if (props.action !== undefined) await props.action();
+          if (props.onSuggestion !== undefined) await props.onSuggestion();
         }}
       >
         <input

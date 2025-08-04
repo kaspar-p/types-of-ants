@@ -73,9 +73,6 @@ export function Header() {
                   </button>
                 </>
               )}
-              <button className="cursor-pointer" onClick={() => push("/info")}>
-                contact me
-              </button>
 
               {user.weakAuth && user.loggedIn && (
                 <button

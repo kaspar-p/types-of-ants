@@ -9,6 +9,7 @@ import { SuggestionBox } from "../components/SuggestionBox";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { TUserContext, UserContext } from "../state/userContext";
+import InputBanner from "@/components/InputBanner";
 
 export default function Home() {
   const [user, setUser] = useState<TUserContext>({ weakAuth: false });
@@ -35,20 +36,10 @@ export default function Home() {
     <ErrorBoundary isError={isError}>
       <LoadingBoundary isLoading={isLoading}>
         <UserContext.Provider value={{ setUser, user }}>
-          <div
-            id="forms-container"
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignSelf: "center",
-            }}
-          >
-            <SuggestionBox />
-            <NewsletterBox />
-          </div>
+          <InputBanner />
           <AntBanner />
-          <div id="ant-filler">
+
+          <div className="pb-0" id="ant-filler">
             {releasedAnts?.pages.map((page, pageNum) =>
               page.ants.map((ant, i) => (
                 <div key={pageNum * 1000 + i}>{escapeAnt(ant)}</div>

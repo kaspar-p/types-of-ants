@@ -1,5 +1,6 @@
 "use client";
 
+import InputBanner from "@/components/InputBanner";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
@@ -68,22 +69,12 @@ export default function Feed() {
     <ErrorBoundary isError={isError}>
       <LoadingBoundary isLoading={isLoading}>
         <div>
-          <div
-            id="forms-container"
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignSelf: "center",
+          <InputBanner
+            onSuggestion={async () => {
+              await refetch();
             }}
-          >
-            <SuggestionBox
-              action={async () => {
-                await refetch();
-              }}
-            />
-            <NewsletterBox />
-          </div>
+          />
+
           <h3>
             latest ant submissions ({unseenAnts?.length}):{" "}
             <button onClick={() => refetch()}>refresh</button>

@@ -312,15 +312,41 @@ impl UsersDao {
         Ok(())
     }
 
+    pub async fn change_username(
+        &mut self,
+        user_id: &UserId,
+        new_username: &str,
+    ) -> Result<(), anyhow::Error> {
+        let mut db = self.database.lock().await;
+
+        let tx = db.transaction().await?;
+        let affected = tx
+            .execute(
+                "update registered_user set user_name = $1 where user_id = $2::uuid",
+                &[&new_username, &user_id.0],
+            )
+            .await?;
+
+        if affected != 1 {
+            debug!("SQL update for new user_name failed!");
+            tx.rollback().await?;
+            return Err(anyhow::Error::msg("More than 1 affected"));
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn add_email_to_user(
         &mut self,
         user_id: &UserId,
         email: &str,
     ) -> Result<(), anyhow::Error> {
-        let res_affected = self
-            .database
-            .lock()
-            .await
+        let mut db = self.database.lock().await;
+        let tx = db.transaction().await?;
+
+        let res_affected = tx
             .execute(
                 "
                 insert into
@@ -335,8 +361,12 @@ impl UsersDao {
 
         if res_affected != 1 {
             debug!("SQL insert for user email failed!");
+            tx.rollback().await?;
             return Err(anyhow::Error::msg("More than 1 affected"));
         }
+
+        tx.commit().await?;
+
         Ok(())
     }
 

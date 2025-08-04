@@ -31,6 +31,12 @@ const posts = {
     path: "/api/users/logout",
     inputDataSchema: z.object({}),
   },
+  changeUsername: {
+    path: "/api/users/username",
+    inputDataSchema: z.object({
+      username: z.string(),
+    }),
+  },
   addPhoneNumber: {
     path: "/api/users/phone-number",
     inputDataSchema: z.object({
@@ -129,6 +135,9 @@ export const signup = (
 export const logout = () => constructPost(posts.logout, {});
 export const login = (inputData: z.infer<typeof posts.login.inputDataSchema>) =>
   constructPost(posts.login, inputData);
+export const changeUsername = (
+  inputData: z.infer<typeof posts.changeUsername.inputDataSchema>
+) => constructPost(posts.changeUsername, inputData);
 export const addPhoneNumber = (
   inputData: z.infer<typeof posts.addPhoneNumber.inputDataSchema>
 ) => constructPost(posts.addPhoneNumber, inputData);
