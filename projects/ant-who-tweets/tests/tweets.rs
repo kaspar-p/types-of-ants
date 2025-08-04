@@ -27,7 +27,7 @@ async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
         migration_dir: Some(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("..")
-                .join("ant-data-farm/data/sql"),
+                .join("ant-data-farm/migrations"),
         ),
     }))
     .await

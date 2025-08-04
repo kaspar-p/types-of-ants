@@ -51,6 +51,8 @@ pub fn decode_jwt<T: DeserializeOwned>(token: &str) -> Result<T, AntOnTheWebErro
 
 #[cfg(test)]
 mod test {
+    use std::env::set_var;
+
     use chrono::{Duration, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -64,6 +66,8 @@ mod test {
 
     #[test]
     fn inverses() {
+        set_var("TYPESOFANTS_SECRET_DIR", "./test-secrets");
+
         let claims = Claims {
             sub: "sub".to_string(),
             exp: (Utc::now() + Duration::days(5)).timestamp(),

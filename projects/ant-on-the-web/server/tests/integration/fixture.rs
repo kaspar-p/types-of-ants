@@ -28,13 +28,13 @@ async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
     pg.setup().await.unwrap();
     pg.start().await.unwrap();
 
-    pg.create_database("test").await.unwrap();
+    pg.create_database("typesofants").await.unwrap();
 
     let client = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(pg.settings().port),
         host: Some(pg.settings().host.clone()),
         creds: Some(DatabaseCredentials {
-            database_name: "test".to_string(),
+            database_name: "typesofants".to_string(),
             database_password: pg.settings().password.clone(),
             database_user: pg.settings().username.clone(),
         }),
@@ -42,7 +42,7 @@ async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("..")
                 .join("..")
-                .join("ant-data-farm/data/sql"),
+                .join("ant-data-farm/migrations"),
         ),
     }))
     .await
