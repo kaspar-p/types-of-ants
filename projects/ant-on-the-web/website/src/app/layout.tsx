@@ -26,6 +26,7 @@ export default function RootLayout({
         const user = getUserSchema.transformer(
           getUserSchema.schema.parse(await res.json())
         );
+        console.log("LOGGED IN");
         setUser({
           weakAuth: true,
           loggedIn: true,
@@ -40,17 +41,17 @@ export default function RootLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <html lang="en">
-        <body
-          className={inter.className + " flex flex-col h-screen m-0"}
-          style={{ fontFamily: "serif" }}
-        >
-          <Header />
-          <UserContext.Provider value={{ user, setUser }}>
+        <UserContext.Provider value={{ user, setUser }}>
+          <body
+            className={inter.className + " flex flex-col h-screen m-0"}
+            style={{ fontFamily: "serif" }}
+          >
+            <Header />
             <div className="mb-auto p-2">{children}</div>
-          </UserContext.Provider>
 
-          <Footer />
-        </body>
+            <Footer />
+          </body>
+        </UserContext.Provider>
       </html>
     </QueryClientProvider>
   );
