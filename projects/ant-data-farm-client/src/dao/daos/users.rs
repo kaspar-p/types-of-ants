@@ -322,7 +322,11 @@ impl UsersDao {
         let tx = db.transaction().await?;
         let affected = tx
             .execute(
-                "update registered_user set user_name = $1 where user_id = $2::uuid",
+                "update registered_user
+                set
+                    user_name = $1,
+                    updated_at = now()
+                where user_id = $2::uuid",
                 &[&new_username, &user_id.0],
             )
             .await?;
