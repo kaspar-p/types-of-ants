@@ -1,15 +1,22 @@
+use std::error;
+
+use ant_data_farm::web_actions::{WebAction, WebTargetType};
 use axum::{
-    extract::{FromRequestParts, Request},
+    extract::{FromRequestParts, Request, State},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
-use tracing::error;
+use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{err::AntOnTheWebError, routes::lib::auth::cookie_defaults};
+use crate::{
+    err::AntOnTheWebError,
+    routes::lib::auth::{cookie_defaults, optional_authenticate, AuthClaims},
+    state::{ApiState, InnerApiState},
+};
 
 /// This cookie contains encrypted information on who the user is. The encryption is purely symmetric for anti-tampering.
 pub const TELEMETRY_COOKIE_NAME: &str = "typesofants_telemetry";
@@ -60,10 +67,51 @@ where
 }
 
 /// Propagate the cookie associated with telemetry. If there isn't one, generate one and set it.
+/// Saves the web request uri into the database.
 pub async fn telemetry_cookie_middleware(
-    _telemetry: TelemetryCookie, // This has to be here to run the extractor.
+    State(InnerApiState { dao, .. }): ApiState,
+    telemetry: TelemetryCookie, // This has to be here to run the extractor.
+    auth: Option<AuthClaims>,
     req: Request,
     next: Next,
 ) -> Response {
+    let user = optional_authenticate(auth.as_ref(), &dao)
+        .await
+        .map_err(|e| {
+            error!("error finding user during telemetry: {e}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error, please retry.",
+            )
+                .into_response();
+        });
+
+    let uri = req.uri().to_string().clone();
+
+    match user {
+        Ok(u) => {
+            tokio::spawn(async move {
+                info!("Writing telemetry action for page visit to: {uri}");
+                dao.web_actions
+                    .write()
+                    .await
+                    .new_action(
+                        telemetry.token,
+                        &u.clone().user_id,
+                        &WebAction::Visit,
+                        &WebTargetType::Page,
+                        &uri,
+                    )
+                    .await
+                    .unwrap_or_else(|e| {
+                        error!("Writing telemetry failed: {e}");
+                    });
+            });
+        }
+        Err(_) => {
+            //
+        }
+    }
+
     next.run(req).await
 }
