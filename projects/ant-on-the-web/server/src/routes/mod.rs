@@ -7,3 +7,4 @@ pub mod msg;
 pub mod tests;
 pub mod users;
 pub mod version;
+pub mod web_actions;

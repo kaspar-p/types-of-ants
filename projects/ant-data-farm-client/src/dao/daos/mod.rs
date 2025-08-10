@@ -5,3 +5,4 @@ pub mod releases;
 pub mod tweets;
 pub mod users;
 pub mod verifications;
+pub mod web_actions;

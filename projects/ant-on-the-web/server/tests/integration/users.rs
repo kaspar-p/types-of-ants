@@ -1,8 +1,8 @@
 use crate::{
-    fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth},
+    fixture::{get_auth_cookie, test_router_auth, test_router_no_auth, test_router_weak_auth},
     fixture_sms::first_otp,
 };
-use http::{header::SET_COOKIE, StatusCode};
+use http::StatusCode;
 use tracing_test::traced_test;
 
 use ant_on_the_web::{
@@ -465,7 +465,7 @@ async fn users_signup_succeeds() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let cookie = get_auth_cookie(res.headers());
         assert!(cookie.contains("typesofants_auth="));
         assert!(cookie.contains("HttpOnly"));
 
@@ -611,8 +611,9 @@ async fn users_logout_returns_200_if_authenticated() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let expiration_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
-        assert!(expiration_cookie.contains("typesofants_auth="));
+        let expiration_cookie = get_auth_cookie(res.headers());
+
+        assert!(expiration_cookie.contains("typesofants_auth=;"));
         assert!(expiration_cookie.contains("HttpOnly"));
         assert!(expiration_cookie.contains("SameSite"));
 
@@ -736,7 +737,7 @@ async fn users_login_returns_200_with_cookie_headers() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let cookie = get_auth_cookie(res.headers());
         assert!(cookie.contains("typesofants_auth="));
         // assert!(cookie.contains("SameSite=Strict"));
         assert!(cookie.contains("HttpOnly"));
@@ -776,13 +777,7 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
             assert_eq!(res.status(), StatusCode::OK);
             assert_eq!(res.status(), StatusCode::OK);
 
-            let cookie = res
-                .headers()
-                .get(SET_COOKIE)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string();
+            let cookie = get_auth_cookie(res.headers());
             assert_eq!(res.text().await, "Signup completed.");
 
             cookie

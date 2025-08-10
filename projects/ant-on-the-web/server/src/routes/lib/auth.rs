@@ -9,18 +9,17 @@ use axum::{
     extract::{FromRequestParts, OptionalFromRequestParts},
     http::StatusCode,
     response::{IntoResponse, Response},
-    RequestPartsExt,
 };
-use axum_extra::{
-    extract::cookie::{Cookie, SameSite},
-    headers, TypedHeader,
-};
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use cookie::{
     time::{Duration, OffsetDateTime},
     CookieBuilder,
 };
 use serde::{Deserialize, Serialize};
+use tower_cookies::Cookies;
 use tracing::{debug, error, info, warn};
+
+use crate::err::AntOnTheWebError;
 
 use super::{
     jwt,
@@ -28,7 +27,7 @@ use super::{
 };
 
 /// The cookie is a secret artifact that (if correct), proves the user is who they say they are.
-const AUTH_COOKIE_NAME: &str = "typesofants_auth";
+pub const AUTH_COOKIE_NAME: &str = "typesofants_auth";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthClaims {
@@ -82,31 +81,28 @@ where
 
     async fn from_request_parts(
         parts: &mut http::request::Parts,
-        _state: &S,
+        state: &S,
     ) -> Result<Option<Self>, Self::Rejection> {
-        // Extract the Cookie header
-        let cookie = match parts.extract::<TypedHeader<headers::Cookie>>().await.ok() {
-            Some(TypedHeader(cookie)) if cookie.len() != 0 => cookie,
-            None | Some(_) => {
-                info!("cookie not included for optional auth, skipping...");
+        let cookies = Cookies::from_request_parts(parts, state)
+            .await
+            .map_err(|e| {
+                error!("Failed to parse cookies: {:?}", e);
+                return AntOnTheWebError::InternalServerError(None).into();
+            })?;
+
+        let jwt = match cookies.get(AUTH_COOKIE_NAME) {
+            Some(cookie) => cookie,
+            None => {
+                info!(
+                    "cookie had no '{}' key for optional auth, skipping...",
+                    AUTH_COOKIE_NAME
+                );
                 return Ok(None);
             }
         };
 
-        // If the user specifies a cookie, it has to have the right properties.
-        let jwt = match cookie.get(AUTH_COOKIE_NAME) {
-            Some(cookie) => cookie,
-            None => {
-                warn!("Cookie {:?} had no '{}' key", cookie, AUTH_COOKIE_NAME);
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Invalid authorization token.".to_string(),
-                ));
-            }
-        };
-
-        // Decode claim data
-        let claim_data = jwt::decode_jwt::<AuthClaims>(jwt).map_err(|e| {
+        // If cookie is specified it can't be tampered with Decode claim data
+        let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
             warn!("decode jwt failed: {e:?}");
             return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
         })?;
@@ -125,21 +121,16 @@ where
 
     async fn from_request_parts(
         parts: &mut http::request::Parts,
-        _state: &S,
+        state: &S,
     ) -> Result<Self, Self::Rejection> {
-        // Extract the Bearer token header
-        let TypedHeader(cookie) = parts
-            .extract::<TypedHeader<headers::Cookie>>()
+        let cookies = Cookies::from_request_parts(parts, state)
             .await
             .map_err(|e| {
-                warn!("Invalid authorization token: {e}");
-                return (
-                    StatusCode::BAD_REQUEST,
-                    "Invalid authorization token.".to_string(),
-                );
+                error!("Failed to parse cookies: {:?}", e);
+                return AntOnTheWebError::InternalServerError(None).into();
             })?;
 
-        let jwt = match cookie.get(AUTH_COOKIE_NAME) {
+        let jwt = match cookies.get(AUTH_COOKIE_NAME) {
             Some(cookie) => cookie,
             None => {
                 warn!("No '{}' cookie found.", AUTH_COOKIE_NAME);
@@ -151,7 +142,7 @@ where
         };
 
         // Decode claim data
-        let claim_data = jwt::decode_jwt::<AuthClaims>(jwt).map_err(|e| {
+        let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
             warn!("decode jwt failed: {e:?}");
             return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
         })?;
@@ -319,7 +310,7 @@ pub fn make_weak_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>
     let claims = AuthClaims::new(user_id);
     let jwt = jwt::encode_jwt(&claims)?;
 
-    let cookie = cookie_defaults(jwt.clone())
+    let cookie = cookie_defaults(AUTH_COOKIE_NAME, jwt.clone())
         .expires(OffsetDateTime::now_utc().saturating_add(Duration::minutes(15)))
         .build();
 
@@ -333,14 +324,14 @@ pub fn make_auth_cookie(user_id: UserId) -> Result<(String, Cookie<'static>), an
     let jwt = jwt::encode_jwt(&claims)?;
 
     debug!("Making JWT auth cookie for the browser...");
-    let cookie = cookie_defaults(jwt.clone()).build();
+    let cookie = cookie_defaults(AUTH_COOKIE_NAME, jwt.clone()).build();
 
     Ok((jwt, cookie))
 }
 
-pub fn cookie_defaults(jwt: String) -> CookieBuilder<'static> {
+pub fn cookie_defaults(name: &'static str, content: String) -> CookieBuilder<'static> {
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
-    Cookie::build((AUTH_COOKIE_NAME, jwt.clone()))
+    Cookie::build((name, content.clone()))
         .secure(true)
         .http_only(true)
         .permanent()

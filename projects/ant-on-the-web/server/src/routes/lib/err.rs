@@ -84,6 +84,35 @@ impl IntoResponse for AntOnTheWebError {
     }
 }
 
+impl Into<(StatusCode, String)> for AntOnTheWebError {
+    fn into(self) -> (StatusCode, String) {
+        match self {
+            AntOnTheWebError::InternalServerError(e) => {
+                error!("AntOnTheWebError::InternalServerError: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong, please retry.".to_string(),
+                )
+            }
+
+            AntOnTheWebError::AccessDenied(identity) => {
+                warn!("AntOnTheWebError::AccessDenied: {:?}", identity);
+                (StatusCode::UNAUTHORIZED, "Access denied.".to_string())
+            }
+
+            AntOnTheWebError::Validation(msg) => {
+                warn!("AntOnTheWebError::ValidationError: {:?}", msg);
+                panic!("Not supported!")
+            }
+
+            AntOnTheWebError::ConflictError(taken) => {
+                warn!("UsersError::ConflictError: {:?}", taken);
+                (StatusCode::CONFLICT, taken.to_string())
+            }
+        }
+    }
+}
+
 impl From<AuthError> for AntOnTheWebError {
     fn from(value: AuthError) -> Self {
         match value {

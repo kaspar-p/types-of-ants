@@ -8,11 +8,12 @@ pub use crate::dao::daos::releases;
 pub use crate::dao::daos::tweets;
 pub use crate::dao::daos::users;
 pub use crate::dao::daos::verifications;
+pub use crate::dao::daos::web_actions;
 
 use crate::{
     dao::daos::{
         ants::AntsDao, hosts::HostsDao, releases::ReleasesDao, tweets::TweetsDao, users::UsersDao,
-        verifications::VerificationsDao,
+        verifications::VerificationsDao, web_actions::WebActionsDao,
     },
     dao::db::Database,
     types::ConnectionPool,
@@ -129,6 +130,7 @@ pub struct AntDataFarmClient {
     pub verifications: RwLock<VerificationsDao>,
     pub tweets: RwLock<TweetsDao>,
     pub hosts: RwLock<HostsDao>,
+    pub web_actions: RwLock<WebActionsDao>,
     // pub deployments: DeploymentsDao,
     // pub metrics: MetricsDao,
     // pub tests: TestsDao,
@@ -164,20 +166,14 @@ impl AntDataFarmClient {
 
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
 
-        let ants = RwLock::new(AntsDao::new(database.clone()).await?);
-        let releases = RwLock::new(ReleasesDao::new(database.clone()).await);
-        let users = RwLock::new(UsersDao::new(database.clone()).await?);
-        let verifications = RwLock::new(VerificationsDao::new(database.clone()));
-        let tweets = RwLock::new(TweetsDao::new(database.clone()));
-        let hosts = RwLock::new(HostsDao::new(database.clone()).await?);
-
         Ok(AntDataFarmClient {
-            ants,
-            releases,
-            tweets,
-            users,
-            verifications,
-            hosts,
+            ants: RwLock::new(AntsDao::new(database.clone()).await?),
+            releases: RwLock::new(ReleasesDao::new(database.clone()).await),
+            tweets: RwLock::new(TweetsDao::new(database.clone())),
+            users: RwLock::new(UsersDao::new(database.clone()).await?),
+            verifications: RwLock::new(VerificationsDao::new(database.clone())),
+            hosts: RwLock::new(HostsDao::new(database.clone()).await?),
+            web_actions: RwLock::new(WebActionsDao::new(database.clone()).await?),
         })
     }
 }

@@ -6,6 +6,7 @@ use routes::{lib::err::AntOnTheWebError, version};
 use std::sync::Arc;
 use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
+use tower_cookies::CookieManagerLayer;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLayer};
 use tower_http::{
     catch_panic::CatchPanicLayer,
@@ -27,10 +28,12 @@ pub use crate::routes::ants;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;
 pub use crate::routes::lib::err;
+use crate::routes::lib::telemetry::telemetry_cookie_middleware;
 pub use crate::routes::lib::two_factor;
 pub use crate::routes::metrics;
 pub use crate::routes::tests;
 pub use crate::routes::users;
+pub use crate::routes::web_actions;
 
 fn origins() -> AllowOrigin {
     match dotenv::var("ANT_ON_THE_WEB_ALLOWED_ORIGINS") {
@@ -90,17 +93,14 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
         // .nest("/msg", routes::msg::router())
         .nest("/users", users::router())
         .nest("/hosts", hosts::router())
+        .nest("/web-actions", web_actions::router())
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
         // .nest("/deployments", deployments::router())
         .with_state(state.clone())
-        .layer(axum::middleware::from_fn(
+        .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
             ant_library::middleware_print_request_response,
-        ))
-        .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
-        // .layer(axum::middleware::from_fn(
-        //     ant_library::middleware_mode_headers,
-        // ))
+        )))
         .fallback(|| async {
             ant_library::api_fallback(&[
                 "GET /version",
@@ -124,7 +124,10 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(cors)
-                .layer(GovernorLayer { config: throttling }),
+                .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
+                .layer(GovernorLayer { config: throttling })
+                .layer(CookieManagerLayer::new())
+                .layer(axum::middleware::from_fn(telemetry_cookie_middleware)),
         );
 
     return Ok(app);

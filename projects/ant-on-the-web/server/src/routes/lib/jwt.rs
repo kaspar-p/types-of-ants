@@ -43,7 +43,7 @@ pub fn decode_jwt<T: DeserializeOwned>(token: &str) -> Result<T, AntOnTheWebErro
         &jsonwebtoken::Validation::default(),
     )
     .map_err(|e| {
-        return AntOnTheWebError::AccessDenied(Some("tampered jwt: ".to_string() + &e.to_string()));
+        AntOnTheWebError::AccessDenied(Some("tampered jwt: ".to_string() + &e.to_string()))
     })?;
 
     return Ok(a.claims);

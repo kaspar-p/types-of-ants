@@ -1,4 +1,5 @@
 pub mod ants;
+pub mod files;
 pub mod fixture;
 pub mod fixture_email;
 pub mod fixture_sms;
@@ -8,3 +9,4 @@ pub mod ping;
 pub mod throttle;
 pub mod two_factor;
 pub mod users;
+pub mod web_actions;

@@ -12,7 +12,7 @@ use ant_on_the_web::{
         VerificationAttemptRequest, VerificationSubmission,
     },
 };
-use http::{header::SET_COOKIE, StatusCode};
+use http::{header::SET_COOKIE, HeaderMap, StatusCode};
 use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
 use tokio::sync::Mutex;
@@ -88,6 +88,28 @@ pub struct TestFixture {
     _guard: PostgreSQL,
 }
 
+pub fn get_auth_cookie(headers: &HeaderMap) -> String {
+    headers
+        .get_all(SET_COOKIE)
+        .iter()
+        .find(|h| h.to_str().unwrap().contains("typesofants_auth"))
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
+pub fn get_telemetry_cookie(headers: &HeaderMap) -> String {
+    headers
+        .get_all(SET_COOKIE)
+        .iter()
+        .find(|h| h.to_str().unwrap().contains("typesofants_telemetry"))
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
 async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
     let (db, db_client) = test_database_client().await;
     let sms = TestSmsSender {
@@ -159,12 +181,7 @@ pub async fn test_router_auth() -> (TestFixture, String) {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        res.headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
+        get_auth_cookie(res.headers())
     };
 
     {
@@ -205,12 +222,7 @@ pub async fn test_router_auth() -> (TestFixture, String) {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        res.headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
+        get_auth_cookie(res.headers())
     };
 
     return (fixture, cookie);

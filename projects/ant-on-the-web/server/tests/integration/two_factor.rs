@@ -1,7 +1,10 @@
 use std::any::Any;
 
 use crate::{
-    fixture::{test_router_auth, test_router_no_auth, test_router_weak_auth, TestSmsSender},
+    fixture::{
+        get_auth_cookie, test_router_auth, test_router_no_auth, test_router_weak_auth,
+        TestSmsSender,
+    },
     fixture_email::TestEmailSender,
     fixture_sms::{first_otp, second_otp, third_otp},
 };
@@ -10,7 +13,7 @@ use ant_on_the_web::users::{
     AddResolution, GetUserResponse, LoginRequest, SignupRequest, VerificationAttemptRequest,
     VerificationSubmission,
 };
-use http::{header::SET_COOKIE, StatusCode};
+use http::StatusCode;
 use tracing_test::traced_test;
 
 #[tokio::test]
@@ -79,7 +82,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = get_auth_cookie(res.headers());
         assert!(new_cookie.contains("typesofants_auth="));
         assert!(new_cookie.contains("HttpOnly"));
 
@@ -132,13 +135,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let new_cookie = get_auth_cookie(res.headers());
         assert!(new_cookie.contains("typesofants_auth="));
         assert!(new_cookie.contains("HttpOnly"));
 
@@ -256,13 +253,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let cookie = get_auth_cookie(res.headers());
         assert_eq!(res.text().await, "Signup completed.");
 
         cookie
@@ -304,13 +295,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
     }
 }
@@ -344,15 +329,7 @@ async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_v
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        cookie
+        get_auth_cookie(res.headers())
     };
 
     // existing phone number works
@@ -423,15 +400,7 @@ async fn users_email_returns_401_if_weak_auth_when_user_has_already_2fa_verified
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        cookie
+        get_auth_cookie(res.headers())
     };
 
     // existing phone number works
@@ -499,15 +468,7 @@ async fn users_verification_attempt_returns_401_if_weak_auth_when_user_has_alrea
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        cookie
+        get_auth_cookie(res.headers())
     };
 
     // unknown number returns 400
@@ -614,13 +575,7 @@ async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() 
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
 
         new_cookie
@@ -661,13 +616,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let cookie = get_auth_cookie(res.headers());
         assert_eq!(res.text().await, "Signup completed.");
 
         cookie
@@ -724,7 +673,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
     }
 }
@@ -836,7 +785,7 @@ async fn users_phone_number_returns_200_and_cancels_previous_codes() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
     }
 }
@@ -861,13 +810,7 @@ async fn users_email_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let cookie = res
-            .headers()
-            .get(SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let cookie = get_auth_cookie(res.headers());
         assert_eq!(res.text().await, "Signup completed.");
 
         cookie
@@ -922,7 +865,7 @@ async fn users_email_returns_200_after_only_signup_no_login() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
     }
 }
@@ -1045,7 +988,7 @@ async fn users_email_returns_200_and_cancels_previous_codes() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let new_cookie = res.headers().get(SET_COOKIE).unwrap().to_str().unwrap();
+        let new_cookie = get_auth_cookie(res.headers());
         assert_ne!(new_cookie, cookie);
     }
 }

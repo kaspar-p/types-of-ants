@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::{
     err::ValidationError,
     routes::lib::{
-        auth::{make_auth_cookie, make_weak_auth_cookie},
+        auth::{make_auth_cookie, make_weak_auth_cookie, AUTH_COOKIE_NAME},
         err::ValidationMessage,
         two_factor,
     },
@@ -20,8 +20,8 @@ use axum::{
 };
 use axum_extra::routing::RouterExt;
 use chrono::{Duration, Utc};
-use http::header;
 use serde::{Deserialize, Serialize};
+use tower_cookies::Cookies;
 use tracing::{debug, info};
 
 use super::lib::{
@@ -160,18 +160,17 @@ async fn change_username(
 
 async fn logout(
     auth: AuthClaims,
+    cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
-    let mut cookie_expiration = cookie_defaults("".to_string()).build();
+    let mut cookie_expiration = cookie_defaults(AUTH_COOKIE_NAME, "".to_string()).build();
     cookie_expiration.make_removal();
 
-    return Ok((
-        StatusCode::OK,
-        [(header::SET_COOKIE, cookie_expiration.to_string())],
-        "Logout successful.",
-    ));
+    cookies.add(cookie_expiration);
+
+    return Ok((StatusCode::OK, "Logout successful."));
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -209,6 +208,7 @@ pub struct LoginResponse {
     pub access_token: String,
 }
 async fn login(
+    cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(login_request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
@@ -257,9 +257,10 @@ async fn login(
     debug!("Password verified, generating jwt token...");
     let (jwt, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
 
+    cookies.add(cookie);
+
     return Ok((
         StatusCode::OK,
-        [(header::SET_COOKIE, cookie.to_string())],
         Json(LoginResponse {
             user_id: user.user_id.clone(),
             access_token: jwt,
@@ -288,6 +289,7 @@ pub struct VerificationAttemptRequest {
 
 async fn two_factor_verification_attempt(
     auth: AuthClaims,
+    cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<VerificationAttemptRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
@@ -377,14 +379,10 @@ async fn two_factor_verification_attempt(
                 }
             }
 
-            let (_, cookie) = make_auth_cookie(user.user_id.clone())?;
+            // Overwrite the old cookie with a new 2fa cookie
+            cookies.add(make_auth_cookie(user.user_id.clone())?.1);
 
-            return Ok((
-                StatusCode::OK,
-                [(header::SET_COOKIE, cookie.to_string())], // Overwrite the old cookie with a new 2fa cookie
-                "Verification successful.",
-            )
-                .into_response());
+            return Ok((StatusCode::OK, "Verification successful.").into_response());
         }
     }
 }
@@ -842,6 +840,7 @@ pub struct SignupRequest {
 }
 
 async fn signup_request(
+    cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(signup_request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
@@ -897,14 +896,9 @@ async fn signup_request(
     };
 
     // Make a weak auth token for the user for 2fa routes
-    let (_, cookie) = make_weak_auth_cookie(user.user_id.clone())?;
+    cookies.add(make_weak_auth_cookie(user.user_id.clone())?.1);
 
-    return Ok((
-        StatusCode::OK,
-        [(header::SET_COOKIE, cookie.to_string())],
-        "Signup completed.",
-    )
-        .into_response());
+    return Ok((StatusCode::OK, "Signup completed.").into_response());
 }
 
 pub fn router() -> ApiRouter {
