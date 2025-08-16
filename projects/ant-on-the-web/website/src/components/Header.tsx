@@ -6,7 +6,7 @@ import React, { useContext } from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { useRouter } from "next/navigation";
 import { UserContext } from "@/state/userContext";
-import { logout } from "@/server/posts";
+import { action, logout } from "@/server/posts";
 import Link from "next/link";
 
 export function Header() {
@@ -84,11 +84,29 @@ export function Header() {
               )}
             </div>
             <div className="text-center flex flex-row space-x-2 align-center justify-center">
-              <Link href="https://twitter.com/typesofants">
+              <Link
+                href="https://twitter.com/typesofants"
+                onClick={() =>
+                  action({
+                    action: "visit",
+                    targetType: "page",
+                    target: "https://twitter.com/typesofants",
+                  })
+                }
+              >
                 <button className="cursor-pointer">twitter @typesofants</button>
               </Link>
-              <Link href="https://github.com/kaspar-p/types-of-ants">
-                <button className="cursor-pointer">
+              <Link
+                href="https://github.com/kaspar-p/types-of-ants"
+                onClick={() =>
+                  action({
+                    action: "visit",
+                    targetType: "page",
+                    target: "https://github.com/kaspar-p/types-of-ants",
+                  })
+                }
+              >
+                <button id="github-link" className="cursor-pointer">
                   ant who wants to read the code
                 </button>
               </Link>

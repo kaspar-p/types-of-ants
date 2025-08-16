@@ -4,11 +4,12 @@ import InputBanner from "@/components/InputBanner";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
+import { action } from "@/server/posts";
 import { Ant, getUnseenAnts } from "@/server/queries";
 import { UserContext } from "@/state/userContext";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
   const months = [
@@ -52,8 +53,7 @@ function AntPost({ ant }: AntPostProps) {
 }
 
 export default function Feed() {
-  const { user, setUser } = useContext(UserContext);
-  const [page, setPage] = useState(0);
+  const [page] = useState(0);
 
   const {
     isLoading,
@@ -63,6 +63,7 @@ export default function Feed() {
   } = useQuery({
     queryKey: ["unseenAnts"],
     queryFn: () => getUnseenAnts(page),
+    refetchInterval: 10_000,
   });
 
   return (
@@ -77,7 +78,19 @@ export default function Feed() {
 
           <h3>
             latest ant submissions ({unseenAnts?.length}):{" "}
-            <button onClick={() => refetch()}>refresh</button>
+            <button
+              id="feed-refresh"
+              onClick={() => {
+                action({
+                  action: "click",
+                  targetType: "button",
+                  target: "feed-refresh",
+                });
+                refetch();
+              }}
+            >
+              refresh
+            </button>
           </h3>
           {unseenAnts?.map((ant, i) => (
             <AntPost key={i} ant={ant} />

@@ -98,6 +98,18 @@ const posts = {
       email: z.string(),
     }),
   },
+  action: {
+    path: "/api/web-actions/action",
+    inputDataSchema: z.object({
+      action: z.union([
+        z.literal("visit"),
+        z.literal("click"),
+        z.literal("hover"),
+      ]),
+      targetType: z.union([z.literal("page"), z.literal("button")]),
+      target: z.string(),
+    }),
+  },
 };
 
 type Query = (typeof posts)[keyof typeof posts];
@@ -156,3 +168,6 @@ export const passwordResetSecret = (
 export const password = (
   inputData: z.infer<typeof posts.password.inputDataSchema>
 ) => constructPost(posts.password, inputData);
+export const action = (
+  inputData: z.infer<typeof posts.action.inputDataSchema>
+) => constructPost(posts.action, inputData);

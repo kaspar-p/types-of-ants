@@ -3,6 +3,7 @@ import Marquee from "react-fast-marquee";
 import { getLatestAnts } from "../server/queries";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "./UnhappyPath";
+import { action } from "@/server/posts";
 
 function formatDate(d: Date): string {
   const months = [
