@@ -117,10 +117,6 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
     let app = Router::new()
         .nest("/api", api_routes)
         .route_with_tsr("/ping", get(ant_library::api_ping))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            telemetry_cookie_middleware,
-        ))
         // Marking the main filesystem as fallback allows wrong paths like
         // /api/something to still hit the /api router fallback()
         .fallback_service(ServeDir::new("static"))
@@ -130,7 +126,11 @@ pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error
                 .layer(cors)
                 .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
                 .layer(GovernorLayer { config: throttling })
-                .layer(CookieManagerLayer::new()),
+                .layer(CookieManagerLayer::new())
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    telemetry_cookie_middleware,
+                )),
         );
 
     return Ok(app);
