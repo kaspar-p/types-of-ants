@@ -39,12 +39,3 @@ for filename in "$migrations_root"/*; do
   --file "$filename" \
   --echo-all
 done
-
-
-# PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/postgres_password.secret")" psql \
-#   --host "$ANT_DATA_FARM_HOST" \
-#   --port "$ANT_DATA_FARM_PORT" \
-#   --username "$(cat "$repository_root/secrets/$deploy_env/postgres_user.secret")" \
-#   --dbname "$(cat "$repository_root/secrets/$deploy_env/postgres_db.secret")" \
-#   --file "$migration_file" \
-#   --echo-all
