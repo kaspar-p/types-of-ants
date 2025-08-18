@@ -412,3 +412,16 @@ impl UsersDao {
         Ok(user)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::users::make_password_hash;
+
+    #[test]
+    fn password_hashing_works() {
+        let hash = make_password_hash("super-secret-ant-password").unwrap();
+        println!("{}", hash);
+
+        assert!(hash.contains("argon2"))
+    }
+}

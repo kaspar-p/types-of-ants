@@ -1,0 +1,21 @@
+dear (Github: {{gh_name}}, {{gh_login}}, {{gh_id}})
+
+we are emailing you to inform you that a typesofants.org user has been created
+for you. we appreciate your contributions and our data-mining efforts have shown
+that you previously have submitted ants such as:
+
+{{ant_list}}
+
+but do not yet have a typesofants.org account. one has been created for you,
+with the following details.
+
+user_name       {{user_name}}
+email           {{user_email}}
+github_user_id  {{gh_id}}
+
+and a random password. to access the account, please use
+https://typesofants.org/login and reset your password using email two-factor
+authentication.
+
+love&ants,
+    the typesofants.org team

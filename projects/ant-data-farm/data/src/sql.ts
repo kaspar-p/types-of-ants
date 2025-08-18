@@ -3,7 +3,7 @@ import {
   type AntMetadata,
   type LegacyAntWithRelease,
   type AcceptedAntWithRelease,
-} from "./main";
+} from "./main.js";
 
 export function hashCode(str: string): number {
   let hash = 0;
@@ -19,7 +19,7 @@ export function sanitizeForSql(content: string): string {
   return content.replace(/'/g, "''");
 }
 
-function toSqlDate(date: string): string {
+export function toSqlDate(date: string): string {
   return new Date(date).toISOString().slice(0, 19).replace("T", " ");
 }
 
