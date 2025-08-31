@@ -1,3 +1,8 @@
 #!/bin/bash
 
-ssh -i "$HOME/.ssh/id_typesofants_ed25519" "ant@$(dig +short "$(anthost "$1")")" "${@:2}"
+set -euo pipefail
+
+num="$(antnum "$1")"
+remote_host="$(dig +short ip.typesofants.org)"
+
+ssh -p "13${num}" -i "$HOME/.ssh/id_typesofants_ed25519" "ant@${remote_host}" "${@:2}"
