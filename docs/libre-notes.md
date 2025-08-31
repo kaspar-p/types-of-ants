@@ -164,13 +164,43 @@ sudo deluser ubuntu
 sudo deluser pi
 ```
 
-## Reserve the local dynamic IP
+## Local network
+
+### Change the hostname
+
+Go to <http://192.168.2.1> > My Devices > Ethernet, and select the current
+device. Change the hostname of the new device to `antworker<num>` in the web
+terminal, if not already done so.
+
+### Reserve the local dynamic IP
 
 To keep this local IP reserved on the network so it doesn't change anymore, go
 to <http://192.168.2.1> > My Devices > Ethernet, and select the current
 antworker.
 
 Make sure to select the IP it is on as _Reserved_.
+
+### Open a debugging SSH port
+
+Open a debugging port used for reading logs if not on the current network.
+
+```txt
+Name:           ssh-antworker<num>
+Protocol:       Both
+Internal Port:  22
+External Port:  13<num>
+Device:         antworker<num>
+```
+
+For example:
+
+```txt
+Name:           ssh-antworker002
+Protocol:       Both
+Internal Port:  22
+External Port:  13002
+Device:         antworker002
+```
 
 ## Setup project
 
