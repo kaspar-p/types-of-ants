@@ -202,6 +202,15 @@ External Port:  13002
 Device:         antworker002
 ```
 
+## Ghostty setup
+
+To get cmd+left, opt+left, and other keybinds to work remotely, from the local
+computer run:
+
+```bash
+infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
+```
+
 ## Setup project
 
 First, clone the `types-of-ants` repository:
