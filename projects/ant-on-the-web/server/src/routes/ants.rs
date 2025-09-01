@@ -1,6 +1,10 @@
-use crate::state::{ApiRouter, ApiState, InnerApiState};
+use crate::{
+    err::{AntOnTheWebError, ValidationError, ValidationMessage},
+    routes::lib::auth::authenticate,
+    state::{ApiRouter, ApiState, InnerApiState},
+};
 use ant_data_farm::{
-    ants::{Ant, AntStatus},
+    ants::{Ant, AntId, AntStatus},
     releases::Release,
     users::UserId,
     DaoTrait,
@@ -8,16 +12,15 @@ use ant_data_farm::{
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
 
-use super::lib::auth::{optional_authenticate, AuthClaims, AuthError};
+use super::lib::auth::{optional_authenticate, AuthClaims};
 
 const PAGE_SIZE: usize = 1_000_usize;
 
@@ -27,7 +30,7 @@ pub struct AllAntsResponse {
 }
 async fn all_ants(
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await.get_all().await?;
     Ok((
         StatusCode::OK,
@@ -48,7 +51,7 @@ struct UnreleasedAntsResponse {
 async fn unreleased_ants(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let mut unreleased_ants = ants
@@ -86,7 +89,7 @@ async fn unreleased_ants(
 async fn declined_ants(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let declined_ants = ants
@@ -123,7 +126,7 @@ pub struct ReleasedAntsResponse {
 async fn released_ants(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let released_ants = ants
@@ -172,14 +175,16 @@ async fn latest_release(State(InnerApiState { dao, .. }): ApiState) -> impl Into
 pub struct TotalResponse {
     pub total: usize,
 }
-async fn total(State(InnerApiState { dao, .. }): ApiState) -> Result<impl IntoResponse, AntsError> {
+async fn total(
+    State(InnerApiState { dao, .. }): ApiState,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
     let total = ants.get_all_released().await?.len();
     Ok((StatusCode::OK, Json(TotalResponse { total })))
 }
 
 #[derive(Serialize, Deserialize)]
-struct LatestAntsResponse {
+pub struct LatestAntsResponse {
     #[serde(with = "chrono::serde::ts_seconds")]
     pub date: chrono::DateTime<chrono::Utc>,
     pub release: i32,
@@ -187,7 +192,7 @@ struct LatestAntsResponse {
 }
 async fn latest_ants(
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
 
@@ -229,14 +234,14 @@ struct FeedInput {
 }
 
 #[derive(Serialize, Deserialize)]
-struct FeedResponse {
+pub struct FeedResponse {
     pub ants: Vec<Ant>,
 }
 
 async fn feed(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<FeedInput>,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let feed = match ants
@@ -273,7 +278,7 @@ async fn make_suggestion(
     auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     Json(suggestion): Json<SuggestionRequest>,
-) -> Result<impl IntoResponse, AntsError> {
+) -> Result<impl IntoResponse, AntOnTheWebError> {
     let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     let mut ants = dao.ants.write().await;
@@ -286,6 +291,74 @@ async fn make_suggestion(
         StatusCode::OK,
         Json(SuggestionResponse { ant }).into_response(),
     ))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FavoriteAntRequest {
+    #[serde(rename = "antId")]
+    pub ant_id: AntId,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FavoriteAntResponse {
+    #[serde(rename = "favoritedAt")]
+    pub favorited_at: DateTime<Utc>,
+}
+
+async fn favorite_ant(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<FavoriteAntRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = authenticate(&auth, &dao).await?;
+
+    let mut ants = dao.ants.write().await;
+
+    if ants.get_one_by_id(&req.ant_id).await?.is_none() {
+        return Err(AntOnTheWebError::Validation(ValidationError::one(
+            ValidationMessage::new("antId", "No such ant."),
+        )));
+    }
+
+    let favorited_at: DateTime<Utc> = match ants.is_favorite_ant(&user.user_id, &req.ant_id).await?
+    {
+        Some(time) => time,
+        None => ants.favorite_ant(&user.user_id, &req.ant_id).await?,
+    };
+
+    Ok((StatusCode::OK, Json(FavoriteAntResponse { favorited_at })))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UnfavoriteAntRequest {
+    #[serde(rename = "antId")]
+    pub ant_id: AntId,
+}
+
+async fn unfavorite_ant(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<UnfavoriteAntRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = authenticate(&auth, &dao).await?;
+
+    let mut ants = dao.ants.write().await;
+
+    if ants.get_one_by_id(&req.ant_id).await?.is_none() {
+        return Err(AntOnTheWebError::Validation(ValidationError::one(
+            ValidationMessage::new("antId", "No such ant."),
+        )));
+    }
+
+    if ants
+        .is_favorite_ant(&user.user_id, &req.ant_id)
+        .await?
+        .is_some()
+    {
+        ants.unfavorite_ant(&user.user_id, &req.ant_id).await?;
+    };
+
+    Ok((StatusCode::OK, "Ant unfavorited."))
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -325,6 +398,8 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/latest-release", get(latest_release))
         .route_with_tsr("/total", get(total))
         .route_with_tsr("/suggest", post(make_suggestion))
+        .route_with_tsr("/favorite", post(favorite_ant))
+        .route_with_tsr("/unfavorite", post(unfavorite_ant))
         // .route_with_tsr("/tweet", post(tweet))
         .fallback(|| async {
             ant_library::api_fallback(&[
@@ -340,46 +415,4 @@ pub fn router() -> ApiRouter {
                 // "POST /tweet",
             ])
         })
-}
-
-enum AntsError {
-    AccessDenied(Option<String>),
-    InternalServerError(anyhow::Error),
-}
-
-impl IntoResponse for AntsError {
-    fn into_response(self) -> Response {
-        match self {
-            AntsError::InternalServerError(e) => {
-                error!("AntsError::InternalServerError: {}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong, please retry",
-                )
-                    .into_response()
-            }
-            AntsError::AccessDenied(identity) => {
-                warn!("Access denied to identity: {:?}", identity);
-                (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
-            }
-        }
-    }
-}
-
-impl From<AuthError> for AntsError {
-    fn from(value: AuthError) -> Self {
-        match value {
-            AuthError::AccessDenied(identity) => AntsError::AccessDenied(identity),
-            AuthError::InternalServerError(e) => AntsError::InternalServerError(e),
-        }
-    }
-}
-
-impl<E> From<E> for AntsError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self::InternalServerError(err.into())
-    }
 }

@@ -200,6 +200,78 @@ impl AntsDao {
         return Ok(Some(vec![]));
     }
 
+    pub async fn is_favorite_ant(
+        &self,
+        user: &UserId,
+        ant: &AntId,
+    ) -> Result<Option<DateTime<Utc>>> {
+        let db = self.database.lock().await;
+
+        let favorite_row = db
+            .query_opt(
+                "select user_id, ant_id, favorited_at
+ from favorite
+ where
+    user_id = $1 and
+    ant_id = $2
+limit 1",
+                &[&user.0, &ant.0],
+            )
+            .await?;
+
+        return Ok(favorite_row.map(|r| r.get("favorited_at")));
+    }
+
+    pub async fn favorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
+        let mut db = self.database.lock().await;
+        let tx = db.transaction().await?;
+
+        let favorited_at: DateTime<Utc> = tx
+            .query_one(
+                "
+        insert into favorite
+            (user_id, ant_id)
+        values
+            ($1, $2)
+        returning favorited_at
+        ",
+                &[&user.0, &ant.0],
+            )
+            .await?
+            .get("favorited_at");
+
+        tx.commit().await?;
+
+        Ok(favorited_at)
+    }
+
+    pub async fn unfavorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<()> {
+        let mut db = self.database.lock().await;
+        let tx = db.transaction().await?;
+
+        let rows = tx
+            .execute(
+                "
+            delete from favorite
+            where
+                user_id = $1 and
+                ant_id = $2
+            ",
+                &[&user.0, &ant.0],
+            )
+            .await?;
+
+        if rows != 1 {
+            return Err(anyhow::Error::msg(format!(
+                "Unexpectedly changed {rows} rows"
+            )));
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Result<Ant> {
         let time = chrono::offset::Utc::now();
 
