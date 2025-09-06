@@ -1,12 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { AntBanner } from "../components/AntBanner";
-import { escapeAnt } from "../utils/utils";
 import { getReleasedAnts } from "../server/queries";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { SuggestionBox } from "../components/SuggestionBox";
-import { NewsletterBox } from "@/components/NewsletterBox";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { TUserContext, UserContext } from "../state/userContext";
 import InputBanner from "@/components/InputBanner";
@@ -42,7 +39,7 @@ export default function Home() {
           <div className="pb-0" id="ant-filler">
             {releasedAnts?.pages.map((page, pageNum) =>
               page.ants.map((ant, i) => (
-                <div key={pageNum * 1000 + i}>{escapeAnt(ant)}</div>
+                <div key={pageNum * 1000 + i}>{ant}</div>
               ))
             )}
           </div>

@@ -1,0 +1,37 @@
+[package]
+name = "ant-fs"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+anyhow = "1.0.99"
+axum = { version = "0.8.4", features = [
+  "tracing",
+  "json",
+  "macros",
+  "multipart",
+] }
+axum-extra = { version = "0.10.1", features = ["typed-header", "cookie"] }
+http = "1.3.1"
+hyper = "1.7.0"
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.47.1", features = ["full"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.6", features = [
+  "fs",
+  "trace",
+  "metrics",
+  "cors",
+  "normalize-path",
+  "catch-panic",
+  "limit",
+] }
+tracing = { version = "0.1.41", features = ["max_level_debug"] }
+tracing-subscriber = "0.3.19"
+openssl = { version = "0.10", features = ["vendored"] }
+dotenv = "0.15.0"
+futures-util = "0.3.31"
+tokio-util = { version = "0.7.16", features = ["io"] }
+futures = "0.3.31"
+http-body-util = "0.1.3"

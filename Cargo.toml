@@ -9,5 +9,5 @@ members = [
   "projects/ant-library",
   "projects/ant-metadata",
   "projects/ant-owning-artifacts",
-  "projects/anthill",
+  "projects/anthill", "projects/ant-fs",
 ]
