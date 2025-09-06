@@ -32,8 +32,8 @@ project_src="$repository_root/projects/$project"
 commit_sha="$(git log --format='%h' -n 1)"
 commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "${commit_sha}")"
 commit_number="$(git rev-list --count HEAD)"
+install_version="$(project_version)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
-install_version="${commit_number}-${commit_datetime}-${commit_sha}"
 
 log "RESOLVING ENVIRONMENT [$project]..."
 

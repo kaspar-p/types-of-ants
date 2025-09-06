@@ -14,12 +14,12 @@ async fn main() {
         .parse()
         .expect("ANT_FS_PORT was not u16");
 
-    debug!(
-        "Starting [{}] server on port [{}]...",
-        ant_library::get_mode(),
-        port
-    );
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    debug!(
+        "Starting [{}] server on [{}]...",
+        ant_library::get_mode(),
+        addr.to_string()
+    );
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect(format!("failed to bind server to {port}").as_str());

@@ -14,7 +14,7 @@ use base64ct::{Base64, Encoding};
 use http::{header, Method};
 use sha2::{Digest, Sha256};
 use std::{
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     path::PathBuf,
 };
 use tower::ServiceBuilder;
@@ -24,12 +24,12 @@ use tower_http::{
 use tracing::{debug, error, info};
 
 fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
-    let tokens = ant_library::secret::load_secret("ant_fs_tokens").map_err(|e| {
+    let tokens = ant_library::secret::load_secret("ant_fs_users").map_err(|e| {
         error!("Failed to read authorized users: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    if !tokens.split(",").any(|t| {
+    if !tokens.trim().split("\n").filter(|&t| t != "").any(|t| {
         let segments: Vec<&str> = t.split(":").collect();
         let user = segments[0];
         let pass = segments[1];
@@ -61,9 +61,13 @@ async fn download(
     info!("Downloading {path}...");
     bearer_authorization(&auth)?;
 
-    let mut file = std::fs::File::open(fs_path(&path)?).map_err(|e| {
+    let mut file = std::fs::File::open(fs_path(&path)?).map_err(|e: std::io::Error| {
         error!("{:?}", e);
-        StatusCode::BAD_REQUEST
+
+        match e.kind() {
+            ErrorKind::NotFound => StatusCode::NOT_FOUND,
+            _ => StatusCode::BAD_REQUEST,
+        }
     })?;
 
     let mut buf = String::new();

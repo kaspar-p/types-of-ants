@@ -74,7 +74,22 @@ services:
     secrets:
       - cloudflare_api_token
 
+  ant-fs:
+    image: typesofants/ant-fs:1
+    platform: linux/arm64
+    environment:
+      TYPESOFANTS_SECRET_DIR: /run/secrets
+    restart: always
+    volumes:
+      - ${INSTALL_DIR}/fs:/app/fs
+    ports:
+      - 3237:3237
+    secrets:
+      - ant_fs_users.secret
+
 secrets:
+  ant_fs_users.secret:
+    file: ${SECRETS_DIR}/ant_fs_users.secret
   postgres_db:
     file: ${SECRETS_DIR}/postgres_db.secret
   postgres_user:

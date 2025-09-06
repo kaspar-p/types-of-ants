@@ -1,28 +1,52 @@
 {
-  "antworker000.hosts.typesofants.org": {
-    "rust-target": "armv7-unknown-linux-gnueabihf",
-    "services": [
-      { "env": "prod", "service": "ant-host-agent" },
-      { "env": "prod", "service": "ant-data-farm" },
-      { "env": "prod", "service": "ant-who-tweets" }
-    ]
+  "architectures": {
+    "raspbian": {
+      "rust-target": "armv7-unknown-linux-gnueabihf",
+      "docker-platform": "linux/arm64"
+    },
+    "arm": {
+      "rust-target": "aarch64-unknown-linux-gnu",
+      "docker-platform": "linux/arm64"
+    },
+    "x86": {
+      "rust-target": "x86_64-unknown-linux-gnu",
+      "docker-platform": "linux/amd64"
+    }
   },
-  "antworker001.hosts.typesofants.org": {
-    "rust-target": "aarch64-unknown-linux-gnu",
-    "services": [
-      { "env": "prod", "service": "ant-host-agent" },
-      { "env": "prod", "service": "ant-gateway" },
-      { "env": "prod", "service": "ant-on-the-web" },
-      { "env": "prod", "service": "ant-naming-domains" }
-    ]
-  },
-  "antworker002.hosts.typesofants.org": {
-    "rust-target": "aarch64-unknown-linux-gnu",
-    "services": [
-      { "env": "beta", "service": "ant-host-agent" },
-      { "env": "beta", "service": "ant-naming-domains" },
-      { "env": "beta", "service": "ant-on-the-web" },
-      { "env": "beta", "service": "ant-data-farm" }
-    ]
+  "hosts": {
+    "antworker000.hosts.typesofants.org": {
+      "architecture": "raspbian",
+      "services": [
+        { "env": "prod", "service": "ant-host-agent" },
+        { "env": "prod", "service": "ant-data-farm" },
+        { "env": "prod", "service": "ant-who-tweets" }
+      ]
+    },
+    "antworker001.hosts.typesofants.org": {
+      "architecture": "arm",
+      "services": [
+        { "env": "prod", "service": "ant-host-agent" },
+        { "env": "prod", "service": "ant-gateway" },
+        { "env": "prod", "service": "ant-on-the-web" },
+        { "env": "prod", "service": "ant-naming-domains" }
+      ]
+    },
+    "antworker002.hosts.typesofants.org": {
+      "architecture": "arm",
+      "services": [
+        { "env": "beta", "service": "ant-host-agent" },
+        { "env": "beta", "service": "ant-naming-domains" },
+        { "env": "beta", "service": "ant-on-the-web" },
+        { "env": "beta", "service": "ant-data-farm" }
+      ]
+    },
+    "hisbaan01.hosts.typesofants.org": {
+      "architecture": "x86",
+      "services": [{ "env": "prod", "service": "ant-fs" }]
+    },
+    "greg01.hosts.typesofants.org": {
+      "architecture": "x86",
+      "services": [{ "env": "prod", "service": "ant-fs" }]
+    }
   }
 }

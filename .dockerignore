@@ -1,1 +1,12 @@
-Dockerfile
+.git
+.gitignore
+.vscode
+.gradle
+
+**/target/**
+logs/**
+images/**
+build/**
+projects/ant-on-the-web/website/.next
+projects/ant-owning-artifacts/repos
+**/node_modules/**
