@@ -21,6 +21,9 @@ elif [[ $project = "ant-on-the-web:server" ]]; then
   cargo run -p ant-on-the-web
 elif [[ $project = "ant-on-the-web:website" ]]; then
   cd projects/ant-on-the-web/website && npm ci && npm run dev
+elif [[ $project = "ant-fs" ]]; then
+  export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
+  cd projects/ant-fs && cargo run
 else
   echo "Unknown project: $project, options are 'ant-data-farm', 'ant-on-the-web:server', and 'ant-on-the-web:website'"
   exit 1

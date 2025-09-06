@@ -24,8 +24,8 @@ use tower_http::{
 use tracing::{debug, error, info};
 
 fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
-    let tokens = dotenv::var("ANT_FS_ALLOWED_USERNAME_PASSWORD_PAIRS").map_err(|e| {
-        error!("No ANT_FS_ALLOWED_USERNAME_PASSWORD_PAIRS variable: {e}");
+    let tokens = ant_library::secret::load_secret("ant_fs_tokens").map_err(|e| {
+        error!("Failed to read authorized users: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -45,6 +45,15 @@ fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
     Ok(())
 }
 
+fn fs_path(path: &str) -> Result<PathBuf, StatusCode> {
+    let root_dir = dotenv::var("ANT_FS_ROOT_DIR").map_err(|e| {
+        error!("No ANT_FS_ROOT_DIR variable: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(PathBuf::from(root_dir).join(path))
+}
+
 async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     Path(path): Path<String>,
@@ -52,7 +61,7 @@ async fn download(
     info!("Downloading {path}...");
     bearer_authorization(&auth)?;
 
-    let mut file = std::fs::File::open(path).map_err(|e| {
+    let mut file = std::fs::File::open(fs_path(&path)?).map_err(|e| {
         error!("{:?}", e);
         StatusCode::BAD_REQUEST
     })?;
@@ -71,7 +80,7 @@ async fn upload(
     info!("Uploading {path}...");
     bearer_authorization(&auth)?;
 
-    let mut file = std::fs::File::create(PathBuf::from("fs").join(path)).map_err(|err| {
+    let mut file = std::fs::File::create(fs_path(&path)?).map_err(|err| {
         error!("Failed to write file: {err}");
         StatusCode::BAD_REQUEST
     })?;
