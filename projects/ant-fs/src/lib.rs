@@ -1,46 +1,84 @@
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Path},
+    body::Bytes,
+    extract::{DefaultBodyLimit, Path},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
     Router,
 };
+use axum_extra::{
+    headers::{authorization::Basic, Authorization},
+    TypedHeader,
+};
+use base64ct::{Base64, Encoding};
 use http::{header, Method};
-use std::{io::Write, path::PathBuf};
+use sha2::{Digest, Sha256};
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+};
 use tower::ServiceBuilder;
 use tower_http::{
     catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer,
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
-async fn download() {}
+fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
+    let tokens = dotenv::var("ANT_FS_ALLOWED_USERNAME_PASSWORD_PAIRS").map_err(|e| {
+        error!("No ANT_FS_ALLOWED_USERNAME_PASSWORD_PAIRS variable: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-async fn upload(
-    Path(path): Path<String>,
-    mut multipart: Multipart,
-) -> Result<impl IntoResponse, StatusCode> {
-    while let Some(mut field) = multipart.next_field().await.map_err(|err| {
-        error!("Failed to get next field: {err}");
-        StatusCode::BAD_REQUEST
-    })? {
-        error!("Failed to write file");
+    if !tokens.split(",").any(|t| {
+        let segments: Vec<&str> = t.split(":").collect();
+        let user = segments[0];
+        let pass = segments[1];
 
-        let mut file =
-            std::fs::File::create(PathBuf::from("archive").join(path)).map_err(|err| {
-                error!("Failed to write file: {err}");
-                StatusCode::BAD_REQUEST
-            })?;
-        while let Some(chunk) = field.chunk().await.map_err(|err| {
-            error!("Failed to read next chunk: {err}");
-            StatusCode::BAD_REQUEST
-        })? {
-            file.write_all(&chunk).unwrap();
-        }
+        let pass_attempt_hash = Sha256::digest(&auth.0.password());
+        let pass_attempt = Base64::encode_string(&pass_attempt_hash);
 
-        return Ok(StatusCode::OK);
+        return user == auth.0.username() && pass == pass_attempt;
+    }) {
+        return Err(StatusCode::UNAUTHORIZED);
     }
 
-    Err(StatusCode::INTERNAL_SERVER_ERROR)
+    Ok(())
+}
+
+async fn download(
+    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    Path(path): Path<String>,
+) -> Result<impl IntoResponse, StatusCode> {
+    info!("Downloading {path}...");
+    bearer_authorization(&auth)?;
+
+    let mut file = std::fs::File::open(path).map_err(|e| {
+        error!("{:?}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).unwrap();
+
+    return Ok((StatusCode::OK, Bytes::from(buf)));
+}
+
+async fn upload(
+    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    Path(path): Path<String>,
+    body: Bytes,
+) -> Result<impl IntoResponse, StatusCode> {
+    info!("Uploading {path}...");
+    bearer_authorization(&auth)?;
+
+    let mut file = std::fs::File::create(PathBuf::from("fs").join(path)).map_err(|err| {
+        error!("Failed to write file: {err}");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    file.write_all(&body).unwrap();
+
+    return Ok(StatusCode::OK);
 }
 
 pub fn make_routes() -> Result<Router, anyhow::Error> {
@@ -48,8 +86,6 @@ pub fn make_routes() -> Result<Router, anyhow::Error> {
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::POST])
-        // .allow_origin(AllowOrigin::any())
-        // .allow_credentials(true)
         .allow_headers([header::CONTENT_TYPE]);
 
     debug!("Initializing site routes...");
