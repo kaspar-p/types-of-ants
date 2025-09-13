@@ -87,7 +87,7 @@ async fn upload(
 
     let mut file = std::fs::File::create(path).map_err(|err| {
         error!("Failed to write file: {err}");
-        StatusCode::BAD_REQUEST
+        StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
     file.write_all(&body).unwrap();

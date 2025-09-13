@@ -15,11 +15,12 @@ function log() {
 }
 
 function usage() {
-  log "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
-          project-name: 'ant-gateway', 'ant-data-farm', ...
-          deploy-environment: 'beta', 'prod', 'dev'
-          ant-worker-num: 000, 001, ...
-"
+  echo "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
+    project-name: 'ant-gateway', 'ant-data-farm', ...
+    deploy-environment: 'beta', 'prod', 'dev'
+    ant-worker-num: 000, 001, ...
+" >> /dev/stderr
+
   exit 1
 }
 
@@ -69,7 +70,7 @@ function get_docker_platform_arch() {
   echo "$rust_target"
 }
 
-function get_rust_architecture() {
+function get_rust_target() {
   local host="$1"
   local arch
   arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"

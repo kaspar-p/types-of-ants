@@ -1,11 +1,11 @@
 [Unit]
-Description=The typesofants web server!
+Description=The typesofants file storage server!
 
 [Service]
 Type=simple
 EnvironmentFile={{INSTALL_DIR}}/.env
 Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
-ExecStart={{INSTALL_DIR}}/ant-on-the-web
+ExecStart={{INSTALL_DIR}}/ant-fs
 WorkingDirectory={{INSTALL_DIR}}
 Restart=always
 
