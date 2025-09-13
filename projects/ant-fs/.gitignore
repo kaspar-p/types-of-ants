@@ -1,1 +1,7 @@
-fs/
+!.env
+
+!test-fs/.gitkeep
+test-fs/*
+
+!dev-fs/.gitkeep
+dev-fs/*

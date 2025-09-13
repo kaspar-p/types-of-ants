@@ -75,8 +75,9 @@ services:
       - cloudflare_api_token
 
   ant-fs:
-    image: typesofants/ant-fs:1
+    image: typesofants/ant-fs:arm64-latest
     platform: linux/arm64
+    container_name: ant-fs
     environment:
       TYPESOFANTS_SECRET_DIR: /run/secrets
     restart: always

@@ -14,6 +14,7 @@ use base64ct::{Base64, Encoding};
 use http::{header, Method};
 use sha2::{Digest, Sha256};
 use std::{
+    env,
     io::{ErrorKind, Read, Write},
     path::PathBuf,
 };
@@ -51,17 +52,21 @@ fn fs_path(path: &str) -> Result<PathBuf, StatusCode> {
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok(PathBuf::from(root_dir).join(path))
+    Ok(PathBuf::from(env::current_dir().unwrap())
+        .join(root_dir)
+        .join(path))
 }
 
 async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     Path(path): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    info!("Downloading {path}...");
     bearer_authorization(&auth)?;
 
-    let mut file = std::fs::File::open(fs_path(&path)?).map_err(|e: std::io::Error| {
+    let path = fs_path(&path)?;
+    info!("Downloading from {}...", path.display());
+
+    let mut file = std::fs::File::open(path).map_err(|e: std::io::Error| {
         error!("{:?}", e);
 
         match e.kind() {
@@ -70,8 +75,10 @@ async fn download(
         }
     })?;
 
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).unwrap();
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).unwrap();
+
+    debug!("Read {} bytes.", buf.len());
 
     return Ok((StatusCode::OK, Bytes::from(buf)));
 }
@@ -81,10 +88,12 @@ async fn upload(
     Path(path): Path<String>,
     body: Bytes,
 ) -> Result<impl IntoResponse, StatusCode> {
-    info!("Uploading {path}...");
     bearer_authorization(&auth)?;
 
-    let mut file = std::fs::File::create(fs_path(&path)?).map_err(|err| {
+    let path = fs_path(&path)?;
+    info!("Uploading {}...", path.display());
+
+    let mut file = std::fs::File::create(path).map_err(|err| {
         error!("Failed to write file: {err}");
         StatusCode::BAD_REQUEST
     })?;
