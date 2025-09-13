@@ -40,4 +40,5 @@ base64ct = { version = "1.8.0", features = ["alloc"] }
 base16ct = { version = "0.3.0", features = ["alloc"] }
 
 [dev-dependencies]
+stdext = "0.3.3"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }

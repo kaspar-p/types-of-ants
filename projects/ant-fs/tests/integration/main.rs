@@ -1,4 +1,5 @@
 use http::StatusCode;
+use stdext::function_name;
 use tracing_test::traced_test;
 
 use crate::fixture::{test_router_auth, test_router_no_auth};
@@ -8,7 +9,7 @@ pub mod fixture;
 #[tokio::test]
 #[traced_test]
 async fn route_returns_4xx_if_unauthenticated() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(function_name!()).await;
 
     {
         let res = fixture.client.get("/file.txt").send().await;
@@ -31,12 +32,12 @@ async fn route_returns_4xx_if_unauthenticated() {
 #[tokio::test]
 #[traced_test]
 async fn route_returns_404_if_file_not_there() {
-    let (fixture, header) = test_router_auth().await;
+    let (fixture, header) = test_router_auth(function_name!()).await;
 
     {
         let res = fixture
             .client
-            .get("/file.txt")
+            .get("/never-there.txt")
             .header("Authorization", &header)
             .send()
             .await;
@@ -48,7 +49,7 @@ async fn route_returns_404_if_file_not_there() {
 #[tokio::test]
 #[traced_test]
 async fn route_returns_200_if_file_there() {
-    let (fixture, header) = test_router_auth().await;
+    let (fixture, header) = test_router_auth(function_name!()).await;
 
     {
         let res = fixture

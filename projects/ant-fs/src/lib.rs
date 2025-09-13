@@ -1,9 +1,9 @@
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, Path},
+    extract::{DefaultBodyLimit, Path, Request, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::put,
     Router,
 };
 use axum_extra::{
@@ -13,14 +13,11 @@ use axum_extra::{
 use base64ct::{Base64, Encoding};
 use http::{header, Method};
 use sha2::{Digest, Sha256};
-use std::{
-    env,
-    io::{ErrorKind, Read, Write},
-    path::PathBuf,
-};
-use tower::ServiceBuilder;
+use std::{io::Write, path::PathBuf};
+use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{
-    catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer,
+    catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer,
+    services::ServeDir, trace::TraceLayer,
 };
 use tracing::{debug, error, info};
 
@@ -46,51 +43,46 @@ fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
     Ok(())
 }
 
-fn fs_path(path: &str) -> Result<PathBuf, StatusCode> {
-    let root_dir = dotenv::var("ANT_FS_ROOT_DIR").map_err(|e| {
-        error!("No ANT_FS_ROOT_DIR variable: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    Ok(PathBuf::from(env::current_dir().unwrap())
-        .join(root_dir)
-        .join(path))
-}
-
 async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
-    Path(path): Path<String>,
+    State(root): State<String>,
+    req: Request,
 ) -> Result<impl IntoResponse, StatusCode> {
     bearer_authorization(&auth)?;
 
-    let path = fs_path(&path)?;
-    info!("Downloading from {}...", path.display());
+    let service = ServeDir::new(PathBuf::from(root));
 
-    let mut file = std::fs::File::open(path).map_err(|e: std::io::Error| {
-        error!("{:?}", e);
+    return Ok(service.oneshot(req).await);
 
-        match e.kind() {
-            ErrorKind::NotFound => StatusCode::NOT_FOUND,
-            _ => StatusCode::BAD_REQUEST,
-        }
-    })?;
+    // let path = fs_path(&path)?;
+    // info!("Downloading from {}...", path.display());
 
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).unwrap();
+    // let mut file = std::fs::File::open(path).map_err(|e: std::io::Error| {
+    //     error!("{:?}", e);
 
-    debug!("Read {} bytes.", buf.len());
+    //     match e.kind() {
+    //         ErrorKind::NotFound => StatusCode::NOT_FOUND,
+    //         _ => StatusCode::BAD_REQUEST,
+    //     }
+    // })?;
 
-    return Ok((StatusCode::OK, Bytes::from(buf)));
+    // let mut buf = Vec::new();
+    // file.read_to_end(&mut buf).unwrap();
+
+    // debug!("Read {} bytes.", buf.len());
+
+    // return Ok((StatusCode::OK, Bytes::from(buf)));
 }
 
 async fn upload(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    State(root): State<String>,
     Path(path): Path<String>,
     body: Bytes,
 ) -> Result<impl IntoResponse, StatusCode> {
     bearer_authorization(&auth)?;
 
-    let path = fs_path(&path)?;
+    let path = PathBuf::from(root).join(path);
     info!("Uploading {}...", path.display());
 
     let mut file = std::fs::File::create(path).map_err(|err| {
@@ -103,7 +95,7 @@ async fn upload(
     return Ok(StatusCode::OK);
 }
 
-pub fn make_routes() -> Result<Router, anyhow::Error> {
+pub fn make_routes(root: String) -> Result<Router, anyhow::Error> {
     debug!("Initializing API route...");
 
     let cors = CorsLayer::new()
@@ -112,7 +104,8 @@ pub fn make_routes() -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Router::new()
-        .route("/{path}", get(download).put(upload).post(upload))
+        .route("/{path}", put(upload).post(upload).get(download))
+        .with_state(root)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())

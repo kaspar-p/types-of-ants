@@ -7,7 +7,11 @@ async fn main() {
     ant_library::set_global_logs("ant-fs");
 
     debug!("Setting up state...");
-    let app = ant_fs::make_routes().expect("failed to init api");
+
+    let root_dir =
+        dotenv::var("ANT_FS_ROOT_DIR").expect("No ANT_FS_ROOT_DIR environment variable!");
+
+    let app = ant_fs::make_routes(root_dir).expect("failed to init api");
 
     let port: u16 = dotenv::var("ANT_FS_PORT")
         .expect("ANT_FS_PORT environment variable not found")
