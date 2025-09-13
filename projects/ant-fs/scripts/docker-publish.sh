@@ -3,12 +3,28 @@
 # shellcheck disable=SC1091
 source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
-set -euxo pipefail
+set -eo pipefail
+
+function usage() {
+  echo "$0 <host>
+  host: Either antworkerXYZ, hisbaanXY, or another name.
+" >> /dev/stderr
+  exit 1
+}
+
+set +u
+if [[ -z "$1" ]]; then
+  usage
+fi
+
+set -ux
+
+host="$1"
 
 repository_root="$(git rev-parse --show-toplevel)"
 project_root="$repository_root/projects/ant-fs"
 
-destination="$(anthost "$1")"
+destination="$(anthost "$host")"
 
 TARGET="$(get_rust_target "$destination")" make release -C "$project_root"
 
