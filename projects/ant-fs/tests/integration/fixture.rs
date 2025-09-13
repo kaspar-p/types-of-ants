@@ -22,7 +22,7 @@ pub async fn test_router_no_auth(name: &str) -> TestFixture {
         .join("test-fs")
         .join(name);
     create_dir_all(&root).unwrap();
-    let api = make_routes(root.to_str().unwrap().to_string()).unwrap();
+    let api = make_routes(root.clone()).unwrap();
 
     TestFixture {
         client: TestClient::new(api).await,

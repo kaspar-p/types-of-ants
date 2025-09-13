@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf};
 
 use tracing::debug;
 
@@ -8,8 +8,12 @@ async fn main() {
 
     debug!("Setting up state...");
 
-    let root_dir =
-        dotenv::var("ANT_FS_ROOT_DIR").expect("No ANT_FS_ROOT_DIR environment variable!");
+    let persist_dir = dotenv::var("PERSIST_DIR").expect("No PERSIST_DIR environment variable!");
+    let root_path =
+        dotenv::var("ANT_FS_ROOT_PATH").expect("No ANT_FS_ROOT_PATH environment variable!");
+
+    let root_dir = PathBuf::from(persist_dir).join(root_path);
+    create_dir_all(&root_dir).expect("root dir creation");
 
     let app = ant_fs::make_routes(root_dir).expect("failed to init api");
 

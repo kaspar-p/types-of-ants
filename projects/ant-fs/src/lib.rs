@@ -45,7 +45,7 @@ fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
 
 async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
-    State(root): State<String>,
+    State(root): State<PathBuf>,
     req: Request,
 ) -> Result<impl IntoResponse, StatusCode> {
     bearer_authorization(&auth)?;
@@ -76,7 +76,7 @@ async fn download(
 
 async fn upload(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
-    State(root): State<String>,
+    State(root): State<PathBuf>,
     Path(path): Path<String>,
     body: Bytes,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -95,7 +95,7 @@ async fn upload(
     return Ok(StatusCode::OK);
 }
 
-pub fn make_routes(root: String) -> Result<Router, anyhow::Error> {
+pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
     debug!("Initializing API route...");
 
     let cors = CorsLayer::new()

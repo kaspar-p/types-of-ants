@@ -54,10 +54,9 @@ source "$build_cfg"
 set +o allexport
 export VERSION="$install_version"
 
-install_dir="${remote_home}/service/$project/$install_version"
-export INSTALL_DIR="$install_dir"
-export PERSIST_DIR="${remote_home}/persist"
-export SECRETS_DIR="$install_dir/secrets"
+export INSTALL_DIR="${remote_home}/service/$project/$install_version"
+export PERSIST_DIR="${remote_home}/persist/$project"
+export SECRETS_DIR="$INSTALL_DIR/secrets"
 
 log "BUILDING [$project]..."
 
@@ -68,32 +67,33 @@ DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose bui
 # Install the project files
 log "INSTALLING [$project] ONTO [$remote_host]..."
 run_command ssh2ant "$ant_worker_num" "
-  mkdir -p ${install_dir};
+  mkdir -p ${INSTALL_DIR};
   mkdir -p ${SECRETS_DIR}
 "
 
 # Copy dockerfile into install dir
 docker-compose config "${project}" | \
-  ssh2ant "$ant_worker_num" "tee ${install_dir}/docker-compose.yml"
+  ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/docker-compose.yml"
 
 # Copy environment into the install dir
-secrets_dir="${repository_root}/secrets/${deploy_env}"
-rm -f "${install_dir}/.env"
+local_secrets_dir="${repository_root}/secrets/${deploy_env}"
+rm -f "${INSTALL_DIR}/.env"
 {
   cat "${build_cfg}"
-} | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
+  echo "PERSIST_DIR=$PERSIST_DIR"
+} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env"
 
 # Copy secrets into the install dir
-run_command scp -r "${secrets_dir}/." "${remote_host}:${SECRETS_DIR}/"
+run_command scp -r "${local_secrets_dir}/." "${remote_host}:${SECRETS_DIR}/"
 
 # Copy all the docker image and build/ files into the install dir
 build_dir="${project_src}/build"
 build_mode="release"
-run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${install_dir}/"
+run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
 
 # Interpret mustache template into the systemctl unit file
-new_unit_path="${install_dir}/${project}.service"
-INSTALL_DIR="$install_dir" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+new_unit_path="${INSTALL_DIR}/${project}.service"
+INSTALL_DIR="$INSTALL_DIR" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
   ssh2ant "$ant_worker_num" "tee $new_unit_path"
 
 # Write the installation manifest
@@ -106,10 +106,10 @@ ssh2ant "$ant_worker_num" "echo '{
   \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"
-}' > '${install_dir}/manifest.json'"
+}' > '${INSTALL_DIR}/manifest.json'"
 
 log "INSTALLED [$project] VERSION [$install_version] ONTO [$remote_host]"
 log "  when:        $(date -Iseconds)"
-log "  install dir: $install_dir"
+log "  install dir: $INSTALL_DIR"
 log "  version:     $install_version"
 log "  unit file:   $new_unit_path"

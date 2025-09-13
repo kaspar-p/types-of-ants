@@ -47,6 +47,10 @@ set +o allexport
 # Some projects require this for generating deterministic build hashes
 export commit_sha
 
+PERSIST_DIR="${remote_home}/persist/$project"
+INSTALL_DIR="${remote_home}/service/$project/$install_version"
+SECRETS_DIR="${INSTALL_DIR}/secrets"
+
 log "BUILDING [$project]..."
 
 # Build the project
@@ -58,26 +62,25 @@ make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
 
-install_dir="$remote_home/service/$project/$install_version"
-remote_secrets_dir="$install_dir/secrets"
 run_command ssh2ant "$ant_worker_num" "
-  mkdir -p $install_dir;
-  mkdir -p $install_dir/secrets;
+  mkdir -p ${INSTALL_DIR};
+  mkdir -p ${SECRETS_DIR};
 "
 
 # Copy secrets into the install dir
-secrets_dir="$repository_root/secrets/$deploy_env"
+local_secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_cfg}"
-} | ssh2ant "$ant_worker_num" "tee ${install_dir}/.env"
-run_command rsync -a "${secrets_dir}/." "${remote_user}@${remote_host}:${remote_secrets_dir}"
+  echo "PERSIST_DIR=$PERSIST_DIR"
+} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env"
+run_command rsync -a "${local_secrets_dir}/." "${remote_user}@${remote_host}:${SECRETS_DIR}"
 
 # Copy all other build/ files into the install dir
-run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${install_dir}/"
+run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${INSTALL_DIR}/"
 
 # Interpret mustache template into the systemctl unit file
-new_unit_path="$install_dir/$project.service"
-INSTALL_DIR="$install_dir" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+new_unit_path="$INSTALL_DIR/$project.service"
+INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
   ssh2ant "$ant_worker_num" "tee ${new_unit_path}"
 
 # Write the installation manifest
@@ -90,10 +93,10 @@ ssh2ant "$ant_worker_num" "echo '{
   \"committed_at\": \"$commit_datetime\",
   \"installed_at\": \"$install_datetime\",
   \"unit_file\": \"$new_unit_path\"
-}' > '${install_dir}/manifest.json'"
+}' > '${INSTALL_DIR}/manifest.json'"
 
 log "INSTALLED [$project] VERSION [$install_version]"
 log "  when:        $(date -Iseconds)"
-log "  install dir: $install_dir"
+log "  install dir: $INSTALL_DIR"
 log "  version:     $install_version"
 log "  unit file:   $new_unit_path"
