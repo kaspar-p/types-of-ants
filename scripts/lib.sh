@@ -54,7 +54,7 @@ function get_docker_platform() {
   local arch
   arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
   local rust_target
-  rust_target="$(get_services | jq -r ".architectures[\"$arch\"][\"docker-platform\"]")"
+  rust_target="$(get_services | jq -r ".architectures[\"$arch\"].docker_platform")"
 
   echo "$rust_target"
 }
@@ -64,7 +64,7 @@ function get_docker_platform_arch() {
   local arch
   arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
   local rust_target
-  rust_target="$(get_services | jq -r ".architectures[\"$arch\"][\"docker-platform\"]" | cut -d '/' -f 2)"
+  rust_target="$(get_services | jq -r ".architectures[\"$arch\"].docker_platform" | cut -d '/' -f 2)"
 
   echo "$rust_target"
 }
@@ -74,7 +74,7 @@ function get_rust_architecture() {
   local arch
   arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
   local rust_target
-  rust_target="$(get_services | jq -r ".architectures[\"$arch\"][\"rust-target\"]")"
+  rust_target="$(get_services | jq -r ".architectures[\"$arch\"].rust_target")"
 
   echo "$rust_target"
 }

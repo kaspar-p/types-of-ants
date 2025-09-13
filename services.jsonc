@@ -1,16 +1,16 @@
 {
   "architectures": {
     "raspbian": {
-      "rust-target": "armv7-unknown-linux-gnueabihf",
-      "docker-platform": "linux/arm64"
+      "rust_target": "armv7-unknown-linux-gnueabihf",
+      "docker_platform": "linux/arm64"
     },
     "arm": {
-      "rust-target": "aarch64-unknown-linux-gnu",
-      "docker-platform": "linux/arm64"
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "docker_platform": "linux/arm64"
     },
     "x86": {
-      "rust-target": "x86_64-unknown-linux-gnu",
-      "docker-platform": "linux/amd64"
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "docker_platform": "linux/amd64"
     }
   },
   "hosts": {

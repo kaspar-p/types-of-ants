@@ -54,7 +54,7 @@ build_dir="$project_src/build"
 build_mode="release"
 run_command rm -rf "$build_dir/$build_mode/*"
 
-target=$(jq -r ".[\"$remote_host\"].[\"rust-target\"]" < "$repository_root/services.jsonc")
+target=$(jq -r ".[\"$remote_host\"].rust_target" < "$repository_root/services.jsonc")
 make -C "$project_src" -e TARGET="$target" release
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
