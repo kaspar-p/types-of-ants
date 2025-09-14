@@ -1,11 +1,11 @@
 use crate::{
     err::{AntOnTheWebError, ValidationError, ValidationMessage},
-    routes::lib::auth::authenticate,
+    routes::lib::auth::{admin_authenticate, authenticate},
     state::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::{
     ants::{Ant, AntId, AntStatus},
-    releases::Release,
+    releases::{AntReleaseRequest, Release},
     users::UserId,
     DaoTrait,
 };
@@ -154,9 +154,9 @@ async fn released_ants(
     ));
 }
 
-#[derive(Serialize, Deserialize)]
-struct LatestReleaseResponse {
-    release: Release,
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub struct LatestReleaseResponse {
+    pub release: Release,
 }
 async fn latest_release(State(InnerApiState { dao, .. }): ApiState) -> impl IntoResponse {
     match dao.releases.read().await.get_latest_release().await {
@@ -172,6 +172,116 @@ async fn latest_release(State(InnerApiState { dao, .. }): ApiState) -> impl Into
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct GetReleaseRequest {
+    pub release: i32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub struct GetReleaseResponse {
+    pub release: Release,
+}
+
+async fn get_release(
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<GetReleaseRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let releases = dao.releases.read().await;
+    let release = releases.get_release(req.release).await?;
+
+    match release {
+        None => Ok((StatusCode::NOT_FOUND).into_response()),
+        Some(release) => Ok((StatusCode::OK, Json(GetReleaseResponse { release })).into_response()),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateReleaseRequest {
+    pub label: String,
+    pub ants: Vec<AntReleaseRequest>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateReleaseResponse {
+    pub release: i32,
+}
+
+async fn create_release(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<CreateReleaseRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = admin_authenticate(&auth, &dao).await?;
+
+    {
+        let mut validations: Vec<ValidationMessage> = vec![];
+        if req.ants.len() == 0 {
+            validations.push(ValidationMessage::new("ants", "Ants cannot be empty."));
+        }
+
+        if req.ants.len() > 256 {
+            validations.push(ValidationMessage::new(
+                "ants",
+                "Ants too long, cannot exceed 256.",
+            ));
+        }
+
+        let ants = dao.ants.read().await;
+        for ant_req in &req.ants {
+            if req
+                .ants
+                .iter()
+                .filter(|&ant| ant.ant_id == ant_req.ant_id)
+                .count()
+                > 1
+            {
+                validations.push(ValidationMessage::new(
+                    "ants",
+                    format!("Ant {} suggested more than once.", ant_req.ant_id),
+                ));
+            }
+
+            let ant = ants.get_one_by_id(&ant_req.ant_id).await?;
+            match ant {
+                None => {
+                    validations.push(ValidationMessage::new(
+                        "ants",
+                        format!("No such ant: {}", ant_req.ant_id),
+                    ));
+                }
+                Some(ant) => match ant.status {
+                    AntStatus::Unreleased => {}
+                    status => validations.push(ValidationMessage::new(
+                        "ants",
+                        format!(
+                            "Only unreleased ants may be suggested, ant {} is {}",
+                            ant_req.ant_id, status
+                        ),
+                    )),
+                },
+            }
+
+            if let Some(content) = &ant_req.overwrite_content {
+                validate_suggested_content(&content).map(|e| validations.push(e));
+            }
+        }
+
+        if validations.len() > 0 {
+            return Err(AntOnTheWebError::Validation(ValidationError::many(
+                validations,
+            )));
+        }
+    }
+
+    let mut releases = dao.releases.write().await;
+
+    let release = releases
+        .make_release(&user.user_id, req.label, req.ants)
+        .await?;
+
+    Ok((StatusCode::OK, Json(CreateReleaseResponse { release })))
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct TotalResponse {
     pub total: usize,
 }
@@ -183,7 +293,7 @@ async fn total(
     Ok((StatusCode::OK, Json(TotalResponse { total })))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct LatestAntsResponse {
     #[serde(with = "chrono::serde::ts_seconds")]
     pub date: chrono::DateTime<chrono::Utc>,
@@ -274,12 +384,34 @@ pub struct SuggestionResponse {
     pub ant: Ant,
 }
 
+fn validate_suggested_content(content: &str) -> Option<ValidationMessage> {
+    if content.len() < 3 || content.len() > 100 {
+        return Some(ValidationMessage::new(
+            "content",
+            "Ant content must be between 3 and 100 characters.",
+        ));
+    }
+
+    None
+}
+
 async fn make_suggestion(
     auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     Json(suggestion): Json<SuggestionRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let user = optional_authenticate(auth.as_ref(), &dao).await?;
+
+    {
+        let mut validations: Vec<ValidationMessage> = vec![];
+        validate_suggested_content(&suggestion.suggestion_content).map(|v| validations.push(v));
+
+        if validations.len() > 0 {
+            return Err(AntOnTheWebError::Validation(ValidationError::many(
+                validations,
+            )));
+        }
+    }
 
     let mut ants = dao.ants.write().await;
 
@@ -395,6 +527,7 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/released-ants", get(released_ants))
         .route_with_tsr("/declined-ants", get(declined_ants))
         .route_with_tsr("/all-ants", get(all_ants))
+        .route_with_tsr("/release", get(get_release).post(create_release))
         .route_with_tsr("/latest-release", get(latest_release))
         .route_with_tsr("/total", get(total))
         .route_with_tsr("/suggest", post(make_suggestion))

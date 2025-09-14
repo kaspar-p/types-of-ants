@@ -1,6 +1,6 @@
 use ant_data_farm::AntDataFarmClient;
 use ant_library::get_mode;
-use ant_on_the_web::{email::MailjetEmailSender, sms::Sms, state::InnerApiState};
+use ant_on_the_web::{email::MailjetEmailSender, sms::Sms, state::InnerApiState, ApiOptions};
 use rand::SeedableRng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
@@ -28,7 +28,8 @@ async fn main() {
         // Choose OS RNG to seed the std PRNG
         rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_rng(&mut rand::rng()))),
     };
-    let app = ant_on_the_web::make_routes(&state).expect("route init failed");
+    let app =
+        ant_on_the_web::make_routes(&state, ApiOptions { tps: 250 }).expect("route init failed");
 
     let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
         .expect("ANT_ON_THE_WEB_PORT environment variable not found")

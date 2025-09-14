@@ -8,9 +8,10 @@ use ant_on_the_web::{
     state::InnerApiState,
     users::{
         AddEmailRequest, AddEmailResponse, AddPhoneNumberRequest, AddPhoneNumberResponse,
-        AddResolution, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
+        AddResolution, GetUserResponse, LoginMethod, LoginRequest, LoginResponse, SignupRequest,
         VerificationAttemptRequest, VerificationSubmission,
     },
+    ApiOptions,
 };
 use http::{header::SET_COOKIE, HeaderMap, StatusCode};
 use postgresql_embedded::PostgreSQL;
@@ -88,6 +89,26 @@ pub struct TestFixture {
     _guard: PostgreSQL,
 }
 
+pub struct FixtureOptions {
+    enable_throttle: bool,
+    seed: [u8; 32],
+}
+
+impl FixtureOptions {
+    pub fn new() -> Self {
+        FixtureOptions {
+            enable_throttle: false,
+            seed: [123u8; 32],
+        }
+    }
+
+    pub fn with_throttle(mut self) -> Self {
+        self.enable_throttle = true;
+
+        self
+    }
+}
+
 pub fn get_auth_cookie(headers: &HeaderMap) -> String {
     headers
         .get_all(SET_COOKIE)
@@ -110,7 +131,7 @@ pub fn get_telemetry_cookie(headers: &HeaderMap) -> String {
         .to_string()
 }
 
-async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
+async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
     let (db, db_client) = test_database_client().await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
@@ -122,9 +143,18 @@ async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
         email: Arc::new(TestEmailSender::new()),
 
         // Deterministic seed for testing.
-        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed(seed))),
+        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed(opts.seed))),
     };
-    let app = make_routes(&state).unwrap();
+    let app = make_routes(
+        &state,
+        ApiOptions {
+            tps: match opts.enable_throttle {
+                true => 25,
+                false => 999_999,
+            },
+        },
+    )
+    .unwrap();
 
     return TestFixture {
         client: TestClient::new(app).await,
@@ -135,13 +165,13 @@ async fn test_router_seeded_no_auth(seed: [u8; 32]) -> TestFixture {
 
 /// Get a test webserver connected to a test webserver.
 /// The database has been bootstrapped with the most modern schema.
-pub async fn test_router_no_auth() -> TestFixture {
-    test_router_seeded_no_auth([123; 32]).await
+pub async fn test_router_no_auth(opts: FixtureOptions) -> TestFixture {
+    test_router_seeded_no_auth(opts).await
 }
 
 /// Get a test webserver and database, along with a valid COOKIE header value.
-pub async fn test_router_auth() -> (TestFixture, String) {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+pub async fn test_router_auth(opts: FixtureOptions) -> (TestFixture, String) {
+    let (fixture, cookie) = test_router_weak_auth(opts).await;
 
     {
         let req = AddPhoneNumberRequest {
@@ -229,8 +259,8 @@ pub async fn test_router_auth() -> (TestFixture, String) {
 }
 
 /// Get a router and cookie pair that has not perform 2fa verification yet.
-pub async fn test_router_weak_auth(seed: Option<[u8; 32]>) -> (TestFixture, String) {
-    let fixture = test_router_seeded_no_auth(seed.unwrap_or([123; 32])).await;
+pub async fn test_router_weak_auth(opts: FixtureOptions) -> (TestFixture, String) {
+    let fixture = test_router_seeded_no_auth(opts).await;
 
     {
         let req = SignupRequest {
@@ -268,4 +298,35 @@ pub async fn test_router_weak_auth(seed: Option<[u8; 32]>) -> (TestFixture, Stri
     };
 
     return (fixture, format!("typesofants_auth={}", token));
+}
+
+pub async fn test_router_admin_auth(opts: FixtureOptions) -> (TestFixture, String) {
+    let (fixture, cookie) = test_router_auth(opts).await;
+
+    let user = {
+        let res = fixture
+            .client
+            .get("/api/users/user")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: GetUserResponse = res.json().await;
+
+        body.user
+    };
+
+    fixture
+        .state
+        .dao
+        .users
+        .write()
+        .await
+        .change_user_role(&user.user_id, "admin")
+        .await
+        .unwrap();
+
+    (fixture, cookie)
 }

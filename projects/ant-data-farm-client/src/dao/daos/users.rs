@@ -33,6 +33,9 @@ pub struct User {
 
     #[serde(with = "chrono::serde::ts_seconds")]
     pub joined: DateTime<Utc>,
+
+    #[serde(rename = "roleName")]
+    pub role_name: String,
 }
 
 async fn construct_emails_for_user(db: &Arc<Mutex<Database>>, user_id: &UserId) -> Vec<String> {
@@ -76,6 +79,7 @@ fn row_to_user(user_row: &Row, emails: Vec<String>, phone_numbers: Vec<String>) 
         username: user_row.get("user_name"),
         password_hash: user_row.get("password_hash"),
         joined: user_row.get("user_joined"),
+        role_name: user_row.get("role_name"),
         phone_numbers,
         emails,
     }
@@ -98,9 +102,11 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             user_id,
             user_name,
             user_joined,
-            password_hash
+            password_hash,
+            role_name
         from
             registered_user
+            join user_role on registered_user.role_id = user_role.role_id
         where
             user_id = $1
         limit 1;",
@@ -128,7 +134,11 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             .lock()
             .await
             .query(
-                "select user_id, user_name, user_joined, password_hash from registered_user;",
+                "select
+                    user_id, user_name, user_joined, password_hash, role_name
+                from registered_user
+                    join user_role on registered_user.role_id = user_role.role_id
+                ;",
                 &[],
             )
             .await?;
@@ -252,11 +262,34 @@ impl UsersDao {
             password_hash,
             user_id: UserId(user_id),
             joined: chrono::offset::Utc::now(),
+            role_name: role,
         };
 
         t.commit().await?;
 
         return Ok(user);
+    }
+
+    pub async fn change_user_role(
+        &mut self,
+        user_id: &UserId,
+        role_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        let db = self.database.lock().await;
+        db.query_one(
+            "
+        update registered_user
+        set
+            role_id = (select role_id from user_role where role_name = $1)
+        where
+            user_id = $2
+        returning role_id
+        ;",
+            &[&role_name, &user_id.0],
+        )
+        .await?;
+
+        Ok(())
     }
 
     pub async fn overwrite_user_password(

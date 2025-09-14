@@ -1,4 +1,4 @@
-use crate::fixture::test_router_no_auth;
+use crate::fixture::{test_router_no_auth, FixtureOptions};
 use ant_on_the_web::hosts::{GetHostResponse, GetHostsResponse};
 use http::StatusCode;
 use tracing_test::traced_test;
@@ -6,7 +6,7 @@ use tracing_test::traced_test;
 #[tokio::test]
 #[traced_test]
 async fn getting_all_hosts_works() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let res = fixture.client.get("/api/hosts/hosts").send().await;
 
@@ -19,7 +19,7 @@ async fn getting_all_hosts_works() {
 #[tokio::test]
 #[traced_test]
 async fn getting_hostname_or_label() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let res1 = fixture
         .client

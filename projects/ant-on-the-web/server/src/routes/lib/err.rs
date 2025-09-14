@@ -15,10 +15,13 @@ pub struct ValidationMessage {
 }
 
 impl ValidationMessage {
-    pub fn new(field: &'static str, msg: &'static str) -> Self {
+    pub fn new<S>(field: &'static str, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             field: field.to_string(),
-            msg: msg.to_string(),
+            msg: msg.into(),
         }
     }
 

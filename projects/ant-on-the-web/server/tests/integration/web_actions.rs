@@ -4,12 +4,12 @@ use http::{header::COOKIE, StatusCode};
 use tracing::debug;
 use tracing_test::traced_test;
 
-use crate::fixture::{get_telemetry_cookie, test_router_auth, test_router_no_auth};
+use crate::fixture::{get_telemetry_cookie, test_router_auth, test_router_no_auth, FixtureOptions};
 
 #[tokio::test]
 #[traced_test]
 async fn web_actions_action_returns_200_if_telemetry_missing_and_new_assigned() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = WebActionRequest {
@@ -39,7 +39,7 @@ async fn web_actions_action_returns_200_if_telemetry_missing_and_new_assigned() 
 #[tokio::test]
 #[traced_test]
 async fn web_actions_action_returns_200_if_unauthenticated() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = WebActionRequest {
@@ -61,7 +61,7 @@ async fn web_actions_action_returns_200_if_unauthenticated() {
 #[tokio::test]
 #[traced_test]
 async fn web_actions_action_returns_200_if_authenticated() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     {
         let req = WebActionRequest {
@@ -84,7 +84,7 @@ async fn web_actions_action_returns_200_if_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn telemetry_cookie_stays_the_same_over_multiple_requests_and_keeps_auth() {
-    let (fixture, cookie0) = test_router_auth().await;
+    let (fixture, cookie0) = test_router_auth(FixtureOptions::new()).await;
 
     let cookie1 = {
         let req = WebActionRequest {

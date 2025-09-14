@@ -1,4 +1,4 @@
-use crate::fixture::test_router_no_auth;
+use crate::fixture::{test_router_no_auth, FixtureOptions};
 use futures::StreamExt;
 use http::StatusCode;
 use tracing::error;
@@ -7,9 +7,9 @@ use tracing_test::traced_test;
 #[tokio::test]
 #[traced_test]
 async fn many_parallel_requests_get_429_too_many_requests() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new().with_throttle()).await;
 
-    const NUM_REQUESTS: usize = 100;
+    const NUM_REQUESTS: usize = 1000;
 
     let urls = vec!["/ping"; NUM_REQUESTS];
     let client = fixture.client;
@@ -21,7 +21,6 @@ async fn many_parallel_requests_get_429_too_many_requests() {
         })
         .buffer_unordered(NUM_REQUESTS);
 
-    // let r = responses
     let throttles = responses
         .filter_map(|res| async {
             let resp = res.unwrap();

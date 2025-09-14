@@ -3,7 +3,7 @@ use std::any::Any;
 use crate::{
     fixture::{
         get_auth_cookie, test_router_auth, test_router_no_auth, test_router_weak_auth,
-        TestSmsSender,
+        FixtureOptions, TestSmsSender,
     },
     fixture_email::TestEmailSender,
     fixture_sms::{first_otp, second_otp, third_otp},
@@ -19,7 +19,7 @@ use tracing_test::traced_test;
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = VerificationAttemptRequest {
@@ -44,7 +44,7 @@ async fn users_verification_attempt_returns_401_if_unauthenticated_call() {
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_200_with_different_cookie_headers() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     let phone = "+1 (111) 222-3333".to_string();
     {
@@ -95,7 +95,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers() 
 #[traced_test]
 async fn users_verification_attempt_returns_200_with_different_cookie_headers_even_if_already_authn(
 ) {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     let phone = "+1 (111) 222-4444".to_string();
     {
@@ -147,7 +147,7 @@ async fn users_verification_attempt_returns_200_with_different_cookie_headers_ev
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_400_for_unknown_phone_number() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
     {
         let req = VerificationAttemptRequest {
             method: VerificationSubmission::Phone {
@@ -171,7 +171,7 @@ async fn users_verification_attempt_returns_400_for_unknown_phone_number() {
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     let phone = "+1 (111) 222-3333".to_string();
     {
@@ -236,7 +236,7 @@ async fn users_verification_attempt_returns_400_for_wrong_or_too_many_attempts()
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let cookie = {
         let req = SignupRequest {
@@ -312,7 +312,7 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
 async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_verified_with_different_number(
 ) {
     // The user has completed signup with 2fa
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     let weak_auth_cookie = {
         let req = LoginRequest {
@@ -383,7 +383,7 @@ async fn users_phone_number_returns_401_if_weak_auth_when_user_has_already_2fa_v
 async fn users_email_returns_401_if_weak_auth_when_user_has_already_2fa_verified_with_different_number(
 ) {
     // The user has completed signup with 2fa
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     let weak_auth_cookie = {
         let req = LoginRequest {
@@ -451,7 +451,7 @@ async fn users_email_returns_401_if_weak_auth_when_user_has_already_2fa_verified
 #[traced_test]
 async fn users_verification_attempt_returns_401_if_weak_auth_when_user_has_already_2fa_verified() {
     // The user has completed signup with 2fa
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     let weak_auth_cookie = {
         let req = LoginRequest {
@@ -535,7 +535,7 @@ async fn users_verification_attempt_returns_401_if_weak_auth_when_user_has_alrea
 #[tokio::test]
 #[traced_test]
 async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     {
         let req = AddPhoneNumberRequest {
@@ -599,7 +599,7 @@ async fn users_verification_attempt_returns_200_and_adds_phone_number_to_user() 
 #[tokio::test]
 #[traced_test]
 async fn users_phone_number_returns_200_after_only_signup_no_login() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let cookie = {
         let req = SignupRequest {
@@ -681,7 +681,7 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
 #[tokio::test]
 #[traced_test]
 async fn users_phone_number_returns_200_and_sends_new_code() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     {
         let req = AddPhoneNumberRequest {
@@ -720,7 +720,7 @@ async fn users_phone_number_returns_200_and_sends_new_code() {
 #[tokio::test]
 #[traced_test]
 async fn users_phone_number_returns_200_and_cancels_previous_codes() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     // old one, sends first code
     let f = || async {
@@ -793,7 +793,7 @@ async fn users_phone_number_returns_200_and_cancels_previous_codes() {
 #[tokio::test]
 #[traced_test]
 async fn users_email_returns_200_after_only_signup_no_login() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let cookie = {
         let req = SignupRequest {
@@ -873,7 +873,7 @@ async fn users_email_returns_200_after_only_signup_no_login() {
 #[tokio::test]
 #[traced_test]
 async fn users_email_returns_200_and_sends_new_code() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     {
         let req = AddEmailRequest {
@@ -923,7 +923,7 @@ with love,
 #[tokio::test]
 #[traced_test]
 async fn users_email_returns_200_and_cancels_previous_codes() {
-    let (fixture, cookie) = test_router_weak_auth(None).await;
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
 
     // old one, sends first code
     let f = || async {

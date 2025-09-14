@@ -8,14 +8,14 @@ use http::StatusCode;
 use tracing_test::traced_test;
 
 use crate::{
-    fixture::{test_router_auth, test_router_no_auth, TestSmsSender},
+    fixture::{test_router_auth, test_router_no_auth, FixtureOptions, TestSmsSender},
     fixture_sms::{second_otp, third_otp},
 };
 
 #[tokio::test]
 #[traced_test]
 async fn users_password_reset_code_returns_400_if_phone_number_or_invalid() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = PasswordResetCodeRequest {
@@ -36,7 +36,7 @@ async fn users_password_reset_code_returns_400_if_phone_number_or_invalid() {
 #[tokio::test]
 #[traced_test]
 async fn users_password_reset_code_returns_200_and_sends_no_messages_if_user_does_not_exist() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = PasswordResetCodeRequest {
@@ -63,7 +63,7 @@ async fn users_password_reset_code_returns_200_and_sends_no_messages_if_user_doe
 #[traced_test]
 async fn users_password_reset_code_returns_200_and_sends_code_if_user_exists() {
     // Use authenticated router just to create a fake 'user' user.
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     let (username, phone_number) = {
         let res = fixture
@@ -110,7 +110,7 @@ async fn users_password_reset_code_returns_200_and_sends_code_if_user_exists() {
 #[tokio::test]
 #[traced_test]
 async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_requests() {
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     // Step 1
     {
@@ -170,7 +170,7 @@ async fn users_password_reset_code_returns_200_and_cancels_outstanding_otp_reque
 #[tokio::test]
 #[traced_test]
 async fn users_password_reset_secret_returns_400_if_otp_is_wrong() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = PasswordResetSecretRequest {
@@ -192,7 +192,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_wrong() {
 #[tokio::test]
 #[traced_test]
 async fn users_password_reset_secret_returns_400_if_otp_is_cancelled() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     for _ in 0..10 {
         let req = PasswordResetSecretRequest {
@@ -232,7 +232,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_cancelled() {
 #[traced_test]
 async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
     // Use this just to get a user created.
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     // Correct one so it cancels the previous
     {
@@ -289,7 +289,7 @@ async fn users_password_reset_secret_returns_400_if_otp_is_already_verified() {
 #[traced_test]
 async fn users_password_reset_secret_returns_200_with_secret_if_otp_is_correct() {
     // Use this just to get a user created.
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     // Correct one so it cancels the previous
     {
@@ -331,7 +331,7 @@ async fn users_password_reset_secret_returns_200_with_secret_if_otp_is_correct()
 #[tokio::test]
 #[traced_test]
 async fn users_password_returns_400_if_password_attempts_do_not_match() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = PasswordRequest {
@@ -354,7 +354,7 @@ async fn users_password_returns_400_if_password_attempts_do_not_match() {
 #[tokio::test]
 #[traced_test]
 async fn users_password_returns_400_if_password_attempts_are_not_valid_passwords() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     // password1 not valid
     {
@@ -414,7 +414,7 @@ async fn users_password_returns_400_if_password_attempts_are_not_valid_passwords
 #[tokio::test]
 #[traced_test]
 async fn users_password_returns_401_if_secret_is_wrong_or_tampered() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
     {
         let req = PasswordRequest {
             password1: "ant-password1".to_string(),
@@ -437,7 +437,7 @@ async fn users_password_returns_401_if_secret_is_wrong_or_tampered() {
 #[traced_test]
 async fn users_password_returns_200_and_resets_password() {
     // Use this just to get a user created.
-    let (fixture, _) = test_router_auth().await;
+    let (fixture, _) = test_router_auth(FixtureOptions::new()).await;
 
     // step 1
     {
@@ -517,7 +517,7 @@ async fn users_password_returns_200_and_resets_password() {
 #[tokio::test]
 #[traced_test]
 async fn users_password_returns_200_if_authenticated_with_no_secret() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     {
         let req = PasswordRequest {

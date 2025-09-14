@@ -1,9 +1,13 @@
-use crate::fixture::{test_router_auth, test_router_no_auth};
-use ant_data_farm::ants::AntId;
+use crate::fixture::{
+    test_router_admin_auth, test_router_auth, test_router_no_auth, FixtureOptions,
+};
+use ant_data_farm::{ants::AntId, releases::AntReleaseRequest};
 use ant_on_the_web::{
     ants::{
-        FavoriteAntRequest, FavoriteAntResponse, LatestAntsResponse, ReleasedAntsResponse,
-        SuggestionRequest, TotalResponse, UnfavoriteAntRequest,
+        CreateReleaseRequest, CreateReleaseResponse, FavoriteAntRequest, FavoriteAntResponse,
+        GetReleaseRequest, GetReleaseResponse, LatestAntsResponse, LatestReleaseResponse,
+        ReleasedAntsResponse, SuggestionRequest, SuggestionResponse, TotalResponse,
+        UnfavoriteAntRequest,
     },
     err::ValidationError,
 };
@@ -14,7 +18,7 @@ use uuid::Uuid;
 #[tokio::test]
 #[traced_test]
 async fn ants_total_matches_ants_released() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let ants_res = fixture
         .client
@@ -57,7 +61,7 @@ async fn ants_total_matches_ants_released() {
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_with_user_if_authenticated() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     {
         let req = SuggestionRequest {
@@ -77,7 +81,7 @@ async fn ants_suggest_returns_200_with_user_if_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_even_if_not_authenticated() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     let req = SuggestionRequest {
         suggestion_content: "some ant content".to_string(),
@@ -94,7 +98,7 @@ async fn ants_suggest_returns_200_even_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_401_if_not_authenticated() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -129,7 +133,7 @@ async fn ants_favorite_returns_401_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_400_if_no_such_ant() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -155,7 +159,7 @@ async fn ants_favorite_returns_400_if_no_such_ant() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_200_idempotently() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     let ant_id = {
         let res = fixture
@@ -215,7 +219,7 @@ async fn ants_favorite_returns_200_idempotently() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_401_if_not_authenticated() {
-    let fixture = test_router_no_auth().await;
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -250,7 +254,7 @@ async fn ants_unfavorite_returns_401_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_400_if_no_such_ant() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -276,7 +280,7 @@ async fn ants_unfavorite_returns_400_if_no_such_ant() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_200_idempotently_and_unfavorites() {
-    let (fixture, cookie) = test_router_auth().await;
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
     let ant_id = {
         let res = fixture
@@ -347,4 +351,394 @@ async fn ants_unfavorite_returns_200_idempotently_and_unfavorites() {
 
     assert_ne!(t1, t2);
     assert!(t2 > t1);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_release_post_returns_401_if_not_admin() {
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_release_post_returns_200_if_release_made() {
+    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+
+    let ants = {
+        let res1 = fixture
+            .client
+            .post("/api/ants/suggest")
+            .header("Cookie", &cookie)
+            .json(&SuggestionRequest {
+                suggestion_content: "ant suggestion!".to_string(),
+            })
+            .send()
+            .await;
+
+        assert_eq!(res1.status(), StatusCode::OK);
+        let body1: SuggestionResponse = res1.json().await;
+
+        let res2 = fixture
+            .client
+            .post("/api/ants/suggest")
+            .header("Cookie", &cookie)
+            .json(&SuggestionRequest {
+                suggestion_content: "other ant suggestion!".to_string(),
+            })
+            .send()
+            .await;
+
+        assert_eq!(res2.status(), StatusCode::OK);
+        let body2: SuggestionResponse = res2.json().await;
+
+        &[body1.ant, body2.ant]
+    };
+
+    let latest1 = {
+        let res = fixture.client.get("/api/ants/latest-ants").send().await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: LatestAntsResponse = res.json().await;
+
+        body
+    };
+
+    let release = {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![
+                AntReleaseRequest {
+                    ant_id: ants[0].ant_id,
+                    overwrite_content: None,
+                },
+                AntReleaseRequest {
+                    ant_id: ants[1].ant_id,
+                    overwrite_content: Some("something else, didn't like that one".to_string()),
+                },
+            ],
+        };
+
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: CreateReleaseResponse = res.json().await;
+
+        body.release
+    };
+
+    let latest2 = {
+        let res = fixture.client.get("/api/ants/latest-ants").send().await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: LatestAntsResponse = res.json().await;
+
+        body
+    };
+
+    assert_ne!(latest1, latest2);
+    assert_eq!(latest1.release + 1, latest2.release);
+    assert_eq!(latest2.release, release);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_release_post_returns_400_if_validation_error() {
+    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+
+    // prereq: suggest 1000 things
+    let mut ids: Vec<AntId> = vec![];
+    {
+        for i in 0..1000 {
+            let res = fixture
+                .client
+                .post("/api/ants/suggest")
+                .header("Cookie", &cookie)
+                .json(&SuggestionRequest {
+                    suggestion_content: format!("ant suggestion {}", i),
+                })
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            let body: SuggestionResponse = res.json().await;
+
+            ids.push(body.ant.ant_id);
+        }
+    }
+
+    // 400 if no ants included
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().msg, "Ants cannot be empty.");
+    }
+
+    // 400 if too many ants included
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: ids
+                .iter()
+                .map(|id| AntReleaseRequest {
+                    ant_id: *id,
+                    overwrite_content: None,
+                })
+                .collect(),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            "Ants too long, cannot exceed 256."
+        );
+    }
+
+    // 400 if duplicate ants included
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![
+                AntReleaseRequest {
+                    ant_id: ids[0],
+                    overwrite_content: None,
+                },
+                AntReleaseRequest {
+                    ant_id: ids[0],
+                    overwrite_content: None,
+                },
+            ],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            format!("Ant {} suggested more than once.", ids[0])
+        );
+    }
+
+    // 400 if some ants are already released
+    {
+        let released_ant = {
+            let res = fixture.client.get("/api/ants/latest-ants").send().await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            let body: LatestAntsResponse = res.json().await;
+
+            body.ants[0].clone()
+        };
+
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![AntReleaseRequest {
+                ant_id: released_ant.ant_id.clone(),
+                overwrite_content: None,
+            }],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            format!(
+                "Only unreleased ants may be suggested, ant {} is {}",
+                released_ant.ant_id, released_ant.status
+            )
+        );
+    }
+
+    // 400 if overwrite_content too short
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![AntReleaseRequest {
+                ant_id: ids[0],
+                overwrite_content: Some("".to_string()),
+            }],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "content");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            "Ant content must be between 3 and 100 characters."
+        );
+    }
+
+    // 400 if overwrite_content too long
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![AntReleaseRequest {
+                ant_id: ids[0],
+                overwrite_content: Some("text".repeat(100).to_string()),
+            }],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "content");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            "Ant content must be between 3 and 100 characters."
+        );
+    }
+
+    // 400 if some ant didn't exist
+    {
+        let req = CreateReleaseRequest {
+            label: "release".to_string(),
+            ants: vec![AntReleaseRequest {
+                ant_id: AntId(Uuid::nil()),
+                overwrite_content: None,
+            }],
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/release")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(
+            body.errors.first().unwrap().msg,
+            format!("No such ant: {}", Uuid::nil()),
+        );
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_release_get_returns_200_same_as_latest_release() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    let latest_release = {
+        let res = fixture.client.get("/api/ants/latest-release").send().await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: LatestReleaseResponse = res.json().await;
+        body
+    };
+
+    {
+        let req = GetReleaseRequest {
+            release: latest_release.release.release_number,
+        };
+        let res = fixture
+            .client
+            .get("/api/ants/release")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: GetReleaseResponse = res.json().await;
+
+        assert_eq!(latest_release.release, body.release);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_release_get_returns_404_if_no_such_release() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    {
+        let req = GetReleaseRequest { release: 99999 };
+        let res = fixture
+            .client
+            .get("/api/ants/release")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
 }

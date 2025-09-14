@@ -279,6 +279,23 @@ pub async fn authenticate(
     return upgrade_weak_auth(&auth, weakly_authenticate(&auth, &dao).await?);
 }
 
+/// Requires that the claim that the user carries belongs to a user with the admin role.
+/// Stronger than authenticate(), which just requires that the caller be a valid user.
+pub async fn admin_authenticate(
+    auth: &AuthClaims,
+    dao: &Arc<AntDataFarmClient>,
+) -> Result<User, AuthError> {
+    let user = authenticate(&auth, &dao).await?;
+
+    match user.role_name.as_str() {
+        "admin" => Ok(user),
+        _ => Err(AuthError::AccessDenied(Some(format!(
+            "User is not 'admin', instead '{}'",
+            user.role_name
+        )))),
+    }
+}
+
 /// If the auth claims are present, return the user that is authenticated. If not, returns the
 /// 'nobody' anonymous user.
 ///

@@ -4,7 +4,7 @@ use crate::dao::{dao_trait::DaoTrait, db::Database};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
@@ -33,6 +33,18 @@ pub enum AntStatus {
 
     #[serde(rename = "declined")]
     Declined,
+}
+
+impl Display for AntStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AntStatus::Declined => f.write_str("declined"),
+            AntStatus::Released(release_number) => {
+                f.write_fmt(format_args!("released::{}", release_number))
+            }
+            AntStatus::Unreleased => f.write_str("unreleased"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]

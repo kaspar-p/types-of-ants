@@ -66,14 +66,20 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
     }
 }
 
-pub fn make_routes(state: &state::InnerApiState) -> Result<Router, anyhow::Error> {
+pub struct ApiOptions {
+    pub tps: u32,
+}
+
+pub fn make_routes(
+    state: &state::InnerApiState,
+    opts: ApiOptions,
+) -> Result<Router, anyhow::Error> {
     debug!("Initializing API routes...");
 
     let throttling = Arc::new(
         GovernorConfigBuilder::default()
-            // 10 TPS
-            .period(std::time::Duration::from_millis(100))
-            .burst_size(25)
+            .period(std::time::Duration::from_millis(1000))
+            .burst_size(opts.tps)
             .use_headers()
             .key_extractor(ThrottleExtractor::new()) // Limit based on X-Real-IP Header
             .error_handler(|err| handle_throttling_error(&err))
