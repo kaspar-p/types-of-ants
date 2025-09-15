@@ -6,7 +6,7 @@ use ant_data_farm::{
 };
 use ant_library::{get_mode, Mode};
 use axum::{
-    extract::{FromRequestParts, OptionalFromRequestParts},
+    extract::{FromRef, FromRequestParts, OptionalFromRequestParts},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
 use tracing::{debug, error, info, warn};
 
-use crate::err::AntOnTheWebError;
+use crate::{err::AntOnTheWebError, state::InnerApiState};
 
 use super::{
     jwt,
@@ -70,11 +70,60 @@ impl AuthClaims {
     }
 }
 
+async fn try_api_token_authentication(
+    state: &InnerApiState,
+    cookie: &str,
+) -> Result<AuthClaims, (StatusCode, String)> {
+    let split: Vec<&str> = cookie.split(":").collect();
+    if split.len() != 2 {
+        return Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()));
+    }
+
+    let username: &str = split[0];
+    let token: &str = split[1];
+
+    let api_tokens = state.dao.api_tokens.read().await;
+
+    let user = api_tokens
+        .verify_token_user(username, token)
+        .await
+        .map_err(|e| {
+            error!("Attempting API Token validation failed: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Something went wrong, please retry.".to_string(),
+            )
+        })?;
+
+    match user {
+        None => Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string())),
+        // Two-factor verification not required for API access!
+        Some(u) => Ok(AuthClaims::two_factor_verified(u)),
+    }
+}
+
+async fn decode_jwt_cookie(
+    state: &InnerApiState,
+    cookie: &str,
+) -> Result<AuthClaims, (StatusCode, String)> {
+    // If cookie is specified it can't be tampered with Decode claim data
+    let claim_data = jwt::decode_jwt::<AuthClaims>(&cookie).map_err(|e| {
+        warn!("decode jwt failed: {e:?}");
+        return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+    });
+
+    match claim_data {
+        Err(_) => Ok(try_api_token_authentication(&state, &cookie).await?),
+        Ok(claim) => Ok(claim),
+    }
+}
+
 /// Implement OptionalFromRequestParts for AuthClaims because not every API
 /// needs to be strictly authenticated, it just helps if it is. For example, /api/ants/suggest
 /// does not require it, but should use it if it's included.
 impl<S> OptionalFromRequestParts<S> for AuthClaims
 where
+    InnerApiState: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, String);
@@ -90,7 +139,7 @@ where
                 return AntOnTheWebError::InternalServerError(None).into();
             })?;
 
-        let jwt = match cookies.get(AUTH_COOKIE_NAME) {
+        let cookie = match cookies.get(AUTH_COOKIE_NAME) {
             Some(cookie) => cookie,
             None => {
                 info!(
@@ -101,13 +150,8 @@ where
             }
         };
 
-        // If cookie is specified it can't be tampered with Decode claim data
-        let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
-            warn!("decode jwt failed: {e:?}");
-            return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-        })?;
-
-        return Ok(Some(claim_data));
+        let state = InnerApiState::from_ref(state);
+        Ok(Some(decode_jwt_cookie(&state, cookie.value()).await?))
     }
 }
 
@@ -115,6 +159,7 @@ where
 /// for example, /api/users/user, /api/users/logout, or other profile information.
 impl<S> FromRequestParts<S> for AuthClaims
 where
+    InnerApiState: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, String);
@@ -130,7 +175,7 @@ where
                 return AntOnTheWebError::InternalServerError(None).into();
             })?;
 
-        let jwt = match cookies.get(AUTH_COOKIE_NAME) {
+        let cookie = match cookies.get(AUTH_COOKIE_NAME) {
             Some(cookie) => cookie,
             None => {
                 warn!("No '{}' cookie found.", AUTH_COOKIE_NAME);
@@ -141,13 +186,16 @@ where
             }
         };
 
-        // Decode claim data
-        let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
-            warn!("decode jwt failed: {e:?}");
-            return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-        })?;
+        let state = InnerApiState::from_ref(state);
+        Ok(decode_jwt_cookie(&state, cookie.value()).await?)
 
-        return Ok(claim_data);
+        // // Decode claim data
+        // let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
+        //     warn!("decode jwt failed: {e:?}");
+        //     return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+        // })?;
+
+        // return Ok(claim_data);
     }
 }
 

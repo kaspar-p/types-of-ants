@@ -3,12 +3,7 @@ use crate::{
     routes::lib::auth::{admin_authenticate, authenticate},
     state::{ApiRouter, ApiState, InnerApiState},
 };
-use ant_data_farm::{
-    ants::{Ant, AntId, AntStatus},
-    releases::{AntReleaseRequest, Release},
-    users::UserId,
-    DaoTrait,
-};
+use ant_data_farm::{users::UserId, DaoTrait};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -21,6 +16,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::lib::auth::{optional_authenticate, AuthClaims};
+
+pub use ant_data_farm::ants::{Ant, AntId, AntStatus};
+pub use ant_data_farm::releases::{AntReleaseRequest, Release};
 
 const PAGE_SIZE: usize = 1_000_usize;
 
@@ -43,8 +41,8 @@ struct Pagination {
     page: usize,
 }
 
-#[derive(Serialize)]
-struct UnreleasedAntsResponse {
+#[derive(Serialize, Deserialize)]
+pub struct UnreleasedAntsResponse {
     pub ants: Vec<Ant>,
 }
 

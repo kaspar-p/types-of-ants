@@ -25,6 +25,7 @@ pub use crate::clients::email;
 pub use crate::clients::sms;
 
 pub use crate::routes::ants;
+pub use crate::routes::api_tokens;
 pub use crate::routes::deployments;
 pub use crate::routes::hosts;
 pub use crate::routes::lib::err;
@@ -97,6 +98,7 @@ pub fn make_routes(
         .merge(version::router())
         .nest("/ants", ants::router())
         // .nest("/msg", routes::msg::router())
+        .nest("/api-tokens", api_tokens::router())
         .nest("/users", users::router())
         .nest("/hosts", hosts::router())
         .nest("/web-actions", web_actions::router())

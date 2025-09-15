@@ -3,6 +3,7 @@ mod types;
 
 pub use crate::dao::dao_trait::DaoTrait;
 pub use crate::dao::daos::ants;
+use crate::dao::daos::api_tokens::ApiTokensDao;
 pub use crate::dao::daos::hosts;
 pub use crate::dao::daos::releases;
 pub use crate::dao::daos::tweets;
@@ -127,6 +128,7 @@ pub struct AntDataFarmClient {
     pub ants: RwLock<AntsDao>,
     pub releases: RwLock<ReleasesDao>,
     pub users: RwLock<UsersDao>,
+    pub api_tokens: RwLock<ApiTokensDao>,
     pub verifications: RwLock<VerificationsDao>,
     pub tweets: RwLock<TweetsDao>,
     pub hosts: RwLock<HostsDao>,
@@ -168,6 +170,7 @@ impl AntDataFarmClient {
 
         Ok(AntDataFarmClient {
             ants: RwLock::new(AntsDao::new(database.clone()).await?),
+            api_tokens: RwLock::new(ApiTokensDao::new(database.clone()).await?),
             releases: RwLock::new(ReleasesDao::new(database.clone()).await),
             tweets: RwLock::new(TweetsDao::new(database.clone())),
             users: RwLock::new(UsersDao::new(database.clone()).await?),
