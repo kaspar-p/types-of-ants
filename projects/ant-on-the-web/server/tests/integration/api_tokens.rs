@@ -1,4 +1,7 @@
-use ant_on_the_web::api_tokens::GrantTokenRequest;
+use ant_on_the_web::{
+    api_tokens::{GrantTokenRequest, GrantTokenResponse},
+    users::GetUserResponse,
+};
 use http::StatusCode;
 use tracing_test::traced_test;
 
@@ -51,7 +54,7 @@ async fn api_tokens_token_post_returns_404_for_not_existing_user() {
 async fn api_tokens_token_post_returns_200_for_existing_user() {
     let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
 
-    {
+    let token = {
         let req = GrantTokenRequest {
             username: "nobody".to_string(),
         };
@@ -64,5 +67,22 @@ async fn api_tokens_token_post_returns_200_for_existing_user() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
+        let body: GrantTokenResponse = res.json().await;
+
+        body.token
+    };
+
+    {
+        let res = fixture
+            .client
+            .get("/api/users/user")
+            .header("Cookie", &format!("typesofants_auth=nobody:{}", token))
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: GetUserResponse = res.json().await;
+
+        assert_eq!(body.user.username, "nobody");
     }
 }

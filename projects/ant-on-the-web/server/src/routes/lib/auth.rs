@@ -76,6 +76,7 @@ async fn try_api_token_authentication(
 ) -> Result<AuthClaims, (StatusCode, String)> {
     let split: Vec<&str> = cookie.split(":").collect();
     if split.len() != 2 {
+        warn!("API token not structured as user:token");
         return Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()));
     }
 
@@ -96,7 +97,10 @@ async fn try_api_token_authentication(
         })?;
 
     match user {
-        None => Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string())),
+        None => {
+            warn!("API token not valid.");
+            Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()))
+        }
         // Two-factor verification not required for API access!
         Some(u) => Ok(AuthClaims::two_factor_verified(u)),
     }
@@ -113,7 +117,10 @@ async fn decode_jwt_cookie(
     });
 
     match claim_data {
-        Err(_) => Ok(try_api_token_authentication(&state, &cookie).await?),
+        Err(_) => {
+            info!("Attempting to authenticate with API tokens...");
+            Ok(try_api_token_authentication(&state, &cookie).await?)
+        }
         Ok(claim) => Ok(claim),
     }
 }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
+use tracing::info;
 
 use crate::{
     dao::db::Database,
@@ -51,13 +52,14 @@ impl ApiTokensDao {
             .await
             .query(
                 "select
-                user_id, api_token_hash
+                  api_token.user_id, api_token.api_token_hash
                 from api_token
                   join registered_user on registered_user.user_id = api_token.user_id
                 where user_name = $1",
                 &[&username],
             )
             .await?;
+        info!("Matched {} user(s)...", users.len());
 
         for user in users {
             if verify_password_hash(api_token, user.get("api_token_hash"))? {
