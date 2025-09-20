@@ -185,6 +185,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hyper 1.7.0",
+ "openssl",
  "postgres-types",
  "reqwest 0.12.23",
  "serde",

@@ -58,6 +58,8 @@ impl ReleasesDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query_opt(
                 "select
                     release_number, release_label, created_at, creator_user_id
@@ -77,8 +79,9 @@ impl ReleasesDao {
         label: String,
         ants: Vec<AntReleaseRequest>,
     ) -> Result<i32, anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let tx = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let tx = con.transaction().await?;
 
         let release_number: i32 = tx
             .query_one(
@@ -131,6 +134,8 @@ impl ReleasesDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query_one(
                 "select
                     release_number, release_label, created_at, creator_user_id

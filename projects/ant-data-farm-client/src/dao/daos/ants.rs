@@ -106,6 +106,8 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
             select 
@@ -137,6 +139,8 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
             select 
@@ -218,8 +222,9 @@ impl AntsDao {
         ant: &AntId,
     ) -> Result<Option<DateTime<Utc>>> {
         let db = self.database.lock().await;
+        let con = db.get().await?;
 
-        let favorite_row = db
+        let favorite_row = con
             .query_opt(
                 "select user_id, ant_id, favorited_at
  from favorite
@@ -235,8 +240,9 @@ limit 1",
     }
 
     pub async fn favorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
-        let mut db = self.database.lock().await;
-        let tx = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let tx = con.transaction().await?;
 
         let favorited_at: DateTime<Utc> = tx
             .query_one(
@@ -258,8 +264,9 @@ limit 1",
     }
 
     pub async fn unfavorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<()> {
-        let mut db = self.database.lock().await;
-        let tx = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let tx = con.transaction().await?;
 
         let rows = tx
             .execute(
@@ -289,6 +296,8 @@ limit 1",
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query_opt(
                 "
             select (ant_id, ant_declined_user_id)
@@ -307,6 +316,8 @@ limit 1",
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query_one(
                 "
     insert into ant_declined
@@ -329,6 +340,8 @@ limit 1",
             .database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
             insert into ant_tweeted
@@ -365,7 +378,7 @@ limit 1",
         ant_suggestion_content: String,
         user_id: UserId,
         username: String,
-    ) -> Result<Ant, tokio_postgres::Error> {
+    ) -> Result<Ant, anyhow::Error> {
         let ant = Ant {
             ant_id: AntId(uuid::Uuid::new_v4()),
             ant_name: ant_suggestion_content,
@@ -379,6 +392,8 @@ limit 1",
         self.database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
             insert into ant

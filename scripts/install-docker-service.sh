@@ -61,7 +61,7 @@ export SECRETS_DIR="$INSTALL_DIR/secrets"
 log "BUILDING [$project]..."
 
 # Build the project remotely
-run_command make -C "$project_src" release
+run_command make -C "$project_src" release >> /dev/stderr
 DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
 
 # Install the project files
@@ -73,7 +73,7 @@ run_command ssh2ant "$ant_worker_num" "
 
 # Copy dockerfile into install dir
 docker-compose config "${project}" | \
-  ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/docker-compose.yml"
+  ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
 
 # Copy environment into the install dir
 local_secrets_dir="${repository_root}/secrets/${deploy_env}"
@@ -81,7 +81,7 @@ rm -f "${INSTALL_DIR}/.env"
 {
   cat "${build_cfg}"
   echo "PERSIST_DIR=$PERSIST_DIR"
-} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env"
+} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
 
 # Copy secrets into the install dir
 run_command scp -r "${local_secrets_dir}/." "${remote_host}:${SECRETS_DIR}/"
@@ -94,7 +94,7 @@ run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}
 # Interpret mustache template into the systemctl unit file
 new_unit_path="${INSTALL_DIR}/${project}.service"
 INSTALL_DIR="$INSTALL_DIR" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
-  ssh2ant "$ant_worker_num" "tee $new_unit_path"
+  ssh2ant "$ant_worker_num" "tee $new_unit_path" >> /dev/stderr
 
 # Write the installation manifest
 ssh2ant "$ant_worker_num" "echo '{
@@ -113,3 +113,6 @@ log "  when:        $(date -Iseconds)"
 log "  install dir: $INSTALL_DIR"
 log "  version:     $install_version"
 log "  unit file:   $new_unit_path"
+
+# Output
+echo "$install_version"

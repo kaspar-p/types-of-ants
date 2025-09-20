@@ -163,10 +163,7 @@ impl AntDataFarmClient {
     }
 
     async fn initialize(pool: ConnectionPool) -> Result<AntDataFarmClient, anyhow::Error> {
-        let db_con: PooledConnection<'_, PostgresConnectionManager<NoTls>> =
-            pool.get_owned().await?;
-
-        let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(db_con));
+        let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(pool));
 
         Ok(AntDataFarmClient {
             ants: RwLock::new(AntsDao::new(database.clone()).await?),

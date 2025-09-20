@@ -50,6 +50,14 @@ function get_services() {
   cat "$repository_root/services.jsonc"
 }
 
+function get_service_mode() {
+  local service="$1"
+  local mode
+  mode="$(get_services | jq -r ".services[\"$service\"].mode")"
+
+  echo "$mode"
+}
+
 function get_docker_platform() {
   local host="$1"
   local arch

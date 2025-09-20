@@ -41,6 +41,9 @@ pub struct User {
 async fn construct_emails_for_user(db: &Arc<Mutex<Database>>, user_id: &UserId) -> Vec<String> {
     db.lock()
         .await
+        .get()
+        .await
+        .unwrap()
         .query(
             "select user_email from registered_user_email where user_id = $1;",
             &[&user_id.0],
@@ -58,6 +61,9 @@ async fn construct_phone_numbers_for_user(
 ) -> Vec<String> {
     db.lock()
         .await
+        .get()
+        .await
+        .unwrap()
         .query(
             "select phone_number from registered_user_phone_number where user_id = $1;",
             &[&user_id.0],
@@ -96,6 +102,8 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
         select
@@ -133,6 +141,8 @@ impl DaoTrait<UsersDao, User> for UsersDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "select
                     user_id, user_name, user_joined, password_hash, role_name
@@ -221,8 +231,9 @@ impl UsersDao {
     ) -> Result<User, anyhow::Error> {
         info!("Creating user '{}'", username);
 
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let t = con.transaction().await?;
 
         let password_hash = make_password_hash(&password)?;
 
@@ -275,9 +286,13 @@ impl UsersDao {
         user_id: &UserId,
         role_name: &str,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        db.query_one(
-            "
+        self.database
+            .lock()
+            .await
+            .get()
+            .await?
+            .query_one(
+                "
         update registered_user
         set
             role_id = (select role_id from user_role where role_name = $1)
@@ -285,9 +300,9 @@ impl UsersDao {
             user_id = $2
         returning role_id
         ;",
-            &[&role_name, &user_id.0],
-        )
-        .await?;
+                &[&role_name, &user_id.0],
+            )
+            .await?;
 
         Ok(())
     }
@@ -298,9 +313,10 @@ impl UsersDao {
         new_password: &str,
     ) -> Result<(), anyhow::Error> {
         let db = self.database.lock().await;
+        let con = db.get().await?;
         let password_hash = make_password_hash(&new_password)?;
 
-        db.query_one(
+        con.query_one(
             "
         update registered_user
         set
@@ -326,6 +342,8 @@ impl UsersDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
                 insert into
@@ -350,9 +368,10 @@ impl UsersDao {
         user_id: &UserId,
         new_username: &str,
     ) -> Result<(), anyhow::Error> {
-        let mut db = self.database.lock().await;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let tx = con.transaction().await?;
 
-        let tx = db.transaction().await?;
         let affected = tx
             .execute(
                 "update registered_user
@@ -380,8 +399,9 @@ impl UsersDao {
         user_id: &UserId,
         email: &str,
     ) -> Result<(), anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let tx = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let tx = con.transaction().await?;
 
         let res_affected = tx
             .execute(

@@ -13,25 +13,25 @@ source "$repository_root/secrets/$deploy_env/build.cfg"
 set -o allexport
 
 if [[ "$deploy_env" = 'prod' ]]; then
-  echo "STOP"
+  echo "STOP" >> /dev/stderr
   exit 1
 fi
 
 if [[ ! -f "$backup_filepath" ]]; then
-  echo "No such file: $backup_filepath"
+  echo "No such file: $backup_filepath" >> /dev/stderr
   exit 1
 fi
 
-echo "STARTING RESTORE TO [$deploy_env] OF [$backup_filepath]"
+echo "STARTING RESTORE TO [$deploy_env] OF [$backup_filepath]" >> /dev/stderr
 
 read -r -p "... THIS IS REALLY DANGEROUS, PROCEED? (Y/N): " answer
 
 if [[ "$(tr '[:upper:]' '[:lower:]' <<< "$answer")" != "y" ]]; then
-  echo "... EXITING"
+  echo "... EXITING" >> /dev/stderr
   exit 1
 fi
 
-echo "... RESTORING"
+echo "... RESTORING" >> /dev/stderr 
 
 PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/postgres_password.secret")" psql \
   --host "$ANT_DATA_FARM_HOST" \
@@ -40,4 +40,4 @@ PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/postgres_password.secret
   --dbname template1 \
   --file "$backup_filepath" \
   --echo-all \
-  | tee -a "$backup_filepath-restore.log"
+  | tee -a "$backup_filepath-restore.log" >> /dev/stderr 

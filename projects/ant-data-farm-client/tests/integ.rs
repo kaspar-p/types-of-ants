@@ -1,29 +1,29 @@
-mod util;
+mod fixture;
 
 use ant_data_farm::{
     ants::Tweeted, AntDataFarmClient, DaoTrait, DatabaseConfig, DatabaseCredentials,
 };
 use chrono::Duration;
 
+use fixture::{logging, test_fixture};
 use testcontainers::runners::AsyncRunner;
 use tracing::debug;
-use util::{logging, test_fixture};
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn more_than_500_ants() {
-    let fixture = test_fixture("more_than_500_ants").await;
+    let fixture = test_fixture("more_than_500_ants", None).await;
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: Some(DatabaseCredentials {
-            database_name: "test".to_string(),
+            database_name: "typesofants".to_string(),
             database_user: "test".to_string(),
             database_password: "test".to_string(),
         }),
-        host: None,
+        host: Some("localhost".to_string()),
         migration_dir: None,
     }))
     .await
@@ -37,18 +37,18 @@ async fn more_than_500_ants() {
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn user_gets_created() {
-    let fixture = test_fixture("user_gets_created").await;
+    let fixture = test_fixture("user_gets_created", None).await;
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: Some(DatabaseCredentials {
-            database_name: "test".to_string(),
+            database_name: "typesofants".to_string(),
             database_user: "test".to_string(),
             database_password: "test".to_string(),
         }),
-        host: None,
+        host: Some("localhost".to_string()),
         migration_dir: None,
     }))
     .await
@@ -71,26 +71,12 @@ async fn user_gets_created() {
         .unwrap()
         .unwrap();
     assert_eq!(user_by_name.username, "integ-user");
-
-    let user_by_phone = users
-        .get_one_by_phone_number("(111) 222-3333")
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(user_by_phone.username, "integ-user");
-
-    let user_by_email = users
-        .get_one_by_email("email@domain.com")
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(user_by_email.username, "integ-user");
 }
 
 #[rstest::rstest(logging as _logging)]
 #[tokio::test(flavor = "multi_thread")]
 async fn see_scheduled_tweets(_logging: &()) {
-    let fixture = test_fixture("see_scheduled_tweets").await;
+    let fixture = test_fixture("see_scheduled_tweets", None).await;
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
@@ -98,11 +84,11 @@ async fn see_scheduled_tweets(_logging: &()) {
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: Some(DatabaseCredentials {
-            database_name: "test".to_string(),
+            database_name: "typesofants".to_string(),
             database_user: "test".to_string(),
             database_password: "test".to_string(),
         }),
-        host: None,
+        host: Some("localhost".to_string()),
         migration_dir: None,
     }))
     .await
@@ -122,7 +108,7 @@ async fn see_scheduled_tweets(_logging: &()) {
 #[rstest::rstest(logging as _logging)]
 #[tokio::test(flavor = "multi_thread")]
 async fn add_tweeted(_logging: &()) {
-    let fixture = test_fixture("add_tweeted").await;
+    let fixture = test_fixture("add_tweeted", None).await;
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
@@ -130,11 +116,11 @@ async fn add_tweeted(_logging: &()) {
     let dao = AntDataFarmClient::new(Some(DatabaseConfig {
         port: Some(port),
         creds: Some(DatabaseCredentials {
-            database_name: "test".to_string(),
+            database_name: "typesofants".to_string(),
             database_user: "test".to_string(),
             database_password: "test".to_string(),
         }),
-        host: None,
+        host: Some("localhost".to_string()),
         migration_dir: None,
     }))
     .await

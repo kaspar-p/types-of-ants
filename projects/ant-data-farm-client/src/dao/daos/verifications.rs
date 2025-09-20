@@ -35,6 +35,8 @@ impl VerificationsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
         select
@@ -63,6 +65,8 @@ impl VerificationsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
         select
@@ -90,8 +94,9 @@ impl VerificationsDao {
         method: &str,
         identifier: &str,
     ) -> Result<(), anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let t = con.transaction().await?;
 
         let rows = t
             .execute(
@@ -157,8 +162,9 @@ impl VerificationsDao {
         expiration: Duration,
         otp: &str,
     ) -> Result<Uuid, anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let t = con.transaction().await?;
 
         let verification_id: Uuid = t
             .query_one(
@@ -229,6 +235,8 @@ impl VerificationsDao {
         self.database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
         update verification_attempt
@@ -247,8 +255,9 @@ impl VerificationsDao {
         identifier: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
-        let mut db = self.database.lock().await;
-        let t = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let t = con.transaction().await?;
 
         let verification = t
             .query_opt(

@@ -38,6 +38,8 @@ impl HostsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
                         select host_id, host_label, host_location, host_hostname, host_type, host_os
@@ -61,7 +63,7 @@ impl DaoTrait<HostsDao, Host> for HostsDao {
     async fn get_all(&self) -> Result<Vec<Host>> {
         Ok(self.database
                 .lock()
-                .await
+                .await.get().await?
                 .query("select host_id, host_label, host_location, host_hostname, host_type, host_os from host;", &[])
                 .await?
                 .iter()
@@ -74,6 +76,8 @@ impl DaoTrait<HostsDao, Host> for HostsDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "
                 select host_id, host_label, host_location, host_hostname, host_type, host_os

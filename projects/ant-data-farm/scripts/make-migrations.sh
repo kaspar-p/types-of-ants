@@ -26,16 +26,16 @@ migrations_root="$repository_root/projects/ant-data-farm/migrations"
 for filename in "$migrations_root"/*; do
   migration_num=$(basename "$filename" | cut -d '_' -f 1)
   if [ "$migration_num" -le "$current_highest_migration" ]; then
-    echo "... skipping $filename"
+    echo "... skipping $filename" >> /dev/stderr
     continue
   fi
 
-  echo "... applying $filename"
+  echo "... applying $filename" >> /dev/stderr
   PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/postgres_password.secret")" psql \
   --host "$ANT_DATA_FARM_HOST" \
   --port "$ANT_DATA_FARM_PORT" \
   --username "$(cat "$repository_root/secrets/$deploy_env/postgres_user.secret")" \
   --dbname "$(cat "$repository_root/secrets/$deploy_env/postgres_db.secret")" \
   --file "$filename" \
-  --echo-all
+  --echo-all >> /dev/stderr
 done

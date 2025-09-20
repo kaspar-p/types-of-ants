@@ -19,7 +19,7 @@ pub struct TestFixture {
 }
 
 #[must_use]
-pub async fn test_fixture(tag: &str) -> TestFixture {
+pub async fn test_fixture(tag: &str, override_port: Option<u16>) -> TestFixture {
     let cwd: String = dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!");
     println!("{}", cwd);
 
@@ -40,14 +40,18 @@ pub async fn test_fixture(tag: &str) -> TestFixture {
         panic!("Unable to build ant-data-farm:{}", tag);
     }
 
-    let image = GenericImage::new("ant-data-farm-test", tag)
+    let mut image = GenericImage::new("ant-data-farm-test", tag)
         .with_wait_for(testcontainers::core::WaitFor::message_on_stdout(
             "database system is ready to accept connections",
         ))
         .with_env_var("PGDATA", "/var/lib/postgresql/data")
-        .with_env_var("POSTGRES_DB", "test")
+        .with_env_var("POSTGRES_DB", "typesofants")
         .with_env_var("POSTGRES_PASSWORD", "test")
         .with_env_var("POSTGRES_USER", "test");
+
+    if let Some(port) = override_port {
+        image = image.with_mapped_port(port, testcontainers::core::ContainerPort::Tcp(5432));
+    }
 
     let _docker = docker_client_instance().await.unwrap();
 

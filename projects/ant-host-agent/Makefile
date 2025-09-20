@@ -20,8 +20,8 @@ run: debug
 	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
 $(BUILD_DIR)/%/$(PROJECT): src/** Cargo.toml
-	cross build --target=$(TARGET) $(RUST_FLAGS)
-	mkdir -p $(@D)
-	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
+	@cross build --target=$(TARGET) $(RUST_FLAGS)
+	@mkdir -p $(@D)
+	@cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
 
 .PHONY: all clean debug release install

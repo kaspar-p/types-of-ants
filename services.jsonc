@@ -13,6 +13,14 @@
       "docker_platform": "linux/amd64"
     }
   },
+  "services": {
+    "ant-host-agent": { "mode": "makefile" },
+    "ant-fs": { "mode": "makefile" },
+    "ant-on-the-web": { "mode": "makefile" },
+    "ant-gateway": { "mode": "docker" },
+    "ant-data-farm": { "mode": "docker" },
+    "ant-naming-domains": { "mode": "docker" }
+  },
   "hosts": {
     "antworker000.hosts.typesofants.org": {
       "architecture": "raspbian",
@@ -34,10 +42,12 @@
     "antworker002.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
+        { "env": "beta", "service": "ant-on-the-web" },
+        { "env": "beta", "service": "ant-data-farm" },
+        { "env": "beta", "service": "ant-gateway" },
         { "env": "beta", "service": "ant-host-agent" },
         { "env": "beta", "service": "ant-naming-domains" },
-        { "env": "beta", "service": "ant-on-the-web" },
-        { "env": "beta", "service": "ant-data-farm" }
+        { "env": "beta", "service": "ant-fs" }
       ]
     },
     "hisbaan01.hosts.typesofants.org": {

@@ -56,9 +56,9 @@ impl TweetsDao {
         &self,
         scheduled_tweet: Id,
     ) -> Result<(), anyhow::Error> {
-        let mut db = self.database.lock().await;
-
-        let t = db.transaction().await?;
+        let db = self.database.lock().await;
+        let mut con = db.get().await?;
+        let t = con.transaction().await?;
 
         t.execute(
             "update
@@ -80,10 +80,11 @@ impl TweetsDao {
 
     pub async fn get_next_scheduled_tweet(&self) -> Result<Option<ScheduledTweet>, anyhow::Error> {
         let db = self.database.lock().await;
+        let con = db.get().await?;
 
         // The interval needs to be subtracted by a day, so that the tweeter at midnight will see the tweet
         // of "today" as being valid. So placing the data at noon always and subtracting a day works.
-        let scheduled_tweet_rows = db
+        let scheduled_tweet_rows = con
             .query(
                 "select
                 scheduled_tweet_id, scheduled_at, scheduled_by, tweet_prefix, tweet_suffix
@@ -108,7 +109,7 @@ impl TweetsDao {
         let scheduled_tweet_id: Id = scheduled_tweet_row.get("scheduled_tweet_id");
         let user_id: UserId = scheduled_tweet_row.get("scheduled_by");
 
-        let user_name: String = db
+        let user_name: String = con
             .query(
                 "select user_name from registered_user where user_id = $1 limit 1",
                 &[&user_id.0],
@@ -118,7 +119,7 @@ impl TweetsDao {
             .expect("no user found")
             .get("user_name");
 
-        let tweet_ants: Vec<TweetAnt> = db
+        let tweet_ants: Vec<TweetAnt> = con
                 .query("select
             scheduled_tweet.scheduled_tweet_id, scheduled_tweet_ant.ant_id, ant_release.ant_content
         from

@@ -58,7 +58,7 @@ build_dir="$project_src/build"
 build_mode="release"
 run_command rm -rf "$build_dir/$build_mode/*"
 
-make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release
+make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> /dev/stderr
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
 
@@ -72,7 +72,7 @@ local_secrets_dir="$repository_root/secrets/$deploy_env"
 {
   cat "${build_cfg}"
   echo "PERSIST_DIR=$PERSIST_DIR"
-} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env"
+} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
 run_command rsync -a "${local_secrets_dir}/." "${remote_user}@${remote_host}:${SECRETS_DIR}"
 
 # Copy all other build/ files into the install dir
@@ -81,7 +81,7 @@ run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_hos
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$INSTALL_DIR/$project.service"
 INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
-  ssh2ant "$ant_worker_num" "tee ${new_unit_path}"
+  ssh2ant "$ant_worker_num" "tee ${new_unit_path}" >> /dev/stderr
 
 # Write the installation manifest
 ssh2ant "$ant_worker_num" "echo '{
@@ -100,3 +100,6 @@ log "  when:        $(date -Iseconds)"
 log "  install dir: $INSTALL_DIR"
 log "  version:     $install_version"
 log "  unit file:   $new_unit_path"
+
+# Output the nondeterministic version
+echo "$install_version"

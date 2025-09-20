@@ -66,6 +66,8 @@ impl WebActionsDao {
         self.database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
         insert into web_action

@@ -27,6 +27,8 @@ impl ApiTokensDao {
         self.database
             .lock()
             .await
+            .get()
+            .await?
             .execute(
                 "
             insert into api_token
@@ -50,6 +52,8 @@ impl ApiTokensDao {
             .database
             .lock()
             .await
+            .get()
+            .await?
             .query(
                 "select
                   api_token.user_id, api_token.api_token_hash
