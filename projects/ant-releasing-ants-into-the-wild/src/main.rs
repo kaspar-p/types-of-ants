@@ -1,9 +1,18 @@
-use std::io::{self, Write};
+use std::{
+    fs::File,
+    io::{Read, Write, stdin},
+    path::PathBuf,
+};
 
-use ant_on_the_web::ants::{AntId, AntReleaseRequest, UnreleasedAntsResponse};
+use ant_on_the_web::ants::{
+    Ant, AntId, AntReleaseRequest, CreateReleaseRequest, CreateReleaseResponse, DeclineAntRequest,
+    DeclineAntResponse, Release, UnreleasedAntsResponse,
+};
+use chrono::{Datelike, Local};
 use clap::Parser;
 use rand::{rng, seq::SliceRandom};
 use reqwest::StatusCode;
+use serde::{Deserialize, Serialize};
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -13,15 +22,200 @@ struct Args {
     endpoint: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+enum UserChoice {
+    Release {
+        ant: Ant,
+        release: AntReleaseRequest,
+    },
+    Decline(Ant),
+    Skip(Ant),
+}
+
+impl UserChoice {
+    pub fn is_ant(&self, ant_id: &AntId) -> bool {
+        match &self {
+            UserChoice::Release { ant, .. } => ant.ant_id == *ant_id,
+            UserChoice::Decline(ant) => ant.ant_id == *ant_id,
+            UserChoice::Skip(ant) => ant.ant_id == *ant_id,
+        }
+    }
+
+    pub fn is_released(&self) -> bool {
+        match self {
+            UserChoice::Release { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_declined(&self) -> bool {
+        match self {
+            UserChoice::Decline(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_skipped(&self) -> bool {
+        match self {
+            UserChoice::Skip(_) => true,
+            _ => false,
+        }
+    }
+}
+
+struct History {
+    path: PathBuf,
+    history: Vec<UserChoice>,
+}
+
+impl History {
+    pub fn new(path: PathBuf) -> Self {
+        let history = History::load(&path);
+        History {
+            path,
+            history: history,
+        }
+    }
+
+    fn load(path: &PathBuf) -> Vec<UserChoice> {
+        let mut buf = String::new();
+        match File::open(&path).map(|mut f| f.read_to_string(&mut buf).unwrap()) {
+            Err(_) => vec![],
+            Ok(_) => serde_json::de::from_str(&buf).unwrap(),
+        }
+    }
+
+    pub fn num_released(&self) -> i32 {
+        self.history.iter().filter(|c| c.is_released()).count() as i32
+    }
+
+    pub fn num_skipped(&self) -> i32 {
+        self.history.iter().filter(|c| c.is_skipped()).count() as i32
+    }
+
+    pub fn num_declined(&self) -> i32 {
+        self.history.iter().filter(|c| c.is_declined()).count() as i32
+    }
+
+    fn save(&self) {
+        let buf = serde_json::ser::to_string(&self.history).unwrap();
+        let mut file = File::create(&self.path).unwrap();
+        file.write_all(buf.as_bytes()).unwrap();
+        file.flush().unwrap();
+    }
+
+    pub fn push(&mut self, choice: UserChoice) {
+        self.history.push(choice);
+        self.save();
+    }
+
+    pub fn is_present(&self, ant: &AntId) -> bool {
+        self.history.iter().find(|c| c.is_ant(&ant)).is_some()
+    }
+
+    pub fn pop(&mut self) -> Option<UserChoice> {
+        let ret = self.history.pop();
+        self.save();
+        ret
+    }
+
+    pub fn dump(self) -> Vec<UserChoice> {
+        self.history
+    }
+}
+
+fn decide_ants_loop(unreleased_ants: Vec<Ant>, history: &mut History) {
+    let mut ants = unreleased_ants;
+    ants.shuffle(&mut rng());
+
+    let ants: Vec<(usize, Ant)> = ants
+        .into_iter()
+        .filter(|a| !history.is_present(&a.ant_id))
+        .enumerate()
+        .collect();
+
+    for (i, ant) in &ants {
+        let prompt = format!(
+            "
+[i:{}, total:{}, yes:{}, no:{}, skipped:{}] [{}]
+    [{}]
+(content/.b[ack]/.y[es]/.n[o]/.s[kip]/.d[one]): ",
+            i,
+            ants.len(),
+            history.num_released(),
+            history.num_declined(),
+            history.num_skipped(),
+            ant.created_by_username,
+            ant.ant_name,
+        );
+
+        let mut buffer = String::new();
+        print!("{}", prompt);
+        std::io::stdout().flush().unwrap();
+        std::io::stdin().read_line(&mut buffer).unwrap();
+
+        match buffer.as_str() {
+            b if b.starts_with(".n") || b == ".no" => {
+                println!("  declined!");
+                history.push(UserChoice::Decline(ant.clone()));
+            }
+            b if b.starts_with(".y") || b == ".yes" => {
+                println!("  accepted!");
+                history.push(UserChoice::Release {
+                    ant: ant.clone(),
+                    release: AntReleaseRequest {
+                        ant_id: ant.ant_id,
+                        overwrite_content: None,
+                    },
+                });
+            }
+            b if b.starts_with(".s") || b == ".skip" => {
+                println!("  skipped!");
+                history.push(UserChoice::Skip(ant.clone()));
+                continue;
+            }
+            b if b.starts_with(".d") || b == ".done" => {
+                println!("  exiting!");
+                break;
+            }
+            b if b.starts_with(".b") || b == ".back" => {
+                let elem = history.pop().expect("cannot go back");
+                println!("Removing: {elem:#?}");
+            }
+            _ => {
+                println!("  replacing with: {}", buffer);
+                history.push(UserChoice::Release {
+                    ant: ant.clone(),
+                    release: AntReleaseRequest {
+                        ant_id: ant.ant_id,
+                        overwrite_content: Some(buffer),
+                    },
+                });
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
 
+    let api_token =
+        ant_library::secret::load_secret("typesofants_kaspar_api_token").expect("load api token");
     let client = reqwest::Client::new();
+
+    let now = Local::now();
+    let date_string = format!("ant-release.{}-{}-{}", now.year(), now.month(), now.day());
 
     let endpoint = args
         .endpoint
         .unwrap_or("https://typesofants.org".to_string());
+
+    let file_name = format!(
+        "{}.{}.json",
+        endpoint.replace("/", "").replace(":", ""),
+        date_string
+    );
 
     let unreleased_ants: UnreleasedAntsResponse = {
         let req = client
@@ -34,48 +228,57 @@ async fn main() {
         req.json().await.unwrap()
     };
 
-    let mut declined_ants: Vec<AntId> = vec![];
-    let mut released_ants: Vec<AntReleaseRequest> = vec![];
-    let mut skipped_ants: Vec<AntId> = vec![];
+    let mut history = History::new(PathBuf::from(format!("./releases/{file_name}")));
 
-    let mut ants = unreleased_ants.ants;
-    ants.shuffle(&mut rng());
+    decide_ants_loop(unreleased_ants.ants, &mut history);
 
-    for (i, ant) in ants.iter().enumerate() {
-        println!(
-            "
-[i:{i}, total:{}, yes:{}, no:{}, skipped:{}] [{}]
-    [{}]",
-            ants.len(),
-            released_ants.len(),
-            declined_ants.len(),
-            skipped_ants.len(),
-            ant.created_by_username,
-            ant.ant_name
-        );
-        print!("(content/.y[es]/.n[o]/.s[kip]/.d[one]): ");
-        io::stdout().flush().unwrap();
+    println!("Thanks for choosing! To continue to send data to server, press ENTER:");
+    let mut buf = String::new();
+    stdin().read_line(&mut buf).unwrap();
 
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer).unwrap();
+    let mut future_release: Vec<AntReleaseRequest> = vec![];
+    for choice in history.dump() {
+        match choice {
+            UserChoice::Skip(_) => continue,
+            UserChoice::Decline(ant) => {
+                println!("> Declining ant: {}", ant.ant_name);
+                let res = client
+                    .post(format!("{endpoint}/api/ants/decline"))
+                    .json(&DeclineAntRequest { ant_id: ant.ant_id })
+                    .header("Cookie", format!("typesofants_auth=kaspar:{api_token}"))
+                    .send()
+                    .await
+                    .expect("declining ant");
+                if res.status() == StatusCode::BAD_REQUEST {
+                    continue;
+                }
+                assert_eq!(res.status(), StatusCode::OK);
+                let body: DeclineAntResponse = res.json().await.expect("deserialize");
 
-        match buffer.as_str() {
-            b if b.starts_with(".n") || b == ".no" => declined_ants.push(ant.ant_id),
-            b if b.starts_with(".y") || b == ".yes" => released_ants.push(AntReleaseRequest {
-                ant_id: ant.ant_id,
-                overwrite_content: None,
-            }),
-            b if b.starts_with(".s") || b == ".skip" => {
-                skipped_ants.push(ant.ant_id);
-                continue;
+                println!("> Declined ant: {}, {}", ant.ant_name, body.declined_at);
             }
-            b if b.starts_with(".d") || b == ".done" => break,
-            _ => released_ants.push(AntReleaseRequest {
-                ant_id: ant.ant_id,
-                overwrite_content: Some(buffer),
-            }),
+            UserChoice::Release { release, ant } => {
+                println!("> Releasing ant: {}", ant.ant_name);
+                future_release.push(release);
+            }
         }
     }
 
-    println!("Hello, world!");
+    let req = CreateReleaseRequest {
+        label: date_string,
+        ants: future_release,
+    };
+
+    println!("{req:#?}");
+
+    let res = client
+        .post(format!("{endpoint}/api/ants/release"))
+        .json(&req)
+        .header("Cookie", format!("typesofants_auth=kaspar:{api_token}"))
+        .send()
+        .await
+        .expect("declining ant");
+    let body: CreateReleaseResponse = res.json().await.expect("deserialize");
+
+    println!("Congratulations, release created: {body:#?}");
 }

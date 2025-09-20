@@ -22,7 +22,7 @@ pub struct Release {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AntReleaseRequest {
     #[serde(rename = "antId")]
     pub ant_id: AntId,

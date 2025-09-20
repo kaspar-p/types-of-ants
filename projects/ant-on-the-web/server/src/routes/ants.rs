@@ -84,9 +84,21 @@ async fn unreleased_ants(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DeclinedAntsRequest {
+    pub page: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeclinedAntsResponse {
+    pub ants: Vec<Ant>,
+    pub has_next_page: bool,
+}
+
 async fn declined_ants(
     State(InnerApiState { dao, .. }): ApiState,
-    query: Query<Pagination>,
+    Json(req): Json<DeclinedAntsRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
@@ -95,30 +107,39 @@ async fn declined_ants(
         .await?
         .into_iter()
         .filter_map(|ant| match ant.status {
-            AntStatus::Released(_) => Some(ant),
+            AntStatus::Declined => Some(ant),
             _ => None,
         })
         .collect::<Vec<Ant>>();
 
-    let ants_page = declined_ants.chunks(PAGE_SIZE).nth(query.page);
+    let mut chunks = declined_ants.chunks(PAGE_SIZE);
+    let ants_page = chunks.nth(req.page.try_into().unwrap());
+
     match ants_page {
         None => {
             return Ok((
                 StatusCode::NOT_FOUND,
-                Json(format!("No page {} exists!", query.page)).into_response(),
+                Json(format!("No page {} exists!", req.page)).into_response(),
             ))
         }
-        Some(released_ants) => {
-            return Ok((StatusCode::OK, Json(released_ants).into_response()));
+        Some(declined_ants) => {
+            return Ok((
+                StatusCode::OK,
+                Json(DeclinedAntsResponse {
+                    ants: declined_ants.to_vec(),
+                    has_next_page: chunks.len() > 0,
+                })
+                .into_response(),
+            ));
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReleasedAntsResponse {
     pub ants: Vec<Ant>,
 
-    #[serde(rename = "hasNextPage")]
     pub has_next_page: bool,
 }
 async fn released_ants(
@@ -192,13 +213,13 @@ async fn get_release(
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateReleaseRequest {
     pub label: String,
     pub ants: Vec<AntReleaseRequest>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateReleaseResponse {
     pub release: i32,
 }
@@ -424,14 +445,59 @@ async fn make_suggestion(
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct FavoriteAntRequest {
-    #[serde(rename = "antId")]
+#[serde(rename_all = "camelCase")]
+pub struct DeclineAntRequest {
     pub ant_id: AntId,
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeclineAntResponse {
+    pub declined_at: DateTime<Utc>,
+}
+
+async fn decline_ant(
+    auth: AuthClaims,
+    State(InnerApiState { dao, .. }): ApiState,
+    Json(req): Json<DeclineAntRequest>,
+) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = admin_authenticate(&auth, &dao).await?;
+
+    let mut ants = dao.ants.write().await;
+
+    let declined_at = match ants.get_one_by_id(&req.ant_id).await? {
+        None => {
+            return Err(AntOnTheWebError::Validation(ValidationError::one(
+                ValidationMessage::new("ant_id", "No such ant."),
+            )));
+        }
+        Some(ant) => match ant.status {
+            AntStatus::Declined => Err(AntOnTheWebError::Validation(ValidationError::one(
+                ValidationMessage::new("ant_id", format!("Ant already declined.")),
+            ))),
+            AntStatus::Released(_) => Err(AntOnTheWebError::Validation(ValidationError::one(
+                ValidationMessage::new("ant_id", format!("Ant already released.")),
+            ))),
+            AntStatus::Unreleased => {
+                let declined_at = ants.decline_ant(&user.user_id, &ant.ant_id).await?;
+
+                Ok(declined_at)
+            }
+        },
+    }?;
+
+    return Ok((StatusCode::OK, Json(DeclineAntResponse { declined_at })));
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteAntRequest {
+    pub ant_id: AntId,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FavoriteAntResponse {
-    #[serde(rename = "favoritedAt")]
     pub favorited_at: DateTime<Utc>,
 }
 
@@ -529,6 +595,7 @@ pub fn router() -> ApiRouter {
         .route_with_tsr("/latest-release", get(latest_release))
         .route_with_tsr("/total", get(total))
         .route_with_tsr("/suggest", post(make_suggestion))
+        .route_with_tsr("/decline", post(decline_ant))
         .route_with_tsr("/favorite", post(favorite_ant))
         .route_with_tsr("/unfavorite", post(unfavorite_ant))
         // .route_with_tsr("/tweet", post(tweet))

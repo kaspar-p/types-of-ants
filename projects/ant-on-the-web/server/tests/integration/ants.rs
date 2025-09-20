@@ -4,10 +4,11 @@ use crate::fixture::{
 use ant_data_farm::{ants::AntId, releases::AntReleaseRequest};
 use ant_on_the_web::{
     ants::{
-        CreateReleaseRequest, CreateReleaseResponse, FavoriteAntRequest, FavoriteAntResponse,
-        GetReleaseRequest, GetReleaseResponse, LatestAntsResponse, LatestReleaseResponse,
-        ReleasedAntsResponse, SuggestionRequest, SuggestionResponse, TotalResponse,
-        UnfavoriteAntRequest,
+        CreateReleaseRequest, CreateReleaseResponse, DeclineAntRequest, DeclinedAntsRequest,
+        DeclinedAntsResponse, FavoriteAntRequest, FavoriteAntResponse, GetReleaseRequest,
+        GetReleaseResponse, LatestAntsResponse, LatestReleaseResponse, ReleasedAntsResponse,
+        SuggestionRequest, SuggestionResponse, TotalResponse, UnfavoriteAntRequest,
+        UnreleasedAntsResponse,
     },
     err::ValidationError,
 };
@@ -740,5 +741,217 @@ async fn ants_release_get_returns_404_if_no_such_release() {
             .await;
 
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_decline_returns_4xx_if_not_admin() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: AntId(Uuid::nil()),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: AntId(Uuid::nil()),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .header("Cookie", "typesofants_auth=bad")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: AntId(Uuid::nil()),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_decline_returns_400_if_ant_not_exists() {
+    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: AntId(Uuid::nil()),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.len(), 1);
+        assert_eq!(body.errors[0].field, "ant_id");
+        assert_eq!(body.errors[0].msg, "No such ant.");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_decline_returns_400_if_ant_already_declined_or_released() {
+    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+
+    {
+        let declined_ant = {
+            let res = fixture
+                .client
+                .get("/api/ants/declined-ants")
+                .header("Cookie", &cookie)
+                .json(&DeclinedAntsRequest { page: 0 })
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            let body: DeclinedAntsResponse = res.json().await;
+
+            body.ants.last().unwrap().ant_id
+        };
+
+        {
+            let req = DeclineAntRequest {
+                ant_id: declined_ant.clone(),
+            };
+            let res = fixture
+                .client
+                .post("/api/ants/decline")
+                .header("Cookie", &cookie)
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+            let body: ValidationError = res.json().await;
+            assert_eq!(body.errors.len(), 1);
+            assert_eq!(body.errors[0].field, "ant_id");
+            assert_eq!(body.errors[0].msg, "Ant already declined.");
+        }
+    }
+
+    {
+        let released_ant = {
+            let res = fixture
+                .client
+                .get("/api/ants/released-ants?page=0")
+                .header("Cookie", &cookie)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+            let body: ReleasedAntsResponse = res.json().await;
+
+            body.ants.first().unwrap().ant_id
+        };
+
+        {
+            let req = DeclineAntRequest {
+                ant_id: released_ant.clone(),
+            };
+            let res = fixture
+                .client
+                .post("/api/ants/decline")
+                .header("Cookie", &cookie)
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+            let body: ValidationError = res.json().await;
+            assert_eq!(body.errors.len(), 1);
+            assert_eq!(body.errors[0].field, "ant_id");
+            assert_eq!(body.errors[0].msg, "Ant already released.");
+        }
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_decline_returns_200_for_declining_new_ant() {
+    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+
+    let unreleased_ant = {
+        let res = fixture
+            .client
+            .get("/api/ants/unreleased-ants?page=0")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UnreleasedAntsResponse = res.json().await;
+
+        body.ants.first().unwrap().ant_id
+    };
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: unreleased_ant.clone(),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    {
+        let req = DeclineAntRequest {
+            ant_id: unreleased_ant.clone(),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/decline")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let body: ValidationError = res.json().await;
+        assert_eq!(body.errors.len(), 1);
+        assert_eq!(body.errors[0].field, "ant_id");
+        assert_eq!(body.errors[0].msg, "Ant already declined.");
     }
 }

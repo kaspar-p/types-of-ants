@@ -284,6 +284,44 @@ limit 1",
         Ok(())
     }
 
+    pub async fn is_ant_declined(&self, ant: &AntId) -> Result<bool> {
+        let ant_row = self
+            .database
+            .lock()
+            .await
+            .query_opt(
+                "
+            select (ant_id, ant_declined_user_id)
+            from ant_declined
+            where ant_id = $1",
+                &[&ant.0],
+            )
+            .await?;
+
+        Ok(ant_row.is_some())
+    }
+
+    // Assumes the ant is not already declined!
+    pub async fn decline_ant(&mut self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
+        let declined_at: DateTime<Utc> = self
+            .database
+            .lock()
+            .await
+            .query_one(
+                "
+    insert into ant_declined
+        (ant_declined_user_id, ant_id)
+    values
+        ($1, $2)
+    returning ant_declined_at",
+                &[&user.0, &ant.0],
+            )
+            .await?
+            .get("ant_declined_at");
+
+        Ok(declined_at)
+    }
+
     pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Result<Ant> {
         let time = chrono::offset::Utc::now();
 
