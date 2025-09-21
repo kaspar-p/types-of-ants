@@ -20,7 +20,7 @@ export default function Home() {
   } = useInfiniteQuery({
     queryKey: ["releasedAnts"],
     queryFn: (ctx) => getReleasedAnts(ctx.pageParam ?? 0),
-    getNextPageParam: (receivedPage, allPages) =>
+    getNextPageParam: async (receivedPage, allPages) =>
       receivedPage.hasNextPage ? allPages.length : undefined,
     keepPreviousData: true,
   });

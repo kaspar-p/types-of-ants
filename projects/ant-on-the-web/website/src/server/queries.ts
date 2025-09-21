@@ -169,7 +169,7 @@ type QueryParams<Q extends Query> = Q extends { queryParams: any }
 async function constructQuery<Q extends Query>(
   query: Q,
   inputData?: QueryParams<Q>
-): Promise<ReturnType<Q["transformer"]>> {
+): Promise<Awaited<ReturnType<Q["transformer"]>>> {
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
@@ -192,7 +192,7 @@ async function constructQuery<Q extends Query>(
   }
 
   const transformedData = await query.transformer(data);
-  return transformedData as any as QueryRet<Q>;
+  return transformedData as any as Awaited<QueryRet<Q>>;
 }
 
 export const getVersion = () => constructQuery(queries.getVersion);
