@@ -1,7 +1,6 @@
 use crate::{ants::AntId, dao::db::Database, users::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
@@ -41,11 +40,6 @@ fn row_to_release(row: &Row) -> Release {
         release_label,
         created_at,
     };
-}
-
-fn content_hash(content: &str) -> i32 {
-    let hash = &Sha256::digest(content)[..4];
-    i32::from_be_bytes(<[u8; 4]>::try_from(hash).expect("failed to convert hash array to i32"))
 }
 
 impl ReleasesDao {
@@ -110,16 +104,11 @@ impl ReleasesDao {
             tx.execute(
                 "
         insert into ant_release
-            (release_number, ant_id, ant_content, ant_content_hash)
+            (release_number, ant_id, ant_content)
         values
-            ($1, $2, $3, $4)
+            ($1, $2, $3)
         ",
-                &[
-                    &release_number,
-                    &ant.ant_id.0,
-                    &content,
-                    &content_hash(&content),
-                ],
+                &[&release_number, &ant.ant_id.0, &content],
             )
             .await?;
         }
@@ -147,5 +136,26 @@ impl ReleasesDao {
             .await?;
 
         return Ok(row_to_release(&row));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use sha2::{Digest, Sha256};
+
+    fn content_hash(content: &str) -> i32 {
+        let hash = &Sha256::digest(content)[..4];
+        i32::from_be_bytes(<[u8; 4]>::try_from(hash).expect("failed to convert hash array to i32"))
+            .abs()
+    }
+
+    #[test]
+    fn content_hash_is_positive() {
+        let hash = content_hash("ant on the moon");
+        println!("{}", hash);
+        assert!(hash > 0);
+        assert!(content_hash("ant 1") > 0);
+        assert!(content_hash("ant 2") > 0);
+        assert!(content_hash("ant 3") > 0);
     }
 }

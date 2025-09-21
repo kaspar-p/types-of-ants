@@ -24,14 +24,10 @@ use tokio_postgres::Row;
 // }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum AntStatus {
-    #[serde(rename = "unreleased")]
     Unreleased,
-
-    #[serde(rename = "released")]
     Released(i32),
-
-    #[serde(rename = "declined")]
     Declined,
 }
 
@@ -48,33 +44,22 @@ impl Display for AntStatus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]
+#[serde(rename_all = "camelCase")]
 pub enum Tweeted {
-    #[serde(rename = "notTweeted")]
     NotTweeted,
-
-    #[serde(rename = "tweeted")]
     Tweeted(DateTime<Utc>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Ant {
-    #[serde(rename = "antId")]
     pub ant_id: AntId,
-
-    #[serde(rename = "antName")]
     pub ant_name: String,
-
-    #[serde(rename = "createdAt")]
+    pub hash: Option<i64>,
     pub created_at: DateTime<Utc>,
-
-    #[serde(rename = "createdBy")]
     pub created_by: UserId,
-
-    #[serde(rename = "createdByUsername")]
     pub created_by_username: String,
-
     pub tweeted: Tweeted,
-
     pub status: AntStatus,
 }
 
@@ -114,7 +99,8 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                 ant.ant_id, 
                 ant.suggested_content,
                 ant_release.ant_content, 
-                ant_release.release_number, 
+                ant_release.ant_content_hash,
+                ant_release.release_number,
                 ant.created_at,
                 registered_user.user_name,
                 ant.ant_user_id,
@@ -125,7 +111,7 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                     left join ant_declined on ant.ant_id = ant_declined.ant_id
                     left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
                     left join registered_user on ant.ant_user_id = registered_user.user_id
-            order by ant_release.ant_content_hash
+            order by ant_release.ant_content_hash nulls first
             ",
                 &[],
             )
@@ -147,7 +133,8 @@ impl DaoTrait<AntsDao, Ant> for AntsDao {
                 ant.ant_id, 
                 ant.suggested_content,
                 ant_release.ant_content, 
-                ant_release.release_number, 
+                ant_release.ant_content_hash,
+                ant_release.release_number,
                 ant.created_at,
                 registered_user.user_name,
                 ant.ant_user_id,
@@ -199,6 +186,7 @@ fn row_to_ant(row: &Row) -> Ant {
     Ant {
         ant_id: row.get("ant_id"),
         ant_name: content,
+        hash: row.get("ant_content_hash"),
         created_at: row.get("created_at"),
         created_by_username: row.get("user_name"),
         created_by: row.get("ant_user_id"),
@@ -382,6 +370,7 @@ limit 1",
         let ant = Ant {
             ant_id: AntId(uuid::Uuid::new_v4()),
             ant_name: ant_suggestion_content,
+            hash: None,
             created_at: chrono::offset::Utc::now(),
             created_by: user_id,
             created_by_username: username,

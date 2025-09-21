@@ -3,12 +3,22 @@ import { getEndpoint, getFetchOptions } from "./lib";
 
 const antSchema = z.object({
   antId: z.string(),
+  hash: z.number().optional(),
   antName: z.string(),
   createdAt: z.string(),
   createdByUsername: z.string(),
 });
 export type Ant = z.infer<typeof antSchema>;
 export type Ants = Ant[];
+
+const contentHash = async (content: string): Promise<number> => {
+  const encoder = new TextEncoder();
+  const buf = await crypto.subtle.digest("SHA-512", encoder.encode(content));
+  const view = new DataView(buf);
+  const hash = Math.abs(view.getInt32(0, false));
+  console.log(content, hash);
+  return hash;
+};
 
 const queries = {
   getVersion: {
@@ -87,13 +97,24 @@ const queries = {
       ants: z.array(antSchema),
       hasNextPage: z.boolean(),
     }),
-    transformer: (data: {
+    transformer: async (data: {
       ants: Ants;
       hasNextPage: boolean;
-    }): { ants: string[]; hasNextPage: boolean } => ({
-      ants: data.ants.map((ant) => ant.antName),
-      hasNextPage: data.hasNextPage,
-    }),
+    }): Promise<{ ants: string[]; hasNextPage: boolean }> => {
+      let ants = await Promise.all(
+        data.ants.map(async (a) => ({
+          ...a,
+          hash: a.hash ?? (await contentHash(a.antName)),
+        }))
+      );
+
+      ants.sort((a, b) => (a.hash < b.hash ? -1 : 1));
+
+      return {
+        ants: ants.map((a) => a.antName),
+        hasNextPage: data.hasNextPage,
+      };
+    },
   },
   getUser: {
     name: "getUser",
@@ -170,7 +191,7 @@ async function constructQuery<Q extends Query>(
     data = await res.json();
   }
 
-  const transformedData = query.transformer(data);
+  const transformedData = await query.transformer(data);
   return transformedData as any as QueryRet<Q>;
 }
 
