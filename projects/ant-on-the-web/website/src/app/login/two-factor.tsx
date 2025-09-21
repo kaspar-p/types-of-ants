@@ -3,9 +3,9 @@
 import { useTimedText } from "@/components/useTimedText";
 import { addEmail, addPhoneNumber, verificationAttempt } from "@/server/posts";
 import { getUser, getUserSchema } from "@/server/queries";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
-import { FormEvent, useContext, useState } from "react";
+import { FormEvent, useState } from "react";
 
 export const TwoFactorVerificationBox = () => {
   const [option, setOption] = useState<"email" | "phone">("email");
@@ -15,7 +15,7 @@ export const TwoFactorVerificationBox = () => {
   const [sent, setSent] = useState<boolean>(false);
   const [otp, setOtp] = useState<string>("");
 
-  const { setUser } = useContext(UserContext);
+  const { setUser } = useUser();
   const { push } = useRouter();
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {

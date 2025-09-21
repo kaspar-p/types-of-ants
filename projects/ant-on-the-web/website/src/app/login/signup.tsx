@@ -1,7 +1,7 @@
 import { signup } from "@/server/posts";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
-import { useContext, useState } from "react";
+import { useState } from "react";
 
 export function SignupBox() {
   const [formState, setFormState] = useState<
@@ -15,8 +15,7 @@ export function SignupBox() {
   const [password2, setPassword2] = useState("");
   const [passwordValidationMsg, setPasswordValidationMsg] = useState("");
 
-  const { user, setUser } = useContext(UserContext);
-
+  const { setUser } = useUser();
   const { push } = useRouter();
 
   async function handle(e: any) {

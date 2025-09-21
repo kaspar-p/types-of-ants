@@ -1,13 +1,12 @@
 "use client";
 
-import { useContext, useEffect } from "react";
+import { useEffect } from "react";
 import { TwoFactorVerificationBox } from "../two-factor";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
 
 export default function TwoFactorPage() {
-  const { user, setUser } = useContext(UserContext);
-
+  const { user } = useUser();
   const { push } = useRouter();
 
   useEffect(() => {

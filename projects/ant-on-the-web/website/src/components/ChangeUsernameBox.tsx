@@ -2,15 +2,15 @@
 
 import { changeUsername } from "@/server/posts";
 import { getUser, getUserSchema } from "@/server/queries";
-import { UserContext } from "@/state/userContext";
-import { FormEvent, useContext, useState } from "react";
+import { useUser } from "@/state/userContext";
+import { FormEvent, useState } from "react";
 
 type ChangeUsernameBoxProps = {
   onSuccess: () => void | Promise<void>;
 };
 
 export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
-  const { user, setUser } = useContext(UserContext);
+  const { user, setUser } = useUser();
   const [username, setUsername] = useState<string>("");
   const [usernameValidationMsg, setUsernameValidationMsg] = useState<{
     valid: boolean;
@@ -19,8 +19,6 @@ export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
 
   async function handleNewUsername(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
-    console.log("NEW: ", username);
 
     const usernameRes = await changeUsername({ username });
     switch (usernameRes.status) {

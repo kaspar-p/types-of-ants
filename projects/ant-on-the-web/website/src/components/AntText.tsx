@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useMediaQuery } from "@uidotdev/usehooks";
 import { favorite, unfavorite } from "@/server/posts";
 import { useUser } from "@/state/userContext";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export type AntTextProps = {
   ant: ReleasedAnt;
@@ -18,6 +18,7 @@ export function AntText({ ant }: AntTextProps) {
   const displayIcon = true;
 
   const [favoritedAt, setFavoritedAt] = useState<string | null>();
+  const { push } = useRouter();
 
   useEffect(() => {
     setFavoritedAt(ant.favoritedAt);
@@ -43,7 +44,11 @@ export function AntText({ ant }: AntTextProps) {
       onMouseEnter={() => !cannotHover && setHover(true)}
       onMouseLeave={() => !cannotHover && setHover(false)}
       onMouseDown={(e) => {
-        setClicked((c) => !c);
+        if ((e.target as unknown as { id: string }).id === "login-link") {
+          push("/login");
+          return;
+        }
+        setClicked(!clicked);
       }}
     >
       <div className="flex flex-row justify-between m-1">
@@ -131,15 +136,9 @@ export function AntText({ ant }: AntTextProps) {
             )
           ) : (
             <div>
-              <Link
-                href="/login"
-                onClick={(e) => {
-                  console.log("1");
-                  // e.stopPropagation();
-                }}
-              >
+              <a id="login-link" href="/login">
                 login
-              </Link>{" "}
+              </a>{" "}
               for more!
             </div>
           )}

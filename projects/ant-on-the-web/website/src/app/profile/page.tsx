@@ -4,9 +4,9 @@ import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
 import ChangeUsernameBox from "@/components/ChangeUsernameBox";
 import InputBanner from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import Link from "next/link";
-import { useContext, useState } from "react";
+import { useState } from "react";
 
 const formatPhoneNumber = (p: string): string => {
   const r = /^\+(\d)(\d{3})(\d{3})(\d{4})$/;
@@ -16,7 +16,7 @@ const formatPhoneNumber = (p: string): string => {
 };
 
 export default function ProfilePage() {
-  const { user } = useContext(UserContext);
+  const { user } = useUser();
 
   const [changingPassword, setChangingPassword] = useState<boolean>(false);
   const [changingUsername, setChangingUsername] = useState<boolean>(false);

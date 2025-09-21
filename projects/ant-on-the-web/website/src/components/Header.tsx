@@ -2,16 +2,15 @@
 
 import { getTotalAnts, getVersion } from "@/server/queries";
 import { useQuery } from "@tanstack/react-query";
-import React, { useContext } from "react";
+import React from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { useRouter } from "next/navigation";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import { webAction, logout } from "@/server/posts";
 import Link from "next/link";
 
 export function Header() {
-  const { user, setUser } = useContext(UserContext);
-
+  const { user, setUser } = useUser();
   const { push } = useRouter();
 
   const totalAntsResult = useQuery({

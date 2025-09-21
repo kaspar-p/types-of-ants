@@ -32,24 +32,33 @@ export default function Home() {
     if (hasNextPage) fetchNextPage();
   });
 
-  const isSmallDevice = useMediaQuery("only screen and (max-width : 768px)");
-  const isMediumDevice = useMediaQuery(
-    "only screen and (min-width : 769px) and (max-width : 992px)"
-  );
-  const isLargeDevice = useMediaQuery(
-    "only screen and (min-width : 993px) and (max-width : 1200px)"
-  );
-  const isExtraLargeDevice = useMediaQuery(
-    "only screen and (min-width : 1201px)"
-  );
+  const isSmallDevice =
+    typeof window !== "undefined"
+      ? // eslint-disable-next-line react-hooks/rules-of-hooks
+        useMediaQuery("only screen and (max-width : 768px)")
+      : false;
+  const isMediumDevice =
+    typeof window !== "undefined"
+      ? // eslint-disable-next-line react-hooks/rules-of-hooks
+        useMediaQuery(
+          "only screen and (min-width : 769px) and (max-width : 992px)"
+        )
+      : false;
+  const isLargeDevice =
+    typeof window !== "undefined"
+      ? // eslint-disable-next-line react-hooks/rules-of-hooks
+        useMediaQuery(
+          "only screen and (min-width : 993px) and (max-width : 1200px)"
+        )
+      : true;
 
   let columns: number;
   if (isSmallDevice) {
     columns = 1;
   } else if (isMediumDevice) {
-    columns = 3;
+    columns = 2;
   } else if (isLargeDevice) {
-    columns = 4;
+    columns = 3;
   } else {
     columns = 5;
   }

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useContext, useEffect } from "react";
+import React, { useEffect } from "react";
 import { SignupBox } from "./signup";
 import { LoginBox } from "./login";
-import { UserContext } from "@/state/userContext";
+import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const { user } = useContext(UserContext);
+  const { user } = useUser();
   const { push } = useRouter();
 
   useEffect(() => {
