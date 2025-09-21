@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     fs::File,
     io::{Read, Write, stdin},
     path::PathBuf,
@@ -196,20 +197,19 @@ fn decide_ants_loop(unreleased_ants: Vec<Ant>, history: &mut History) {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args = Args::parse();
 
     let api_token =
         ant_library::secret::load_secret("typesofants_kaspar_api_token").expect("load api token");
-    let client = reqwest::Client::new();
+    let cookie = format!("typesofants_auth=kaspar:{api_token}");
 
     let now = Local::now();
     let date_string = format!("ant-release.{}-{}-{}", now.year(), now.month(), now.day());
 
     let endpoint = args
         .endpoint
-        .unwrap_or("https://typesofants.org".to_string());
+        .unwrap_or("https://www.typesofants.org".to_string());
 
     let file_name = format!(
         "{}.{}.json",
@@ -218,14 +218,14 @@ async fn main() {
     );
 
     let unreleased_ants: UnreleasedAntsResponse = {
-        let req = client
+        let req = reqwest::blocking::Client::new()
             .get(format!("{endpoint}/api/ants/unreleased-ants?page=0"))
+            .header("Cookie", &cookie)
             .send()
-            .await
             .expect("unreleased-ants");
         assert_eq!(req.status(), StatusCode::OK);
 
-        req.json().await.unwrap()
+        req.json().unwrap()
     };
 
     let mut history = History::new(PathBuf::from(format!("./releases/{file_name}")));
@@ -242,18 +242,23 @@ async fn main() {
             UserChoice::Skip(_) => continue,
             UserChoice::Decline(ant) => {
                 println!("> Declining ant: {}", ant.ant_name);
-                let res = client
+                let req = reqwest::blocking::Client::new()
                     .post(format!("{endpoint}/api/ants/decline"))
-                    .json(&DeclineAntRequest { ant_id: ant.ant_id })
-                    .header("Cookie", format!("typesofants_auth=kaspar:{api_token}"))
-                    .send()
-                    .await
-                    .expect("declining ant");
+                    .header("Cookie", &cookie)
+                    .json(&DeclineAntRequest { ant_id: ant.ant_id });
+
+                println!("{:?}", req);
+
+                let res = req.send().expect("declining ant");
+
+                println!("{:?}", res);
+
                 if res.status() == StatusCode::BAD_REQUEST {
+                    println!("skipping: {}", ant.ant_name);
                     continue;
                 }
                 assert_eq!(res.status(), StatusCode::OK);
-                let body: DeclineAntResponse = res.json().await.expect("deserialize");
+                let body: DeclineAntResponse = res.json().expect("deserialize");
 
                 println!("> Declined ant: {}, {}", ant.ant_name, body.declined_at);
             }
@@ -271,14 +276,13 @@ async fn main() {
 
     println!("{req:#?}");
 
-    let res = client
+    let res = reqwest::blocking::Client::new()
         .post(format!("{endpoint}/api/ants/release"))
         .json(&req)
         .header("Cookie", format!("typesofants_auth=kaspar:{api_token}"))
         .send()
-        .await
         .expect("declining ant");
-    let body: CreateReleaseResponse = res.json().await.expect("deserialize");
+    let body: CreateReleaseResponse = res.json().expect("deserialize");
 
     println!("Congratulations, release created: {body:#?}");
 }

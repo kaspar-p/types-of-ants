@@ -607,9 +607,13 @@ pub fn router() -> ApiRouter {
                 "GET /released-ants",
                 "GET /declined-ants",
                 "GET /all-ants",
+                "GET+POST /release",
                 "GET /latest-release",
                 "GET /total",
                 "POST /suggest",
+                "POST /decline",
+                "POST /favorite",
+                "POST /unfavorite",
                 // "POST /tweet",
             ])
         })

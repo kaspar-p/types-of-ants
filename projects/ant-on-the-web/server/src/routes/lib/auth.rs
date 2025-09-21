@@ -158,7 +158,10 @@ where
         };
 
         let state = InnerApiState::from_ref(state);
-        Ok(Some(decode_jwt_cookie(&state, cookie.value()).await?))
+        let decoded = decode_jwt_cookie(&state, cookie.value()).await?;
+
+        info!("Authentication successful.");
+        Ok(Some(decoded))
     }
 }
 
@@ -194,15 +197,10 @@ where
         };
 
         let state = InnerApiState::from_ref(state);
-        Ok(decode_jwt_cookie(&state, cookie.value()).await?)
 
-        // // Decode claim data
-        // let claim_data = jwt::decode_jwt::<AuthClaims>(&jwt.value()).map_err(|e| {
-        //     warn!("decode jwt failed: {e:?}");
-        //     return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
-        // })?;
-
-        // return Ok(claim_data);
+        let auth = decode_jwt_cookie(&state, cookie.value()).await?;
+        info!("Authentication successful.");
+        Ok(auth)
     }
 }
 
@@ -260,6 +258,7 @@ pub async fn weakly_authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
+    info!("Attempting weak authentication.");
     let user = {
         let users = dao.users.read().await;
         let user = users.get_one_by_id(&auth.sub).await?;
@@ -331,6 +330,7 @@ pub async fn authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
+    info!("Attempting admin authentication.");
     return upgrade_weak_auth(&auth, weakly_authenticate(&auth, &dao).await?);
 }
 
@@ -340,6 +340,7 @@ pub async fn admin_authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
+    info!("Attempting admin authentication.");
     let user = authenticate(&auth, &dao).await?;
 
     match user.role_name.as_str() {

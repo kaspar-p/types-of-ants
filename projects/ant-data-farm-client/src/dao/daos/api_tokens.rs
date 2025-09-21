@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     dao::db::Database,
@@ -67,7 +67,10 @@ impl ApiTokensDao {
 
         for user in users {
             if verify_password_hash(api_token, user.get("api_token_hash"))? {
+                info!("Verified hash successfully for user {}", username);
                 return Ok(Some(user.get("user_id")));
+            } else {
+                warn!("Hash was not valid for user {username}!");
             }
         }
 
