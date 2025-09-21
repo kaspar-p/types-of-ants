@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { AntBanner } from "../components/AntBanner";
-import { getReleasedAnts } from "../server/queries";
+import { getReleasedAnts, ReleasedAnt } from "../server/queries";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { TUserContext, UserContext } from "../state/userContext";
 import InputBanner from "@/components/InputBanner";
+import { AntText } from "@/components/AntText";
+import { useMediaQuery } from "@uidotdev/usehooks";
 
 export default function Home() {
-  const [user, setUser] = useState<TUserContext>({ weakAuth: false });
-
   const {
     isLoading,
     isError,
@@ -19,9 +18,13 @@ export default function Home() {
     hasNextPage,
   } = useInfiniteQuery({
     queryKey: ["releasedAnts"],
-    queryFn: (ctx) => getReleasedAnts(ctx.pageParam ?? 0),
-    getNextPageParam: async (receivedPage, allPages) =>
-      receivedPage.hasNextPage ? allPages.length : undefined,
+    queryFn: async (ctx) => {
+      const page = ctx.pageParam ?? 0;
+      return getReleasedAnts(page);
+    },
+    getNextPageParam: (receivedPage, allPages) => {
+      return receivedPage.hasNextPage ? allPages.length : undefined;
+    },
     keepPreviousData: true,
   });
 
@@ -29,21 +32,52 @@ export default function Home() {
     if (hasNextPage) fetchNextPage();
   });
 
+  const isSmallDevice = useMediaQuery("only screen and (max-width : 768px)");
+  const isMediumDevice = useMediaQuery(
+    "only screen and (min-width : 769px) and (max-width : 992px)"
+  );
+  const isLargeDevice = useMediaQuery(
+    "only screen and (min-width : 993px) and (max-width : 1200px)"
+  );
+  const isExtraLargeDevice = useMediaQuery(
+    "only screen and (min-width : 1201px)"
+  );
+
+  let columns: number;
+  if (isSmallDevice) {
+    columns = 1;
+  } else if (isMediumDevice) {
+    columns = 3;
+  } else if (isLargeDevice) {
+    columns = 4;
+  } else {
+    columns = 5;
+  }
+
+  const ants = releasedAnts?.pages.flatMap((page) => page.ants) ?? [];
+  const antColumns: ReleasedAnt[][] = [];
+  const numAntsInColumn = ants.length / columns;
+  for (let i = 0; i < columns; i++) {
+    antColumns.push(ants.slice(i * numAntsInColumn, (i + 1) * numAntsInColumn));
+  }
+
   return (
     <ErrorBoundary isError={isError}>
       <LoadingBoundary isLoading={isLoading}>
-        <UserContext.Provider value={{ setUser, user }}>
-          <InputBanner />
-          <AntBanner />
+        <InputBanner />
+        <AntBanner />
 
-          <div className="pb-0" id="ant-filler">
-            {releasedAnts?.pages.map((page, pageNum) =>
-              page.ants.map((ant, i) => (
-                <div key={pageNum * 1000 + i}>{ant}</div>
-              ))
-            )}
+        <div className="mt-2">
+          <div className="flex flex-row justify-center space-x-2">
+            {antColumns.map((ants, c) => (
+              <div key={c} className="flex flex-col justify-start space-y-1">
+                {ants.map((ant, i) => (
+                  <AntText key={i} ant={ant} />
+                ))}
+              </div>
+            ))}
           </div>
-        </UserContext.Provider>
+        </div>
       </LoadingBoundary>
     </ErrorBoundary>
   );

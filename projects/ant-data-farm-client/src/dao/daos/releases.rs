@@ -1,24 +1,31 @@
 use crate::{ants::AntId, dao::db::Database, users::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
+use uuid::Uuid;
 
 pub struct ReleasesDao {
     database: Arc<Mutex<Database>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Release {
-    #[serde(rename = "releaseNumber")]
     pub release_number: i32,
-
-    #[serde(rename = "releaseLabel")]
     pub release_label: String,
-
-    #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+    pub created_by: UserId,
+}
+
+impl Display for Release {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "[{}:{}]@{}",
+            self.release_number, self.release_label, self.created_at,
+        ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,11 +41,13 @@ fn row_to_release(row: &Row) -> Release {
     let release_number: i32 = row.get("release_number");
     let release_label: String = row.get("release_label");
     let created_at: DateTime<Utc> = row.get("created_at");
+    let creator_user_id: Uuid = row.get("creator_user_id");
 
     return Release {
         release_number,
         release_label,
         created_at,
+        created_by: UserId(creator_user_id),
     };
 }
 

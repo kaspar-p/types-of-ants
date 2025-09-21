@@ -1,6 +1,6 @@
 pub use super::lib::Id as AntId;
 use super::users::UserId;
-use crate::dao::{dao_trait::DaoTrait, db::Database};
+use crate::{dao::db::Database, releases::Release, users::User};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -8,26 +8,11 @@ use std::{fmt::Display, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub enum SuggestionStatus {
-//     LIVE,
-//     DECLINED,
-//     DEPRECATED,
-//     UNSEEN,
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct SuggestionAudit {
-//     pub who: UserId,
-//     pub when: DateTime<Utc>,
-//     pub status: SuggestionStatus,
-// }
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum AntStatus {
     Unreleased,
-    Released(i32),
+    Released(Release),
     Declined,
 }
 
@@ -35,9 +20,7 @@ impl Display for AntStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AntStatus::Declined => f.write_str("declined"),
-            AntStatus::Released(release_number) => {
-                f.write_fmt(format_args!("released::{}", release_number))
-            }
+            AntStatus::Released(release) => f.write_fmt(format_args!("released::{}", release)),
             AntStatus::Unreleased => f.write_str("unreleased"),
         }
     }
@@ -61,6 +44,9 @@ pub struct Ant {
     pub created_by_username: String,
     pub tweeted: Tweeted,
     pub status: AntStatus,
+
+    /// If the ants were retrieved in the context of a user
+    pub favorited_at: Option<DateTime<Utc>>,
 }
 
 impl PartialOrd for Ant {
@@ -79,83 +65,6 @@ pub struct AntsDao {
     database: Arc<Mutex<Database>>,
 }
 
-#[async_trait::async_trait]
-impl DaoTrait<AntsDao, Ant> for AntsDao {
-    async fn new(db: Arc<Mutex<Database>>) -> Result<AntsDao, anyhow::Error> {
-        Ok(AntsDao { database: db })
-    }
-
-    // Read
-    async fn get_all(&self) -> anyhow::Result<Vec<Ant>> {
-        let rows = self
-            .database
-            .lock()
-            .await
-            .get()
-            .await?
-            .query(
-                "
-            select 
-                ant.ant_id, 
-                ant.suggested_content,
-                ant_release.ant_content, 
-                ant_release.ant_content_hash,
-                ant_release.release_number,
-                ant.created_at,
-                registered_user.user_name,
-                ant.ant_user_id,
-                ant_declined.ant_declined_at,
-                ant_tweeted.tweeted_at
-            from 
-                ant left join ant_release on ant.ant_id = ant_release.ant_id
-                    left join ant_declined on ant.ant_id = ant_declined.ant_id
-                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
-                    left join registered_user on ant.ant_user_id = registered_user.user_id
-            order by ant_release.ant_content_hash nulls first
-            ",
-                &[],
-            )
-            .await?;
-
-        Ok(rows.into_iter().map(|row| row_to_ant(&row)).collect())
-    }
-
-    async fn get_one_by_id(&self, ant_id: &AntId) -> Result<Option<Ant>> {
-        let rows = self
-            .database
-            .lock()
-            .await
-            .get()
-            .await?
-            .query(
-                "
-            select 
-                ant.ant_id, 
-                ant.suggested_content,
-                ant_release.ant_content, 
-                ant_release.ant_content_hash,
-                ant_release.release_number,
-                ant.created_at,
-                registered_user.user_name,
-                ant.ant_user_id,
-                ant_declined.ant_declined_at,
-                ant_tweeted.tweeted_at
-            from 
-                ant left join ant_release on ant.ant_id = ant_release.ant_id
-                    left join ant_declined on ant.ant_id = ant_declined.ant_id
-                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
-                    left join registered_user on ant.ant_user_id = registered_user.user_id
-            where
-                ant.ant_id = $1
-            ",
-                &[&ant_id.0],
-            )
-            .await?;
-
-        return Ok(rows.first().map(|row| row_to_ant(row)));
-    }
-}
-
 fn row_to_ant(row: &Row) -> Ant {
     let tweeted_at: Option<DateTime<Utc>> = row.get("tweeted_at");
     let ant_content: Option<String> = row.get("ant_content");
@@ -163,7 +72,12 @@ fn row_to_ant(row: &Row) -> Ant {
 
     let status = {
         if ant_content.is_some() {
-            AntStatus::Released(row.get("release_number"))
+            AntStatus::Released(Release {
+                release_number: row.get("release_number"),
+                release_label: row.get("release_label"),
+                created_at: row.get("release_created_at"),
+                created_by: UserId(row.get("creator_user_id")),
+            })
         } else if declined_at.is_some() {
             AntStatus::Declined
         } else {
@@ -192,10 +106,141 @@ fn row_to_ant(row: &Row) -> Ant {
         created_by: row.get("ant_user_id"),
         status,
         tweeted: tweeted_status,
+        favorited_at: row.get("favorited_at"),
     }
 }
 
 impl AntsDao {
+    pub async fn new(db: Arc<Mutex<Database>>) -> Result<AntsDao, anyhow::Error> {
+        Ok(AntsDao { database: db })
+    }
+
+    // Read
+    pub async fn get_all(&self) -> anyhow::Result<Vec<Ant>> {
+        let rows = self
+            .database
+            .lock()
+            .await
+            .get()
+            .await?
+            .query(
+                "
+            select 
+                ant.ant_id, 
+                ant.suggested_content,
+                ant_release.ant_content, 
+                ant_release.ant_content_hash,
+                ant_release.release_number,
+                ant.created_at,
+                registered_user.user_name,
+                ant.ant_user_id,
+                ant_declined.ant_declined_at,
+                ant_tweeted.tweeted_at,
+                release.release_label,
+                release.release_number,
+                release.created_at as release_created_at,
+                release.creator_user_id,
+                favorite.favorited_at
+            from 
+                ant left join ant_release on ant.ant_id = ant_release.ant_id
+                    left join ant_declined on ant.ant_id = ant_declined.ant_id
+                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                    left join registered_user on ant.ant_user_id = registered_user.user_id
+                    left join release on ant_release.release_number = release.release_number
+                    left join favorite on favorite.user_id = registered_user.user_id
+            order by ant_release.ant_content_hash nulls first
+            ",
+                &[],
+            )
+            .await?;
+
+        Ok(rows.into_iter().map(|row| row_to_ant(&row)).collect())
+    }
+
+    pub async fn get_all_with_user_context(&self, user: &User) -> anyhow::Result<Vec<Ant>> {
+        let rows = self
+            .database
+            .lock()
+            .await
+            .get()
+            .await?
+            .query(
+                "
+            select 
+                ant.ant_id, 
+                ant.suggested_content,
+                ant_release.ant_content, 
+                ant_release.ant_content_hash,
+                ant_release.release_number,
+                ant.created_at,
+                registered_user.user_name,
+                ant.ant_user_id,
+                ant_declined.ant_declined_at,
+                ant_tweeted.tweeted_at,
+                release.release_label,
+                release.release_number,
+                release.created_at as release_created_at,
+                release.creator_user_id,
+                favorite.favorited_at
+            from 
+                ant left join ant_release on ant.ant_id = ant_release.ant_id
+                    left join ant_declined on ant.ant_id = ant_declined.ant_id
+                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                    left join registered_user on ant.ant_user_id = registered_user.user_id
+                    left join release on ant_release.release_number = release.release_number
+                    left join favorite on
+                        favorite.ant_id = ant.ant_id and favorite.user_id = $1
+            order by ant_release.ant_content_hash nulls first
+            ",
+                &[&user.user_id.0],
+            )
+            .await?;
+
+        Ok(rows.into_iter().map(|row| row_to_ant(&row)).collect())
+    }
+
+    pub async fn get_one_by_id(&self, ant_id: &AntId) -> Result<Option<Ant>> {
+        let rows = self
+            .database
+            .lock()
+            .await
+            .get()
+            .await?
+            .query(
+                "
+            select 
+                ant.ant_id, 
+                ant.suggested_content,
+                ant_release.ant_content, 
+                ant_release.ant_content_hash,
+                ant_release.release_number,
+                ant.created_at,
+                registered_user.user_name,
+                ant.ant_user_id,
+                ant_declined.ant_declined_at,
+                ant_tweeted.tweeted_at,
+                release.release_label,
+                release.release_number,
+                release.created_at as release_created_at,
+                release.creator_user_id,
+                favorite.favorited_at
+            from 
+                ant left join ant_release on ant.ant_id = ant_release.ant_id
+                    left join ant_declined on ant.ant_id = ant_declined.ant_id
+                    left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
+                    left join registered_user on ant.ant_user_id = registered_user.user_id
+                    left join release on ant_release.release_number = release.release_number
+                    left join favorite on favorite.user_id = registered_user.user_id
+            where
+                ant.ant_id = $1
+            ",
+                &[&ant_id.0],
+            )
+            .await?;
+
+        return Ok(rows.first().map(|row| row_to_ant(row)));
+    }
+
     pub async fn get_user_feed_since(
         &self,
         user_id: &UserId,
@@ -214,12 +259,13 @@ impl AntsDao {
 
         let favorite_row = con
             .query_opt(
-                "select user_id, ant_id, favorited_at
- from favorite
- where
-    user_id = $1 and
-    ant_id = $2
-limit 1",
+                "
+            select user_id, ant_id, favorited_at
+            from favorite
+            where
+                user_id = $1 and
+                ant_id = $2
+            limit 1",
                 &[&user.0, &ant.0],
             )
             .await?;
@@ -376,6 +422,7 @@ limit 1",
             created_by_username: username,
             tweeted: Tweeted::NotTweeted,
             status: AntStatus::Unreleased,
+            favorited_at: None,
         };
 
         self.database

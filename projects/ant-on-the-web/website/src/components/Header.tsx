@@ -6,7 +6,7 @@ import React, { useContext } from "react";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { useRouter } from "next/navigation";
 import { UserContext } from "@/state/userContext";
-import { action, logout } from "@/server/posts";
+import { webAction, logout } from "@/server/posts";
 import Link from "next/link";
 
 export function Header() {
@@ -87,7 +87,7 @@ export function Header() {
               <Link
                 href="https://twitter.com/typesofants"
                 onClick={() =>
-                  action({
+                  webAction({
                     action: "visit",
                     targetType: "page",
                     target: "https://twitter.com/typesofants",
@@ -99,7 +99,7 @@ export function Header() {
               <Link
                 href="https://github.com/kaspar-p/types-of-ants"
                 onClick={() =>
-                  action({
+                  webAction({
                     action: "visit",
                     targetType: "page",
                     target: "https://github.com/kaspar-p/types-of-ants",

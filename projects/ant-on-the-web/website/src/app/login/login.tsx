@@ -1,8 +1,7 @@
 import { login } from "@/server/posts";
-import { useContext, useState } from "react";
-import { UserContext } from "../../state/userContext";
+import { useState } from "react";
+import { useUser } from "../../state/userContext";
 import { useRouter } from "next/navigation";
-import { getUser, getUserSchema } from "@/server/queries";
 import Link from "next/link";
 
 export const LoginBox = () => {
@@ -13,7 +12,7 @@ export const LoginBox = () => {
   const [passwordAttemptValidationMsg, setPasswordAttemptValidationMsg] =
     useState("");
 
-  const { setUser } = useContext(UserContext);
+  const { setUser } = useUser();
 
   const { push } = useRouter();
 

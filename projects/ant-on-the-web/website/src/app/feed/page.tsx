@@ -4,7 +4,7 @@ import InputBanner from "@/components/InputBanner";
 import { NewsletterBox } from "@/components/NewsletterBox";
 import { SuggestionBox } from "@/components/SuggestionBox";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { action } from "@/server/posts";
+import { webAction } from "@/server/posts";
 import { Ant, getUnseenAnts } from "@/server/queries";
 import { UserContext } from "@/state/userContext";
 import { useQuery } from "@tanstack/react-query";
@@ -81,7 +81,7 @@ export default function Feed() {
             <button
               id="feed-refresh"
               onClick={() => {
-                action({
+                webAction({
                   action: "click",
                   targetType: "button",
                   target: "feed-refresh",

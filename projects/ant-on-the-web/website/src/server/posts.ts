@@ -98,7 +98,7 @@ const posts = {
       email: z.string(),
     }),
   },
-  action: {
+  webAction: {
     path: "/api/web-actions/action",
     inputDataSchema: z.object({
       action: z.union([
@@ -108,6 +108,18 @@ const posts = {
       ]),
       targetType: z.union([z.literal("page"), z.literal("button")]),
       target: z.string(),
+    }),
+  },
+  favorite: {
+    path: "/api/ants/favorite",
+    inputDataSchema: z.object({
+      antId: z.string(),
+    }),
+  },
+  unfavorite: {
+    path: "/api/ants/unfavorite",
+    inputDataSchema: z.object({
+      antId: z.string(),
     }),
   },
 };
@@ -168,6 +180,12 @@ export const passwordResetSecret = (
 export const password = (
   inputData: z.infer<typeof posts.password.inputDataSchema>
 ) => constructPost(posts.password, inputData);
-export const action = (
-  inputData: z.infer<typeof posts.action.inputDataSchema>
-) => constructPost(posts.action, inputData);
+export const webAction = (
+  inputData: z.infer<typeof posts.webAction.inputDataSchema>
+) => constructPost(posts.webAction, inputData);
+export const favorite = (
+  inputData: z.infer<typeof posts.favorite.inputDataSchema>
+) => constructPost(posts.favorite, inputData);
+export const unfavorite = (
+  inputData: z.infer<typeof posts.unfavorite.inputDataSchema>
+) => constructPost(posts.unfavorite, inputData);

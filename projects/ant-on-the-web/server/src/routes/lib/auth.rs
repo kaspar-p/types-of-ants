@@ -330,7 +330,7 @@ pub async fn authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
-    info!("Attempting admin authentication.");
+    info!("Attempting authentication.");
     return upgrade_weak_auth(&auth, weakly_authenticate(&auth, &dao).await?);
 }
 
@@ -352,6 +352,23 @@ pub async fn admin_authenticate(
     }
 }
 
+/// If the auth claims are present, return the user that is authenticated. If not, returns None.
+/// This is different from [`optional_authenticate`] since that will return the 'nobody' user.
+///
+/// Returns AccessDenied errors if the user is specified but the claims are tampered or somehow
+/// wrong.
+///
+/// This is used in public APIs, for private user-specific APIs default to using [`authenticate`].
+pub async fn optional_strict_authenticate(
+    auth: Option<&AuthClaims>,
+    dao: &Arc<AntDataFarmClient>,
+) -> Result<Option<User>, AuthError> {
+    match auth {
+        None => Ok(None),
+        Some(auth) => Ok(Some(authenticate(&auth, &dao).await?)),
+    }
+}
+
 /// If the auth claims are present, return the user that is authenticated. If not, returns the
 /// 'nobody' anonymous user.
 ///
@@ -363,7 +380,7 @@ pub async fn optional_authenticate(
     auth: Option<&AuthClaims>,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
-    match auth {
+    match optional_strict_authenticate(auth, dao).await? {
         None => {
             let users = dao.users.read().await;
             Ok(users
@@ -371,7 +388,7 @@ pub async fn optional_authenticate(
                 .await?
                 .expect("nobody user exists"))
         }
-        Some(auth) => authenticate(&auth, &dao).await,
+        Some(user) => Ok(user),
     }
 }
 

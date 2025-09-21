@@ -7,16 +7,42 @@ const antSchema = z.object({
   antName: z.string(),
   createdAt: z.string(),
   createdByUsername: z.string(),
+  favoritedAt: z.date().optional(),
+  status: z.union([
+    z.literal("unreleased"),
+    z.object({
+      released: z.object({
+        createdAt: z.string(),
+        createdBy: z.string(),
+        releaseNumber: z.number(),
+      }),
+    }),
+  ]),
 });
+
 export type Ant = z.infer<typeof antSchema>;
-export type Ants = Ant[];
+
+const releasedAntSchema = z.object({
+  antId: z.string(),
+  hash: z.number().optional(),
+  antName: z.string(),
+  createdAt: z.string(),
+  createdByUsername: z.string(),
+  favoritedAt: z.string().nullable(),
+  release: z.object({
+    createdAt: z.string(),
+    createdBy: z.string(),
+    releaseNumber: z.number(),
+    releaseLabel: z.string(),
+  }),
+});
+export type ReleasedAnt = z.infer<typeof releasedAntSchema>;
 
 const contentHash = async (content: string): Promise<number> => {
   const encoder = new TextEncoder();
   const buf = await crypto.subtle.digest("SHA-512", encoder.encode(content));
   const view = new DataView(buf);
   const hash = Math.abs(view.getInt32(0, false));
-  console.log(content, hash);
   return hash;
 };
 
@@ -85,7 +111,7 @@ const queries = {
     schema: z.object({
       ants: z.array(antSchema),
     }),
-    transformer: (data: { ants: Ants }): Ants => {
+    transformer: (data: { ants: Ant[] }): Ant[] => {
       return data.ants;
     },
   },
@@ -98,9 +124,9 @@ const queries = {
       hasNextPage: z.boolean(),
     }),
     transformer: async (data: {
-      ants: Ants;
+      ants: ReleasedAnt[];
       hasNextPage: boolean;
-    }): Promise<{ ants: string[]; hasNextPage: boolean }> => {
+    }): Promise<{ ants: ReleasedAnt[]; hasNextPage: boolean }> => {
       let ants = await Promise.all(
         data.ants.map(async (a) => ({
           ...a,
@@ -111,7 +137,7 @@ const queries = {
       ants.sort((a, b) => (a.hash < b.hash ? -1 : 1));
 
       return {
-        ants: ants.map((a) => a.antName),
+        ants: ants,
         hasNextPage: data.hasNextPage,
       };
     },

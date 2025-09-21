@@ -3,7 +3,7 @@ import Marquee from "react-fast-marquee";
 import { getLatestAnts } from "../server/queries";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "./UnhappyPath";
-import { action } from "@/server/posts";
+import { webAction } from "@/server/posts";
 
 function formatDate(d: Date): string {
   const months = [
@@ -39,12 +39,8 @@ export function AntBanner() {
     <ErrorBoundary isError={isError}>
       <LoadingBoundary isLoading={isLoading}>
         <div
-          className="block w-full pr-0"
-          style={{
-            backgroundColor: "gold",
-            borderRadius: "6px",
-            padding: "12px",
-          }}
+          className="block pr-0 rounded-md p-3"
+          style={{ backgroundColor: "gold" }}
           onMouseEnter={() => setScroll(false)}
           onMouseLeave={() => setScroll(true)}
         >

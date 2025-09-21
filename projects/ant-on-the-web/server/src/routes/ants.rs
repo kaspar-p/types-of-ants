@@ -1,9 +1,9 @@
 use crate::{
     err::{AntOnTheWebError, ValidationError, ValidationMessage},
-    routes::lib::auth::{admin_authenticate, authenticate},
+    routes::lib::auth::{admin_authenticate, authenticate, optional_strict_authenticate},
     state::{ApiRouter, ApiState, InnerApiState},
 };
-use ant_data_farm::{users::UserId, DaoTrait};
+use ant_data_farm::users::UserId;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -135,28 +135,57 @@ async fn declined_ants(
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleasedAnt {
+    pub ant_id: AntId,
+    pub ant_name: String,
+    pub hash: Option<i64>,
+    pub created_at: DateTime<Utc>,
+    pub created_by: UserId,
+    pub created_by_username: String,
+    pub release: Release,
+
+    /// If the user is logged in, this is Some(bool), else None
+    pub favorited_at: Option<DateTime<Utc>>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleasedAntsResponse {
-    pub ants: Vec<Ant>,
-
+    pub ants: Vec<ReleasedAnt>,
     pub has_next_page: bool,
 }
 async fn released_ants(
+    auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
+    let user = optional_strict_authenticate(auth.as_ref(), &dao).await?;
+
     let ants = dao.ants.read().await;
 
-    let released_ants = ants
-        .get_all()
-        .await?
-        .into_iter()
-        .filter_map(|ant| match ant.status {
-            AntStatus::Released(_) => Some(ant),
-            _ => None,
-        })
-        .collect::<Vec<Ant>>();
+    let released_ants = match &user {
+        None => ants.get_all().await?,
+        Some(u) => ants.get_all_with_user_context(&u).await?,
+    }
+    .into_iter()
+    .filter_map(|ant| match ant.status {
+        AntStatus::Released(release) => Some(ReleasedAnt {
+            ant_id: ant.ant_id,
+            ant_name: ant.ant_name,
+            created_at: ant.created_at,
+            created_by: ant.created_by,
+            created_by_username: ant.created_by_username,
+
+            hash: ant.hash,
+            release: release,
+
+            favorited_at: ant.favorited_at,
+        }),
+        _ => None,
+    })
+    .collect::<Vec<ReleasedAnt>>();
 
     let mut chunks = released_ants.chunks(PAGE_SIZE);
 
@@ -333,8 +362,8 @@ async fn latest_ants(
         Ok(latest_release) => {
             let current_release_ants = all_ants
                 .iter()
-                .filter(|ant| match ant.status {
-                    AntStatus::Released(n) => n == latest_release.release_number,
+                .filter(|ant| match &ant.status {
+                    AntStatus::Released(n) => n.release_number == latest_release.release_number,
                     _ => false,
                 })
                 .map(std::clone::Clone::clone)

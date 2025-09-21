@@ -2,12 +2,11 @@
 
 import "./globals.css";
 import { Inter } from "next/font/google";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
-import { getUser, getUserSchema } from "@/server/queries";
-import { TUserContext, UserContext } from "@/state/userContext";
 import Footer from "@/components/Footer";
+import { UserProvider } from "@/components/UserProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 const queryClient = new QueryClient();
@@ -17,31 +16,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, setUser] = useState<TUserContext>({ weakAuth: false });
-
-  useEffect(() => {
-    async function checkLoggedIn() {
-      const res = await getUser();
-      if (res.ok) {
-        const user = getUserSchema.transformer(
-          getUserSchema.schema.parse(await res.json())
-        );
-        console.log("LOGGED IN");
-        setUser({
-          weakAuth: true,
-          loggedIn: true,
-          user: user.user,
-        });
-      }
-    }
-
-    checkLoggedIn();
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <html lang="en">
-        <UserContext.Provider value={{ user, setUser }}>
+        <UserProvider>
           <body
             className={inter.className + " flex flex-col h-screen m-0"}
             style={{ fontFamily: "serif" }}
@@ -51,7 +29,7 @@ export default function RootLayout({
 
             <Footer />
           </body>
-        </UserContext.Provider>
+        </UserProvider>
       </html>
     </QueryClientProvider>
   );

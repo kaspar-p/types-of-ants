@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 export type User = {
   userId: string;
@@ -12,12 +12,16 @@ export type TUserContext =
   | { weakAuth: true; loggedIn: false }
   | { weakAuth: true; loggedIn: true; user: User };
 
-export const UserContext = createContext<{
+export const UserContext = createContext<
+  undefined | { user: TUserContext; setUser: (user: TUserContext) => void }
+>(undefined);
+
+export const useUser = (): {
   user: TUserContext;
   setUser: (user: TUserContext) => void;
-}>({
-  user: {
-    weakAuth: false,
-  },
-  setUser: () => {},
-});
+} => {
+  const user = useContext(UserContext);
+  if (!user) throw new Error("UserContext not initialized");
+
+  return user;
+};

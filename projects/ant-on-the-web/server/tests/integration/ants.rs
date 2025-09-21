@@ -61,6 +61,22 @@ async fn ants_total_matches_ants_released() {
 
 #[tokio::test]
 #[traced_test]
+async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_in() {
+    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+
+    {
+        let res = fixture
+            .client
+            .get("/api/ants/released-ants?page=0")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
 async fn ants_suggest_returns_200_with_user_if_authenticated() {
     let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
 
