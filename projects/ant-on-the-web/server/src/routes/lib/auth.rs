@@ -251,10 +251,8 @@ where
 /// their two-factor verification. This should be used for routes required to start/finish the
 /// two-factor verification flows.
 ///
-/// The `method` is used to ensure that the weak authentication is only valid for
-///
 /// Unless this is a route that deals with auth, you should use [`authenticate`].
-pub async fn weakly_authenticate(
+pub async fn authenticate_weak(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
@@ -310,7 +308,7 @@ pub async fn authenticate_or_weak_matching_method(
     )));
 }
 
-fn upgrade_weak_auth(auth: &AuthClaims, user: User) -> Result<User, AuthError> {
+fn upgrade_weak_auth_to_strong(auth: &AuthClaims, user: User) -> Result<User, AuthError> {
     // We let the user in only if they don't need 2fa. This comes from AuthClaims and is signed
     // by the server's key, so we can trust that the server wrote this during /login, but it
     // never got replaced during /verification
@@ -331,12 +329,12 @@ pub async fn authenticate(
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
     info!("Attempting authentication.");
-    return upgrade_weak_auth(&auth, weakly_authenticate(&auth, &dao).await?);
+    return upgrade_weak_auth_to_strong(&auth, authenticate_weak(&auth, &dao).await?);
 }
 
 /// Requires that the claim that the user carries belongs to a user with the admin role.
 /// Stronger than authenticate(), which just requires that the caller be a valid user.
-pub async fn admin_authenticate(
+pub async fn authenticate_admin(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AuthError> {
@@ -355,18 +353,23 @@ pub async fn admin_authenticate(
 /// If the auth claims are present, return the user that is authenticated. If not, returns None.
 /// This is different from [`optional_authenticate`] since that will return the 'nobody' user.
 ///
-/// Returns AccessDenied errors if the user is specified but the claims are tampered or somehow
-/// wrong.
+/// This function treats WEAK authentication as NO authentication. Returns AccessDenied errors if
+/// the user is specified but the claims are tampered or somehow wrong.
 ///
 /// This is used in public APIs, for private user-specific APIs default to using [`authenticate`].
 pub async fn optional_strict_authenticate(
     auth: Option<&AuthClaims>,
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<Option<User>, AuthError> {
-    match auth {
+    return match auth.map(async |claims| {
+        authenticate_weak(&claims, &dao)
+            .await
+            .ok()
+            .and_then(|weak_user| upgrade_weak_auth_to_strong(&claims, weak_user).ok())
+    }) {
         None => Ok(None),
-        Some(auth) => Ok(Some(authenticate(&auth, &dao).await?)),
-    }
+        Some(u) => Ok(u.await),
+    };
 }
 
 /// If the auth claims are present, return the user that is authenticated. If not, returns the

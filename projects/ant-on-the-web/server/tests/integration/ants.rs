@@ -1,5 +1,6 @@
 use crate::fixture::{
-    test_router_admin_auth, test_router_auth, test_router_no_auth, FixtureOptions,
+    test_router_admin_auth, test_router_auth, test_router_no_auth, test_router_weak_auth,
+    FixtureOptions,
 };
 use ant_data_farm::{ants::AntId, releases::AntReleaseRequest};
 use ant_on_the_web::{
@@ -110,6 +111,26 @@ async fn ants_suggest_returns_200_even_if_not_authenticated() {
         .send()
         .await;
     assert_eq!(res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn ants_suggest_returns_200_with_weak_authentication() {
+    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
+
+    {
+        let req = SuggestionRequest {
+            suggestion_content: "some ant content".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/api/ants/suggest")
+            .header("Cookie", &cookie)
+            .json(&req)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
 }
 
 #[tokio::test]

@@ -26,8 +26,8 @@ use tracing::{debug, info};
 
 use super::lib::{
     auth::{
-        authenticate, authenticate_or_weak_matching_method, cookie_defaults, optional_authenticate,
-        weakly_authenticate, AuthClaims,
+        authenticate, authenticate_or_weak_matching_method, authenticate_weak, cookie_defaults,
+        optional_authenticate, AuthClaims,
     },
     err::AntOnTheWebError,
     jwt::{decode_jwt, encode_jwt},
@@ -295,7 +295,7 @@ async fn two_factor_verification_attempt(
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow weak validations here because the user has to exist, but if this is their first
     // phone number/email 2fa then they won't be able to be strongly authenticated.
-    let user = weakly_authenticate(&auth, &dao).await?;
+    let user = authenticate_weak(&auth, &dao).await?;
 
     let canonical = match &req.method {
         VerificationSubmission::Phone { phone_number, .. } => {
@@ -418,7 +418,7 @@ async fn add_phone_number(
     // AuthN: Allow weak authentication here because during signup process they need to be able
     // to add a phone number to get it validated. However, we only allow the user to be weakly
     // authenticated if they don't have any phone numbers or emails associated.
-    let user = weakly_authenticate(&auth, &dao).await?;
+    let user = authenticate_weak(&auth, &dao).await?;
 
     info!("User adding phone number");
     let canonical_phone_number = {
@@ -520,7 +520,7 @@ async fn add_email(
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
     // to add an email to get it validated.
-    let user = weakly_authenticate(&auth, &dao).await?;
+    let user = authenticate_weak(&auth, &dao).await?;
 
     info!("User adding email");
 

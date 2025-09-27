@@ -1,6 +1,6 @@
 use crate::{
     err::{AntOnTheWebError, ValidationError, ValidationMessage},
-    routes::lib::auth::{admin_authenticate, authenticate, optional_strict_authenticate},
+    routes::lib::auth::{authenticate, authenticate_admin, optional_strict_authenticate},
     state::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::users::UserId;
@@ -258,7 +258,7 @@ async fn create_release(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<CreateReleaseRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    let user = admin_authenticate(&auth, &dao).await?;
+    let user = authenticate_admin(&auth, &dao).await?;
 
     {
         let mut validations: Vec<ValidationMessage> = vec![];
@@ -490,7 +490,7 @@ async fn decline_ant(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<DeclineAntRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    let user = admin_authenticate(&auth, &dao).await?;
+    let user = authenticate_admin(&auth, &dao).await?;
 
     let mut ants = dao.ants.write().await;
 

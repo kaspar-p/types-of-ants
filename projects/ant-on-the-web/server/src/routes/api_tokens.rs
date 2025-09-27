@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     err::AntOnTheWebError,
-    routes::lib::auth::{admin_authenticate, AuthClaims},
+    routes::lib::auth::{authenticate_admin, AuthClaims},
     state::{ApiRouter, ApiState, InnerApiState},
 };
 
@@ -31,7 +31,7 @@ async fn grant_token(
     State(InnerApiState { dao, rng, .. }): ApiState,
     Json(req): Json<GrantTokenRequest>,
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
-    admin_authenticate(&auth, &dao).await?;
+    authenticate_admin(&auth, &dao).await?;
 
     let user = dao
         .users
