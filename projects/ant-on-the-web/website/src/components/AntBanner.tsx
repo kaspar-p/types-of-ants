@@ -46,7 +46,8 @@ export function AntBanner() {
         >
           <>
             <div>
-              discovered {bannerAnts?.ants.length} new ants on{" "}
+              discovered {bannerAnts?.ants.length} new ant
+              {(bannerAnts?.ants.length ?? 0) > 1 ? "s" : ""} on{" "}
               {formatDate(bannerAnts?.date || new Date())}:
             </div>
             <Marquee

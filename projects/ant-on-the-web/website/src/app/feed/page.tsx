@@ -1,15 +1,12 @@
 "use client";
 
-import InputBanner from "@/components/InputBanner";
-import { NewsletterBox } from "@/components/NewsletterBox";
-import { SuggestionBox } from "@/components/SuggestionBox";
+import { InputBanner } from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { webAction } from "@/server/posts";
 import { Ant, getUnseenAnts } from "@/server/queries";
-import { UserContext } from "@/state/userContext";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useState } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
   const months = [

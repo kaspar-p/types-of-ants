@@ -5,7 +5,7 @@ type InputBannerProps = {
   onSuggestion?: () => Promise<void>;
 };
 
-export default function InputBanner(props?: InputBannerProps) {
+export function InputBanner(props?: InputBannerProps) {
   return (
     <div className="w-full flex flex-row justify-start flex-wrap">
       <SuggestionBox onSuggestion={props?.onSuggestion} />

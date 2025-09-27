@@ -106,7 +106,7 @@ fn row_to_ant(row: &Row) -> Ant {
         created_by: row.get("ant_user_id"),
         status,
         tweeted: tweeted_status,
-        favorited_at: row.get("favorited_at"),
+        favorited_at: row.try_get("favorited_at").unwrap_or(None),
     }
 }
 
@@ -139,15 +139,13 @@ impl AntsDao {
                 release.release_label,
                 release.release_number,
                 release.created_at as release_created_at,
-                release.creator_user_id,
-                favorite.favorited_at
+                release.creator_user_id
             from 
                 ant left join ant_release on ant.ant_id = ant_release.ant_id
                     left join ant_declined on ant.ant_id = ant_declined.ant_id
                     left join ant_tweeted on ant.ant_id = ant_tweeted.ant_id
                     left join registered_user on ant.ant_user_id = registered_user.user_id
                     left join release on ant_release.release_number = release.release_number
-                    left join favorite on favorite.user_id = registered_user.user_id
             order by ant_release.ant_content_hash nulls first
             ",
                 &[],

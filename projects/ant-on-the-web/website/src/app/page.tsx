@@ -5,7 +5,7 @@ import { AntBanner } from "../components/AntBanner";
 import { getReleasedAnts, ReleasedAnt } from "../server/queries";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import InputBanner from "@/components/InputBanner";
+import { InputBanner } from "@/components/InputBanner";
 import { AntText } from "@/components/AntText";
 import { useMediaQuery } from "@uidotdev/usehooks";
 

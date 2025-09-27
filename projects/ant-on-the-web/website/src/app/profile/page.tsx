@@ -2,7 +2,7 @@
 
 import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
 import ChangeUsernameBox from "@/components/ChangeUsernameBox";
-import InputBanner from "@/components/InputBanner";
+import { InputBanner } from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { useUser } from "@/state/userContext";
 import Link from "next/link";

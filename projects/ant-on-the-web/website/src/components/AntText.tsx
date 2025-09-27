@@ -14,15 +14,16 @@ export type AntTextProps = {
 
 const ICON_SIZE = 14;
 
-export function AntText({ ant }: AntTextProps) {
+export function AntText(props: AntTextProps) {
   const displayIcon = true;
 
-  const [favoritedAt, setFavoritedAt] = useState<string | null>();
-  const { push } = useRouter();
+  const [ant, setAnt] = useState<ReleasedAnt | undefined>(undefined);
 
   useEffect(() => {
-    setFavoritedAt(ant.favoritedAt);
+    setAnt(props.ant);
   }, []);
+
+  const { push } = useRouter();
 
   const { user } = useUser();
 
@@ -30,9 +31,11 @@ export function AntText({ ant }: AntTextProps) {
   const [clicked, setClicked] = useState<boolean>(false);
 
   const canLike = user.weakAuth && user.loggedIn;
-  const liked = canLike && !!favoritedAt;
+  const liked = canLike && !!ant?.favoritedAt;
 
   const cannotHover = useMediaQuery("only screen and (max-width : 768px)");
+
+  if (!ant) return <div></div>;
 
   return (
     <div
@@ -82,7 +85,8 @@ export function AntText({ ant }: AntTextProps) {
                     }
                     case 200: {
                       ant.favoritedAt = null;
-                      setFavoritedAt(null);
+                      setAnt({ ...ant, favoritedAt: null });
+                      break;
                     }
                   }
                 } else {
@@ -99,7 +103,8 @@ export function AntText({ ant }: AntTextProps) {
                     case 200: {
                       const body: { favoritedAt: string } = await res.json();
                       ant.favoritedAt = body.favoritedAt;
-                      setFavoritedAt(body.favoritedAt);
+                      setAnt({ ...ant, favoritedAt: body.favoritedAt });
+                      break;
                     }
                   }
                 }
