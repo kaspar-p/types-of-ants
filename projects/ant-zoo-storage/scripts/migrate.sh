@@ -12,11 +12,11 @@ source "$repository_root/secrets/$deploy_env/build.cfg"
 set -o allexport
 
 current_highest_migration="$(
-  PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_password.secret")" psql \
-  --host "$ANT_DATA_FARM_HOST" \
-  --port "$ANT_DATA_FARM_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_user.secret")" \
-  --dbname "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_db.secret")" \
+  PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_password.secret")" psql \
+  --host "$ANT_ZOO_STORAGE_HOST" \
+  --port "$ANT_ZOO_STORAGE_PORT" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_user.secret")" \
+  --dbname "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_db.secret")" \
   --tuples-only \
   --no-align \
   --command='select max(migration_seq) from migration;'
@@ -31,11 +31,11 @@ for filename in "$migrations_root"/*; do
   fi
 
   echo "... applying $filename" >> /dev/stderr
-  PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_password.secret")" psql \
-  --host "$ANT_DATA_FARM_HOST" \
-  --port "$ANT_DATA_FARM_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_user.secret")" \
-  --dbname "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_db.secret")" \
+  PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_password.secret")" psql \
+  --host "$ANT_ZOO_STORAGE_HOST" \
+  --port "$ANT_ZOO_STORAGE_PORT" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_user.secret")" \
+  --dbname "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_db.secret")" \
   --file "$filename" \
   --echo-all >> /dev/stderr
 done

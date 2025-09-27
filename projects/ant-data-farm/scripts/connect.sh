@@ -11,8 +11,8 @@ set +o allexport
 source "$repository_root/secrets/$deploy_env/build.cfg"
 set -o allexport
 
-PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/postgres_password.secret")" psql \
+PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_password.secret")" psql \
   --host "$ANT_DATA_FARM_HOST" \
   --port "$ANT_DATA_FARM_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/postgres_user.secret")" \
-  --dbname "$(cat "$repository_root/secrets/$deploy_env/postgres_db.secret")"
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_user.secret")" \
+  --dbname "$(cat "$repository_root/secrets/$deploy_env/ant_data_farm_db.secret")"

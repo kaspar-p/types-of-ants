@@ -10,16 +10,40 @@ services:
       - "${ANT_DATA_FARM_PORT}:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
     environment:
       VERSION: ${VERSION}
-      POSTGRES_DB_FILE: /run/secrets/postgres_db
-      POSTGRES_USER_FILE: /run/secrets/postgres_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB_FILE: /run/secrets/ant_data_farm_db
+      POSTGRES_USER_FILE: /run/secrets/ant_data_farm_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_data_farm_password
       PGDATA: /var/lib/postgresql/data/
     volumes:
       - ${PERSIST_DIR}/database-files/:/var/lib/postgresql/data
     secrets:
-      - postgres_db
-      - postgres_user
-      - postgres_password
+      - ant_data_farm_db
+      - ant_data_farm_user
+      - ant_data_farm_password
+
+  ant-zoo-storage:
+    image: ant-zoo-storage:${VERSION}
+    container_name: ant-zoo-storage
+    build:
+      context: ./projects/ant-zoo-storage
+      dockerfile: Dockerfile
+      args:
+        TYPESOFANTS_ENV: ${TYPESOFANTS_ENV}
+    restart: always
+    ports:
+      - "${ANT_ZOO_STORAGE_PORT}:5432"
+    environment:
+      VERSION: ${VERSION}
+      POSTGRES_DB_FILE: /run/secrets/ant_zoo_storage_db
+      POSTGRES_USER_FILE: /run/secrets/ant_zoo_storage_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_zoo_storage_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - ${PERSIST_DIR}/database-files/:/var/lib/postgresql/data
+    secrets:
+      - ant_zoo_storage_db
+      - ant_zoo_storage_user
+      - ant_zoo_storage_password
 
   ant-gateway:
     image: ant-gateway:${VERSION}
@@ -91,12 +115,18 @@ services:
 secrets:
   ant_fs_users.secret:
     file: ${SECRETS_DIR}/ant_fs_users.secret
-  postgres_db:
-    file: ${SECRETS_DIR}/postgres_db.secret
-  postgres_user:
-    file: ${SECRETS_DIR}/postgres_user.secret
-  postgres_password:
-    file: ${SECRETS_DIR}/postgres_password.secret
+  ant_zoo_storage_db:
+    file: ${SECRETS_DIR}/ant_zoo_storage_db.secret
+  ant_zoo_storage_user:
+    file: ${SECRETS_DIR}/ant_zoo_storage_user.secret
+  ant_zoo_storage_password:
+    file: ${SECRETS_DIR}/ant_zoo_storage_password.secret
+  ant_data_farm_db:
+    file: ${SECRETS_DIR}/ant_data_farm_db.secret
+  ant_data_farm_user:
+    file: ${SECRETS_DIR}/ant_data_farm_user.secret
+  ant_data_farm_password:
+    file: ${SECRETS_DIR}/ant_data_farm_password.secret
   tls_cert:
     file: ${SECRETS_DIR}/tls_cert.pem
   tls_cert_key:

@@ -16,6 +16,8 @@ if [[ $project = "ant-data-farm" ]]; then
   export VERSION=dev
   export PERSIST_DIR="$repository_root/projects/ant-data-farm/database-files"
   docker-compose up --build ant-data-farm "${@:2}"
+elif [[ $project = "ant-zoo-storage" ]]; then
+  ./projects/ant-zoo-storage/.anthill/dev.sh
 elif [[ $project = "ant-on-the-web:server" ]]; then
   export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
   cargo run -p ant-on-the-web
