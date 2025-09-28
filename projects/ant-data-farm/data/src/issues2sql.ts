@@ -254,11 +254,11 @@ const main = async () => {
   };
 
   const sql = postgres({
-    database: readSecret("postgres_db.secret"),
-    user: readSecret("postgres_user.secret"),
+    database: readSecret("ant_data_farm_db.secret"),
+    user: readSecret("ant_data_farm_user.secret"),
     host: cfg.ANT_DATA_FARM_HOST,
     port: parseInt(cfg.ANT_DATA_FARM_PORT),
-    password: readSecret("postgres_password.secret"),
+    password: readSecret("ant_data_farm_password.secret"),
   });
 
   const antsDatabase = await Promise.all(

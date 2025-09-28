@@ -9,9 +9,9 @@ use std::str::FromStr;
 /// during development.
 ///
 /// ```rs
-/// let db_name: String = load_secret("postgres_db")
+/// let db_name: String = load_secret("my_db_name")
 /// ```
-/// will read the file $TYPESOFANTS_SECRET_DIR/postgres_db.secret
+/// will read the file $TYPESOFANTS_SECRET_DIR/my_db_name.secret
 pub fn load_secret(secret_name: &str) -> Result<String, anyhow::Error> {
     let secret_dir =
         dotenv::var("TYPESOFANTS_SECRET_DIR").expect("no TYPESOFANTS_SECRET_DIR defined");

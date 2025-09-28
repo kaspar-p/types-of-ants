@@ -202,9 +202,9 @@ pub fn get_config() -> Result<Config, anyhow::Error> {
         },
         database: DatabaseConfig {
             creds: Some(DatabaseCredentials {
-                database_name: ant_library::secret::load_secret("postgres_db")?,
-                database_user: ant_library::secret::load_secret("postgres_user")?,
-                database_password: ant_library::secret::load_secret("postgres_password")?,
+                database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
+                database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
+                database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
             }),
             host: Some(dotenv::var("ANT_DATA_FARM_HOST")?),
             port: Some(dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?),

@@ -54,9 +54,9 @@ pub struct DatabaseConfig {
 
 fn get_credentials_from_env() -> Result<DatabaseCredentials, anyhow::Error> {
     Ok(DatabaseCredentials {
-        database_name: ant_library::secret::load_secret("postgres_db")?,
-        database_user: ant_library::secret::load_secret("postgres_user")?,
-        database_password: ant_library::secret::load_secret("postgres_password")?,
+        database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
+        database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
+        database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
     })
 }
 
