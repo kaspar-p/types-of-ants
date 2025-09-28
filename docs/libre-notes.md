@@ -42,7 +42,8 @@ sudo apt upgrade && \
 sudo apt install net-tools dirmngr ca-certificates \
   software-properties-common apt-transport-https lsb-release curl && \
 sudo apt-get install autoconf && \
-sudo snap install jq docker btop
+sudo snap install jq docker btop && \
+echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"' | sudo tee /etc/environment
 ```
 
 Install a postgresql client matching the version `ant-data-farm` uses:

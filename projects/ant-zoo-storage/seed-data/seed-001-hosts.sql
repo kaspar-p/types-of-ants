@@ -36,6 +36,8 @@ insert into project_instance
 values
   -- PROD
   ('ant-data-farm', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
+  ('ant-backing-it-up-storage', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
+  ('ant-backing-it-up', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
   ('ant-who-tweets', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
   ('ant-gateway', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
   ('ant-host-agent', 'antworker000.hosts.typesofants.org', 'prod', 'live'),

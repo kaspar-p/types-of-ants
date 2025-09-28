@@ -21,6 +21,16 @@ services:
       - ant_data_farm_user
       - ant_data_farm_password
 
+  # ant-backing-it-up:
+  #   image: typesofants/ant-backing-it-up:arm64-latest
+  #   platform: linux/arm64
+  #   container_name: ant-backing-it-up
+  #   environment:
+  #     TYPESOFANTS_SECRET_DIR: /run/secrets
+  #   restart: always
+  #   ports:
+  #     - 3238:3238
+
   ant-backing-it-up-storage:
     image: ant-backing-it-up-storage:${VERSION}
     container_name: ant-backing-it-up-storage
@@ -122,19 +132,19 @@ services:
     secrets:
       - cloudflare_api_token
 
-  ant-fs:
-    image: typesofants/ant-fs:arm64-latest
-    platform: linux/arm64
-    container_name: ant-fs
-    environment:
-      TYPESOFANTS_SECRET_DIR: /run/secrets
-    restart: always
-    volumes:
-      - ${INSTALL_DIR}/fs:/app/fs
-    ports:
-      - 3237:3237
-    secrets:
-      - ant_fs_users.secret
+  # ant-fs:
+  #   image: typesofants/ant-fs:arm64-latest
+  #   platform: linux/arm64
+  #   container_name: ant-fs
+  #   environment:
+  #     TYPESOFANTS_SECRET_DIR: /run/secrets
+  #   restart: always
+  #   volumes:
+  #     - ${INSTALL_DIR}/fs:/app/fs
+  #   ports:
+  #     - 3237:3237
+  #   secrets:
+  #     - ant_fs_users.secret
 
 secrets:
   ant_fs_users.secret:

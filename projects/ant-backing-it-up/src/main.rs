@@ -50,11 +50,15 @@ async fn main() {
             .unwrap(),
         ant_library::secret::load_secret("ant_fs_client_creds")
             .unwrap()
+            .split("\n")
+            .collect::<Vec<&str>>()[0]
             .split(":")
             .collect::<Vec<&str>>()[0]
             .to_string(),
         ant_library::secret::load_secret("ant_fs_client_creds")
             .unwrap()
+            .split("\n")
+            .collect::<Vec<&str>>()[0]
             .split(":")
             .collect::<Vec<&str>>()[1]
             .to_string(),

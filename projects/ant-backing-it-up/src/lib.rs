@@ -142,6 +142,11 @@ async fn post_backup(
         .unwrap()
         .read_to_end(&mut sql_plaintext)
         .unwrap();
+    info!("Removing backup SQL: {}", local_sql_path.display());
+    std::fs::remove_file(&local_sql_path).expect(&format!(
+        "removing pg_dump output: {}",
+        local_sql_path.display()
+    ));
 
     let local_zip_filename = format!("{local_sql_filename}.zip");
     let local_zip_path = root_dir.join(&local_zip_filename);
@@ -165,12 +170,17 @@ async fn post_backup(
     zip.finish().expect("zip flush");
     let mut plaintext_zip_file = std::fs::File::open(&local_zip_path).expect("open zip file");
 
+    info!("Reading zip archive: {}", local_zip_path.display());
     let mut plaintext_zip_buf: Vec<u8> = vec![];
     plaintext_zip_file
         .read_to_end(&mut plaintext_zip_buf)
         .expect("plaintext zip read");
 
-    info!("Encrypting zip archive: {}", local_zip_path.display());
+    info!("Deleting zip archive: {}", local_zip_path.display());
+    std::fs::remove_file(&local_zip_path)
+        .expect(&format!("removing zip file: {}", local_zip_path.display()));
+
+    info!("Encrypting zip archive...");
     let cipher = Aes256Gcm::new((&[0; 32]).into());
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // Unique per file
 
@@ -183,7 +193,7 @@ async fn post_backup(
     ant_fs.put_file(&remote_filename, ciphertext).await.unwrap();
 
     // Then save all of that in the database.
-    info!("Recording backup job was done...");
+    info!("Recording backup job...");
     db.record_backup(
         &req.source_project,
         &db_params,
@@ -198,9 +208,7 @@ async fn post_backup(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    info!("Removing local file...");
-    std::fs::remove_file(&local_sql_path).unwrap();
-    std::fs::remove_file(&local_zip_path).unwrap();
+    info!("Backup job successful.");
 
     return Ok(StatusCode::OK);
 }
