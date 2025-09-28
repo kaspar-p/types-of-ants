@@ -7,7 +7,7 @@ use std::{
 
 use ant_on_the_web::ants::{
     Ant, AntId, AntReleaseRequest, CreateReleaseRequest, CreateReleaseResponse, DeclineAntRequest,
-    DeclineAntResponse, Release, UnreleasedAntsResponse,
+    DeclineAntResponse, UnreleasedAntsResponse,
 };
 use chrono::{Datelike, Local};
 use clap::Parser;

@@ -52,7 +52,9 @@ values
   ('ant-host-agent', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
   ('ant-fs', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
   ('ant-naming-domains', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
-  ('ant-on-the-web', 'antworker002.hosts.typesofants.org', 'beta', 'live')
+  ('ant-on-the-web', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
+  ('ant-backing-it-up-storage', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
+  ('ant-backing-it-up', 'antworker002.hosts.typesofants.org', 'beta', 'live')
 ;
 
 commit;

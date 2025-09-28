@@ -21,6 +21,30 @@ services:
       - ant_data_farm_user
       - ant_data_farm_password
 
+  ant-backing-it-up-storage:
+    image: ant-backing-it-up-storage:${VERSION}
+    container_name: ant-backing-it-up-storage
+    build:
+      context: ./projects/ant-backing-it-up-storage
+      dockerfile: Dockerfile
+      args:
+        TYPESOFANTS_ENV: ${TYPESOFANTS_ENV}
+    restart: always
+    ports:
+      - "${ANT_BACKING_IT_UP_STORAGE_PORT}:5432"
+    environment:
+      VERSION: ${VERSION}
+      POSTGRES_DB_FILE: /run/secrets/ant_backing_it_up_storage_db
+      POSTGRES_USER_FILE: /run/secrets/ant_backing_it_up_storage_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_backing_it_up_storage_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - ${PERSIST_DIR}/database-files/:/var/lib/postgresql/data
+    secrets:
+      - ant_backing_it_up_storage_db
+      - ant_backing_it_up_storage_user
+      - ant_backing_it_up_storage_password
+
   ant-zoo-storage:
     image: ant-zoo-storage:${VERSION}
     container_name: ant-zoo-storage
@@ -115,18 +139,28 @@ services:
 secrets:
   ant_fs_users.secret:
     file: ${SECRETS_DIR}/ant_fs_users.secret
+
   ant_zoo_storage_db:
     file: ${SECRETS_DIR}/ant_zoo_storage_db.secret
   ant_zoo_storage_user:
     file: ${SECRETS_DIR}/ant_zoo_storage_user.secret
   ant_zoo_storage_password:
     file: ${SECRETS_DIR}/ant_zoo_storage_password.secret
+
+  ant_backing_it_up_storage_db:
+    file: ${SECRETS_DIR}/ant_backing_it_up_storage_db.secret
+  ant_backing_it_up_storage_user:
+    file: ${SECRETS_DIR}/ant_backing_it_up_storage_user.secret
+  ant_backing_it_up_storage_password:
+    file: ${SECRETS_DIR}/ant_backing_it_up_storage_password.secret
+
   ant_data_farm_db:
     file: ${SECRETS_DIR}/ant_data_farm_db.secret
   ant_data_farm_user:
     file: ${SECRETS_DIR}/ant_data_farm_user.secret
   ant_data_farm_password:
     file: ${SECRETS_DIR}/ant_data_farm_password.secret
+
   tls_cert:
     file: ${SECRETS_DIR}/tls_cert.pem
   tls_cert_key:

@@ -163,7 +163,19 @@ pub async fn middleware_mode_headers(
 pub fn middleware_catch_panic(
     err: Box<dyn std::any::Any + Send + 'static>,
 ) -> Response<Full<Bytes>> {
-    error!("panic: {:?}", err);
+    // Try to downcast to a String and print its length and content
+    if let Some(s) = err.downcast_ref::<String>() {
+        error!("panic ({}): \"{}\"", s.len(), s);
+    }
+    // Otherwise, try to downcast to a type that implements Debug and print it
+    else if let Some(debug_value) = err.downcast_ref::<&dyn std::fmt::Debug>() {
+        error!("panic: {:?}", debug_value);
+    }
+    // If no specific handling, just indicate the type is unknown
+    else {
+        error!("panic: {:?}", err.type_id());
+    }
+
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Full::from(

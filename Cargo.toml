@@ -9,5 +9,10 @@ members = [
   "projects/ant-library",
   "projects/ant-metadata",
   "projects/ant-owning-artifacts",
-  "projects/anthill", "projects/ant-fs", "projects/ant-releasing-ants-into-the-wild", "projects/ant-backing-it-up",
+  "projects/anthill",
+  "projects/ant-fs",
+  "projects/ant-releasing-ants-into-the-wild",
+  "projects/ant-zookeeper",
+  "projects/ant-backing-it-up",
+  "projects/ant-fs-client",
 ]

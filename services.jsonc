@@ -47,7 +47,9 @@
         { "env": "beta", "service": "ant-gateway" },
         { "env": "beta", "service": "ant-host-agent" },
         { "env": "beta", "service": "ant-naming-domains" },
-        { "env": "beta", "service": "ant-fs" }
+        { "env": "beta", "service": "ant-fs" },
+        { "env": "beta", "service": "ant-backing-it-up-storage" },
+        { "env": "beta", "service": "ant-backing-it-up" }
       ]
     },
     "hisbaan01.hosts.typesofants.org": {
