@@ -31,11 +31,6 @@ for env in $(environments); do
     host=$(jq -r ".host" <<< "$host_project_pair")
     project=$(jq -r ".project" <<< "$host_project_pair")
 
-    project_mode="$(get_service_mode "$project")"
-    script="install-$project_mode-service.sh"
-
-    version=$("$repository_root/scripts/$script" "$project" "$env" "$host")
-
-    "$repository_root/scripts/deploy-systemd.sh" "$project" "$host" "$version"
+    "$repository_root/scripts/deploy.sh" "$project" "$env" "$host"
   done 
 done
