@@ -30,6 +30,7 @@ fi
 remote_user="ant"
 remote_home="/home/$remote_user"
 remote_host="$(anthost "$ant_worker_num")"
+repository_root="$(git rev-parse --show-toplevel)"
 
 log "DEPLOYING [$project] VERSION [$version] ONTO [$ant_worker_num] ..."
 
@@ -40,10 +41,10 @@ install_dir="$remote_home/service/$project/$version"
 new_unit_path="$install_dir/$project.service"
 
 ssh "ant@$remote_host" "
-  sudo -S systemctl disable '$project.service' || true;
-  sudo -S systemctl enable '$new_unit_path';
-  sudo -S systemctl daemon-reload;
-  sudo -S systemctl restart '$project.service';
+  sudo -S systemctl disable '$project.service' <<< $(cat "$repository_root/secrets/ant_user.secret") || true;
+  sudo -S systemctl enable '$new_unit_path'  <<< $(cat "$repository_root/secrets/ant_user.secret");
+  sudo -S systemctl daemon-reload  <<< $(cat "$repository_root/secrets/ant_user.secret");
+  sudo -S systemctl restart '$project.service'  <<< $(cat "$repository_root/secrets/ant_user.secret");
 "
 
 log "TRANSITIONED [$project] TO [$version]"
