@@ -31,9 +31,6 @@ for env in $(environments); do
     host=$(jq -r ".host" <<< "$host_project_pair")
     project=$(jq -r ".project" <<< "$host_project_pair")
 
-    # if [[ $project == "ant-gateway" ]]; then continue; fi # Ignore because I don't know how to get new certs yet
-    # if [[ $project == "ant-data-farm" ]]; then continue; fi # Ignore because prod has non-standard deployment.
-
     project_mode="$(get_service_mode "$project")"
     script="install-$project_mode-service.sh"
 
