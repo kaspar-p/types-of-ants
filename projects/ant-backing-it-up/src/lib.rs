@@ -14,6 +14,7 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use http::{header, Method, StatusCode};
 use postgresql_commands::{pg_dump::PgDumpBuilder, traits::CommandToString, CommandBuilder};
 use serde::{Deserialize, Serialize};
+use sha2::digest::generic_array::GenericArray;
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, trace::TraceLayer};
 use tracing::{debug, error, info, warn};
@@ -181,7 +182,9 @@ async fn post_backup(
         .expect(&format!("removing zip file: {}", local_zip_path.display()));
 
     info!("Encrypting zip archive...");
-    let cipher = Aes256Gcm::new((&[0; 32]).into());
+    let key = ant_library::secret::load_secret_binary("ant_backing_it_up_key")
+        .expect("ant_backing_it_up_key secret");
+    let cipher = Aes256Gcm::new(&GenericArray::clone_from_slice(&key[0..32])); // 256 bits = 8 * 32 bytes
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // Unique per file
 
     let ciphertext = cipher.encrypt(&nonce, plaintext_zip_buf.as_ref()).unwrap();
