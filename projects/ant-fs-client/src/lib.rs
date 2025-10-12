@@ -40,16 +40,31 @@ impl AntFsClient {
         }
     }
 
+    fn url(&self, path: &str) -> String {
+        format!("http{}://{}:{}/{}", self.tls(), self.host, self.port, path)
+    }
+
+    pub async fn delete_file(&mut self, path: &str) -> Result<(), anyhow::Error> {
+        let response = self
+            .client
+            .delete(self.url(path))
+            .basic_auth(self.username.clone(), Some(self.password.clone()))
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(_res) => Ok(()),
+            Err(e) => {
+                error!("Failed to put ant-fs file {e}");
+                Err(e.into())
+            }
+        }
+    }
+
     pub async fn put_file(&mut self, path: &str, bytes: Vec<u8>) -> Result<(), anyhow::Error> {
         let response = self
             .client
-            .post(format!(
-                "http{}://{}:{}/{}",
-                self.tls(),
-                self.host,
-                self.port,
-                path
-            ))
+            .put(self.url(path))
             .basic_auth(self.username.clone(), Some(self.password.clone()))
             .body(bytes)
             .send()
@@ -64,16 +79,10 @@ impl AntFsClient {
         }
     }
 
-    pub async fn get_file(&mut self, path: &str) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    pub async fn get_file(&self, path: &str) -> Result<Option<Vec<u8>>, anyhow::Error> {
         let response = self
             .client
-            .post(format!(
-                "http{}://{}:{}/{}",
-                self.tls(),
-                self.host,
-                self.port,
-                path
-            ))
+            .get(self.url(path))
             .basic_auth(self.username.clone(), Some(self.password.clone()))
             .send()
             .await?;

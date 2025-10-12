@@ -13,7 +13,10 @@ use axum_extra::{
 use base64ct::{Base64, Encoding};
 use http::{header, Method};
 use sha2::{Digest, Sha256};
-use std::{io::Write, path::PathBuf};
+use std::{
+    io::{ErrorKind, Write},
+    path::PathBuf,
+};
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{
     catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer,
@@ -21,10 +24,13 @@ use tower_http::{
 };
 use tracing::{debug, error, info};
 
-fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
+fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), (StatusCode, String)> {
     let tokens = ant_library::secret::load_secret("ant_fs_users").map_err(|e| {
         error!("Failed to read authorized users: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Internal server error, please retry.".to_string(),
+        )
     })?;
 
     if !tokens.trim().split("\n").filter(|&t| t != "").any(|t| {
@@ -37,7 +43,7 @@ fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), StatusCode> {
 
         return user == auth.0.username() && pass == pass_attempt;
     }) {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()));
     }
 
     Ok(())
@@ -47,31 +53,12 @@ async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     State(root): State<PathBuf>,
     req: Request,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     bearer_authorization(&auth)?;
 
     let service = ServeDir::new(PathBuf::from(root));
 
     return Ok(service.oneshot(req).await);
-
-    // let path = fs_path(&path)?;
-    // info!("Downloading from {}...", path.display());
-
-    // let mut file = std::fs::File::open(path).map_err(|e: std::io::Error| {
-    //     error!("{:?}", e);
-
-    //     match e.kind() {
-    //         ErrorKind::NotFound => StatusCode::NOT_FOUND,
-    //         _ => StatusCode::BAD_REQUEST,
-    //     }
-    // })?;
-
-    // let mut buf = Vec::new();
-    // file.read_to_end(&mut buf).unwrap();
-
-    // debug!("Read {} bytes.", buf.len());
-
-    // return Ok((StatusCode::OK, Bytes::from(buf)));
 }
 
 async fn upload(
@@ -79,7 +66,7 @@ async fn upload(
     State(root): State<PathBuf>,
     Path(path): Path<String>,
     body: Bytes,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     bearer_authorization(&auth)?;
 
     let path = PathBuf::from(root).join(path);
@@ -87,12 +74,42 @@ async fn upload(
 
     let mut file = std::fs::File::create(path).map_err(|err| {
         error!("Failed to write file: {err}");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Internal server error, please retry.".to_string(),
+        )
     })?;
 
     file.write_all(&body).unwrap();
 
     return Ok(StatusCode::OK);
+}
+
+async fn delete(
+    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    State(root): State<PathBuf>,
+    Path(path): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    bearer_authorization(&auth)?;
+
+    let full_path = PathBuf::from(root).join(&path);
+    info!("Deleting {}...", full_path.display());
+
+    std::fs::remove_file(full_path).map_err(|err| {
+        error!("Failed to delete file: {err}");
+        match err.kind() {
+            ErrorKind::NotFound => (
+                StatusCode::NOT_FOUND,
+                format!("error: {} does not exist.\n", &path),
+            ),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Internal server error, please retry.\n"),
+            ),
+        }
+    })?;
+
+    return Ok(StatusCode::OK.into_response());
 }
 
 pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
@@ -104,7 +121,10 @@ pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Router::new()
-        .route("/{path}", put(upload).post(upload).get(download))
+        .route(
+            "/{path}",
+            put(upload).post(upload).get(download).delete(delete),
+        )
         .with_state(root)
         .layer(
             ServiceBuilder::new()
