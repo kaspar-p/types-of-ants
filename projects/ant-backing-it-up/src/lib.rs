@@ -1,9 +1,5 @@
 use std::io::{Read, Write};
 
-use aes_gcm::{
-    aead::{Aead, OsRng},
-    AeadCore, Aes256Gcm, KeyInit,
-};
 use axum::{
     extract::State,
     response::IntoResponse,
@@ -14,7 +10,6 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use http::{header, Method, StatusCode};
 use postgresql_commands::{pg_dump::PgDumpBuilder, traits::CommandToString, CommandBuilder};
 use serde::{Deserialize, Serialize};
-use sha2::digest::generic_array::GenericArray;
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, trace::TraceLayer};
 use tracing::{debug, error, info, warn};
@@ -25,6 +20,7 @@ use crate::{
     storage_client::{Backup, DatabaseParams},
 };
 
+pub mod crypto;
 pub mod state;
 pub mod storage_client;
 
@@ -182,25 +178,23 @@ async fn post_backup(
         .expect(&format!("removing zip file: {}", local_zip_path.display()));
 
     info!("Encrypting zip archive...");
-    let key = ant_library::secret::load_secret_binary("ant_backing_it_up_key")
-        .expect("ant_backing_it_up_key secret");
-    let cipher = Aes256Gcm::new(&GenericArray::clone_from_slice(&key[0..32])); // 256 bits = 8 * 32 bytes
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // Unique per file
-
-    let ciphertext = cipher.encrypt(&nonce, plaintext_zip_buf.as_ref()).unwrap();
+    let encryption = crypto::encrypt_backup(&plaintext_zip_buf);
 
     // Then save that file to an ant-fs worker.
     info!("Saving to ant-fs...");
     let remote_filename = format!("{}.enc", &local_zip_filename);
 
-    ant_fs.put_file(&remote_filename, ciphertext).await.unwrap();
+    ant_fs
+        .put_file(&remote_filename, encryption.ciphertext)
+        .await
+        .unwrap();
 
     // Then save all of that in the database.
     info!("Recording backup job...");
     db.record_backup(
         &req.source_project,
         &db_params,
-        &nonce.to_vec(),
+        &encryption.nonce,
         &ant_fs.host,
         ant_fs.port,
         &remote_filename,

@@ -1,1 +1,4 @@
 *.sql
+*.enc
+*.zip
+*.bak

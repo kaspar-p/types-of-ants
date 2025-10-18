@@ -3,6 +3,10 @@ name = "ant-backing-it-up"
 version = "1.0.0"
 edition = "2021"
 
+[[bin]]
+name = "fetch-backup"
+path = "src/bin/fetch.rs"
+
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.99"
@@ -48,6 +52,8 @@ aes-gcm = "0.10.3"
 reqwest = "0.12.23"
 stdext = "0.3.3"
 zip = { version = "5.1.1", features = ["zstd"] }
+clap = { version = "4.5.49", features = ["derive"] }
+hex = "0.4.3"
 
 [dev-dependencies]
 stdext = "0.3.3"

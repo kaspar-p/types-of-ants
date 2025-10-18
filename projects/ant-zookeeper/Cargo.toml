@@ -40,6 +40,7 @@ base64ct = { version = "1.8.0", features = ["alloc"] }
 base16ct = { version = "0.3.0", features = ["alloc"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 postgresql_commands = "0.20.0"
+zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
 
 [dev-dependencies]
 stdext = "0.3.3"

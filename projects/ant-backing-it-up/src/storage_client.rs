@@ -1,7 +1,7 @@
 use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio_postgres::NoTls;
+use tokio_postgres::{NoTls, Row};
 use tracing::debug;
 
 #[derive(Clone)]
@@ -30,6 +30,21 @@ pub struct Backup {
     pub destination_filepath: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+fn row_to_backup(row: &Row) -> Backup {
+    Backup {
+        backup_id: row.get("backup_id"),
+        project: row.get("project"),
+        database_host: row.get("database_host"),
+        database_port: row.get::<_, i32>("database_port") as u16,
+        encryption_nonce: row.get("encryption_nonce"),
+        destination_host: row.get("destination_host"),
+        destination_port: row.get::<_, i32>("destination_port") as u16,
+        destination_filepath: row.get("destination_filepath"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }
 }
 
 impl AntBackingItUpStorageClient {
@@ -72,6 +87,38 @@ impl AntBackingItUpStorageClient {
         format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
     }
 
+    pub async fn get_latest_backup_for_project(
+        &self,
+        project: &str,
+    ) -> Result<Option<Backup>, anyhow::Error> {
+        let row = self
+            .db
+            .get()
+            .await?
+            .query_opt(
+                "
+      select
+        backup_id,
+        project,
+        database_host,
+        database_port,
+        encryption_nonce,
+        destination_host,
+        destination_port,
+        destination_filepath,
+        created_at,
+        updated_at
+      from backup
+      where project = $1
+      order by created_at desc
+      limit 1",
+                &[&project],
+            )
+            .await?;
+
+        Ok(row.map(|row| row_to_backup(&row)))
+    }
+
     pub async fn get_all_backups(&self) -> Result<Vec<Backup>, anyhow::Error> {
         let rows = self
             .db
@@ -96,18 +143,7 @@ impl AntBackingItUpStorageClient {
             )
             .await?
             .into_iter()
-            .map(|row| Backup {
-                backup_id: row.get("backup_id"),
-                project: row.get("project"),
-                database_host: row.get("database_host"),
-                database_port: row.get::<_, i32>("database_port") as u16,
-                encryption_nonce: row.get("encryption_nonce"),
-                destination_host: row.get("destination_host"),
-                destination_port: row.get::<_, i32>("destination_port") as u16,
-                destination_filepath: row.get("destination_filepath"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-            })
+            .map(|row| row_to_backup(&row))
             .collect();
 
         Ok(rows)

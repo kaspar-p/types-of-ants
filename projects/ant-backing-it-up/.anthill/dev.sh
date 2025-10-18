@@ -8,4 +8,4 @@ export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
 export PERSIST_DIR="$repository_root/projects/ant-backing-it-up/dev-fs"
 
 cd "$repository_root/projects/ant-backing-it-up"
-cargo run
+cargo run --bin ant-backing-it-up
