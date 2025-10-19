@@ -13,19 +13,19 @@ set -euo pipefail
 set +u
 project="$1"
 deploy_env="$2"
-ant_worker_num="$3"
+host="$3"
 if [[ "$DEBUG" != "" ]]; then
  set -x
 fi
-set -u
 
 if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
   usage
 fi
+set -u
 
 remote_user="ant"
 remote_home="/home/$remote_user"
-remote_host="$(anthost "$ant_worker_num")"
+remote_host="$(anthost "$host")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 

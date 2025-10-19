@@ -20,13 +20,13 @@
         { "env": "prod", "service": "ant-host-agent" },
         { "env": "prod", "service": "ant-data-farm" },
         { "env": "prod", "service": "ant-who-tweets" },
-        { "env": "prod", "service": "ant-backing-it-storage" },
-        { "env": "prod", "service": "ant-backing-it-up" }
+        { "env": "prod", "service": "ant-backing-it-storage" }
       ]
     },
     "antworker001.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
+        { "env": "prod", "service": "ant-backing-it-up" },
         { "env": "prod", "service": "ant-host-agent" },
         { "env": "prod", "service": "ant-gateway" },
         { "env": "prod", "service": "ant-on-the-web" },

@@ -13,10 +13,10 @@ function log() {
 }
 
 function usage() {
-  echo "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
+  echo "USAGE: $0 <project-name> <deploy-environment> <host>
     project-name: 'ant-gateway', 'ant-data-farm', ...
     deploy-environment: 'beta', 'prod', 'dev'
-    ant-worker-num: 000, 001, ...
+    host: 000, 001, antworker002, ...
 " >> /dev/stderr
 
   exit 1
@@ -46,6 +46,34 @@ function get_services() {
   repository_root="$(git rev-parse --show-toplevel)"
 
   cat "$repository_root/services.jsonc"
+}
+
+function find_host_project_pairs_with_env() {
+  local env="$1"
+
+  local repository_root
+  repository_root="$(git rev-parse --show-toplevel)"
+
+  cat "$repository_root/services.jsonc" | jq -rc "
+    .hosts |
+    to_entries | 
+    map(
+      select(.value.services | map(select(.env == \"$env\")) | length > 0) | 
+      { host: .key, project: .value.services[] | .service }
+    )[]"
+}
+
+function find_projects_in_env() {
+  local env="$1"
+
+  local repository_root
+  repository_root="$(git rev-parse --show-toplevel)"
+
+  cat "$repository_root/services.jsonc" | jq -rc "
+    .hosts |
+    to_entries[] |
+    .value.services[] |
+    select(.env == \"$env\").service" | sort | uniq
 }
 
 function get_service_mode() {

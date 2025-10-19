@@ -13,7 +13,7 @@ set -euo pipefail
 set +u
 project="$1"
 deploy_env="$2"
-ant_worker_num="$3"
+host="$3"
 if [[ "$DEBUG" != "" ]]; then
  set -x
 fi
@@ -25,7 +25,7 @@ set -u
 
 remote_user="ant"
 remote_home="/home/$remote_user"
-remote_host="$(anthost "$ant_worker_num")"
+remote_host="$(anthost "$host")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
@@ -62,7 +62,7 @@ make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> 
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
 
-run_command ssh2ant "$ant_worker_num" "
+run_command ssh2ant "$host" "
   mkdir -p ${INSTALL_DIR};
   mkdir -p ${SECRETS_DIR};
 "
@@ -71,7 +71,7 @@ run_command ssh2ant "$ant_worker_num" "
 {
   cat "${build_cfg}"
   echo "PERSIST_DIR=$PERSIST_DIR"
-} | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
+} | ssh2ant "$host" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
 
 # Copy secrets into the install dir
 local_secrets_dir="$repository_root/secrets/$deploy_env"
@@ -86,10 +86,10 @@ run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_hos
 # Interpret mustache template into the systemctl unit file
 new_unit_path="$INSTALL_DIR/$project.service"
 INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
-  ssh2ant "$ant_worker_num" "tee ${new_unit_path}" >> /dev/stderr
+  ssh2ant "$host" "tee ${new_unit_path}" >> /dev/stderr
 
 # Write the installation manifest
-ssh2ant "$ant_worker_num" "echo '{
+ssh2ant "$host" "echo '{
   \"project\": \"$project\",
   \"project_type\": \"makefile\",
   \"version\": \"$install_version\",

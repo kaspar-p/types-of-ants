@@ -21,7 +21,10 @@ async fn main() {
     ant_library::set_global_logs("fetch-backup");
 
     dotenv::from_path(
-        PathBuf::from(dotenv::var("TYPESOFANTS_SECRET_DIR").unwrap()).join("build.cfg"),
+        PathBuf::from(
+            dotenv::var("TYPESOFANTS_SECRET_DIR").expect("No TYPESOFANTS_SECRET_DIR variable"),
+        )
+        .join("build.cfg"),
     )
     .unwrap();
 
