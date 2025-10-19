@@ -37,8 +37,6 @@ services:
     build:
       context: ./projects/ant-backing-it-up-storage
       dockerfile: Dockerfile
-      args:
-        TYPESOFANTS_ENV: ${TYPESOFANTS_ENV}
     restart: always
     ports:
       - "${ANT_BACKING_IT_UP_STORAGE_PORT}:5432"

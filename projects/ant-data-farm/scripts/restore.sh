@@ -12,10 +12,10 @@ set +o allexport
 source "$repository_root/secrets/$deploy_env/build.cfg"
 set -o allexport
 
-if [[ "$deploy_env" = 'prod' ]]; then
-  echo "STOP" >> /dev/stderr
-  exit 1
-fi
+# if [[ "$deploy_env" = 'prod' ]]; then
+#   echo "STOP" >> /dev/stderr
+#   exit 1
+# fi
 
 if [[ ! -f "$backup_filepath" ]]; then
   echo "No such file: $backup_filepath" >> /dev/stderr

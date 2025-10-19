@@ -61,9 +61,9 @@ run_command rm -rf "$build_dir/$build_mode/*"
 make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> /dev/stderr
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
-
 run_command ssh2ant "$host" "
   mkdir -p ${INSTALL_DIR};
+  mkdir -p ${PERSIST_DIR};
   mkdir -p ${SECRETS_DIR};
 "
 
