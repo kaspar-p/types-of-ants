@@ -1,5 +1,13 @@
 {
   "project": "ant-who-tweets",
-  "version": "1.0.0",
-  "project_type": "rust-binary"
+  "project_type": "rust-binary",
+  "secrets": [
+    "twitter_consumer_key",
+    "twitter_consumer_secret",
+    "twitter_access_token",
+    "twitter_access_token_secret",
+    "ant_data_farm_db",
+    "ant_data_farm_user",
+    "ant_data_farm_password"
+  ]
 }

@@ -1,0 +1,7 @@
+{
+  "project": "ant-fs",
+  "project_type": "rust-binary",
+  "secrets": [
+    "ant_fs_users"
+  ]
+}

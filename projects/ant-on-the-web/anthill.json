@@ -1,5 +1,15 @@
 {
   "project": "ant-on-the-web",
-  "version": "1.0.0",
-  "project_type": "custom"
+  "project_type": "custom",
+  "secrets": [
+    "mailjet_api_key",
+    "mailjet_secret_key",
+    "twilio_phone_number",
+    "twilio_account_id",
+    "twilio_auth_token",
+    "jwt",
+    "ant_data_farm_db",
+    "ant_data_farm_user",
+    "ant_data_farm_password"
+  ]
 }

@@ -1,0 +1,14 @@
+{
+  "project": "ant-host-agent",
+  "project_type": "rust-binary",
+  "secrets": [
+    "ant_data_farm_db",
+    "ant_data_farm_user",
+    "ant_data_farm_password",
+    "ant_backing_it_up_storage_db",
+    "ant_backing_it_up_storage_user",
+    "ant_backing_it_up_storage_password",
+    "ant_backing_it_up_key",
+    "ant_fs_client_creds"
+  ]
+}

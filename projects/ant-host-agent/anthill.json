@@ -1,5 +1,5 @@
 {
   "project": "ant-host-agent",
-  "version": "1.0.0",
-  "project_type": "rust-binary"
+  "project_type": "rust-binary",
+  "secrets": []
 }

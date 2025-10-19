@@ -27,28 +27,20 @@ if [[ -z "$project" ]] || [[ -z "$version" ]] || [[ -z "$ant_worker_num" ]]; the
   usage
 fi
 
-remote_user="ant"
-remote_home="/home/$remote_user"
 remote_host="$(anthost "$ant_worker_num")"
-repository_root="$(git rev-parse --show-toplevel)"
 
 log "DEPLOYING [$project] VERSION [$version] ONTO [$ant_worker_num] ..."
 
 deploy_datetime="$(date -Iminutes)"
-install_dir="$remote_home/service/$project/$version"
 
-# Cut over to the systemd service
-new_unit_path="$install_dir/$project.service"
-
-ssh "ant@$remote_host" "
-  sudo -S systemctl disable '$project.service' <<< $(cat "$repository_root/secrets/ant_user.secret") || true;
-  sudo -S systemctl enable '$new_unit_path'  <<< $(cat "$repository_root/secrets/ant_user.secret");
-  sudo -S systemctl daemon-reload  <<< $(cat "$repository_root/secrets/ant_user.secret");
-  sudo -S systemctl restart '$project.service'  <<< $(cat "$repository_root/secrets/ant_user.secret");
-"
+run_command curl \
+  -X POST \
+  --silent \
+  -w "\n" \
+  -d "{ \"project\": \"$project\", \"version\": \"$version\" }" \
+  -H 'Content-type: application/json' \
+  "$remote_host:3232/service/service"
 
 log "TRANSITIONED [$project] TO [$version]"
 log "  when:        $deploy_datetime"
-log "  install dir: $install_dir"
 log "  version:     $version"
-log "  unit file:   $new_unit_path"

@@ -10,15 +10,6 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
 set -euo pipefail
 
-function usage() {
-  log "USAGE: $0 <project-name> <deploy-environment> <ant-worker-num>
-          project-name: 'ant-gateway', 'ant-data-farm', ...
-          deploy-environment: 'beta', 'prod', 'dev'
-          ant-worker-num: 000, 001, ...
-"
-  exit 1
-}
-
 set +u
 project="$1"
 deploy_env="$2"
@@ -32,36 +23,8 @@ if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
   usage
 fi
 
-remote_user="ant"
-remote_home="/home/$remote_user"
-remote_host="$(anthost "$ant_worker_num")"
-repository_root="$(git rev-parse --show-toplevel)"
-project_src="$repository_root/projects/$project"
+deploy_build "$project" "$deploy_env" "$ant_worker_num"
 
-commit_sha="$(git log --format='%h' -n 1)"
-commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
-commit_number="$(git rev-list --count HEAD)"
-install_datetime="$(date "+%Y-%m-%d-%H-%M")"
-install_version="$commit_number-$commit_datetime-$commit_sha"
-
-log "RESOLVING ENVIRONMENT [$project]..."
-
-# Expose the environment ('beta', 'prod', ...) for other commands to pick up.
-build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
-set -o allexport
-# shellcheck disable=SC1090
-source "$build_cfg"
-set +o allexport
-export VERSION="$install_version"
-
-export INSTALL_DIR="${remote_home}/service/$project/$install_version"
-export PERSIST_DIR="${remote_home}/persist/$project"
-export SECRETS_DIR="$INSTALL_DIR/secrets"
-
-log "BUILDING [$project]..."
-
-# Build the project remotely
-run_command make -C "$project_src" release >> /dev/stderr
 DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
 
 # Install the project files
@@ -76,7 +39,6 @@ docker-compose config "${project}" | \
   ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
 
 # Copy environment into the install dir
-local_secrets_dir="${repository_root}/secrets/${deploy_env}"
 rm -f "${INSTALL_DIR}/.env"
 {
   cat "${build_cfg}"
@@ -84,7 +46,11 @@ rm -f "${INSTALL_DIR}/.env"
 } | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
 
 # Copy secrets into the install dir
-run_command scp -r "${local_secrets_dir}/." "${remote_host}:${SECRETS_DIR}/"
+local_secrets_dir="${repository_root}/secrets/${deploy_env}"
+for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
+  log "... copying secret [$secret_name]"
+  run_command rsync -a "${local_secrets_dir}/${secret_name}.secret" "${remote_user}@${remote_host}:${SECRETS_DIR}/${secret_name}.secret"
+done
 
 # Copy all the docker image and build/ files into the install dir
 build_dir="${project_src}/build"

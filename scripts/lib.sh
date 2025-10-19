@@ -5,9 +5,7 @@ set -euo pipefail
 function _get_log_prefix() {
   local dt
   dt="$(date -Iseconds)"
-  local dir
-  dir=$(basename "$(pwd)")
-  echo "INFO [ $dt $USER@$(hostname) $dir ]"
+  echo "INFO [ $dt ]"
 }
 
 function log() {

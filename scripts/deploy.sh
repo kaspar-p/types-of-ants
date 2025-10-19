@@ -3,7 +3,7 @@
 # shellcheck disable=SC1091
 source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 
-set -euxo pipefail
+set -euo pipefail
 
 project="$1"
 env="$2"

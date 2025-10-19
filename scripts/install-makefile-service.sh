@@ -67,13 +67,18 @@ run_command ssh2ant "$ant_worker_num" "
   mkdir -p ${SECRETS_DIR};
 "
 
-# Copy secrets into the install dir
-local_secrets_dir="$repository_root/secrets/$deploy_env"
+# Copy environment into the install dir
 {
   cat "${build_cfg}"
   echo "PERSIST_DIR=$PERSIST_DIR"
 } | ssh2ant "$ant_worker_num" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
-run_command rsync -a "${local_secrets_dir}/." "${remote_user}@${remote_host}:${SECRETS_DIR}"
+
+# Copy secrets into the install dir
+local_secrets_dir="$repository_root/secrets/$deploy_env"
+for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
+  log "... copying secret [$secret_name]"
+  run_command rsync -a "${local_secrets_dir}/${secret_name}.secret" "${remote_user}@${remote_host}:${SECRETS_DIR}/${secret_name}.secret"
+done
 
 # Copy all other build/ files into the install dir
 run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${INSTALL_DIR}/"
