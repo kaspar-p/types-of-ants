@@ -23,8 +23,36 @@ if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
   usage
 fi
 
-deploy_build "$project" "$deploy_env" "$ant_worker_num"
+remote_user="ant"
+remote_home="/home/$remote_user"
+remote_host="$(anthost "$ant_worker_num")"
+repository_root="$(git rev-parse --show-toplevel)"
+project_src="$repository_root/projects/$project"
 
+commit_sha="$(git log --format='%h' -n 1)"
+commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
+commit_number="$(git rev-list --count HEAD)"
+install_datetime="$(date "+%Y-%m-%d-%H-%M")"
+install_version="$commit_number-$commit_datetime-$commit_sha"
+
+log "RESOLVING ENVIRONMENT [$project]..."
+
+# Expose the environment ('beta', 'prod', ...) for other commands to pick up.
+build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
+set -o allexport
+# shellcheck disable=SC1090
+source "$build_cfg"
+set +o allexport
+export VERSION="$install_version"
+
+export INSTALL_DIR="${remote_home}/service/$project/$install_version"
+export PERSIST_DIR="${remote_home}/persist/$project"
+export SECRETS_DIR="$INSTALL_DIR/secrets"
+
+log "BUILDING [$project]..."
+
+# Build the project remotely
+run_command make -C "$project_src" release >> /dev/stderr
 DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
 
 # Install the project files

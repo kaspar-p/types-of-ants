@@ -1,5 +1,9 @@
 {
   "project": "ant-data-farm",
-  "version": "1.0.0",
-  "project_type": "docker-compose"
+  "project_type": "docker",
+  "secrets": [
+    "ant_data_farm_db",
+    "ant_data_farm_user",
+    "ant_data_farm_password"
+  ]
 }

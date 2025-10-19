@@ -49,11 +49,12 @@ function get_services() {
 }
 
 function get_service_mode() {
-  local service="$1"
-  local mode
-  mode="$(get_services | jq -r ".services[\"$service\"].mode")"
+  local project="$1"
 
-  echo "$mode"
+  local repository_root
+  repository_root="$(git rev-parse --show-toplevel)"
+
+  jq -r '.project_type' < "$repository_root/projects/$project/anthill.json"
 }
 
 function get_docker_platform() {

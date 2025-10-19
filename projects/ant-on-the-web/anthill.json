@@ -1,6 +1,6 @@
 {
   "project": "ant-on-the-web",
-  "project_type": "custom",
+  "project_type": "makefile",
   "secrets": [
     "mailjet_api_key",
     "mailjet_secret_key",

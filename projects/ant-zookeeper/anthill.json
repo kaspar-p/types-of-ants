@@ -1,5 +1,5 @@
 {
-  "project": "ant-host-agent",
+  "project": "ant-zookeeper",
   "project_type": "makefile",
   "secrets": []
 }

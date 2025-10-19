@@ -1,6 +1,6 @@
 {
   "project": "ant-fs",
-  "project_type": "rust-binary",
+  "project_type": "makefile",
   "secrets": [
     "ant_fs_users"
   ]

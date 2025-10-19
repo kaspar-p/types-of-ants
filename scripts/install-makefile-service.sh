@@ -91,7 +91,7 @@ INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$p
 # Write the installation manifest
 ssh2ant "$ant_worker_num" "echo '{
   \"project\": \"$project\",
-  \"project_type\": \"rust-binary\",
+  \"project_type\": \"makefile\",
   \"version\": \"$install_version\",
   \"commit_sha\": \"$commit_sha\",
   \"commit_number\": \"$commit_number\",

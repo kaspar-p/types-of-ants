@@ -1,6 +1,6 @@
 {
   "project": "ant-who-tweets",
-  "project_type": "rust-binary",
+  "project_type": "makefile",
   "secrets": [
     "twitter_consumer_key",
     "twitter_consumer_secret",

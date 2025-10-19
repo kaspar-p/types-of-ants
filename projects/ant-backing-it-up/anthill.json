@@ -1,6 +1,6 @@
 {
   "project": "ant-host-agent",
-  "project_type": "rust-binary",
+  "project_type": "makefile",
   "secrets": [
     "ant_data_farm_db",
     "ant_data_farm_user",
