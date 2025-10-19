@@ -1,7 +1,8 @@
-use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf};
+use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, time::Duration};
 
 use ant_zookeeper::state::AntZookeeperState;
-use tracing::debug;
+use tokio::time::sleep;
+use tracing::{debug, info};
 use zbus_systemd::zbus;
 
 #[tokio::main]
@@ -26,16 +27,17 @@ async fn main() {
         .parse()
         .expect("ANT_ZOOKEEPER_PORT was not u16");
 
-    let conn = zbus::Connection::system().await.expect("system connection");
-    let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
-        .await
-        .expect("manager init");
+    // let a = manager
+    //     .start_unit("ant-on-the-web.service".to_string(), "replace".to_string())
+    //     .await
+    //     .unwrap();
+    // println!("{}", a);
 
-    let a = manager
-        .start_unit("ant-on-the-web.service".to_string(), "mode".to_string())
-        .await
-        .unwrap();
-    println!("{}", a);
+    // let a = manager
+    //     .stop_unit("ant-on-the-web.service".to_string(), "replace".to_string())
+    //     .await
+    //     .unwrap();
+    // println!("{}", a);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     debug!(

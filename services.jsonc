@@ -21,7 +21,9 @@
     "ant-on-the-web": { "mode": "makefile" },
     "ant-gateway": { "mode": "docker" },
     "ant-data-farm": { "mode": "docker" },
-    "ant-naming-domains": { "mode": "docker" }
+    "ant-naming-domains": { "mode": "docker" },
+    "ant-zoo-storage": { "mode": "docker" },
+    "ant-zookeeper": { "mode": "makefile" }
   },
   "hosts": {
     "antworker000.hosts.typesofants.org": {

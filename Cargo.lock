@@ -289,6 +289,7 @@ dependencies = [
  "tracing-test",
  "uuid",
  "validator",
+ "zbus_systemd",
 ]
 
 [[package]]

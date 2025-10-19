@@ -1,8 +1,7 @@
-PROJECT = ant-host-agent
+PROJECT = ant-zookeeper
 
 -include ../../Makefile.common
 
-# Default to debug builds
 all: debug
 
 debug: BUILD_MODE = debug
@@ -14,10 +13,6 @@ release: binary
 
 clean:
 	rm -rf build
-	cargo clean
-
-run: debug
-	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
 binary:
 	@echo "BUILDING BINARY" >> /dev/stderr
@@ -25,4 +20,4 @@ binary:
 	@mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
 	@cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
 
-.PHONY: all clean debug release binary
+.PHONY: all release debug binary

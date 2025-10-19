@@ -1,8 +1,6 @@
-use ant_host_agent::{
-    clients::{Host, HostAgentClient},
-    start_server,
-};
-use std::{thread::sleep, time::Duration};
+use ant_host_agent::make_routes;
+use ant_library::axum_test_client::TestClient;
+use hyper::StatusCode;
 use tracing::info;
 
 use tracing_test::traced_test;
@@ -10,28 +8,12 @@ use tracing_test::traced_test;
 #[traced_test]
 #[tokio::test]
 async fn ping_healthy() {
-    tokio::spawn(async {
-        info!("Starting server...");
-        start_server(Some(7008))
-            .await
-            .expect("Server failed to start!");
-    });
+    let fixture = TestClient::new(make_routes().await.unwrap()).await;
 
     info!("Connecting...");
 
-    let client = HostAgentClient::connect(Host {
-        label: "test-host".to_string(),
-        port: 7008,
-        hostname: "localhost".to_string(),
-    })
-    .unwrap();
+    let response = fixture.get("/ping").send().await;
 
-    while !client.healthy().await {
-        info!("Waiting for server to be healthy...");
-        sleep(Duration::from_millis(100));
-    }
-
-    client.ping().await.unwrap();
-
-    ()
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.text().await, "healthy ant");
 }
