@@ -1,13 +1,19 @@
-use ant_host_agent::make_routes;
-use std::net::SocketAddr;
+use ant_host_agent::{make_routes, state::AntHostAgentState};
+use std::{net::SocketAddr, path::PathBuf};
 use tracing::{debug, info};
 
 #[tokio::main]
 async fn main() {
     ant_library::set_global_logs("ant-host-agent");
 
+    info!("Initializing state...");
+    let state = AntHostAgentState {
+        archive_root_dir: PathBuf::from("."),
+        install_root_dir: PathBuf::from("."),
+    };
+
     info!("Initializing routes...");
-    let api = make_routes().await.expect("init api");
+    let api = make_routes(state).await.expect("init api");
 
     info!("Starting server...");
     let port = dotenv::var("ANT_HOST_AGENT_PORT")

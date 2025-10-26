@@ -41,7 +41,9 @@ futures-util = "0.3.31"
 axum_typed_multipart = "0.16.2"
 tar = "0.4.44"
 ant-library = { version = "1.0.0", path = "../ant-library" }
-tracing-test = "0.2.5"
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 tracing-appender = "0.2.3"
 openssl = { version = "0.10.73", features = ["vendored"] }
 zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
+stdext = "0.3.3"
+flate2 = "1.1.5"

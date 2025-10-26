@@ -1,12 +1,14 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
-use axum::{response::IntoResponse, routing::post, Json, Router};
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use axum_extra::routing::RouterExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
+
+use crate::state::AntHostAgentState;
 
 fn unit_name(project: &str) -> String {
     format!("{project}.service")
@@ -49,6 +51,9 @@ async fn enable_unit(manager: &ManagerProxy<'_>, project: &str, version: &str) {
     }
 }
 
+/// A route to enable a systemd service. This is _fast_, and can be used to switch between versions quickly.
+///
+/// It requires that a service be _installed_ first on the host, done with the "POST /service-installation" endpoint.
 async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoResponse {
     let conn = zbus::Connection::system().await.expect("system connection");
     let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
@@ -109,6 +114,58 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
     (StatusCode::OK, "Service enabled.")
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct InstallServiceRequest {
+    /// The name of the project, e.g. "ant-data-farm".
+    pub project: String,
+
+    ///
+    pub version: String,
+
+    /// If the service is a docker project, we require loading the image. Assumes the image is contained
+    /// in the deployment TAR file is called "docker-image.tar" and will install that tagged image.
+    pub is_docker: bool,
+}
+
+fn deployment_file_name(project: &str, version: &str) -> String {
+    format!("deployment.{project}.{version}.tar.gz")
+}
+
+fn install_location_path(install_root: &PathBuf, project: &str, version: &str) -> PathBuf {
+    install_root.join(project).join(version)
+}
+
+async fn install_service(
+    State(state): State<AntHostAgentState>,
+    Json(req): Json<InstallServiceRequest>,
+) -> impl IntoResponse {
+    let file_name = deployment_file_name(&req.project, &req.version);
+    let file_path = state.archive_root_dir.join(file_name);
+    info!(
+        "Installing {} version {} from {}...",
+        req.project,
+        req.version,
+        file_path.display()
+    );
+
+    let file = std::fs::File::open(&file_path)
+        .expect(&format!("valid deployment file {}", &file_path.display()));
+
+    let file = flate2::read::GzDecoder::new(file);
+
+    let mut deployment = tar::Archive::new(file);
+
+    deployment
+        .unpack(install_location_path(
+            &state.install_root_dir,
+            &req.project,
+            &req.version,
+        ))
+        .expect("unpack");
+
+    (StatusCode::OK, "Service installed.")
+}
+
 async fn disable_unit(manager: &ManagerProxy<'_>, unit_name: &String) {
     info!("Disabling service {unit_name}...");
     let disable = manager
@@ -151,6 +208,8 @@ async fn disable_service(Json(req): Json<DisableServiceRequest>) -> impl IntoRes
     (StatusCode::OK, "Service disabled.")
 }
 
-pub fn make_routes() -> Router {
-    Router::new().route_service_with_tsr("/service", post(enable_service).delete(disable_service))
+pub fn make_routes() -> Router<AntHostAgentState> {
+    Router::new()
+        .route_with_tsr("/service", post(enable_service).delete(disable_service))
+        .route_with_tsr("/service-installation", post(install_service))
 }

@@ -13,14 +13,14 @@ kept for the last month, anything older than that can be thrown away.
 
 All functionality that the project requires is tested here. This includes:
 
-**ant-on-the-web**
+### ant-on-the-web
 
 - The site is up, contains some ants (`ping` or `curl -L` test)
 - Suggestions are received and listed in the site afterwards
 - New emails are received and confirmation emails are sent to them.
 - Each page is working as expected and is populated with the relevant data.
 
-**ant-building-projects**
+### ant-building-projects
 
 - projects can be spun up on machines they didn't exist on before (deploying for
   the first time)

@@ -54,6 +54,10 @@ log "BUILDING [$project]..."
 # Build the project remotely
 run_command make -C "$project_src" release >> /dev/stderr
 DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
+# run_command docker-compose build "${project}"
+# docker_image_file="${project}.${install_version}.docker.tar"
+# docker_image_path="build/$docker_image_file"
+# docker image save "${project}:${install_version}" -o "$docker_image_path"
 
 # Install the project files
 log "INSTALLING [$project] ONTO [$remote_host]..."
@@ -63,7 +67,12 @@ run_command ssh2ant "$host" "
   mkdir -p ${SECRETS_DIR};
 "
 
-# Copy dockerfile into install dir
+# Copy docker-compose file into install dir
+docker-compose config "${project}" | \
+  ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
+
+# Copy docker image file into install dir
+run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
 docker-compose config "${project}" | \
   ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
 

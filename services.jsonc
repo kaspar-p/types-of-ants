@@ -20,7 +20,7 @@
         { "env": "prod", "service": "ant-host-agent" },
         { "env": "prod", "service": "ant-data-farm" },
         { "env": "prod", "service": "ant-who-tweets" },
-        { "env": "prod", "service": "ant-backing-it-storage" }
+        { "env": "prod", "service": "ant-backing-it-up-storage" }
       ]
     },
     "antworker001.hosts.typesofants.org": {
