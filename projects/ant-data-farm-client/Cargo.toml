@@ -49,6 +49,6 @@ uuid = { version = "1.16.0", features = ["serde", "v4"] }
 validator = "0.20.0"
 
 [dev-dependencies]
-testcontainers = "0.24.0"
+testcontainers = "0.25.0"
 rstest = "0.25.0"
 tracing-test = "0.2.5"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# A script to build+install a docker container. Does not affect the runtime of any running projects,
+# A script to build+install a rust binary. Does not affect the runtime of any running projects,
 # is completely safe to run.
 #
 
@@ -30,10 +30,10 @@ repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
 commit_sha="$(git log --format='%h' -n 1)"
-commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
+commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "${commit_sha}")"
 commit_number="$(git rev-list --count HEAD)"
+install_version="$(project_version)"
 install_datetime="$(date "+%Y-%m-%d-%H-%M")"
-install_version="$commit_number-$commit_datetime-$commit_sha"
 
 log "RESOLVING ENVIRONMENT [$project]..."
 
@@ -43,80 +43,260 @@ set -o allexport
 # shellcheck disable=SC1090
 source "$build_cfg"
 set +o allexport
-export VERSION="$install_version"
 
-export INSTALL_DIR="${remote_home}/service/$project/$install_version"
-export PERSIST_DIR="${remote_home}/persist/$project"
-export SECRETS_DIR="$INSTALL_DIR/secrets"
+# Some projects require this for generating deterministic build hashes
+export commit_sha
+
+PERSIST_DIR="${remote_home}/persist/$project"
+INSTALL_DIR="${remote_home}/service/$project/$install_version"
+SECRETS_DIR="${INSTALL_DIR}/secrets"
 
 log "BUILDING [$project]..."
 
-# Build the project remotely
-run_command make -C "$project_src" release >> /dev/stderr
-DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
-# run_command docker-compose build "${project}"
-# docker_image_file="${project}.${install_version}.docker.tar"
-# docker_image_path="build/$docker_image_file"
-# docker image save "${project}:${install_version}" -o "$docker_image_path"
+# Build the project
+build_dir="$project_src/build"
+tmp_build_dir="$build_dir/$project.build.tmp"
+run_command rm -rf "${tmp_build_dir}" # clear previous builds
 
-# Install the project files
-log "INSTALLING [$project] ONTO [$remote_host]..."
-run_command ssh2ant "$host" "
-  mkdir -p ${INSTALL_DIR};
-  mkdir -p ${PERSIST_DIR};
-  mkdir -p ${SECRETS_DIR};
-"
+run_command mkdir -p "${tmp_build_dir}"
+run_command mkdir -p "${tmp_build_dir}/secrets"
 
-# Copy docker-compose file into install dir
-docker-compose config "${project}" | \
-  ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
+build_mode="release"
+run_command rm -rf "$build_dir/$build_mode/*"
 
-# Copy docker image file into install dir
-run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
-docker-compose config "${project}" | \
-  ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
+make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> /dev/stderr
 
-# Copy environment into the install dir
-rm -f "${INSTALL_DIR}/.env"
+# Copy environment into the build directory.
+log "... creating environment variables"
 {
   cat "${build_cfg}"
   echo "PERSIST_DIR=$PERSIST_DIR"
-} | ssh2ant "$host" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
+} > "${tmp_build_dir}/.env"
 
-# Copy secrets into the install dir
-local_secrets_dir="${repository_root}/secrets/${deploy_env}"
-for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
-  log "... copying secret [$secret_name]"
-  run_command rsync -a "${local_secrets_dir}/${secret_name}.secret" "${remote_user}@${remote_host}:${SECRETS_DIR}/${secret_name}.secret"
-done
+if is_project_docker "$project"; then
+  log "... creating docker image"
+  VERSION="$install_version" \
+    PERSIST_DIR="$PERSIST_DIR" \
+    INSTALL_DIR="$INSTALL_DIR" \
+    SECRETS_DIR="$SECRETS_DIR" \
+    run_command docker-compose build "${project}"
+  docker_image_file="docker-image.tar"
+  docker_image_path="$tmp_build_dir/$docker_image_file"
+  run_command docker image save "${project}:${install_version}" -o "$docker_image_path"
 
-# Copy all the docker image and build/ files into the install dir
-build_dir="${project_src}/build"
-build_mode="release"
-run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
+  log "... copying docker-compose config"
+  VERSION="$install_version" \
+    PERSIST_DIR="$PERSIST_DIR" \
+    INSTALL_DIR="$INSTALL_DIR" \
+    SECRETS_DIR="$SECRETS_DIR" \
+    docker-compose config "${project}" > "$tmp_build_dir/docker-compose.yml"
+fi
+
+# # Copy secrets into the build directory
+# log "... copying secrets"
+# local_secrets_dir="$repository_root/secrets/$deploy_env"
+# for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
+#   log "... copying secret [$secret_name]"
+#   cp "${local_secrets_dir}/${secret_name}.secret" "${tmp_build_dir}/secrets/${secret_name}.secret"
+# done
+
+# Copy all other build files into the build directory
+cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"
 
 # Interpret mustache template into the systemctl unit file
-new_unit_path="${INSTALL_DIR}/${project}.service"
-INSTALL_DIR="$INSTALL_DIR" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
-  ssh2ant "$host" "tee $new_unit_path" >> /dev/stderr
+log "... creating unit file"
+INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" > "${tmp_build_dir}/$project.service"
 
-# Write the installation manifest
-ssh2ant "$host" "echo '{
-  \"project\": \"$project\",
-  \"project_type\": \"docker-service\",
-  \"version\": \"$install_version\",
-  \"commit_sha\": \"$commit_sha\",
-  \"commit_number\": \"$commit_number\",
-  \"committed_at\": \"$commit_datetime\",
-  \"installed_at\": \"$install_datetime\",
-  \"unit_file\": \"$new_unit_path\"
-}' > '${INSTALL_DIR}/manifest.json'"
+deployment_file_name="deployment.${project}.${install_version}.tar.gz"
+log "... building deployment: ${deployment_file_name}"
 
-log "INSTALLED [$project] VERSION [$install_version] ONTO [$remote_host]"
-log "  when:        $(date -Iseconds)"
-log "  install dir: $INSTALL_DIR"
-log "  version:     $install_version"
-log "  unit file:   $new_unit_path"
+deployment_file_path="${build_dir}/${deployment_file_name}"
+tar --disable-copyfile -cz -C "${tmp_build_dir}" -f "${deployment_file_path}" "."
+rm -rf "${tmp_build_dir}"
 
-# Output
+deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
+log "... deployment file size: ${deployment_size}"
+
+log "INSTALLING [$project] ONTO [$remote_host]..."
+remote_deployment_file_path="${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}"
+run_command ssh2ant "$host" "
+  sudo -S mkdir -p $(dirname "${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}") <<< $(cat "$repository_root/secrets/ant_user.secret") && echo
+"
+run_command scp "${deployment_file_path}" "${remote_user}@${remote_host}:/tmp/${deployment_file_name}"
+run_command ssh2ant "$host" "sudo -S mv /tmp/${deployment_file_name} ${remote_deployment_file_path} <<< $(cat "$repository_root/secrets/ant_user.secret") && echo"
+
+run_command curl \
+  --no-progress-meter \
+  -X POST \
+  -w "\n" \
+  -d "{ \"project\": \"$project\", \"version\": \"$install_version\", \"is_docker\": false }" \
+  -H 'Content-type: application/json' \
+  "$remote_host:3232/service/service-installation"
+
+# rsync --rsync-path="sudo rsync" "${deployment_file_path}" "${remote_user}@${remote_host}:${remote_deployment_file_path}"
+
+# # Copy environment into the install dir
+# {
+#   cat "${build_cfg}"
+#   echo "PERSIST_DIR=$PERSIST_DIR"
+# } | ssh2ant "$host" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
+
+# # Copy secrets into the install dir
+# local_secrets_dir="$repository_root/secrets/$deploy_env"
+# for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
+#   log "... copying secret [$secret_name]"
+#   run_command rsync -a "${local_secrets_dir}/${secret_name}.secret" "${remote_user}@${remote_host}:${SECRETS_DIR}/${secret_name}.secret"
+# done
+
+# # Copy all other build/ files into the install dir
+# run_command rsync -a "${build_dir}/${build_mode}/." "${remote_user}@${remote_host}:${INSTALL_DIR}/"
+
+# # Interpret mustache template into the systemctl unit file
+# new_unit_path="$INSTALL_DIR/$project.service"
+# INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+#   ssh2ant "$host" "tee ${new_unit_path}" >> /dev/stderr
+
+# # Write the installation manifest
+# ssh2ant "$host" "echo '{
+#   \"project\": \"$project\",
+#   \"project_type\": \"makefile\",
+#   \"version\": \"$install_version\",
+#   \"commit_sha\": \"$commit_sha\",
+#   \"commit_number\": \"$commit_number\",
+#   \"committed_at\": \"$commit_datetime\",
+#   \"installed_at\": \"$install_datetime\",
+#   \"unit_file\": \"$new_unit_path\"
+# }' > '${INSTALL_DIR}/manifest.json'"
+
+# log "INSTALLED [$project] VERSION [$install_version]"
+# log "  when:        $(date -Iseconds)"
+# log "  install dir: $INSTALL_DIR"
+# log "  version:     $install_version"
+# log "  unit file:   $new_unit_path"
+
+# Output the nondeterministic version
 echo "$install_version"
+
+
+# #!/bin/bash
+
+# #
+# # A script to build+install a docker container. Does not affect the runtime of any running projects,
+# # is completely safe to run.
+# #
+
+# # shellcheck disable=SC1091
+# source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
+
+# set -euo pipefail
+
+# set +u
+# project="$1"
+# deploy_env="$2"
+# host="$3"
+# if [[ "$DEBUG" != "" ]]; then
+#  set -x
+# fi
+
+# if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
+#   usage
+# fi
+# set -u
+
+# remote_user="ant"
+# remote_home="/home/$remote_user"
+# remote_host="$(anthost "$host")"
+# repository_root="$(git rev-parse --show-toplevel)"
+# project_src="$repository_root/projects/$project"
+
+# commit_sha="$(git log --format='%h' -n 1)"
+# commit_datetime="$(git show -s --date=format:'%Y-%m-%d-%H-%M' --format=%cd "$commit_sha")"
+# commit_number="$(git rev-list --count HEAD)"
+# install_datetime="$(date "+%Y-%m-%d-%H-%M")"
+# install_version="$commit_number-$commit_datetime-$commit_sha"
+
+# log "RESOLVING ENVIRONMENT [$project]..."
+
+# # Expose the environment ('beta', 'prod', ...) for other commands to pick up.
+# build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
+# set -o allexport
+# # shellcheck disable=SC1090
+# source "$build_cfg"
+# set +o allexport
+# export VERSION="$install_version"
+
+# export INSTALL_DIR="${remote_home}/service/$project/$install_version"
+# export PERSIST_DIR="${remote_home}/persist/$project"
+# export SECRETS_DIR="$INSTALL_DIR/secrets"
+
+# log "BUILDING [$project]..."
+
+# # Build the project remotely
+# run_command make -C "$project_src" release >> /dev/stderr
+# DOCKER_HOST="ssh://${remote_user}@${remote_host}" run_command docker-compose build "${project}"
+# # run_command docker-compose build "${project}"
+# # docker_image_file="${project}.${install_version}.docker.tar"
+# # docker_image_path="build/$docker_image_file"
+# # docker image save "${project}:${install_version}" -o "$docker_image_path"
+
+# # Install the project files
+# log "INSTALLING [$project] ONTO [$remote_host]..."
+# run_command ssh2ant "$host" "
+#   mkdir -p ${INSTALL_DIR};
+#   mkdir -p ${PERSIST_DIR};
+#   mkdir -p ${SECRETS_DIR};
+# "
+
+# # Copy docker-compose file into install dir
+# docker-compose config "${project}" | \
+#   ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
+
+# # Copy docker image file into install dir
+# run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
+# docker-compose config "${project}" | \
+#   ssh2ant "$host" "tee ${INSTALL_DIR}/docker-compose.yml" >> /dev/stderr
+
+# # Copy environment into the install dir
+# rm -f "${INSTALL_DIR}/.env"
+# {
+#   cat "${build_cfg}"
+#   echo "PERSIST_DIR=$PERSIST_DIR"
+# } | ssh2ant "$host" "tee ${INSTALL_DIR}/.env" >> /dev/stderr
+
+# # Copy secrets into the install dir
+# local_secrets_dir="${repository_root}/secrets/${deploy_env}"
+# for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
+#   log "... copying secret [$secret_name]"
+#   run_command rsync -a "${local_secrets_dir}/${secret_name}.secret" "${remote_user}@${remote_host}:${SECRETS_DIR}/${secret_name}.secret"
+# done
+
+# # Copy all the docker image and build/ files into the install dir
+# build_dir="${project_src}/build"
+# build_mode="release"
+# run_command scp -r "${build_dir}/${build_mode}/." "${remote_host}:${INSTALL_DIR}/"
+
+# # Interpret mustache template into the systemctl unit file
+# new_unit_path="${INSTALL_DIR}/${project}.service"
+# INSTALL_DIR="$INSTALL_DIR" HOME="$HOME" VERSION="$install_version" mo "$project_src/$project.service.mo" | \
+#   ssh2ant "$host" "tee $new_unit_path" >> /dev/stderr
+
+# # Write the installation manifest
+# ssh2ant "$host" "echo '{
+#   \"project\": \"$project\",
+#   \"project_type\": \"docker-service\",
+#   \"version\": \"$install_version\",
+#   \"commit_sha\": \"$commit_sha\",
+#   \"commit_number\": \"$commit_number\",
+#   \"committed_at\": \"$commit_datetime\",
+#   \"installed_at\": \"$install_datetime\",
+#   \"unit_file\": \"$new_unit_path\"
+# }' > '${INSTALL_DIR}/manifest.json'"
+
+# log "INSTALLED [$project] VERSION [$install_version] ONTO [$remote_host]"
+# log "  when:        $(date -Iseconds)"
+# log "  install dir: $INSTALL_DIR"
+# log "  version:     $install_version"
+# log "  unit file:   $new_unit_path"
+
+# # Output
+# echo "$install_version"

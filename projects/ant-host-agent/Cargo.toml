@@ -27,7 +27,15 @@ tokio-postgres = { version = "0.7.13", features = [
   "with-chrono-0_4",
 ] }
 tower = "0.5.2"
-tower-http = { version = "0.6.2", features = ["fs", "trace", "metrics", "cors", "normalize-path", "limit", "catch-panic"] }
+tower-http = { version = "0.6.2", features = [
+  "fs",
+  "trace",
+  "metrics",
+  "cors",
+  "normalize-path",
+  "limit",
+  "catch-panic",
+] }
 tracing = { version = "0.1.41", features = ["max_level_debug"] }
 tracing-subscriber = "0.3.19"
 uuid = { version = "1.16.0", features = ["serde", "v4"] }
@@ -47,3 +55,5 @@ openssl = { version = "0.10.73", features = ["vendored"] }
 zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
 stdext = "0.3.3"
 flate2 = "1.1.5"
+bollard = "0.19.3"
+tokio-util = "0.7.17"

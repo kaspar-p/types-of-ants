@@ -35,17 +35,19 @@ deploy_datetime="$(date -Iminutes)"
 
 if [[ $project != "ant-host-agent" ]]; then
   run_command curl \
+    --no-progress-meter \
     -X POST \
     -w "\n" \
     -d "{ \"project\": \"$project\", \"version\": \"$version\" }" \
     -H 'Content-type: application/json' \
     "$remote_host:3232/service/service"
 else
+  log "... deploying old-school"
+
   remote_user="ant"
   remote_home="/home/$remote_user"
   repository_root="$(git rev-parse --show-toplevel)"
 
-  log "DEPLOYING [$project] VERSION [$version] ONTO [$ant_worker_num] ..."
 
   deploy_datetime="$(date -Iminutes)"
   install_dir="$remote_home/service/$project/$version"
@@ -60,7 +62,6 @@ else
     sudo -S systemctl restart '$project.service'  <<< $(cat "$repository_root/secrets/ant_user.secret");
   "
 fi
-
 
 log "TRANSITIONED [$project] TO [$version]"
 log "  when:        $deploy_datetime"

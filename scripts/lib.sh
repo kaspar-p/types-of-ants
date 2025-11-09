@@ -76,13 +76,19 @@ function find_projects_in_env() {
     select(.env == \"$env\").service" | sort | uniq
 }
 
-function get_service_mode() {
+function get_project_type() {
   local project="$1"
 
   local repository_root
   repository_root="$(git rev-parse --show-toplevel)"
 
   jq -r '.project_type' < "$repository_root/projects/$project/anthill.json"
+}
+
+function is_project_docker() {
+  local project="$1"
+
+  test "$(get_project_type "$project")" == "docker"
 }
 
 function get_docker_platform() {

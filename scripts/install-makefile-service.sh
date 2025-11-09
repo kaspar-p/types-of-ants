@@ -90,17 +90,31 @@ INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$install_version" mo "$p
 
 deployment_file_name="deployment.${project}.${install_version}.tar.gz"
 log "... building deployment: ${deployment_file_name}"
-tar -cz -C "${tmp_build_dir}" -f "${build_dir}/${deployment_file_name}" "."
+
+deployment_file_path="${build_dir}/${deployment_file_name}"
+tar --disable-copyfile -cz -C "${tmp_build_dir}" -f "${deployment_file_path}" "."
 rm -rf "${tmp_build_dir}"
 
-deployment_size="$(du -hs "${build_dir}/${deployment_file_name}" | cut -f 1)"
+deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
 log "... deployment file size: ${deployment_size}"
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
+remote_deployment_file_path="${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}"
 run_command ssh2ant "$host" "
-  mkdir -p ${INSTALL_DIR};
-  mkdir -p ${SECRETS_DIR};
+  sudo -S mkdir -p $(dirname "${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}") <<< $(cat "$repository_root/secrets/ant_user.secret") && echo
 "
+run_command scp "${deployment_file_path}" "${remote_user}@${remote_host}:/tmp/${deployment_file_name}"
+run_command ssh2ant "$host" "sudo -S mv /tmp/${deployment_file_name} ${remote_deployment_file_path} <<< $(cat "$repository_root/secrets/ant_user.secret") && echo"
+
+run_command curl \
+  --no-progress-meter \
+  -X POST \
+  -w "\n" \
+  -d "{ \"project\": \"$project\", \"version\": \"$install_version\", \"is_docker\": false }" \
+  -H 'Content-type: application/json' \
+  "$remote_host:3232/service/service-installation"
+
+# rsync --rsync-path="sudo rsync" "${deployment_file_path}" "${remote_user}@${remote_host}:${remote_deployment_file_path}"
 
 # # Copy environment into the install dir
 # {

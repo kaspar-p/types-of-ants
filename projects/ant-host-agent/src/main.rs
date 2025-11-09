@@ -1,5 +1,5 @@
 use ant_host_agent::{make_routes, state::AntHostAgentState};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{fs, net::SocketAddr, path::PathBuf};
 use tracing::{debug, info};
 
 #[tokio::main]
@@ -8,9 +8,24 @@ async fn main() {
 
     info!("Initializing state...");
     let state = AntHostAgentState {
-        archive_root_dir: PathBuf::from("."),
-        install_root_dir: PathBuf::from("."),
+        archive_root_dir: PathBuf::from(
+            PathBuf::from(dotenv::var("PERSIST_DIR").expect("No PERSIST_DIR variable."))
+                .join("fs")
+                .join("archives"),
+        ),
+        install_root_dir: PathBuf::from(
+            dotenv::var("ANT_HOST_AGENT_INSTALL_ROOT_DIR")
+                .expect("No ANT_HOST_AGENT_INSTALL_ROOT_DIR variable."),
+        )
+        .join("service"),
     };
+
+    info!("Init directory: {}", state.archive_root_dir.display());
+    fs::create_dir_all(&state.archive_root_dir)
+        .expect(format!("Failed mkdir: {}", state.archive_root_dir.display()).as_str());
+    info!("Init directory: {}", state.install_root_dir.display());
+    fs::create_dir_all(&state.install_root_dir)
+        .expect(format!("Failed mkdir: {}", state.install_root_dir.display()).as_str());
 
     info!("Initializing routes...");
     let api = make_routes(state).await.expect("init api");

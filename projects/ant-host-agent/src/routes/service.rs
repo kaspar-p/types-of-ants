@@ -1,12 +1,16 @@
 use std::{path::PathBuf, time::Duration};
+use tokio_util::codec;
 
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use axum_extra::routing::RouterExt;
+use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio::time::sleep;
+use tokio::{fs::File, time::sleep};
 use tracing::{error, info, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
+
+use std::default::Default;
 
 use crate::state::AntHostAgentState;
 
@@ -148,20 +152,66 @@ async fn install_service(
         file_path.display()
     );
 
-    let file = std::fs::File::open(&file_path)
-        .expect(&format!("valid deployment file {}", &file_path.display()));
+    let file = std::fs::File::open(&file_path).expect(&format!(
+        "invalid deployment file: {}",
+        &file_path.display()
+    ));
 
     let file = flate2::read::GzDecoder::new(file);
 
     let mut deployment = tar::Archive::new(file);
 
-    deployment
-        .unpack(install_location_path(
-            &state.install_root_dir,
-            &req.project,
-            &req.version,
-        ))
-        .expect("unpack");
+    let dst = install_location_path(&state.install_root_dir, &req.project, &req.version);
+    std::fs::create_dir_all(dst.parent().unwrap()).expect("mkdir");
+
+    deployment.unpack(&dst).expect("unpack");
+
+    if req.is_docker {
+        info!("Loading docker image...");
+        let docker_img_path = dst.join("docker-image.tar");
+        if !std::fs::exists(&docker_img_path).unwrap() {
+            return (
+                StatusCode::BAD_REQUEST,
+                "Docker mentioned bu no docker-image.tar included",
+            );
+        }
+
+        let docker_img_file = File::open(docker_img_path).await.unwrap();
+        let docker_img_bytes = codec::FramedRead::new(docker_img_file, codec::BytesCodec::new())
+            .map(|r| r.unwrap().freeze());
+
+        let docker =
+            bollard::Docker::connect_with_defaults().expect("docker daemon connect failed");
+
+        let mut import_out = docker.import_image_stream(
+            bollard::query_parameters::ImportImageOptions {
+                ..Default::default()
+            },
+            docker_img_bytes,
+            None,
+        );
+
+        while let Some(val) = import_out.next().await {
+            let build_info = val.expect("docker connection");
+            if build_info.error.is_some() || build_info.error_detail.is_some() {
+                error!(
+                    "Failed to load image: {}",
+                    build_info.error.unwrap_or("".to_string())
+                );
+                return (StatusCode::BAD_REQUEST, "Failed to load docker image.");
+            }
+
+            if let Some(stream) = &build_info.stream {
+                info!("load docker image: {}", stream.trim());
+
+                if stream.contains("Loaded image") {
+                    break;
+                }
+            }
+
+            warn!("Unknown value: {:#?}", build_info);
+        }
+    }
 
     (StatusCode::OK, "Service installed.")
 }
