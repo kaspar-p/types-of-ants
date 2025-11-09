@@ -16,8 +16,7 @@ async fn main() {
         install_root_dir: PathBuf::from(
             dotenv::var("ANT_HOST_AGENT_INSTALL_ROOT_DIR")
                 .expect("No ANT_HOST_AGENT_INSTALL_ROOT_DIR variable."),
-        )
-        .join("service"),
+        ),
     };
 
     info!("Init directory: {}", state.archive_root_dir.display());

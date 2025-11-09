@@ -19,13 +19,10 @@ set -u
 
 repository_root="$(git rev-parse --show-toplevel)"
 
-project_type="$(get_project_type "$project")"
-script="install-$project_type-service.sh"
-
 for host_project_pair in $(find_host_project_pairs_with_env "$deploy_env" | jq -rc "select(.project == \"$project\")"); do
   host=$(jq -r ".host" <<< "$host_project_pair")
   project=$(jq -r ".project" <<< "$host_project_pair")
 
-  version=$("$repository_root/scripts/$script" "$project" "$deploy_env" "$host")
+  version="$("$repository_root/scripts/build.sh" "$project" "$deploy_env" "$host")"
   "$repository_root/scripts/deploy-systemd.sh" "$project" "$host" "$version"
 done

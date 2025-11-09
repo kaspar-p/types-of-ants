@@ -33,7 +33,9 @@ log "DEPLOYING [$project] VERSION [$version] ONTO [$ant_worker_num] ..."
 
 deploy_datetime="$(date -Iminutes)"
 
-if [[ $project != "ant-host-agent" ]]; then
+if [[ "$project" != "ant-host-agent" ]]; then
+  request="{ \"project\": \"$project\", \"version\": \"$version\" }"
+  log "request: $(jq -c <<< "$request")"
   run_command curl \
     --no-progress-meter \
     -X POST \
@@ -47,7 +49,6 @@ else
   remote_user="ant"
   remote_home="/home/$remote_user"
   repository_root="$(git rev-parse --show-toplevel)"
-
 
   deploy_datetime="$(date -Iminutes)"
   install_dir="$remote_home/service/$project/$version"

@@ -15,9 +15,9 @@ clean:
 	rm -rf build
 
 binary:
-	echo "BUILDING BINARY" >> /dev/stderr
-	cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
-	mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
-	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
+	@echo "BUILDING BINARY" >> /dev/stderr
+	@cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
+	@mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
+	@cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
 
 .PHONY: all release debug binary

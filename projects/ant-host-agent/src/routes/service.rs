@@ -85,7 +85,7 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
             },
         );
 
-        sleep(Duration::from_millis(25)).await;
+        sleep(Duration::from_millis(250)).await;
     }
 
     let units = manager
@@ -164,6 +164,7 @@ async fn install_service(
     let dst = install_location_path(&state.install_root_dir, &req.project, &req.version);
     std::fs::create_dir_all(dst.parent().unwrap()).expect("mkdir");
 
+    info!("Unpacking installation to: {}", &dst.display());
     deployment.unpack(&dst).expect("unpack");
 
     if req.is_docker {
