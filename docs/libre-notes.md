@@ -9,8 +9,7 @@ Unbox the board, in my case I had a Libre AML-S905X-CC.
 Following
 <https://medium.com/@johnhebron/setting-up-a-le-potato-raspberry-pi-alternative-with-ubuntu-server-22-04-linux-from-scratch-8b7c22c8e4b1>
 download the version, I did
-`ubuntu-22.04.3-preinstalled-server-arm64+aml-s905x-cc.img.xz` unzipped it with
-sa
+`ubuntu-22.04.3-preinstalled-server-arm64+aml-s905x-cc.img.xz` unzipped it with:
 
 ```bash
 unxz ubuntu-22.04.3-preinstalled-server-arm64+aml-s905x-cc.img.xz
@@ -53,7 +52,7 @@ sudo apt install dirmngr ca-certificates software-properties-common apt-transpor
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
 sudo apt update
-sudo apt install -y postgresql-client-15
+sudo apt install -y postgresql-client-15 postgresql-client-17
 ```
 
 And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`.
