@@ -79,6 +79,8 @@ if is_project_docker "$project"; then
     INSTALL_DIR="$INSTALL_DIR" \
     SECRETS_DIR="$SECRETS_DIR" \
     run_command docker-compose build "${project}"
+  
+  log "... exporting docker image"
   docker_image_file="docker-image.tar"
   docker_image_path="$tmp_build_dir/$docker_image_file"
   run_command docker image save "${project}:${version}" -o "$docker_image_path"

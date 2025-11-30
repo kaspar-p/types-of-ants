@@ -31,16 +31,31 @@ $ arp -a | grep ubuntu
 ubuntu-22 (192.168.2.95) at 82:de:6c:c4:68:a9 on en0 ifscope [ethernet]
 ```
 
+Sometimes it doesn't work and you have to go to the network home and search for
+`ubuntu-22` connected hosts there.
+
 And SSH in with `ubuntu@<ip>`. Mine was `192.168.2.53`. Then change the password
-to any temporary ubuntu password (`typesofants`)! Then, run (this will take a
-while):
+to any temporary ubuntu password (`typesofants`).
+
+## Terminal setup
+
+To get cmd+left, opt+left, and other keybinds to work remotely, from the local
+computer run:
+
+```bash
+infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
+```
+
+## Tool onboarding
+
+Then, run (this will take a while):
 
 ```bash
 sudo apt update && \
 sudo apt upgrade && \
-sudo apt install net-tools dirmngr ca-certificates \
+sudo apt install -y net-tools dirmngr ca-certificates \
   software-properties-common apt-transport-https lsb-release curl && \
-sudo apt-get install autoconf && \
+sudo apt-get install -y autoconf && \
 sudo snap install jq docker btop && \
 echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"' | sudo tee /etc/environment
 ```
@@ -124,7 +139,6 @@ Install `mo`, a mustache template implementation.
 
 ```bash
 mkdir -p ~/installs
-mkdir -p ~/secrets
 mkdir -p ~/persist
 
 curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
@@ -202,187 +216,42 @@ External Port:  13002
 Device:         antworker002
 ```
 
-## Ghostty setup
+## Deploy deployment support server `ant-host-agent`
 
-To get cmd+left, opt+left, and other keybinds to work remotely, from the local
-computer run:
-
-```bash
-infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
-```
-
-## Setup project
-
-First, clone the `types-of-ants` repository:
+The ant-host-agent server is responsible for responding to requests for service
+installations and deployments. However, since it's the first run, it's not
+available and needs to be done manually.
 
 ```bash
-cd ~ && \
-git clone https://github.com/kaspar-p/types-of-ants && \
-cd types-of-ants && \
-git checkout v1.0
+./scripts/build.sh ant-host-agent dest-environment ant-host-num
 ```
 
-Install the utilities defined in the package:
+And on the host:
 
 ```bash
-echo 'export PATH="$PATH:/home/ant/types-of-ants/bin"' >> ~/.bashrc && source ~/.bashrc
+$ cd ~/persist/ant-host-agent/fs/archives
+
+$ ls
+deployment.ant-host-agent.467-2025-11-28-19-51-48310c0.tar.gz
+
+$ mkdir -p ~/service/ant-host-agent/467-2025-11-28-19-51-48310c0
+$ cd ~/service/ant-host-agent/467-2025-11-28-19-51-48310c0
+
+$ tar -xvf ~/persist/ant-host-agent/fs/archives/deployment.ant-host-agent.467-2025-11-28-19-51-48310c0.tar.gz .
+
+$ pwd
+/home/ant/service/ant-host-agent/467-2025-11-28-19-51-48310c0
+
+$ sudo systemctl enable /home/ant/service/ant-host-agent/467-2025-11-28-19-51-48310c0/ant-host-agent.service
+
+$ sudo systemctl status ant-host-agent.service
+● ant-host-agent.service - The typesofants host agent!
+  Active: active (running) since Sun 2025-11-30 02:17:18 UTC; 6s ago
+  ...
 ```
 
-Install Cargo and Rust:
+And test it by installing itself the same script from before, from your Mac:
 
 ```bash
-sudo snap install rustup --classic && \
-rustup default stable
+./scripts/build.sh ant-host-agent dest-environment ant-host-num
 ```
-
-And build the project. This will take a long time, especially on these slow ass
-machines.
-
-```bash
-cargo build
-df
-```
-
-## Daemonization of `ant-host-agent`
-
-The `ant-host-agent` project is a rust binary, and can be deployed like the
-others.
-
-On the right machine, run:
-
-```bash
-./scripts/install-rust-binary.sh ant-host-agent
-```
-
-It will return the installed version, like:
-
-```txt
-INSTALLED [ant-host-agent] VERSION [2025-04-27-12-59-43a85ad]
-   when:        2025-04-27T13:00:48-04:00
-   install dir: /Users/kasparpoland/service/ant-host-agent/2025-04-27-12-59-43a85ad
-   version:     2025-04-27-12-59-43a85ad
-   unit file:   /Users/kasparpoland/service/ant-host-agent/2025-04-27-12-59-43a85ad/ant-host-agent.service
-```
-
-And using version `2025-04-27-12-59-43a85ad`, run:
-
-```bash
-./deploy-systemd ant-host-agent 2025-04-27-12-59-43a85ad
-```
-
-## Daemonization of `ant-on-the-web`
-
-We also need a .env file here, with the port and some database credentials. For
-the file `./projects/ant-on-the-web/server/.env`, fill in the details:
-
-```txt
-DB_PG_USER=...
-DB_PG_NAME=...
-DB_PG_PASSWORD=...
-DB_PG_PORT=7000
-DB_HOST=...
-```
-
-Then, we make `ant-on-the-web` a systemd service:
-
-```bash
-sudo nano /etc/systemd/system/ant-on-the-web.service
-```
-
-with the content:
-
-```txt
-[Unit]
-Description=The typesofants web server!
-
-[Service]
-Type=simple
-ExecStart=/home/ant/types-of-ants/target/debug/ant-on-the-web
-WorkingDirectory=/home/ant/types-of-ants/projects/ant-on-the-web/server
-EnvironmentFile=/home/ant/types-of-ants/projects/ant-on-the-web/server/.env
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-And enable it with:
-
-```bash
-sudo systemctl enable ant-on-the-web.service && \
-sudo systemctl start ant-on-the-web.service
-```
-
-## Daemonization of `ant-gateway`
-
-The main thing missing is the private key certificate. I have it locally on my
-laptop, so copy it to the right location _LOCALLY_ with:
-
-```bash
-scp local_path/to/key.pem \
-  ant@$(anthost <NUM>):~/types-of-ants/projects/ant-gateway/secrets/ssl/beta.typesofants.org/key.pem
-```
-
-Then, we make `ant-gateway` a systemd service:
-
-```bash
-sudo nano /etc/systemd/system/ant-gateway.service
-```
-
-with the content:
-
-```txt
-[Unit]
-Description=The reverse proxy for typesofants.org!
-
-[Service]
-Type=simple
-ExecStart=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml up --build ant-gateway"
-ExecStop=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml stop --build ant-gateway"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-And enable it with:
-
-```bash
-sudo systemctl enable ant-gateway.service && \
-sudo systemctl start ant-gateway.service
-```
-
-We can check if it's working with `docker ps` and look at the logs with
-`docker logs $(docker ps -q)`.
-
-## Daemonization of `ant-data-farm`
-
-We make `ant-data-farm` a systemd service:
-
-```bash
-sudo nano /etc/systemd/system/ant-data-farm.service
-```
-
-with the content:
-
-```txt
-[Unit]
-Description=The reverse proxy for typesofants.org!
-
-[Service]
-Type=simple
-ExecStart=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml up --build ant-data-farm"
-ExecStop=/bin/bash -c "docker-compose -f /home/ant/types-of-ants/docker-compose.yml stop --build ant-data-farm"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-And enable it with:
-
-```bash
-sudo systemctl enable ant-data-farm.service && \
-sudo systemctl start ant-data-farm.service
-```
-
-We can check if it's working with `docker ps` and look at the logs with
-`docker logs $(docker ps -q)`.
