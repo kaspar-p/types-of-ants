@@ -57,3 +57,4 @@ stdext = "0.3.3"
 flate2 = "1.1.5"
 bollard = "0.19.3"
 tokio-util = "0.7.17"
+serde_with = { version = "3.16.1", features = ["base64"] }

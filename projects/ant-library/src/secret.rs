@@ -1,4 +1,6 @@
-use std::str::FromStr;
+use std::path::PathBuf;
+
+use tracing::debug;
 
 /// Load a secret from the secret directory wherever it's configured. It must be the case that
 /// the TYPESOFANTS_SECRET_DIR is defined in the systemd unit file ass %d, see:
@@ -18,6 +20,30 @@ pub fn load_secret(secret_name: &str) -> Result<String, anyhow::Error> {
         .to_owned())
 }
 
+/// Canonicalize the name of a secret
+pub fn secret_name(name: &str) -> String {
+    if name.ends_with(".secret") {
+        return name.to_string();
+    } else {
+        return name.to_string() + ".secret";
+    }
+}
+
+/// Return the filepath to a secret, useful if you don't want to read the secret content but you still
+/// need to refer to the secret. For example, ant-host-agent needs this to replicate secrets down to
+/// the deployed services.
+pub fn find_secret(secret: &str, secret_dir: Option<PathBuf>) -> PathBuf {
+    let secret_dir = secret_dir.unwrap_or_else(|| {
+        std::path::PathBuf::from(
+            dotenv::var("TYPESOFANTS_SECRET_DIR").expect("no TYPESOFANTS_SECRET_DIR defined"),
+        )
+    });
+
+    let path = secret_dir.join(secret_name(secret));
+
+    path
+}
+
 /// Load a secret from the secret directory wherever it's configured. It must be the case that
 /// the TYPESOFANTS_SECRET_DIR is defined in the systemd unit file ass %d, see:
 /// https://systemd.io/CREDENTIALS
@@ -30,15 +56,10 @@ pub fn load_secret(secret_name: &str) -> Result<String, anyhow::Error> {
 /// let secret_key: Vec<u8> = load_secret("my-secret_key")
 /// ```
 /// will read the file $TYPESOFANTS_SECRET_DIR/secret_key.secret
-pub fn load_secret_binary(secret_name: &str) -> Result<Vec<u8>, anyhow::Error> {
-    let secret_dir =
-        dotenv::var("TYPESOFANTS_SECRET_DIR").expect("no TYPESOFANTS_SECRET_DIR defined");
+pub fn load_secret_binary(secret: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let path = find_secret(secret, None);
 
-    let path = std::path::PathBuf::from_str(&secret_dir)
-        .unwrap()
-        .join(secret_name.to_string() + ".secret");
-
-    tracing::debug!("Reading secret: {}", path.to_str().unwrap().to_string());
+    debug!("Reading secret: {}", path.display());
 
     let secret_content = std::fs::read(&path)
         .map_err(|e| anyhow::Error::from(e).context(path.to_str().unwrap().to_string()))?;

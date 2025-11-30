@@ -17,6 +17,11 @@ async fn main() {
             dotenv::var("ANT_HOST_AGENT_INSTALL_ROOT_DIR")
                 .expect("No ANT_HOST_AGENT_INSTALL_ROOT_DIR variable."),
         ),
+        secrets_root_dir: PathBuf::from(
+            PathBuf::from(dotenv::var("PERSIST_DIR").expect("No PERSIST_DIR variable."))
+                .join("fs")
+                .join("secrets"),
+        ),
     };
 
     info!("Init directory: {}", state.archive_root_dir.display());

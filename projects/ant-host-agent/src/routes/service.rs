@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use tokio_util::codec;
 
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
@@ -79,11 +79,12 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
     let mut queued = true;
     while queued {
         info!("Polling for job to start...");
-        queued = manager.list_jobs().await.unwrap().iter().any(
-            |(queue_id, some_unit_name, job_type, job_state, job_obj_path, unit_obj_path)| {
-                *some_unit_name == unit_name
-            },
-        );
+        queued = manager
+            .list_jobs()
+            .await
+            .unwrap()
+            .iter()
+            .any(|(_, some_unit_name, _, _, _, _)| *some_unit_name == unit_name);
 
         sleep(Duration::from_millis(250)).await;
     }
@@ -93,18 +94,7 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
         .await
         .unwrap();
     let unit = units.first().unwrap();
-    let (
-        unit_name,
-        desc,
-        loaded_state,
-        active_state,
-        substate,
-        _,
-        unit_obj_path,
-        job_queue_id,
-        job_type,
-        job_obj_path,
-    ) = unit;
+    let (_, _, loaded_state, active_state, _, _, _, _, _, _) = unit;
 
     match (loaded_state.as_str(), active_state.as_str()) {
         ("loaded", "active") => {
@@ -123,26 +113,39 @@ pub struct InstallServiceRequest {
     /// The name of the project, e.g. "ant-data-farm".
     pub project: String,
 
-    ///
+    /// The unique version ID of the software, corresponds to a path on the host. Reinstalling the same
+    /// version multiple times is still fine, but there may be files in the 'cwd' that the process doesn't
+    /// expect.
     pub version: String,
 
     /// If the service is a docker project, we require loading the image. Assumes the image is contained
     /// in the deployment TAR file is called "docker-image.tar" and will install that tagged image.
-    pub is_docker: bool,
+    pub is_docker: Option<bool>,
+
+    /// The list of secret IDs/names that this project needs, e.g. ["jwt", "ant_fs_client_creds", ...]
+    /// These secrets are replicated into the right directory for ant_library::load_secret() to find them
+    /// when they are needed.
+    pub secrets: Option<Vec<String>>,
 }
 
 fn deployment_file_name(project: &str, version: &str) -> String {
     format!("deployment.{project}.{version}.tar.gz")
 }
 
+/// The directory where all installable files for the project will live
 fn install_location_path(install_root: &PathBuf, project: &str, version: &str) -> PathBuf {
     install_root.join(project).join(version)
+}
+
+/// The directory where the secrets files will be replicated
+fn secrets_dir(install_dir: &PathBuf) -> PathBuf {
+    install_dir.join("secrets")
 }
 
 async fn install_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<InstallServiceRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     let file_name = deployment_file_name(&req.project, &req.version);
     let file_path = state.archive_root_dir.join(file_name);
     info!(
@@ -152,10 +155,25 @@ async fn install_service(
         file_path.display()
     );
 
-    let file = std::fs::File::open(&file_path).expect(&format!(
-        "invalid deployment file: {}",
-        &file_path.display()
-    ));
+    let file = std::fs::File::open(&file_path).map_err(|e| match e.kind() {
+        ErrorKind::NotFound => {
+            error!("No such deployment file {}: {e}", &file_path.display());
+            return (
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "No deployment tarball found for: {} version {}",
+                    req.project, req.version
+                ),
+            );
+        }
+        _ => {
+            error!("Unknown error {}: {e}", file_path.display());
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Invalid deployment file: {}", &file_path.display()),
+            );
+        }
+    })?;
 
     let file = flate2::read::GzDecoder::new(file);
 
@@ -167,14 +185,40 @@ async fn install_service(
     info!("Unpacking installation to: {}", &dst.display());
     deployment.unpack(&dst).expect("unpack");
 
-    if req.is_docker {
+    let num_secrets = req.secrets.as_ref().map(|s| s.len()).unwrap_or(0);
+    info!("Finding {} secret(s)...", num_secrets);
+    let dst_secrets_dir = secrets_dir(&dst);
+    std::fs::create_dir_all(&dst_secrets_dir).expect("mkdir secrets");
+
+    for secret in req.secrets.unwrap_or(vec![]) {
+        info!("Copying secret {secret}...");
+        let source_secret =
+            ant_library::secret::find_secret(&secret, Some(state.secrets_root_dir.clone()));
+
+        let dst_secret = dst_secrets_dir.join(ant_library::secret::secret_name(&secret));
+        std::fs::copy(source_secret, dst_secret).map_err(|e| match e.kind() {
+            ErrorKind::NotFound => {
+                error!("Failed to find secret {secret}: {e}");
+                return (StatusCode::BAD_REQUEST, format!("Invalid secret: {secret}"));
+            }
+            _ => {
+                error!("Unknown error occurred: {e}");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error, please retry.".to_string(),
+                );
+            }
+        })?;
+    }
+
+    if req.is_docker.unwrap_or(false) {
         info!("Loading docker image...");
         let docker_img_path = dst.join("docker-image.tar");
         if !std::fs::exists(&docker_img_path).unwrap() {
-            return (
+            return Err((
                 StatusCode::BAD_REQUEST,
-                "Docker mentioned bu no docker-image.tar included",
-            );
+                "Docker mentioned bu no docker-image.tar included".to_string(),
+            ));
         }
 
         let docker_img_file = File::open(docker_img_path).await.unwrap();
@@ -199,7 +243,10 @@ async fn install_service(
                     "Failed to load image: {}",
                     build_info.error.unwrap_or("".to_string())
                 );
-                return (StatusCode::BAD_REQUEST, "Failed to load docker image.");
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Failed to load docker image.".to_string(),
+                ));
             }
 
             if let Some(stream) = &build_info.stream {
@@ -214,7 +261,7 @@ async fn install_service(
         }
     }
 
-    (StatusCode::OK, "Service installed.")
+    Ok((StatusCode::OK, "Service installed."))
 }
 
 async fn disable_unit(manager: &ManagerProxy<'_>, unit_name: &String) {
@@ -263,4 +310,11 @@ pub fn make_routes() -> Router<AntHostAgentState> {
     Router::new()
         .route_with_tsr("/service", post(enable_service).delete(disable_service))
         .route_with_tsr("/service-installation", post(install_service))
+        .fallback(|| async {
+            ant_library::api_fallback(&[
+                "POST /service/service",
+                "DELETE /service/service",
+                "POST /service/service-installation",
+            ])
+        })
 }

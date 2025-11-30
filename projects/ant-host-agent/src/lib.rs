@@ -21,6 +21,7 @@ pub async fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Err
 
     let api: Router = Router::new()
         .nest("/service", crate::routes::service::make_routes())
+        .nest("/secret", crate::routes::secret::make_routes())
         .route_with_tsr(
             "/ping",
             get(ant_library::api_ping).post(ant_library::api_ping),
@@ -35,7 +36,9 @@ pub async fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Err
                     ant_library::middleware_print_request_response,
                 ))),
         )
-        .fallback(|| async { ant_library::api_fallback(&["GET|POST /ping", "/service"]) });
+        .fallback(|| async {
+            ant_library::api_fallback(&["GET|POST /ping", "/service/...", "/secret/..."])
+        });
 
     return Ok(api);
 }

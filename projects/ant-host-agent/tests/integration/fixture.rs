@@ -3,11 +3,12 @@ use std::{
     path::PathBuf,
 };
 
-use ant_host_agent::{make_routes, state::AntHostAgentState};
+use ant_host_agent::{make_routes, routes::secret::PutSecretRequest, state::AntHostAgentState};
 use ant_library::axum_test_client::TestClient;
+use hyper::StatusCode;
 
 pub struct TestFixture {
-    test_root_dir: PathBuf,
+    pub test_root_dir: PathBuf,
     pub client: TestClient,
 }
 
@@ -30,15 +31,39 @@ impl TestFixture {
             .join("archives");
         create_dir_all(&archive_root_dir).unwrap();
 
+        let test_secrets_dir = test_root_dir.join("secrets");
+        create_dir_all(&test_secrets_dir).unwrap();
+
         let install_root_dir = test_root_dir.join("service");
         create_dir_all(&install_root_dir).unwrap();
 
         let state = AntHostAgentState {
             archive_root_dir: archive_root_dir.clone(),
             install_root_dir: install_root_dir.clone(),
+            secrets_root_dir: test_secrets_dir.clone(),
         };
 
         let client = TestClient::new(make_routes(state.clone()).await.unwrap()).await;
+
+        {
+            let req = PutSecretRequest {
+                name: "test-secret1".to_string(),
+                value: "secret value 1".as_bytes().to_vec(),
+            };
+
+            let response = client.post("/secret/secret").json(&req).send().await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        {
+            let req = PutSecretRequest {
+                name: "test-secret2".to_string(),
+                value: "secret value 2".as_bytes().to_vec(),
+            };
+
+            let response = client.post("/secret/secret").json(&req).send().await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
 
         TestFixture {
             client,

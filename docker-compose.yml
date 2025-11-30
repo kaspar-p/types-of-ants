@@ -114,9 +114,12 @@ services:
       - cloudflare_api_token
 
   ant-naming-domains:
-    image: linuxserver/ddclient:arm64v8-4.0.0
+    image: ant-naming-domains:${VERSION}
     platform: linux/arm64
     container_name: ant-naming-domains
+    build:
+      context: ./projects/ant-naming-domains
+      dockerfile: Dockerfile
     environment:
       VERSION: ${VERSION}
       ANT_NAMING_DOMAINS_FQDN: ${ANT_NAMING_DOMAINS_FQDN}

@@ -1,5 +1,7 @@
 {
   "project": "ant-naming-domains",
   "project_type": "docker",
-  "secrets": []
+  "secrets": [
+    "cloudflare"
+  ]
 }

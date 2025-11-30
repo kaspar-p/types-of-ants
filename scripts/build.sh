@@ -93,13 +93,6 @@ if is_project_docker "$project"; then
     docker-compose config "${project}" > "$tmp_build_dir/docker-compose.yml"
 fi
 
-# # Copy secrets into the build directory
-# log "... copying secrets"
-# local_secrets_dir="$repository_root/secrets/$deploy_env"
-# for secret_name in $(jq -r '.secrets[]' < "$project_src/anthill.json"); do
-#   log "... copying secret [$secret_name]"
-#   cp "${local_secrets_dir}/${secret_name}.secret" "${tmp_build_dir}/secrets/${secret_name}.secret"
-# done
 
 # Copy all other build files into the build directory
 cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"
@@ -119,14 +112,21 @@ deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
 log "... deployment file size: ${deployment_size}"
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
-remote_deployment_file_path="${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}"
+remote_deployment_file_store="${remote_home}/persist/ant-host-agent/fs/archives"
+remote_deployment_file_path="$remote_deployment_file_store/$deployment_file_name"
 run_command ssh2ant "$host" "
-  sudo -S mkdir -p $(dirname "${remote_home}/persist/ant-host-agent/fs/archives/${deployment_file_name}") <<< $(cat "$repository_root/secrets/ant_user.secret") && echo
+  sudo -S mkdir -p $remote_deployment_file_store <<< $(cat "$repository_root/secrets/ant_user.secret") && echo
 "
 run_command scp "${deployment_file_path}" "${remote_user}@${remote_host}:/tmp/${deployment_file_name}"
 run_command ssh2ant "$host" "sudo -S mv /tmp/${deployment_file_name} ${remote_deployment_file_path} <<< $(cat "$repository_root/secrets/ant_user.secret") && echo"
 
-request="{ \"project\": \"$project\", \"version\": \"$version\", \"is_docker\": $is_docker }"
+secrets_list="$(get_project_secrets "$project")"
+request="{
+  \"project\": \"$project\",
+  \"version\": \"$version\",
+  \"is_docker\": $is_docker,
+  \"secrets\": $secrets_list
+}"
 log "request: $(jq -c <<< "$request")"
 run_command curl \
   --no-progress-meter \
