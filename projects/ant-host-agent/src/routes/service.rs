@@ -7,7 +7,7 @@ use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, time::sleep};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
 
 use std::default::Default;
@@ -225,6 +225,7 @@ async fn install_service(
         let docker_img_bytes = codec::FramedRead::new(docker_img_file, codec::BytesCodec::new())
             .map(|r| r.unwrap().freeze());
 
+        debug!("Connecting to docker daemon...");
         let docker =
             bollard::Docker::connect_with_defaults().expect("docker daemon connect failed");
 
@@ -236,6 +237,7 @@ async fn install_service(
             None,
         );
 
+        debug!("Start loading docker image...");
         while let Some(val) = import_out.next().await {
             let build_info = val.expect("docker connection");
             if build_info.error.is_some() || build_info.error_detail.is_some() {

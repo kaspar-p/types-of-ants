@@ -30,8 +30,7 @@
         { "env": "prod", "service": "ant-host-agent" },
         { "env": "prod", "service": "ant-gateway" },
         { "env": "prod", "service": "ant-on-the-web" },
-        { "env": "prod", "service": "ant-naming-domains" },
-        { "env": "prod", "service": "ant-fs" }
+        { "env": "prod", "service": "ant-naming-domains" }
       ]
     },
     "antworker002.hosts.typesofants.org": {
@@ -49,11 +48,17 @@
     },
     "antworker003.hosts.typesofants.org": {
       "architecture": "arm",
-      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+      "services": [
+        { "env": "prod", "service": "ant-host-agent" },
+        { "env": "prod", "service": "ant-backing-it-up-storage" }
+      ]
     },
     "antworker004.hosts.typesofants.org": {
       "architecture": "arm",
-      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+      "services": [
+        { "env": "prod", "service": "ant-host-agent" },
+        { "env": "prod", "service": "ant-fs" }
+      ]
     },
     "hisbaan01.hosts.typesofants.org": {
       "architecture": "x86",

@@ -56,7 +56,6 @@ tmp_build_dir="$build_dir/$project.build.tmp"
 run_command rm -rf "${tmp_build_dir}" # clear previous builds
 
 run_command mkdir -p "${tmp_build_dir}"
-run_command mkdir -p "${tmp_build_dir}/secrets"
 
 build_mode="release"
 run_command rm -rf "$build_dir/$build_mode/*"
@@ -114,6 +113,7 @@ log "... deployment file size: ${deployment_size}"
 log "INSTALLING [$project] ONTO [$remote_host]..."
 remote_deployment_file_store="${remote_home}/persist/ant-host-agent/fs/archives"
 remote_deployment_file_path="$remote_deployment_file_store/$deployment_file_name"
+log "... copying to $remote_deployment_file_path"
 run_command ssh2ant "$host" "
   sudo -S mkdir -p $remote_deployment_file_store <<< $(cat "$repository_root/secrets/ant_user.secret") && echo
 "
