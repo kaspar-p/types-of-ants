@@ -130,6 +130,7 @@ request="{
 log "request: $(jq -c <<< "$request")"
 run_command curl \
   --no-progress-meter \
+  --fail-with-body \
   -X POST \
   -w "\n" \
   -d "${request}" \

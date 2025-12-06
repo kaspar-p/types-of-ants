@@ -382,45 +382,6 @@ async fn latest_ants(
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct FeedInput {
-    #[serde(rename = "userId")]
-    pub user_id: UserId,
-
-    #[serde(with = "chrono::serde::ts_seconds")]
-    pub since: DateTime<Utc>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct FeedResponse {
-    pub ants: Vec<Ant>,
-}
-
-async fn feed(
-    State(InnerApiState { dao, .. }): ApiState,
-    query: Query<FeedInput>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await;
-
-    let feed = match ants
-        .get_user_feed_since(&query.user_id, &query.since)
-        .await?
-    {
-        None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                Json("User does not exist!".to_string()).into_response(),
-            ))
-        }
-        Some(feed) => feed,
-    };
-
-    return Ok((
-        StatusCode::OK,
-        Json(FeedResponse { ants: feed }).into_response(),
-    ));
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SuggestionRequest {
     #[serde(rename = "suggestionContent")]
@@ -614,7 +575,6 @@ async fn unfavorite_ant(
 
 pub fn router() -> ApiRouter {
     Router::new()
-        .route_with_tsr("/feed", get(feed))
         .route_with_tsr("/latest-ants", get(latest_ants))
         .route_with_tsr("/unreleased-ants", get(unreleased_ants))
         .route_with_tsr("/released-ants", get(released_ants))
@@ -630,7 +590,6 @@ pub fn router() -> ApiRouter {
         // .route_with_tsr("/tweet", post(tweet))
         .fallback(|| async {
             ant_library::api_fallback(&[
-                "GET /feed",
                 "GET /latest-ants",
                 "GET /unreleased-ants",
                 "GET /released-ants",

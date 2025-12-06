@@ -20,17 +20,10 @@ clean:
 run: debug
 	cd $(BUILD_DIR)/debug && ./$(PROJECT)
 
-binary: $(BUILD_DIR)/%/$(STATIC)/
+binary:
 	@echo "BUILDING BINARY" >> /dev/stderr
-	@cd ./server && cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
-	@mkdir -p $(@D)
+	@cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
+	@mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
 	@cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
-
-WEBSITE_SOURCES := $(shell find ./website)
-$(BUILD_DIR)/%/$(STATIC)/: $(WEBSITE_SOURCES)
-	@echo "BUILDING STATIC CONTENT" >> /dev/stderr
-	@$(MAKE) -C ./website
-	@mkdir -p $(BUILD_DIR)/$(BUILD_MODE)/$(STATIC)
-	@cp -R ./website/out/* $(BUILD_DIR)/$(BUILD_MODE)/$(STATIC)
 
 .PHONY: all clean debug release install binary

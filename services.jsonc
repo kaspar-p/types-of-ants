@@ -38,6 +38,7 @@
       "services": [
         { "env": "beta", "service": "ant-backing-it-up-storage" },
         { "env": "beta", "service": "ant-backing-it-up" },
+        { "env": "beta", "service": "ant-looking-pretty" },
         { "env": "beta", "service": "ant-on-the-web" },
         { "env": "beta", "service": "ant-data-farm" },
         { "env": "beta", "service": "ant-gateway" },

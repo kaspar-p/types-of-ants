@@ -1,0 +1,5 @@
+target
+.cargo
+
+!tests/integration/test-secrets/*
+!tests/integration/test-static

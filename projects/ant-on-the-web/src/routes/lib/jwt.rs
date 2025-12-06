@@ -66,7 +66,7 @@ mod test {
 
     #[test]
     fn inverses() {
-        set_var("TYPESOFANTS_SECRET_DIR", "./test-secrets");
+        set_var("TYPESOFANTS_SECRET_DIR", "./tests/integration/test-secrets");
 
         let claims = Claims {
             sub: "sub".to_string(),

@@ -60,6 +60,15 @@ sudo snap install jq docker btop && \
 echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"' | sudo tee /etc/environment
 ```
 
+Install NodeJS with NVM like:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+ln -s $(nvm which node) /home/ant/.nvm/versions/node/current
+```
+
 Install a postgresql client matching the version `ant-data-farm` uses:
 
 ```bash

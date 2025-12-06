@@ -86,23 +86,31 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
             .iter()
             .any(|(_, some_unit_name, _, _, _, _)| *some_unit_name == unit_name);
 
-        sleep(Duration::from_millis(250)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
-    let units = manager
-        .list_units_by_names(vec![unit_name.clone()])
-        .await
-        .unwrap();
-    let unit = units.first().unwrap();
-    let (_, _, loaded_state, active_state, _, _, _, _, _, _) = unit;
+    let mut activating = true;
+    while activating {
+        let units = manager
+            .list_units_by_names(vec![unit_name.clone()])
+            .await
+            .unwrap();
+        let unit = units.first().unwrap();
+        let (_, _, loaded_state, active_state, _, _, _, _, _, _) = unit;
 
-    match (loaded_state.as_str(), active_state.as_str()) {
-        ("loaded", "active") => {
-            info!("Service running!");
-        }
-        (loaded_state, active_state) => {
-            panic!("Unrecognized state, loaded: {loaded_state}, active: {active_state}");
-        }
+        info!("Polling for job to activate: {unit:?}");
+        activating = match (loaded_state.as_str(), active_state.as_str()) {
+            ("loaded", "activating") => true,
+            ("loaded", "active") => false,
+            (_, "failed") => {
+                return (StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start.");
+            }
+            (loaded_state, active_state) => {
+                panic!("Unrecognized state, loaded: {loaded_state}, active: {active_state}");
+            }
+        };
+
+        sleep(Duration::from_millis(500)).await;
     }
 
     (StatusCode::OK, "Service enabled.")

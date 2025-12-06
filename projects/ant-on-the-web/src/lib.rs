@@ -127,7 +127,7 @@ pub fn make_routes(
         .route_with_tsr("/ping", get(ant_library::api_ping))
         // Marking the main filesystem as fallback allows wrong paths like
         // /api/something to still hit the /api router fallback()
-        .fallback_service(ServeDir::new("static"))
+        .fallback_service(ServeDir::new(state.static_dir.clone()))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())

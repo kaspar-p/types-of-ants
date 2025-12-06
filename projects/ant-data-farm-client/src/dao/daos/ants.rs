@@ -239,14 +239,6 @@ impl AntsDao {
         return Ok(rows.first().map(|row| row_to_ant(row)));
     }
 
-    pub async fn get_user_feed_since(
-        &self,
-        user_id: &UserId,
-        since: &DateTime<Utc>,
-    ) -> Result<Option<Vec<Ant>>, anyhow::Error> {
-        return Ok(Some(vec![]));
-    }
-
     pub async fn is_favorite_ant(
         &self,
         user: &UserId,

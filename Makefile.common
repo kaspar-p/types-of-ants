@@ -1,5 +1,4 @@
 BUILD_DIR = build
-STATIC = static
 
 INSTALL_VERSION = default
 INSTALL_PREFIX = $(HOME)/service

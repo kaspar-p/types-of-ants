@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{env::set_var, path::PathBuf, sync::Arc};
 
 use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
 use ant_library::axum_test_client::TestClient;
@@ -41,7 +41,6 @@ async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
         }),
         migration_dir: Some(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("..")
                 .join("..")
                 .join("ant-data-farm/migrations"),
         ),
@@ -132,12 +131,16 @@ pub fn get_telemetry_cookie(headers: &HeaderMap) -> String {
 }
 
 async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
+    set_var("TYPESOFANTS_SECRET_DIR", "./tests/integration/test-secrets");
+
     let (db, db_client) = test_database_client().await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
     };
 
     let state = InnerApiState {
+        static_dir: PathBuf::from("./tests/integration/test-static"),
+
         dao: Arc::new(db_client),
         sms: Arc::new(sms),
         email: Arc::new(TestEmailSender::new()),

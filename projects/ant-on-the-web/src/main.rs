@@ -2,7 +2,7 @@ use ant_data_farm::AntDataFarmClient;
 use ant_library::get_mode;
 use ant_on_the_web::{email::MailjetEmailSender, sms::Sms, state::InnerApiState, ApiOptions};
 use rand::SeedableRng;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -12,6 +12,9 @@ async fn main() {
 
     debug!("Setting up state...");
     let state = InnerApiState {
+        // Static files all stored locally in ./static
+        static_dir: PathBuf::from("./static"),
+
         // None config for production use-case
         dao: Arc::new(
             AntDataFarmClient::new(None)

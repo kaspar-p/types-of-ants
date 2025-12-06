@@ -39,6 +39,7 @@ if [[ "$project" != "ant-host-agent" ]]; then
   run_command curl \
     --no-progress-meter \
     -X POST \
+    --fail-with-body \
     -w "\n" \
     -d "{ \"project\": \"$project\", \"version\": \"$version\" }" \
     -H 'Content-type: application/json' \
