@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { AntBanner } from "../components/AntBanner";
 import { getReleasedAnts, ReleasedAnt } from "../server/queries";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { InputBanner } from "@/components/InputBanner";
 import { AntText } from "@/components/AntText";
-import { useMediaQuery } from "@uidotdev/usehooks";
+import { useMediaQuery } from "usehooks-ts";
+
+const IS_SERVER = typeof window === "undefined";
 
 export default function Home() {
   const {
@@ -17,40 +19,26 @@ export default function Home() {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
+    initialPageParam: 0,
     queryKey: ["releasedAnts"],
-    queryFn: async (ctx) => {
-      const page = ctx.pageParam ?? 0;
-      return getReleasedAnts(page);
-    },
+    queryFn: async (ctx) => getReleasedAnts(ctx.pageParam),
     getNextPageParam: (receivedPage, allPages) => {
       return receivedPage.hasNextPage ? allPages.length : undefined;
     },
-    keepPreviousData: true,
+    placeholderData: { pageParams: [], pages: [] },
   });
 
   useEffect(() => {
     if (hasNextPage) fetchNextPage();
   });
 
-  const isSmallDevice =
-    typeof window !== "undefined"
-      ? // eslint-disable-next-line react-hooks/rules-of-hooks
-        useMediaQuery("only screen and (max-width : 768px)")
-      : false;
-  const isMediumDevice =
-    typeof window !== "undefined"
-      ? // eslint-disable-next-line react-hooks/rules-of-hooks
-        useMediaQuery(
-          "only screen and (min-width : 769px) and (max-width : 992px)"
-        )
-      : false;
-  const isLargeDevice =
-    typeof window !== "undefined"
-      ? // eslint-disable-next-line react-hooks/rules-of-hooks
-        useMediaQuery(
-          "only screen and (min-width : 993px) and (max-width : 1200px)"
-        )
-      : true;
+  const isSmallDevice = useMediaQuery("only screen and (max-width : 768px)");
+  const isMediumDevice = useMediaQuery(
+    "only screen and (min-width : 769px) and (max-width : 992px)"
+  );
+  const isLargeDevice = useMediaQuery(
+    "only screen and (min-width : 993px) and (max-width : 1200px)"
+  );
 
   let columns: number;
   if (isSmallDevice) {
@@ -77,9 +65,9 @@ export default function Home() {
         <AntBanner />
 
         <div className="mt-2">
-          <div className="flex flex-row justify-center space-x-2">
+          <div className="flex flex-row gap-2 justify-center">
             {antColumns.map((ants, c) => (
-              <div key={c} className="flex flex-col justify-start space-y-1">
+              <div key={c} className="flex flex-col gap-1 justify-start">
                 {ants.map((ant, i) => (
                   <AntText key={i} ant={ant} />
                 ))}

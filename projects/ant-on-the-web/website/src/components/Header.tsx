@@ -43,8 +43,8 @@ export function Header() {
           <h3 className="text-center m-0">
             ants discovered to date: {totalAntsResult?.data}
           </h3>
-          <div className="flex flex-col space-y-2 py-4 max-w-md mx-auto">
-            <div className="text-center flex flex-row space-x-2 align-center justify-center">
+          <div className="flex flex-col gap-y-2 py-4 max-w-md mx-auto">
+            <div className="text-center flex flex-row gap-x-2 align-center justify-center">
               {!(user.weakAuth && user.loggedIn) && (
                 <button
                   className="cursor-pointer"
@@ -82,7 +82,7 @@ export function Header() {
                 </button>
               )}
             </div>
-            <div className="text-center flex flex-row space-x-2 align-center justify-center">
+            <div className="text-center flex flex-row gap-x-2 align-center justify-center">
               <Link
                 href="https://twitter.com/typesofants"
                 onClick={() =>

@@ -4,6 +4,7 @@ const environmentSchema = z.union([
   z.literal("dev"),
   z.literal("beta"),
   z.literal("prod"),
+  z.undefined(),
 ]);
 
 function generateBaseUrl(): string {
@@ -23,6 +24,7 @@ function generateBaseUrl(): string {
       url = `https://beta.typesofants.org:${port}`;
       break;
     }
+    case undefined:
     case "dev": {
       const port = z
         .string()
@@ -53,6 +55,7 @@ export function getFetchOptions(): { credentials?: "include" } {
     case "prod":
     case "beta":
       return {};
+    case undefined:
     case "dev":
       return { credentials: "include" };
   }

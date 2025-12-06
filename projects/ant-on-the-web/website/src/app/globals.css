@@ -1,4 +1,9 @@
-@tailwind utilities;
+@config "../../tailwind.config.js";
+
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+/* @import "tailwindcss/preflight.css" layer(base); */
+@import "tailwindcss/utilities.css" layer(utilities);
 
 *,
 *::before,
@@ -11,12 +16,12 @@ body {
 }
 
 #banner {
-  display: block; 
-  width: 100%; 
-  background-color: gold; 
-  border-radius: 5px; 
-  padding: 10px; 
-  padding-right: 0
+  display: block;
+  width: 100%;
+  background-color: gold;
+  border-radius: 5px;
+  padding: 10px;
+  padding-right: 0;
 }
 
 .banner-ant {
@@ -27,8 +32,8 @@ body {
 }
 
 .form-form {
-  display: flex; 
-  flex-direction: row; 
+  display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   padding: 10px;
 }

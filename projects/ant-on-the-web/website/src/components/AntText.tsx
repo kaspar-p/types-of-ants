@@ -3,7 +3,7 @@
 import { Heart, Info } from "lucide-react";
 import { ReleasedAnt } from "@/server/queries";
 import { useEffect, useState } from "react";
-import { useMediaQuery } from "@uidotdev/usehooks";
+import { useMediaQuery } from "usehooks-ts";
 import { favorite, unfavorite } from "@/server/posts";
 import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
@@ -58,7 +58,7 @@ export function AntText(props: AntTextProps) {
         <div className="w-10/12">
           {clicked ? <strong>{ant.antName}</strong> : <div>{ant.antName}</div>}
         </div>
-        <div className="px-1 self-center space-x-1">
+        <div className="px-1 self-center flex flex-row gap-1">
           {displayIcon && (
             <Info
               size={ICON_SIZE}
@@ -114,7 +114,7 @@ export function AntText(props: AntTextProps) {
         </div>
       </div>
       {clicked && (
-        <div className="flex flex-col justify-between space-y-1 mb-2 pl-4">
+        <div className="flex flex-col justify-between gap-y-1 mb-2 pl-4">
           {
             <div>
               suggested by{" "}
@@ -132,7 +132,7 @@ export function AntText(props: AntTextProps) {
           }
           {canLike ? (
             liked && ant.favoritedAt ? (
-              <div className="flex flex-row space-x-1">
+              <div className="flex flex-row gap-x-1">
                 {/* <AntHeart liked={liked} enableHover={false} /> */}
                 favorited at {formatDatetime(new Date(ant.favoritedAt))}
               </div>

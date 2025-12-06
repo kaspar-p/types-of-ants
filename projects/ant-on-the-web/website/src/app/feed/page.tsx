@@ -39,7 +39,7 @@ export type AntPostProps = {
 
 function AntPost({ ant }: AntPostProps) {
   return (
-    <div className="p-2 border-black border-b-2">
+    <div className="p-2 border border-black border-b-2">
       <div>
         <Link href={`/${ant.createdByUsername}`}>@{ant.createdByUsername}</Link>{" "}
         <small className="pl-1">{formatDate(ant.createdAt)}</small>
