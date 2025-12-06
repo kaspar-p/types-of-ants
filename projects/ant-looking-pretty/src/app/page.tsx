@@ -9,8 +9,6 @@ import { InputBanner } from "@/components/InputBanner";
 import { AntText } from "@/components/AntText";
 import { useMediaQuery } from "usehooks-ts";
 
-const IS_SERVER = typeof window === "undefined";
-
 export default function Home() {
   const {
     isLoading,

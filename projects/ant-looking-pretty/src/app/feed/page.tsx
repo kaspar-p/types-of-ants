@@ -39,9 +39,11 @@ export type AntPostProps = {
 
 function AntPost({ ant }: AntPostProps) {
   return (
-    <div className="p-2 border border-black border-b-2">
+    <div className="p-1.5">
       <div>
-        <Link href={`/${ant.createdByUsername}`}>@{ant.createdByUsername}</Link>{" "}
+        <Link href={`/im/${ant.createdByUsername}`}>
+          @{ant.createdByUsername}
+        </Link>{" "}
         <small className="pl-1">{formatDate(ant.createdAt)}</small>
       </div>
       <div className="pl-4">{ant.antName}</div>
@@ -73,7 +75,7 @@ export default function Feed() {
             }}
           />
 
-          <h3>
+          <h3 className="mb-1">
             latest ant submissions ({unseenAnts?.length}):{" "}
             <button
               id="feed-refresh"

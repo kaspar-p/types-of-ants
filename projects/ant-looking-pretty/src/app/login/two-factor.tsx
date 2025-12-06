@@ -76,6 +76,10 @@ export const TwoFactorVerificationBox = () => {
         setKeyValidationMsg(msg.toLocaleLowerCase());
         break;
       }
+      case 400: {
+        setKeyValidationMsg("invalid code!");
+        break;
+      }
       case 200: {
         console.log(res.status);
         setKey("");
