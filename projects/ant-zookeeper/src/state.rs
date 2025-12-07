@@ -1,6 +1,17 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
+
+use acme_lib::DirectoryUrl;
+use tokio::sync::Mutex;
+
+use crate::dns::Dns;
 
 #[derive(Clone)]
 pub struct AntZookeeperState {
     pub root_dir: PathBuf,
+
+    pub dns: Arc<Mutex<dyn Dns>>,
+    pub acme_contact_email: String,
+    pub acme_url: DirectoryUrl<'static>,
+
+    pub rng: rsa::rand_core::OsRng,
 }

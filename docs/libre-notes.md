@@ -46,6 +46,12 @@ computer run:
 infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
 ```
 
+And set it to be globally available (on the host):
+
+```bash
+sudo ln -s $HOME/.terminfo/x/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty
+```
+
 ## Tool onboarding
 
 Then, run (this will take a while):
@@ -67,6 +73,7 @@ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 source ~/.bashrc
 nvm install --lts
 ln -s $(nvm which node) /home/ant/.nvm/versions/node/current
+node -v
 ```
 
 Install a postgresql client matching the version `ant-data-farm` uses:

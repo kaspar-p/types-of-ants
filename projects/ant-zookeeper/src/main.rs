@@ -1,7 +1,9 @@
-use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf};
+use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use ant_zookeeper::state::AntZookeeperState;
-use tracing::{debug, info};
+use ant_zookeeper::{dns::CloudFlareDns, state::AntZookeeperState};
+use rsa::rand_core::OsRng;
+use tokio::sync::Mutex;
+use tracing::debug;
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +18,17 @@ async fn main() {
     let root_dir = PathBuf::from(persist_dir).join(root_path);
     create_dir_all(&root_dir).expect("failed to create root dir");
 
-    let state = AntZookeeperState { root_dir };
+    let state = AntZookeeperState {
+        root_dir,
+        rng: OsRng,
+        dns: Arc::new(Mutex::new(CloudFlareDns::new(
+            ant_library::secret::load_secret("cloudflare").unwrap(),
+            ant_library::secret::load_secret("cloudflare_zone_id").unwrap(),
+        ))),
+        acme_url: acme_lib::DirectoryUrl::LetsEncrypt,
+        acme_contact_email: dotenv::var("ANT_ZOOKEEPER_ACME_CONTACT_EMAIL")
+            .expect("No ANT_ZOOKEEPER_ACME_CONTACT_EMAIL variable."),
+    };
 
     let app = ant_zookeeper::make_routes(state).expect("failed to init api");
 

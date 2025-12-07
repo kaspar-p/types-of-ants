@@ -41,6 +41,10 @@ base16ct = { version = "0.3.0", features = ["alloc"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 postgresql_commands = "0.20.0"
 zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
+cloudflare = "0.14.0"
+async-trait = "0.1.89"
+acme-lib = "0.9.1"
+rsa = "0.9.9"
 
 [dev-dependencies]
 stdext = "0.3.3"

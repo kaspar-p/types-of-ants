@@ -98,7 +98,7 @@ services:
       - "443:443"
     secrets:
       - tls_cert
-      - tls_cert_key
+      - tls_key
 
   ant-renewing-certificates:
     image: ant-renewing-certificates:${VERSION}
@@ -174,8 +174,8 @@ secrets:
     file: ${SECRETS_DIR}/ant_data_farm_password.secret
 
   tls_cert:
-    file: ${SECRETS_DIR}/tls_cert.pem
-  tls_cert_key:
-    file: ${SECRETS_DIR}/tls_key.pem
+    file: ${SECRETS_DIR}/tls_cert.secret
+  tls_key:
+    file: ${SECRETS_DIR}/tls_key.secret
   cloudflare_api_token:
     file: ${SECRETS_DIR}/cloudflare.secret

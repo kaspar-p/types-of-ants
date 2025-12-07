@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use axum::{response::IntoResponse, routing::post, Json, Router};
+use axum::Router;
 use http::{header, Method};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -9,6 +7,9 @@ use tracing::debug;
 
 use crate::state::AntZookeeperState;
 
+pub mod dns;
+pub mod err;
+pub mod routes;
 pub mod state;
 
 #[derive(Serialize, Deserialize)]
@@ -27,6 +28,7 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
     debug!("Initializing site routes...");
     let app = Router::new()
         // .route("/enable-service", post(enable_service))
+        .nest("/certs", routes::certs::make_routes())
         .with_state(s)
         .layer(
             ServiceBuilder::new()

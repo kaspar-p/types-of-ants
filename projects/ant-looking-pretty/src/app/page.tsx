@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
 import { AntBanner } from "../components/AntBanner";
 import { getReleasedAnts, ReleasedAnt } from "../server/queries";
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { InputBanner } from "@/components/InputBanner";
 import { AntText } from "@/components/AntText";
 import { useMediaQuery } from "usehooks-ts";
+import { isServer, useInfiniteQuery } from "@tanstack/react-query";
 
 export default function Home() {
   const {
@@ -26,17 +25,21 @@ export default function Home() {
     placeholderData: { pageParams: [], pages: [] },
   });
 
-  useEffect(() => {
-    if (hasNextPage) fetchNextPage();
-  });
+  if (hasNextPage) fetchNextPage();
 
-  const isSmallDevice = useMediaQuery("only screen and (max-width : 768px)");
-  const isMediumDevice = useMediaQuery(
-    "only screen and (min-width : 769px) and (max-width : 992px)"
-  );
-  const isLargeDevice = useMediaQuery(
-    "only screen and (min-width : 993px) and (max-width : 1200px)"
-  );
+  const isSmallDevice = isServer
+    ? false
+    : useMediaQuery("only screen and (max-width : 768px)");
+  const isMediumDevice = isServer
+    ? true
+    : useMediaQuery(
+        "only screen and (min-width : 769px) and (max-width : 992px)"
+      );
+  const isLargeDevice = isServer
+    ? false
+    : useMediaQuery(
+        "only screen and (min-width : 993px) and (max-width : 1200px)"
+      );
 
   let columns: number;
   if (isSmallDevice) {

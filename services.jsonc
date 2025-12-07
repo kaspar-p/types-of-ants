@@ -26,9 +26,10 @@
     "antworker001.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
-        { "env": "prod", "service": "ant-backing-it-up" },
         { "env": "prod", "service": "ant-host-agent" },
+        { "env": "prod", "service": "ant-backing-it-up" },
         { "env": "prod", "service": "ant-gateway" },
+        { "env": "prod", "service": "ant-looking-pretty" },
         { "env": "prod", "service": "ant-on-the-web" },
         { "env": "prod", "service": "ant-naming-domains" }
       ]
@@ -36,13 +37,13 @@
     "antworker002.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
+        { "env": "beta", "service": "ant-host-agent" },
         { "env": "beta", "service": "ant-backing-it-up-storage" },
         { "env": "beta", "service": "ant-backing-it-up" },
         { "env": "beta", "service": "ant-looking-pretty" },
         { "env": "beta", "service": "ant-on-the-web" },
         { "env": "beta", "service": "ant-data-farm" },
         { "env": "beta", "service": "ant-gateway" },
-        { "env": "beta", "service": "ant-host-agent" },
         { "env": "beta", "service": "ant-naming-domains" },
         { "env": "beta", "service": "ant-fs" }
       ]

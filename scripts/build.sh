@@ -29,6 +29,7 @@ remote_host="$(anthost "$host")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
+commit_number="$(git rev-list --count HEAD)"
 commit_sha="$(git log --format='%h' -n 1)"
 version="$(project_version)"
 
@@ -92,6 +93,10 @@ if is_project_docker "$project"; then
     docker-compose config "${project}" > "$tmp_build_dir/docker-compose.yml"
 fi
 
+# Create a small manifest.json file into the build directory
+echo "{
+  \"commit_number\": \"$commit_number\"
+}" > "$tmp_build_dir/manifest.json"
 
 # Copy all other build files into the build directory
 cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"
