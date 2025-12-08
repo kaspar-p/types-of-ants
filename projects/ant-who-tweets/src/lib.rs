@@ -1,7 +1,5 @@
-use ant_data_farm::{
-    ants::Ant, ants::Tweeted, tweets::ScheduledTweet, AntDataFarmClient, DatabaseConfig,
-    DatabaseCredentials,
-};
+use ant_data_farm::{ants::Ant, ants::Tweeted, tweets::ScheduledTweet, AntDataFarmClient};
+use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
 use chrono::{DateTime, Utc};
 use rand::seq::IteratorRandom;
 use tracing::info;
@@ -70,15 +68,6 @@ async fn post_tweet(
     return tweets;
 }
 
-pub async fn ant_client(config: DatabaseConfig) -> AntDataFarmClient {
-    match AntDataFarmClient::new(Some(config)).await {
-        Err(e) => {
-            panic!("Failed to initialize database: {}", e);
-        }
-        Ok(client) => client,
-    }
-}
-
 /// Check if there is a scheduled ant within 24 hours that needs to be tweeted instead. If so, tweet that.
 async fn choose_scheduled_ants(
     client: &AntDataFarmClient,
@@ -125,7 +114,7 @@ pub async fn cron_tweet(config: Config) -> Result<Vec<twitter_v2::Tweet>, anyhow
     info!("Starting cron_tweet()...");
 
     info!("Beginning database connection...");
-    let client = ant_client(config.database).await;
+    let client = AntDataFarmClient::connect(&config.database).await?;
 
     info!("Getting random ant choice...");
     if let Some(tweet) = choose_scheduled_ants(&client).await? {
@@ -201,13 +190,11 @@ pub fn get_config() -> Result<Config, anyhow::Error> {
             access_token_secret: ant_library::secret::load_secret("twitter_access_token_secret")?,
         },
         database: DatabaseConfig {
-            creds: Some(DatabaseCredentials {
-                database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
-                database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
-                database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
-            }),
-            host: Some(dotenv::var("ANT_DATA_FARM_HOST")?),
-            port: Some(dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?),
+            database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
+            database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
+            database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
+            host: dotenv::var("ANT_DATA_FARM_HOST")?,
+            port: dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?,
             migration_dir: None,
         },
     };

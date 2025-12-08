@@ -168,7 +168,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.8.1",
  "openssl",
- "postgresql_commands 0.20.0",
+ "postgresql_commands",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
@@ -332,18 +332,23 @@ name = "ant-library"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "axum-extra",
  "axum-macros",
+ "bb8",
+ "bb8-postgres",
  "bytes",
  "dotenv",
  "http 1.4.0",
  "http-body-util",
  "hyper 1.8.1",
+ "postgresql_embedded",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-postgres",
  "tower",
  "tracing",
  "tracing-appender",
@@ -490,11 +495,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ant-zoo-storage"
+version = "0.1.0"
+dependencies = [
+ "ant-library",
+ "anyhow",
+ "async-trait",
+]
+
+[[package]]
 name = "ant-zookeeper"
 version = "1.0.0"
 dependencies = [
  "acme-lib",
  "ant-library",
+ "ant-zoo-storage",
  "anyhow",
  "async-trait",
  "axum",
@@ -510,7 +525,8 @@ dependencies = [
  "http-body-util",
  "hyper 1.8.1",
  "openssl",
- "postgresql_commands 0.20.0",
+ "postgresql_commands",
+ "postgresql_embedded",
  "rsa",
  "serde",
  "sha2",
@@ -3726,9 +3742,9 @@ dependencies = [
 
 [[package]]
 name = "postgresql_archive"
-version = "0.18.7"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c1e2f490f528e4eb06be6e9494ad28ea2b3f376bac7a9ad7c99b9062a7358e"
+checksum = "e80b519badc77389e9bb48944da8b639eaddc0ab9bb0e921be233c11348f3655"
 dependencies = [
  "async-trait",
  "flate2",
@@ -3754,16 +3770,6 @@ dependencies = [
 
 [[package]]
 name = "postgresql_commands"
-version = "0.18.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56eae883251fb55f23ff8e9f16121cfb2b00a56ebe62c56183c67904af26fa1d"
-dependencies = [
- "thiserror 2.0.17",
- "tracing",
-]
-
-[[package]]
-name = "postgresql_commands"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20698f9f0fddfa20bb0f8db60c47c7c1996b781c8e4bc2d09182d6cab66da25c"
@@ -3774,13 +3780,13 @@ dependencies = [
 
 [[package]]
 name = "postgresql_embedded"
-version = "0.18.7"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3aa5ce9babb49ac262752db7d1a4bda7b05b83eccd55559c7c20605447a6d9a"
+checksum = "c73524453412018db32b4929cc0b58ecb2d04cff679e9d397ab32880fbe7a0ca"
 dependencies = [
  "anyhow",
  "postgresql_archive",
- "postgresql_commands 0.18.7",
+ "postgresql_commands",
  "rand 0.9.2",
  "semver",
  "sqlx",

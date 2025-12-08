@@ -1,0 +1,9 @@
+[package]
+name = "ant-zoo-storage"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+anyhow = "1.0.100"
+async-trait = "0.1.89"

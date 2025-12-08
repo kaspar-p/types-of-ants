@@ -2,26 +2,13 @@ mod test;
 mod tests;
 
 use crate::tests::ping::StatusData;
-use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
+use ant_data_farm::AntDataFarmClient;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::error;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-
-fn get_config() -> Result<DatabaseConfig, anyhow::Error> {
-    Ok(DatabaseConfig {
-        creds: Some(DatabaseCredentials {
-            database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
-            database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
-            database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
-        }),
-        host: Some(dotenv::var("ANT_DATA_FARM_HOST")?),
-        port: Some(7000),
-        migration_dir: None,
-    })
-}
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +23,7 @@ async fn main() {
         .finish();
     let _ = tracing::subscriber::set_default(subscriber);
 
-    let client = match AntDataFarmClient::new(Some(get_config().unwrap())).await {
+    let client = match AntDataFarmClient::connect_from_env(None).await {
         Err(e) => {
             error!("Failed to initialize database: {}", e);
             error!("Ending CRON early!");

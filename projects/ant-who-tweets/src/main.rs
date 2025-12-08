@@ -1,15 +1,16 @@
-use ant_library::set_global_logs;
-use ant_who_tweets::{ant_client, cron_tweet, get_config};
+use ant_data_farm::AntDataFarmClient;
+use ant_library::{db::TypesOfAntsDatabase, set_global_logs};
+use ant_who_tweets::{cron_tweet, get_config};
 use chrono::Timelike;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::info;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), anyhow::Error> {
     set_global_logs("ant-who-tweets");
 
-    let scheduler = JobScheduler::new().await.unwrap();
+    let scheduler = JobScheduler::new().await?;
 
     // Midnight UTC is 8pm EST is 6pm MST
     let utc_hour_to_tweet = 0;
@@ -24,7 +25,7 @@ async fn main() {
     info!("Tweeting on behalf of @{}", config.twitter.handle);
 
     // Check the connection to the database by creating a dummy "test" client at the front.
-    ant_client(config.database).await;
+    AntDataFarmClient::connect(&config.database).await?;
 
     scheduler
         .add(
@@ -39,14 +40,12 @@ async fn main() {
                             .expect("Cron tweet failed!");
                     })
                 },
-            )
-            .unwrap(),
+            )?,
         )
-        .await
-        .unwrap();
+        .await?;
 
     // Start the scheduler
-    scheduler.start().await.unwrap();
+    scheduler.start().await?;
 
     loop {
         info!("Sleeping 1800 seconds...");

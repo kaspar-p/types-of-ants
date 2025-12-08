@@ -20,5 +20,5 @@ anyhow = "1.0.98"
 ant-library = { version = "1.0.0", path = "../ant-library" }
 
 [dev-dependencies]
-postgresql_embedded = "0.18.3"
+postgresql_embedded = "0.20.0"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }

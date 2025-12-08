@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use super::lib::Id;
 use crate::ants::AntId;
-use crate::dao::db::Database;
 use crate::users::UserId;
+use ant_library::db::Database;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;

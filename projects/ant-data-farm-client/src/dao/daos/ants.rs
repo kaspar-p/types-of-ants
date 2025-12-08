@@ -1,6 +1,7 @@
 pub use super::lib::Id as AntId;
 use super::users::UserId;
-use crate::{dao::db::Database, releases::Release, users::User};
+use crate::{releases::Release, users::User};
+use ant_library::db::Database;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

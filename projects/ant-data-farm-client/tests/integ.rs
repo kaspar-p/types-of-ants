@@ -1,8 +1,7 @@
 mod fixture;
 
-use ant_data_farm::{
-    ants::Tweeted, AntDataFarmClient, DaoTrait, DatabaseConfig, DatabaseCredentials,
-};
+use ant_data_farm::{ants::Tweeted, AntDataFarmClient};
+use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
 use chrono::Duration;
 
 use fixture::{logging, test_fixture};
@@ -16,16 +15,14 @@ async fn more_than_500_ants() {
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
-    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
-        port: Some(port),
-        creds: Some(DatabaseCredentials {
-            database_name: "typesofants".to_string(),
-            database_user: "test".to_string(),
-            database_password: "test".to_string(),
-        }),
-        host: Some("localhost".to_string()),
+    let dao = AntDataFarmClient::connect(&DatabaseConfig {
+        port: port,
+        database_name: "typesofants".to_string(),
+        database_user: "test".to_string(),
+        database_password: "test".to_string(),
+        host: "localhost".to_string(),
         migration_dir: None,
-    }))
+    })
     .await
     .expect("Connected!");
 
@@ -41,16 +38,14 @@ async fn user_gets_created() {
     let container = fixture.image.start().await.unwrap();
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
-    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
-        port: Some(port),
-        creds: Some(DatabaseCredentials {
-            database_name: "typesofants".to_string(),
-            database_user: "test".to_string(),
-            database_password: "test".to_string(),
-        }),
-        host: Some("localhost".to_string()),
+    let dao = AntDataFarmClient::connect(&DatabaseConfig {
+        port: port,
+        database_name: "typesofants".to_string(),
+        database_user: "test".to_string(),
+        database_password: "test".to_string(),
+        host: "localhost".to_string(),
         migration_dir: None,
-    }))
+    })
     .await
     .expect("Connected!");
 
@@ -81,16 +76,14 @@ async fn see_scheduled_tweets(_logging: &()) {
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     debug!("Ran fixture!");
-    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
-        port: Some(port),
-        creds: Some(DatabaseCredentials {
-            database_name: "typesofants".to_string(),
-            database_user: "test".to_string(),
-            database_password: "test".to_string(),
-        }),
-        host: Some("localhost".to_string()),
+    let dao = AntDataFarmClient::connect(&DatabaseConfig {
+        port: port,
+        database_name: "typesofants".to_string(),
+        database_user: "test".to_string(),
+        database_password: "test".to_string(),
+        host: "localhost".to_string(),
         migration_dir: None,
-    }))
+    })
     .await
     .expect("Connected!");
 
@@ -113,16 +106,14 @@ async fn add_tweeted(_logging: &()) {
 
     let port = container.get_host_port_ipv4(5432).await.unwrap();
     debug!("Ran fixture!");
-    let dao = AntDataFarmClient::new(Some(DatabaseConfig {
-        port: Some(port),
-        creds: Some(DatabaseCredentials {
-            database_name: "typesofants".to_string(),
-            database_user: "test".to_string(),
-            database_password: "test".to_string(),
-        }),
-        host: Some("localhost".to_string()),
+    let dao = AntDataFarmClient::connect(&DatabaseConfig {
+        port: port,
+        database_name: "typesofants".to_string(),
+        database_user: "test".to_string(),
+        database_password: "test".to_string(),
+        host: "localhost".to_string(),
         migration_dir: None,
-    }))
+    })
     .await
     .expect("Connected!");
 

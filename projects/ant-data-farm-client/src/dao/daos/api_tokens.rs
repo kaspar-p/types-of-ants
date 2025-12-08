@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
+use crate::users::{make_password_hash, verify_password_hash, UserId};
+use ant_library::db::Database;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
-
-use crate::{
-    dao::db::Database,
-    users::{make_password_hash, verify_password_hash, UserId},
-};
 
 pub struct ApiTokensDao {
     database: Arc<Mutex<Database>>,

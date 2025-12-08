@@ -1,4 +1,5 @@
-use crate::{ants::AntId, dao::db::Database, users::UserId};
+use crate::{ants::AntId, users::UserId};
+use ant_library::db::Database;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};

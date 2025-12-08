@@ -14,10 +14,12 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
 pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error> {
-    std::env::set_var(
-        "RUST_LOG",
-        "ant_owning_artifacts=debug,glimmer=debug,tower_http=debug",
-    );
+    unsafe {
+        std::env::set_var(
+            "RUST_LOG",
+            "ant_owning_artifacts=debug,glimmer=debug,tower_http=debug",
+        )
+    };
     dotenv::dotenv().unwrap();
 
     let cors = CorsLayer::new()
@@ -29,7 +31,7 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
     // artifact::initialize()?;
 
     let db = Arc::new(
-        AntDataFarmClient::new(None)
+        AntDataFarmClient::connect_from_env(None)
             .await
             .expect("Failed to connect to database!"),
     );

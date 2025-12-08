@@ -1,5 +1,5 @@
-use super::db::Database;
 use crate::dao::daos::lib::Id;
+use ant_library::db::Database;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;

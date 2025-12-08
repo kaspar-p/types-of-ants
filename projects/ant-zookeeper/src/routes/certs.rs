@@ -139,7 +139,7 @@ async fn provision_certificate(
     let order_certificate = csr.finalize(&pem, 5_000)?;
 
     debug!("Downloading certificate...");
-    order_certificate.download_and_save_cert()?;
+    let files = order_certificate.download_and_save_cert()?;
 
     debug!("Deleting TXT records created during the challenge...");
     clean_acme_records(&state, &req.domains).await?;

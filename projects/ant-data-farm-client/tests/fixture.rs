@@ -8,7 +8,7 @@ use tracing::debug;
 #[fixture]
 #[once]
 pub fn logging() -> () {
-    std::env::set_var("RUST_LOG", "ant_data_farm=debug,glimmer=debug");
+    unsafe { std::env::set_var("RUST_LOG", "ant_data_farm=debug,glimmer=debug") };
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();

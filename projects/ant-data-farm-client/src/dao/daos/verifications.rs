@@ -1,5 +1,6 @@
 pub use super::lib::Id as UserId;
-use crate::{dao::db::Database, users::verify_password_hash};
+use crate::users::verify_password_hash;
+use ant_library::db::Database;
 use chrono::Duration;
 use std::sync::Arc;
 use tokio::sync::Mutex;

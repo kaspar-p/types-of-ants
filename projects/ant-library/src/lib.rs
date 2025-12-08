@@ -7,11 +7,12 @@ use axum::{
 use http::{header, HeaderValue};
 use http_body_util::BodyExt;
 use http_body_util::Full;
-use std::fmt::Display;
+use std::{env::set_var, fmt::Display};
 use tracing::{debug, error, Level};
 use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
 
 pub mod axum_test_client;
+pub mod db;
 pub mod manifest_file;
 pub mod secret;
 
@@ -36,13 +37,18 @@ pub fn api_fallback(routes: &[&str]) -> (StatusCode, String) {
 }
 
 pub fn set_global_logs(project: &str) -> () {
-    std::env::set_var(
+    // SAFETY: according to this discussion: https://users.rust-lang.org/t/unsafe-std-set-var-change/112704/68
+    // this function is unsafe if-and-only-if there is FFI code modifying the environment lock that the
+    // rust standard library sets. We don't use FFI!
+    unsafe {
+        set_var(
         "RUST_LOG",
         format!(
             "{}=debug,ant_library=debug,ant_data_farm=debug,glimmer=debug,tower_http=debug,axum::rejection=trace",
             project
         ),
     );
+    }
     dotenv::dotenv().expect("No .env file found!");
 
     // Initialize tracing

@@ -1,5 +1,6 @@
 pub use super::lib::Id as UserId;
-use crate::dao::{dao_trait::DaoTrait, db::Database};
+use crate::dao::dao_trait::DaoTrait;
+use ant_library::db::Database;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,

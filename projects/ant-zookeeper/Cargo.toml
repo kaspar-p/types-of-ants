@@ -45,6 +45,8 @@ cloudflare = "0.14.0"
 async-trait = "0.1.89"
 acme-lib = "0.9.1"
 rsa = "0.9.9"
+ant-zoo-storage = { version = "0.1.0", path = "../ant-zoo-storage" }
+postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
 stdext = "0.3.3"

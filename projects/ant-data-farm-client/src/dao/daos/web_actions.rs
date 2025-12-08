@@ -1,10 +1,9 @@
-use std::{fmt::Display, sync::Arc};
-
+use crate::users::UserId;
+use ant_library::db::Database;
 use serde::{Deserialize, Serialize};
+use std::{fmt::Display, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
-
-use crate::{dao::db::Database, users::UserId};
 
 pub struct WebActionsDao {
     database: Arc<Mutex<Database>>,

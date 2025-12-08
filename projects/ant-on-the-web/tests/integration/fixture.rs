@@ -1,7 +1,10 @@
 use std::{env::set_var, path::PathBuf, sync::Arc};
 
-use ant_data_farm::{AntDataFarmClient, DatabaseConfig, DatabaseCredentials};
-use ant_library::axum_test_client::TestClient;
+use ant_data_farm::AntDataFarmClient;
+use ant_library::{
+    axum_test_client::TestClient,
+    db::{fixture::test_database_config, TypesOfAntsDatabase},
+};
 use ant_on_the_web::{
     make_routes,
     sms::{SmsError, SmsSender},
@@ -20,36 +23,6 @@ use tokio::sync::Mutex;
 
 use crate::fixture_sms::first_otp;
 use crate::{fixture_email::TestEmailSender, fixture_sms::second_otp};
-
-async fn test_database_client() -> (PostgreSQL, AntDataFarmClient) {
-    let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
-        temporary: true,
-        ..Default::default()
-    });
-    pg.setup().await.unwrap();
-    pg.start().await.unwrap();
-
-    pg.create_database("typesofants").await.unwrap();
-
-    let client = AntDataFarmClient::new(Some(DatabaseConfig {
-        port: Some(pg.settings().port),
-        host: Some(pg.settings().host.clone()),
-        creds: Some(DatabaseCredentials {
-            database_name: "typesofants".to_string(),
-            database_password: pg.settings().password.clone(),
-            database_user: pg.settings().username.clone(),
-        }),
-        migration_dir: Some(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("..")
-                .join("ant-data-farm/migrations"),
-        ),
-    }))
-    .await
-    .expect("connection failed");
-
-    return (pg, client);
-}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TestMsg {
@@ -131,9 +104,9 @@ pub fn get_telemetry_cookie(headers: &HeaderMap) -> String {
 }
 
 async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
-    set_var("TYPESOFANTS_SECRET_DIR", "./tests/integration/test-secrets");
+    unsafe { set_var("TYPESOFANTS_SECRET_DIR", "./tests/integration/test-secrets") };
 
-    let (db, db_client) = test_database_client().await;
+    let (db, db_config) = test_database_config("ant-data-farm").await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
     };
@@ -141,7 +114,7 @@ async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
     let state = InnerApiState {
         static_dir: PathBuf::from("./tests/integration/test-static"),
 
-        dao: Arc::new(db_client),
+        dao: Arc::new(AntDataFarmClient::connect(&db_config).await.unwrap()),
         sms: Arc::new(sms),
         email: Arc::new(TestEmailSender::new()),
 

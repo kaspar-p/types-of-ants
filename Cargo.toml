@@ -14,5 +14,5 @@ members = [
   "projects/ant-releasing-ants-into-the-wild",
   "projects/ant-zookeeper",
   "projects/ant-backing-it-up",
-  "projects/ant-fs-client",
+  "projects/ant-fs-client", "projects/ant-zoo-storage",
 ]

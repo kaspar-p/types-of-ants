@@ -49,9 +49,9 @@ create table project_instance (
   project_id identifier not null, -- The project that's deployed.
   host_id identifier not null, -- The host it's deployed onto.
 
-  environment varchar(16) not null, -- "prod", "beta", "dev", ...
+  environment varchar(16), -- "prod", "beta", "dev". Null means the project is environment-agnostic.
 
-  deployment identifier not null, -- The current version/deployment that this instance is running.
+  deployment_version identifier not null, -- The current version that this instance is running.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -63,18 +63,37 @@ create table project_instance (
   constraint fk_host foreign key (host_id) references host(host_id)
 );
 
-create table backup (
-  backup_id identifier primary key default ('b-' || random_string(16)), -- Unique ID for the backup.
+create table secret (
+  secret_id identifier primary key default ('secret-' || random_string(32)),
   
-  project_instance_id identifier not null, -- Project instance that this was a backup of.
-  destination_storage_instance_id identifier not null, -- The instance of ant-fs or any file server that this host was backed up to.
+  secret_environment varchar(16), -- "prod", "beta", ...
+  secret_name identifier not null, -- Human-knowable name of the secret, e.g. "tls_cert" or "jwt".
+  secret_version int not null, -- A sequential version of the secret.
+   
+  -- Example: ('jwt', 1, 'prod') is unique but different from ('jwt', 2, 'prod')
+  -- and they are both different from any beta secret like ('jwt', 1, 'beta')
+  unique (secret_name, secret_version, secret_environment),
 
-  created_at timestamp with time zone not null default now(), -- When the backup was started.
-  updated_at timestamp with time zone not null default now(), -- When the backup was updated.
-  deleted_at timestamp with time zone, -- Null unless the backup was deleted.
+  valid_for interval not null, -- How long the secret is still valid, after its created_at date.
+  secret_value bytea not null, -- The value of the secret, in bytes. May need to be stringified to be read.
 
-  constraint fk_project_instance foreign key (project_instance_id) references project_instance(project_instance_id),
-  constraint fk_fs foreign key (destination_storage_instance_id) references project_instance(project_instance_id)
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone
+);
+
+create table project_secret (
+  project_instance_id identifier not null, -- The project instance using this secret.
+  secret_id identifier not null, -- The exact secret being used.
+
+  primary key (project_instance_id, secret_id),
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  constraint fk_project foreign key (project_instance_id) references project_instance(project_instance_id),
+  constraint fk_secret foreign key (secret_id) references secret(secret_id)
 );
 
 insert into migration (migration_label) values

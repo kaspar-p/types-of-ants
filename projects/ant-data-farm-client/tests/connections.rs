@@ -1,7 +1,8 @@
 mod fixture;
 
-use ant_data_farm::{AntDataFarmClient, DaoTrait, DatabaseConfig, DatabaseCredentials};
+use ant_data_farm::AntDataFarmClient;
 
+use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
 use fixture::test_fixture;
 use testcontainers::runners::AsyncRunner;
 
@@ -18,16 +19,14 @@ async fn connection_resetting_works_fine() {
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         assert_eq!(port, 13654);
 
-        let dao = AntDataFarmClient::new(Some(DatabaseConfig {
-            port: Some(port),
-            creds: Some(DatabaseCredentials {
-                database_name: "typesofants".to_string(),
-                database_user: "test".to_string(),
-                database_password: "test".to_string(),
-            }),
-            host: Some(host),
+        let dao = AntDataFarmClient::connect(&DatabaseConfig {
+            port: port,
+            host: host,
+            database_name: "typesofants".to_string(),
+            database_user: "test".to_string(),
+            database_password: "test".to_string(),
             migration_dir: None,
-        }))
+        })
         .await
         .expect("Connected!");
 

@@ -1,13 +1,17 @@
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use ant_library::axum_test_client::TestClient;
+use ant_library::{
+    axum_test_client::TestClient,
+    db::{fixture::test_database_config, TypesOfAntsDatabase},
+};
+use ant_zoo_storage::AntZooStorageClient;
 use ant_zookeeper::{
-    dns::{CloudFlareDns, Dns, TxtRecord},
+    dns::{Dns, TxtRecord},
     make_routes,
     state::AntZookeeperState,
 };
 use async_trait::async_trait;
-use chrono::{Date, DateTime, NaiveDate, Timelike, Utc};
+use chrono::Utc;
 use rsa::rand_core::OsRng;
 use tokio::sync::Mutex;
 
@@ -82,10 +86,13 @@ impl Dns for TestDns {
 pub struct Fixture {
     pub client: TestClient,
     pub state: AntZookeeperState,
+    db: postgresql_embedded::PostgreSQL,
 }
 
 impl Fixture {
     pub async fn new() -> Self {
+        let (db, test_db_config) = test_database_config("ant-zoo-storage").await;
+
         let state = AntZookeeperState {
             dns: Arc::new(Mutex::new(TestDns::new())),
             rng: OsRng,
@@ -95,34 +102,13 @@ impl Fixture {
                 .join("tests")
                 .join("integration")
                 .join("fs"),
+            db: AntZooStorageClient::connect(&test_db_config).await.unwrap(),
         };
 
         let routes = make_routes(state.clone()).unwrap();
 
         let client = TestClient::new(routes).await;
 
-        Fixture { client, state }
-    }
-
-    pub async fn with_real_dns() -> Self {
-        let state = AntZookeeperState {
-            dns: Arc::new(Mutex::new(CloudFlareDns::new(
-                ant_library::secret::load_secret("cloudflare").unwrap(),
-                ant_library::secret::load_secret("cloudflare_zone_id").unwrap(),
-            ))),
-            rng: OsRng,
-            acme_url: acme_lib::DirectoryUrl::LetsEncryptStaging,
-            acme_contact_email: "integ-test@typesofants.org".to_string(),
-            root_dir: PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-                .join("tests")
-                .join("integration")
-                .join("fs"),
-        };
-
-        let routes = make_routes(state.clone()).unwrap();
-
-        let client = TestClient::new(routes).await;
-
-        Fixture { client, state }
+        Fixture { client, state, db }
     }
 }
