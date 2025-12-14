@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -eo pipefail
+
+function usage() {
+  echo "USAGE: dbconnect <project> [env]
+  project: The name of the database project, e.g. ant-data-farm, ant-backing-it-up-storage, ant-zoo-storage, ...
+  env: The environment the database is deployed in, defaults to 'prod'.
+" >> /dev/stderr
+  exit 1
+}
+
+project="$1"
+deploy_env="${2:-prod}"
+
+if [[ -z "$project" ]]; then
+  usage
+fi
+set -u
+
+repository_root="$(git rev-parse --show-toplevel)"
+
+set +o allexport
+# shellcheck disable=SC1090
+source "$repository_root/secrets/$deploy_env/build.cfg"
+set -o allexport
+
+project_underscores="${project//-/_}"
+project_underscores_upper="$(echo "$project_underscores" | tr '[:lower:]' '[:upper:]')"
+
+host_var="${project_underscores_upper}_HOST"
+port_var="${project_underscores_upper}_PORT"
+username_secret="${project_underscores}_user.secret"
+dbname_secret="${project_underscores}_db.secret"
+password_secret="${project_underscores}_password.secret"
+
+PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/$password_secret")" psql \
+  --host "${!host_var}" \
+  --port "${!port_var}" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/$username_secret")" \
+  --dbname "$(cat "$repository_root/secrets/$deploy_env/$dbname_secret")"
