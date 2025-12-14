@@ -41,6 +41,7 @@ pub struct AntDataFarmClient {
 impl TypesOfAntsDatabase for AntDataFarmClient {
     async fn connect(config: &DatabaseConfig) -> Result<Self, anyhow::Error> {
         let pool = database_connection(&config).await?;
+
         info!("Initializing data access layer...");
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(pool));
 

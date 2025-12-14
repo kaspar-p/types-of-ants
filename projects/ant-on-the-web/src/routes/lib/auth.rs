@@ -213,8 +213,14 @@ pub enum AuthError {
 impl fmt::Display for AuthError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthError::AccessDenied(_) => write!(f, "AuthError::AccessDenied"),
-            AuthError::InternalServerError(_) => write!(f, "AuthError::InternalServerError"),
+            AuthError::AccessDenied(e) => {
+                write!(
+                    f,
+                    "AuthError::AccessDenied::{}",
+                    e.clone().unwrap_or("<none>".to_string())
+                )
+            }
+            AuthError::InternalServerError(e) => write!(f, "AuthError::InternalServerError::{}", e),
         }
     }
 }
@@ -227,7 +233,7 @@ impl IntoResponse for AuthError {
                 (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
             }
             AuthError::InternalServerError(e) => {
-                error!("AuthError::InternalServerError {}", e);
+                error!("AuthError::InternalServerError::{}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong, please retry.",
@@ -240,7 +246,7 @@ impl IntoResponse for AuthError {
 
 impl<E> From<E> for AuthError
 where
-    E: std::fmt::Display + Into<anyhow::Error>,
+    E: Into<anyhow::Error>,
 {
     fn from(value: E) -> Self {
         Self::InternalServerError(value.into())
