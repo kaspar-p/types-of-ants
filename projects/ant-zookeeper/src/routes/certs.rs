@@ -11,11 +11,6 @@ use tracing::{debug, info};
 
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
-#[derive(Serialize, Deserialize)]
-pub struct ProvisionCertificateRequest {
-    pub domains: Vec<String>,
-}
-
 fn acme_domain(owned_domain: &str) -> String {
     format!("_acme-challenge.{owned_domain}")
 }
@@ -42,6 +37,11 @@ async fn clean_acme_records(
     }
 
     return Ok(cleaned);
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProvisionCertificateRequest {
+    pub domains: Vec<String>,
 }
 
 async fn provision_certificate(

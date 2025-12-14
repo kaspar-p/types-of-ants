@@ -100,7 +100,9 @@ impl Fixture {
                 .join("tests")
                 .join("integration")
                 .join("fs"),
-            db: AntZooStorageClient::connect(&test_db_config).await.unwrap(),
+            db: Arc::new(Mutex::new(
+                AntZooStorageClient::connect(&test_db_config).await.unwrap(),
+            )),
         };
 
         let routes = make_routes(state.clone()).unwrap();
