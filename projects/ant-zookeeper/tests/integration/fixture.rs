@@ -1,9 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use ant_library::{
-    axum_test_client::TestClient,
-    db::{fixture::test_database_config, TypesOfAntsDatabase},
-};
+use ant_library::db::TypesOfAntsDatabase;
+use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
 use ant_zoo_storage::AntZooStorageClient;
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},

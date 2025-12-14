@@ -7,6 +7,7 @@ members = [
   "projects/ant-who-tweets",
   "projects/ant-host-agent",
   "projects/ant-library",
+  "projects/ant-library-test",
   "projects/ant-metadata",
   "projects/ant-owning-artifacts",
   "projects/anthill",
@@ -14,5 +15,6 @@ members = [
   "projects/ant-releasing-ants-into-the-wild",
   "projects/ant-zookeeper",
   "projects/ant-backing-it-up",
-  "projects/ant-fs-client", "projects/ant-zoo-storage",
+  "projects/ant-fs-client",
+  "projects/ant-zoo-storage",
 ]

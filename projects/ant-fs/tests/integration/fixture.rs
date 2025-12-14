@@ -4,7 +4,7 @@ use std::{
 };
 
 use ant_fs::make_routes;
-use ant_library::axum_test_client::TestClient;
+use ant_library_test::axum_test_client::TestClient;
 
 pub struct TestFixture {
     root: PathBuf,

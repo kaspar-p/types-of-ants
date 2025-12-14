@@ -43,14 +43,15 @@ ant-host-agent = { path = "../ant-host-agent" }
 ant-metadata = { path = "../ant-metadata" }
 tokio-util = "0.7.15"
 anyhow = "1.0.98"
-git2 = "0.20.2"
+openssl = { version = "0.10", features = ["vendored"] }
 anthill = { path = "../anthill" }
 home = "0.5.11"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 ant-library = { path = "../ant-library" }
-reqwest = { version = "0.12.15", features = ["json"] }
+reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
 flate2 = "1.1.1"
 tar = "0.4.44"
+git2 = "0.20.3"
 
 [dev-dependencies]
 rstest = "0.25.0"

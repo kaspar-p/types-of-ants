@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use postgresql_embedded::PostgreSQL;
 
-use crate::db::DatabaseConfig;
+use ant_library::db::DatabaseConfig;
 
 pub async fn test_database_config(project: &str) -> (PostgreSQL, DatabaseConfig) {
     let mut pg = PostgreSQL::new(postgresql_embedded::Settings {

@@ -5,7 +5,7 @@ use ant_backing_it_up::{
     storage_client::{AntBackingItUpStorageClient, DatabaseParams},
 };
 use ant_fs_client::AntFsClient;
-use clap::{command, Parser};
+use clap::Parser;
 use tracing::info;
 
 #[derive(Parser, Debug)]

@@ -10,7 +10,7 @@
 //! use axum::Router;
 //! use axum::http::StatusCode;
 //! use axum::routing::get;
-//! use ant_library::axum_test_client::TestClient;
+//! use ant_library_test::axum_test_client::TestClient;
 //!
 //! fn main() {
 //!     let async_block = async {
@@ -215,7 +215,7 @@ impl AsRef<reqwest::Response> for TestResponse {
 #[cfg(test)]
 mod tests {
     use axum::response::Html;
-    use axum::{routing::get, routing::post, Json, Router};
+    use axum::{Json, Router, routing::get, routing::post};
     use http::StatusCode;
     use serde::{Deserialize, Serialize};
 

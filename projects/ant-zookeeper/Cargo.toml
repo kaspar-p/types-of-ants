@@ -43,11 +43,12 @@ postgresql_commands = "0.20.0"
 zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
 cloudflare = "0.14.0"
 async-trait = "0.1.89"
-acme-lib = "0.9.1"
 rsa = "0.9.9"
 ant-zoo-storage = { version = "0.1.0", path = "../ant-zoo-storage" }
-postgresql_embedded = "0.20.0"
+acme-lib = "0.9.1"
 
 [dev-dependencies]
+ant-library-test = { version = "1.0.0", path = "../ant-library-test" }
+postgresql_embedded = "0.20.0"
 stdext = "0.3.3"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }

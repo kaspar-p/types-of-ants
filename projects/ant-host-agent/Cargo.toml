@@ -42,7 +42,11 @@ uuid = { version = "1.16.0", features = ["serde", "v4"] }
 validator = "0.20.0"
 ant-data-farm = { path = "../ant-data-farm-client" }
 ant-metadata = { path = "../ant-metadata" }
-reqwest = { version = "0.12.15", features = ["json", "multipart"] }
+reqwest = { version = "0.12.15", features = [
+  "json",
+  "multipart",
+  "rustls-tls",
+] }
 anyhow = "1.0.98"
 sysinfo = "0.35.0"
 futures-util = "0.3.31"
@@ -51,10 +55,13 @@ tar = "0.4.44"
 ant-library = { version = "1.0.0", path = "../ant-library" }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 tracing-appender = "0.2.3"
-openssl = { version = "0.10.73", features = ["vendored"] }
+openssl = { version = "0.10", features = ["vendored"] }
 zbus_systemd = { version = "0.25701.0", features = ["systemd1"] }
 stdext = "0.3.3"
 flate2 = "1.1.5"
 bollard = "0.19.3"
 tokio-util = "0.7.17"
 serde_with = { version = "3.16.1", features = ["base64"] }
+
+[dev-dependencies]
+ant-library-test = { path = "../ant-library-test" }

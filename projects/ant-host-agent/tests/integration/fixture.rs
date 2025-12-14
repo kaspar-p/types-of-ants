@@ -4,7 +4,7 @@ use std::{
 };
 
 use ant_host_agent::{make_routes, routes::secret::PutSecretRequest, state::AntHostAgentState};
-use ant_library::axum_test_client::TestClient;
+use ant_library_test::axum_test_client::TestClient;
 use hyper::StatusCode;
 
 pub struct TestFixture {

@@ -7,8 +7,6 @@ use std::fs::read_dir;
 use tokio_postgres::NoTls;
 use tracing::debug;
 
-pub mod fixture;
-
 #[derive(Debug, Clone)]
 pub struct DatabaseCredentials {}
 
