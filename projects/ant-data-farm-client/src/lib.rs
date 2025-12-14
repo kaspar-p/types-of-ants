@@ -64,7 +64,7 @@ impl AntDataFarmClient {
     ) -> Result<AntDataFarmClient, anyhow::Error> {
         let cfg = DatabaseConfig {
             port: dotenv::var("ANT_DATA_FARM_PORT")?.parse()?,
-            host: dotenv::var("ANT_DATA_FARM_PORT")?,
+            host: dotenv::var("ANT_DATA_FARM_HOST")?,
             database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
             database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
             database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
