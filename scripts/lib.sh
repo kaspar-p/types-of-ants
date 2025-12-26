@@ -117,11 +117,20 @@ function is_project_docker() {
 function get_docker_platform() {
   local host="$1"
   local arch
-  arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
+  arch="$(get_architecture "$host")"
   local rust_target
   rust_target="$(get_services | jq -r ".architectures[\"$arch\"].docker_platform")"
 
   echo "$rust_target"
+}
+
+function get_architecture() {
+  local host="$1"
+  
+  local arch
+  arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
+  
+  echo "$arch"
 }
 
 function get_docker_platform_arch() {

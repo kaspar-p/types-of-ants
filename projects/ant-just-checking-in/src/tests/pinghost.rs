@@ -1,4 +1,5 @@
 use ant_host_agent::clients::{Host, HostAgentClient};
+use anyhow::Context;
 use reqwest::StatusCode;
 
 use super::ping::StatusData;

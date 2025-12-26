@@ -20,7 +20,7 @@ async fn invalid_version_throws() {
 
     println!("testing!");
 
-    let client = AntOwningArtifactsClient::new(None, Some(7007));
+    let client = AntOwningArtifactsClient::new("localhost".to_string(), 7007);
 
     while !client.healthy().await {
         info!("Waiting for server to be healthy...");
@@ -52,7 +52,7 @@ async fn valid_version_builds_correctly() {
 
     println!("testing!");
 
-    let client = AntOwningArtifactsClient::new(None, Some(7008));
+    let client = AntOwningArtifactsClient::new("localhost".to_string(), 7008);
 
     while !client.healthy().await {
         info!("Waiting for server to be healthy...");

@@ -1,1 +1,0 @@
-1. Add status code information into the test_instance. Or tables for each type of test and then further information within that test. Maybe rename test_instance to test_run?

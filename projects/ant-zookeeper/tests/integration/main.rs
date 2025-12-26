@@ -1,1 +1,1 @@
-pub mod fixture;
+pub mod deployments;

@@ -1,4 +1,5 @@
 use std::{
+    env::set_var,
     fs::{create_dir_all, remove_dir_all},
     path::PathBuf,
 };
@@ -18,7 +19,22 @@ impl Drop for TestFixture {
 }
 
 pub async fn test_router_no_auth(name: &str) -> TestFixture {
+    unsafe {
+        set_var(
+            "TYPESOFANTS_SECRET_DIR",
+            PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
+                .join("tests")
+                .join("integration")
+                .join("test-secrets")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+
     let root = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("tests")
+        .join("integration")
         .join("test-fs")
         .join(name);
     create_dir_all(&root).unwrap();

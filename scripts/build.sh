@@ -29,18 +29,20 @@ remote_host="$(anthost "$host")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
+arch="$(get_architecture "$remote_host")"
+
 commit_number="$(git rev-list --count HEAD)"
 commit_sha="$(git log --format='%h' -n 1)"
 version="$(project_version)"
 
 log "RESOLVING ENVIRONMENT [$project]..."
 
-# Expose the environment ('beta', 'prod', ...) for other commands to pick up.
-build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
-set -o allexport
-# shellcheck disable=SC1090
-source "$build_cfg"
-set +o allexport
+# # Expose the environment ('beta', 'prod', ...) for other commands to pick up.
+# build_cfg="${repository_root}/secrets/${deploy_env}/build.cfg"
+# set -o allexport
+# # shellcheck disable=SC1090
+# source "$build_cfg"
+# set +o allexport
 
 # Some projects require this for generating deterministic build hashes
 export commit_sha
@@ -53,7 +55,7 @@ log "BUILDING [$project]..."
 
 # Build the project
 build_dir="$project_src/build"
-tmp_build_dir="$build_dir/$project.build.tmp"
+tmp_build_dir="$build_dir/tmp.$project.build"
 run_command rm -rf "${tmp_build_dir}" # clear previous builds
 
 run_command mkdir -p "${tmp_build_dir}"
@@ -63,12 +65,12 @@ run_command rm -rf "$build_dir/$build_mode/*"
 
 make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> /dev/stderr
 
-# Copy environment into the build directory.
-log "... creating environment variables"
-{
-  cat "${build_cfg}"
-  echo "PERSIST_DIR=$PERSIST_DIR"
-} > "${tmp_build_dir}/.env"
+# # Copy environment into the build directory.
+# log "... creating environment variables"
+# {
+#   cat "${build_cfg}"
+#   echo "PERSIST_DIR=$PERSIST_DIR"
+# } > "${tmp_build_dir}/.env"
 
 is_docker=false
 if is_project_docker "$project"; then
@@ -101,19 +103,24 @@ echo "{
 # Copy all other build files into the build directory
 cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"
 
-# Interpret mustache template into the systemctl unit file
-log "... creating unit file"
-INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$version" mo "$project_src/$project.service.mo" > "${tmp_build_dir}/$project.service"
-
-deployment_file_name="deployment.${project}.${version}.tar.gz"
+deployment_file_name="${project}.${arch}.${version}.tar.gz"
 log "... building deployment file: ${deployment_file_name}"
 
-deployment_file_path="${build_dir}/${deployment_file_name}"
+registry_dir="${repository_root}/build/registry"
+mkdir -p "$registry_dir"
+
+deployment_file_path="${registry_dir}/${deployment_file_name}"
 tar --disable-copyfile -cz -C "${tmp_build_dir}" -f "${deployment_file_path}" "."
 rm -rf "${tmp_build_dir}"
 
 deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
 log "... deployment file size: ${deployment_size}"
+
+exit 1
+
+# # Interpret mustache template into the systemctl unit file
+# log "... creating unit file"
+# INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$version" mo "$project_src/$project.service.mo" > "${tmp_build_dir}/$project.service"
 
 log "INSTALLING [$project] ONTO [$remote_host]..."
 remote_deployment_file_store="${remote_home}/persist/ant-host-agent/fs/archives"
