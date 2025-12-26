@@ -14,21 +14,36 @@ fn digest(path: &PathBuf) -> String {
 
 #[traced_test]
 #[tokio::test]
-async fn services_service_version_returns_400_if_no_project() {
+async fn services_service_version_returns_400_if_no_headers() {
     let fixture = fixture::Fixture::new().await;
 
-    let req = reqwest::multipart::Form::new();
-    let res = fixture
-        .client
-        .post("/services/service-version")
-        .header("X-Ant-Project", "docker-proj1")
-        .header("X-Ant-Version", "v1")
-        .multipart(req)
-        .send()
-        .await;
+    {
+        let req = reqwest::multipart::Form::new();
+        let res = fixture
+            .client
+            .post("/services/service-version")
+            // .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
 
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(res.text().await, "No such project: docker-proj1");
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = reqwest::multipart::Form::new();
+        let res = fixture
+            .client
+            .post("/services/service-version")
+            .header("X-Ant-Project", "docker-proj1")
+            // .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
 }
 
 #[traced_test]
