@@ -37,7 +37,7 @@ values
 ;
 
 insert into project_instance
-  (project_id, host_id, environment, deployment_version)
+  (project_id, deployment_version)
 values
   -- PROD 000
   ('ant-host-agent', 'antworker000.hosts.typesofants.org', 'prod', 'live'),

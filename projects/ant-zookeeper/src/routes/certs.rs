@@ -41,6 +41,7 @@ async fn clean_acme_records(
 
 #[derive(Serialize, Deserialize)]
 pub struct ProvisionCertificateRequest {
+    pub environment: String,
     pub domains: Vec<String>,
 }
 
@@ -143,6 +144,26 @@ async fn provision_certificate(
 
     debug!("Deleting TXT records created during the challenge...");
     clean_acme_records(&state, &req.domains).await?;
+
+    state
+        .db
+        .register_new_secret_version(
+            "tls_cert",
+            &req.environment,
+            chrono::Duration::days(files.valid_days_left() - 1), // subtract 1 for some safety
+            files.certificate().as_bytes(),
+        )
+        .await?;
+
+    state
+        .db
+        .register_new_secret_version(
+            "tls_key",
+            &req.environment,
+            chrono::Duration::days(files.valid_days_left() - 1), // subtract 1 for some safety
+            files.private_key().as_bytes(),
+        )
+        .await?;
 
     return Ok((StatusCode::OK, "Certificate provisioned.".to_string()));
 }

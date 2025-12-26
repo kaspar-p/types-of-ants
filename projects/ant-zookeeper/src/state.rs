@@ -10,7 +10,7 @@ use crate::dns::Dns;
 pub struct AntZookeeperState {
     pub root_dir: PathBuf,
 
-    pub db: Arc<Mutex<AntZooStorageClient>>,
+    pub db: AntZooStorageClient,
 
     pub dns: Arc<Mutex<dyn Dns>>,
     pub acme_contact_email: String,

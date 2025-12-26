@@ -23,21 +23,19 @@ async fn main() -> Result<(), anyhow::Error> {
     let state = AntZookeeperState {
         root_dir,
 
-        db: Arc::new(Mutex::new(
-            AntZooStorageClient::connect(&DatabaseConfig {
-                port: std::env::var("ANT_ZOO_STORAGE_PORT")
-                    .context("ANT_ZOO_STORAGE_PORT")?
-                    .parse()?,
-                database_name: ant_library::secret::load_secret("ant_zoo_storage_db")?,
-                database_password: ant_library::secret::load_secret("ant_zoo_storage_password")?,
-                database_user: ant_library::secret::load_secret("ant_zoo_storage_user")?,
-                host: std::env::var("ANT_ZOO_STORAGE_HOST")
-                    .context("ANT_ZOO_STORAGE_HOST")?
-                    .parse()?,
-                migration_dir: None,
-            })
-            .await?,
-        )),
+        db: AntZooStorageClient::connect(&DatabaseConfig {
+            port: std::env::var("ANT_ZOO_STORAGE_PORT")
+                .context("ANT_ZOO_STORAGE_PORT")?
+                .parse()?,
+            database_name: ant_library::secret::load_secret("ant_zoo_storage_db")?,
+            database_password: ant_library::secret::load_secret("ant_zoo_storage_password")?,
+            database_user: ant_library::secret::load_secret("ant_zoo_storage_user")?,
+            host: std::env::var("ANT_ZOO_STORAGE_HOST")
+                .context("ANT_ZOO_STORAGE_HOST")?
+                .parse()?,
+            migration_dir: None,
+        })
+        .await?,
 
         rng: OsRng,
 

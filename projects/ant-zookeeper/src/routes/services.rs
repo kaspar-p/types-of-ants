@@ -137,7 +137,7 @@ fn persist_dir(root_dir: &PathBuf) -> PathBuf {
     root_dir.join("services-db")
 }
 
-fn service_file_name(project: String, version: String) -> String {
+fn service_file_name(project: &str, version: &str) -> String {
     format!("{project}.{version}.bld")
 }
 
@@ -148,10 +148,16 @@ async fn register_service_version(
     TypedHeader(version): TypedHeader<XAntVersionHeader>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
+    if !state.db.get_project(&project.0).await? {
+        info!("Registering project [{}] for the first time...", project.0);
+        // Building our own images means an owned project!
+        state.db.register_project(&project.0, true).await?;
+    }
+
     let dir = persist_dir(&state.root_dir);
     create_dir_all(&dir).await?;
 
-    let path = dir.join(service_file_name(project.0, version.0));
+    let path = dir.join(service_file_name(&project.0, &version.0));
     let mut file = File::create(&path).await?;
 
     let mut field = multipart
@@ -176,6 +182,11 @@ async fn register_service_version(
     file.flush().await?;
 
     info!("Finished writing to [{}]...", path.display());
+
+    state
+        .db
+        .register_project_version(&project.0, &version.0)
+        .await?;
 
     Ok((StatusCode::OK, "Version registered"))
 }
