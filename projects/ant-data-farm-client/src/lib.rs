@@ -60,7 +60,7 @@ impl TypesOfAntsDatabase for AntDataFarmClient {
 
 impl AntDataFarmClient {
     pub async fn connect_from_env(
-        migration_dir: Option<PathBuf>,
+        migration_dirs: Vec<PathBuf>,
     ) -> Result<AntDataFarmClient, anyhow::Error> {
         let cfg = DatabaseConfig {
             port: dotenv::var("ANT_DATA_FARM_PORT")?.parse()?,
@@ -68,7 +68,7 @@ impl AntDataFarmClient {
             database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
             database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
             database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
-            migration_dir: migration_dir,
+            migration_dirs: migration_dirs,
         };
 
         AntDataFarmClient::connect(&cfg).await

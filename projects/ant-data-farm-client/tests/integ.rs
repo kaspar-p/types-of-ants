@@ -21,7 +21,7 @@ async fn more_than_500_ants() {
         database_user: "test".to_string(),
         database_password: "test".to_string(),
         host: "localhost".to_string(),
-        migration_dir: None,
+        migration_dirs: vec![],
     })
     .await
     .expect("Connected!");
@@ -44,7 +44,7 @@ async fn user_gets_created() {
         database_user: "test".to_string(),
         database_password: "test".to_string(),
         host: "localhost".to_string(),
-        migration_dir: None,
+        migration_dirs: vec![],
     })
     .await
     .expect("Connected!");
@@ -82,7 +82,7 @@ async fn see_scheduled_tweets(_logging: &()) {
         database_user: "test".to_string(),
         database_password: "test".to_string(),
         host: "localhost".to_string(),
-        migration_dir: None,
+        migration_dirs: vec![],
     })
     .await
     .expect("Connected!");
@@ -112,7 +112,7 @@ async fn add_tweeted(_logging: &()) {
         database_user: "test".to_string(),
         database_password: "test".to_string(),
         host: "localhost".to_string(),
-        migration_dir: None,
+        migration_dirs: vec![],
     })
     .await
     .expect("Connected!");

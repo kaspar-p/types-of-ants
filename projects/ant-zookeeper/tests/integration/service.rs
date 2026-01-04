@@ -1,29 +1,28 @@
-#[path = "../common/mod.rs"]
-mod common;
-
 use std::{fs::exists, path::PathBuf};
 
 use http::StatusCode;
+use tokio::test;
 use tracing_test::traced_test;
 
-use crate::services::common::fixture;
+use crate::fixture;
 
 fn digest(path: &PathBuf) -> String {
     sha256::try_digest(path).unwrap()
 }
 
 #[traced_test]
-#[tokio::test]
-async fn services_service_version_returns_400_if_no_headers() {
+#[test]
+async fn service_artifact_returns_400_if_no_headers() {
     let fixture = fixture::Fixture::new().await;
 
     {
         let req = reqwest::multipart::Form::new();
         let res = fixture
             .client
-            .post("/services/service-version")
+            .post("/service/artifact")
             // .header("X-Ant-Project", "docker-proj1")
             .header("X-Ant-Version", "v1")
+            .header("X-Ant-Architecture", "aarch64")
             .multipart(req)
             .send()
             .await;
@@ -35,9 +34,41 @@ async fn services_service_version_returns_400_if_no_headers() {
         let req = reqwest::multipart::Form::new();
         let res = fixture
             .client
-            .post("/services/service-version")
+            .post("/service/artifact")
             .header("X-Ant-Project", "docker-proj1")
             // .header("X-Ant-Version", "v1")
+            .header("X-Ant-Architecture", "aarch64")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let req = reqwest::multipart::Form::new();
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Version", "v1")
+            // .header("X-Ant-Architecture", "aarch64")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // bad arch header
+    {
+        let req = reqwest::multipart::Form::new();
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Version", "v1")
+            .header("X-Ant-Architecture", "something-else")
             .multipart(req)
             .send()
             .await;
@@ -47,8 +78,8 @@ async fn services_service_version_returns_400_if_no_headers() {
 }
 
 #[traced_test]
-#[tokio::test]
-async fn services_service_version_returns_200_happy_path() {
+#[test]
+async fn service_artifact_returns_200_happy_path() {
     let fixture = fixture::Fixture::new().await;
 
     let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
@@ -65,9 +96,10 @@ async fn services_service_version_returns_200_happy_path() {
 
     let res = fixture
         .client
-        .post("/services/service-version")
+        .post("/service/artifact")
         .header("X-Ant-Project", "docker-proj1")
         .header("X-Ant-Version", "v1")
+        .header("X-Ant-Architecture", "aarch64")
         .multipart(req)
         .send()
         .await;

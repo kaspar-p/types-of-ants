@@ -1,5 +1,5 @@
 # Testing files
 tests/integration/test-fs/
 
-dev-fs/dev-fs/certs-db
-dev-fs/dev-fs/secrets
+dev-fs/dev-fs/*
+!dev-fs/dev-fs/envs-db

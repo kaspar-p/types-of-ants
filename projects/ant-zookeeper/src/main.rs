@@ -8,6 +8,8 @@ use rsa::rand_core::OsRng;
 use tokio::sync::Mutex;
 use tracing::debug;
 
+mod deployment;
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     ant_library::set_global_logs("ant-zookeeper");
@@ -33,7 +35,7 @@ async fn main() -> Result<(), anyhow::Error> {
             host: std::env::var("ANT_ZOO_STORAGE_HOST")
                 .context("ANT_ZOO_STORAGE_HOST")?
                 .parse()?,
-            migration_dir: None,
+            migration_dirs: vec![],
         })
         .await?,
 

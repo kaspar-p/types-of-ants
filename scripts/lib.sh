@@ -48,7 +48,6 @@ function get_services() {
   cat "$repository_root/services.jsonc"
 }
 
-
 function find_host_project_pairs_with_env() {
   local env="$1"
 
@@ -133,20 +132,60 @@ function get_architecture() {
   echo "$arch"
 }
 
+function get_prometheus_os() {
+  local host="$1"
+
+  local arch
+  arch="$(get_architecture "$host")"
+
+  local rust_target
+  prometheus_os="$(get_services | jq -r ".architectures[\"$arch\"].prometheus_os")"
+
+  echo "$prometheus_os"
+}
+
+function get_prometheus_arch() {
+  local host="$1"
+
+  local arch
+  arch="$(get_architecture "$host")"
+
+  local rust_target
+  prometheus_arch="$(get_services | jq -r ".architectures[\"$arch\"].prometheus_arch")"
+
+  echo "$prometheus_arch"
+}
+
 function get_docker_platform_arch() {
   local host="$1"
   local arch
-  arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
+  arch="$(get_architecture "$host")"
+
   local rust_target
   rust_target="$(get_services | jq -r ".architectures[\"$arch\"].docker_platform" | cut -d '/' -f 2)"
 
   echo "$rust_target"
 }
 
+function register_artifact() {
+  local project="$1"
+  local version="$2"
+  local arch="$3"
+  local path="$4"
+
+  curl \
+    -X POST \
+    -H "X-Ant-Project: $project" \
+    -H "X-Ant-Version: $version" \
+    -H "X-Ant-Architecture: $arch" \
+    -F file="@$path" \
+    localhost:3235/service/artifact
+}
+
 function get_rust_target() {
   local host="$1"
   local arch
-  arch="$(get_services | jq -r ".hosts[\"$host\"].architecture")"
+  arch="$(get_architecture "$host")"
   local rust_target
   rust_target="$(get_services | jq -r ".architectures[\"$arch\"].rust_target")"
 

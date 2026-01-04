@@ -30,7 +30,9 @@ create table architecture (
   architecture_id text primary key,
 
   rust_target varchar(255), -- The target name for the Rust cross compiler to consume.
-  docker_platform varchar(255) -- The docker platform for publishing images meant for this host.
+  docker_platform varchar(255), -- The docker platform for publishing images meant for this host.
+  prometheus_os varchar(255), -- The OS component in Prometheus installs
+  prometheus_arch varchar(255) -- The Arch component in Prometheus installs
 );
 
 create table host (
@@ -41,25 +43,45 @@ create table host (
   constraint fk_architecture foreign key (architecture_id) references architecture(architecture_id)
 );
 
-create table project_version (
-  project_version_id text primary key default ('proj-v-' || random_string(10)),
+-- A generic revision/version of a project. May have multiple artifacts,
+-- one per architecture of the destination hosts.
+create table project_revision (
+  project_revision_id text primary key default ('proj-rev-' || random_string(10)),
 
-  project_id text not null, -- The project that this is a version of
-  deployment_version text not null, -- The current version deployed
+  project_id text not null, -- The project this is a version of.
+  deployment_version text not null, -- The version.
+
+  unique (project_id, deployment_version),
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone,
 
-  unique (project_id, deployment_version), -- Cannot have multiple of the same project and version
+  foreign key (project_id) references project(project_id)
+);
 
-  constraint fk_project foreign key (project_id) references project(project_id)
+create table artifact (
+  artifact_id text primary key default ('a-' || random_string(10)),
+
+  project_revision_id text not null, -- The revision of this project.
+  architecture_id text, -- The architecture this project was built for. If NULL, is platform-agnostic.
+
+  unique (project_revision_id, architecture_id), -- Cannot have multiple of the same project and version
+
+  local_path text not null, -- The local filesystem path to the artifact, where it was saved.
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (project_revision_id) references project_revision(project_revision_id),
+  foreign key (architecture_id) references architecture(architecture_id)
 );
 
 create table project_instance (
   project_instance_id text primary key default ('proj-i-' || random_string(10)),
 
-  project_version_id text not null, -- The project version that's deployed.
+  artifact_id text not null, -- The artifact that's deployed.
   host_id text not null, -- The host it's deployed onto.
 
   environment varchar(16), -- "prod", "beta", "dev". Null means the project is environment-agnostic.
@@ -68,8 +90,80 @@ create table project_instance (
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone,
 
-  constraint fk_project_version foreign key (project_version_id) references project_version(project_version_id),
-  constraint fk_host foreign key (host_id) references host(host_id)
+  foreign key (artifact_id) references artifact(artifact_id),
+  foreign key (host_id) references host(host_id)
+);
+
+create table deployment_pipeline (
+  deployment_pipeline_id text primary key default ('pipe-' || random_string(10)),
+
+  project_id text not null, -- The project that this pipeline deploys.
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (project_id) references project(project_id)
+);
+
+create table host_group (
+  host_group_id text primary key default ('hostgroup-' || random_string(10)),
+
+  host_group_name text unique not null, -- Human readable name.
+  host_group_description text,
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone
+);
+
+create table host_group_host (
+  host_group_id text not null, -- The semantic name of the host group, e.g. "ant-on-the-web/beta"
+  host_id text not null, -- The host in the group.
+
+  primary key (host_group_id, host_id),
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (host_group_id) references host_group(host_group_id),
+  foreign key (host_id) references host(host_id)
+);
+
+create table deployment_pipeline_stage (
+  deployment_pipeline_stage_id text primary key default ('stage-' || random_string(10)),
+
+  deployment_pipeline_id text not null, -- The pipeline this stage is a part of.
+  stage_name text not null, -- The name of the stage, e.g. "beta" or whatever.
+
+  unique (deployment_pipeline_id, stage_name), -- Stages unique in a pipeline.
+
+  host_group_id text not null, -- The hosts to deploy to, in this stage.
+  stage_order int not null, -- The order of the stages, lower is earlier. 0 is the first stage.
+
+  unique (deployment_pipeline_id, host_group_id), -- Cannot deploy to same set of hosts twice in the same pipeline.
+  unique (deployment_pipeline_id, stage_name, stage_order), -- No two stages can have the same order.
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (deployment_pipeline_id) references deployment_pipeline(deployment_pipeline_id),
+  foreign key (host_group_id) references host_group(host_group_id)
+);
+
+create table deployment (
+  deployment_id text primary key default ('d-' || random_string(16)),
+
+  host_group_id text not null, -- The host group that got this project revision.
+  project_revision_id text not null, -- The revision that was deployed to that stage.
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (host_group_id) references host_group(host_group_id)
 );
 
 create table secret (

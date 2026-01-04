@@ -7,6 +7,7 @@ use tracing::debug;
 
 use crate::state::AntZookeeperState;
 
+pub mod client;
 pub mod dns;
 pub mod err;
 pub mod routes;
@@ -27,8 +28,9 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Router::new()
-        .nest("/services", routes::services::make_routes())
-        .nest("/certs", routes::certs::make_routes())
+        .nest("/pipeline", routes::pipeline::make_routes())
+        .nest("/service", routes::service::make_routes())
+        .nest("/cert", routes::cert::make_routes())
         .with_state(s)
         .layer(
             ServiceBuilder::new()

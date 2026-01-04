@@ -25,7 +25,7 @@ async fn connection_resetting_works_fine() {
             database_name: "typesofants".to_string(),
             database_user: "test".to_string(),
             database_password: "test".to_string(),
-            migration_dir: None,
+            migration_dirs: vec![],
         })
         .await
         .expect("Connected!");

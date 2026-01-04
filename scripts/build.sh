@@ -29,6 +29,11 @@ remote_host="$(anthost "$host")"
 repository_root="$(git rev-parse --show-toplevel)"
 project_src="$repository_root/projects/$project"
 
+if [[ ! -e "$project_src" ]]; then
+  log "Project [$project] does not exist!"
+  exit 1
+fi
+
 arch="$(get_architecture "$remote_host")"
 
 commit_number="$(git rev-list --count HEAD)"
@@ -63,7 +68,11 @@ run_command mkdir -p "${tmp_build_dir}"
 build_mode="release"
 run_command rm -rf "$build_dir/$build_mode/*"
 
-make -C "$project_src" -e TARGET="$(get_rust_target "$remote_host")" release >> /dev/stderr
+make -C "$project_src" \
+  -e RUST_TARGET="$(get_rust_target "$remote_host")" \
+  -e PROMETHEUS_OS="$(get_prometheus_os "$remote_host")" \
+  -e PROMETHEUS_ARCH="$(get_prometheus_arch "$remote_host")" \
+  release >> /dev/stderr
 
 # # Copy environment into the build directory.
 # log "... creating environment variables"
@@ -115,6 +124,9 @@ rm -rf "${tmp_build_dir}"
 
 deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
 log "... deployment file size: ${deployment_size}"
+
+log "... registering artifact"
+register_artifact "$project" "$version" "$arch" "$deployment_file_path"
 
 exit 1
 

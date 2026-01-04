@@ -21,7 +21,8 @@ pub struct DatabaseConfig {
     /// The host of the database.
     pub host: String,
     /// On client startup, execute the SQL within the directory to bootstrap schemas and databases.
-    pub migration_dir: Option<PathBuf>,
+    /// Executes in the order of the vector.
+    pub migration_dirs: Vec<PathBuf>,
 }
 
 fn make_connection_string(
@@ -58,9 +59,9 @@ pub async fn database_connection(config: &DatabaseConfig) -> Result<Database, an
     let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)?;
     let db: Database = Pool::builder().build(manager).await?;
 
-    if let Some(migration_dir) = &config.migration_dir {
+    for migration_dir in &config.migration_dirs {
         let con = db.get().await?;
-        bootstrap(con, migration_dir).await?;
+        bootstrap(con, &migration_dir).await?;
     }
 
     Ok(db)

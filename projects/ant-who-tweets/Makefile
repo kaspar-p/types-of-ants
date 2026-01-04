@@ -19,8 +19,8 @@ run: debug
 	cd $(BUILD_DIR)/debug/ && ./$(PROJECT)
 
 binary:
-	cross build --target=$(TARGET) $(RUST_FLAGS) -p $(PROJECT)
+	cross build --target=$(RUST_TARGET) $(RUST_FLAGS) -p $(PROJECT)
 	mkdir -p $(@D)
-	cp ../../target/$(TARGET)/$(BUILD_MODE)/$(PROJECT) $@
+	cp ../../target/$(RUST_TARGET)/$(BUILD_MODE)/$(PROJECT) $@
 
 .PHONY: all debug release clean run binary

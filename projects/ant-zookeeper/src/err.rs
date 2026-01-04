@@ -11,6 +11,13 @@ pub enum AntZookeeperError {
 }
 
 impl AntZookeeperError {
+    pub fn validation_msg(msg: &str) -> Self {
+        Self::ValidationError {
+            msg: msg.to_string(),
+            e: None,
+        }
+    }
+
     pub fn validation(msg: &str, e: Option<anyhow::Error>) -> Self {
         Self::ValidationError {
             msg: msg.to_string(),

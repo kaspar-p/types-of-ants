@@ -525,6 +525,7 @@ dependencies = [
  "bytes",
  "chrono",
  "postgres-types",
+ "serde",
  "tokio",
  "tokio-postgres",
  "tracing",

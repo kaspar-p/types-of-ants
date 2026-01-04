@@ -10,6 +10,7 @@ async-trait = "0.1.89"
 bytes = "1.11.0"
 chrono = "0.4.42"
 postgres-types = "0.2.11"
+serde = { version = "1.0.228", features = ["derive"] }
 tokio = "1.48.0"
 tokio-postgres = { version = "0.7.15", features = ["with-chrono-0_4"] }
 tracing = "0.1.44"
