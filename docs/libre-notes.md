@@ -21,177 +21,15 @@ flash it.
 Plug in Ethernet _before_ power, to initialize on the network. Find it with:
 
 ```bash
-sudo arp-scan --localnet
+nmap -sL 192.168.2.0/24 | grep ubuntu
 ```
 
-or something like
+Note that the `.2` is specific to houze, some networks have a different 3rd
+octet. Or something like
 
 ```bash
 $ arp -a | grep ubuntu
 ubuntu-22 (192.168.2.95) at 82:de:6c:c4:68:a9 on en0 ifscope [ethernet]
-```
-
-Sometimes it doesn't work and you have to go to the network home and search for
-`ubuntu-22` connected hosts there.
-
-And SSH in with `ubuntu@<ip>`. Mine was `192.168.2.53`. Then change the password
-to any temporary ubuntu password (`typesofants`).
-
-## Terminal setup
-
-To get cmd+left, opt+left, and other keybinds to work remotely, from the local
-computer run:
-
-```bash
-infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
-```
-
-And set it to be globally available (on the host):
-
-```bash
-sudo ln -s $HOME/.terminfo/x/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty
-```
-
-## Tool onboarding
-
-Then, run (this will take a while):
-
-```bash
-sudo apt update && \
-sudo apt upgrade && \
-sudo apt install -y net-tools dirmngr ca-certificates \
-  software-properties-common apt-transport-https lsb-release curl && \
-sudo apt-get install -y autoconf && \
-sudo snap install jq docker btop && \
-echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"' | sudo tee /etc/environment
-```
-
-Install NodeJS with NVM like:
-
-```bash
-wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.bashrc
-nvm install --lts
-ln -s $(nvm which node) /home/ant/.nvm/versions/node/current
-node -v
-```
-
-Install a postgresql client matching the version `ant-data-farm` uses:
-
-```bash
-sudo apt install dirmngr ca-certificates software-properties-common apt-transport-https lsb-release curl -y
-sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
-sudo apt update
-sudo apt install -y postgresql-client-15 postgresql-client-17
-```
-
-And in `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`.
-
-Change the hostname to the one you decide on for this machine. Others are named
-`antworker<num>`. Set it with:
-
-```bash
-export ANT_HOSTNAME=antworker<num>
-sudo hostnamectl set-hostname $ANT_HOSTNAME
-sudo cat /etc/hostname
-```
-
-and make sure it's the right output. Also add a line to `cat /etc/hosts`:
-
-```txt
-127.0.1.1  $ANT_HOSTNAME
-```
-
-and that's it!
-
-## User setup
-
-Create an `ant` user on the host, and rename the `ubuntu` group to the `ants`
-group:
-
-```bash
-sudo adduser ant
-sudo usermod -aG ubuntu ant
-sudo groupmod -n ants ubuntu
-```
-
-Add the `ant` user to be able to `sudo` by adding via `visudo`:
-
-```txt
-root  ALL=(ALL:ALL) ALL
-ant   ALL=(ALL:ALL) ALL
-```
-
-Then logout, you can log back in with:
-
-```bash
-ssh2ant <number>
-```
-
-## Docker installation
-
-Make sure you can use `docker` tools:
-
-```bash
-sudo groupadd docker
-sudo usermod -aG docker ant
-newgrp docker
-sudo systemctl restart docker
-```
-
-Alternatively, if the `systemctl restart` command doesn't work, this might:
-
-```bash
-sudo systemctl restart snap.docker.dockerd.service
-```
-
-Make sure Docker is up by getting a response from `docker ps`. You might need to
-`sudo reboot`, which is safe at this point.
-
-## Other tools installation
-
-Install `mo`, a mustache template implementation.
-
-```bash
-mkdir -p ~/installs
-mkdir -p ~/persist
-
-curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
-  -o ~/installs/mo
-chmod +x ~/installs/mo
-
-echo 'export PATH="$PATH:/home/ant/installs"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-## Networking
-
-To get DNS working, go to the
-[CloudFlare Domain](https://dash.cloudflare.com/3196bd788e22028260c62531239ac7c2/typesofants.org/dns/records)
-and add a record for `antworker<num>.hosts.typesofants.org` pointing to the
-LOCAL IP. This makes local lookups work, but doesn't expose anything.
-
-To get the SSH key you have working to login to that user, locally from your Mac
-on the network, run:
-
-```bash
-ssh-copy-id -i ~/.ssh/id_typesofants_ed25519 ant@<hostname>.hosts.typesofants.org
-```
-
-Please! Test logging into this machine with `ssh2ant <hostname_or_num>` and make
-sure it works before logging out again! Finally, restart the various services we
-have changed with, on the new host:
-
-```bash
-sudo systemctl restart sshd
-```
-
-and remove the default user, either `ubuntu` or `pi`:
-
-```bash
-sudo deluser ubuntu
-sudo deluser pi
 ```
 
 ## Local network
@@ -232,6 +70,181 @@ External Port:  13002
 Device:         antworker002
 ```
 
+## User setup
+
+SSH in with `ubuntu@<ip>`. Mine was `192.168.2.53`. Then change the password to
+any temporary ubuntu password (`typesofants`).
+
+Create an `ant` user on the host, and rename the `ubuntu` group to the `ants`
+group:
+
+```bash
+sudo adduser ant
+sudo usermod -aG ubuntu ant
+sudo groupmod -n ants ubuntu
+```
+
+Add the `ant` user to be able to `sudo` by adding via `visudo`:
+
+```txt
+root  ALL=(ALL:ALL) ALL
+ant   ALL=(ALL:ALL) ALL
+```
+
+Then exit, and log back in with `ant@<ip>`.
+
+## Host networking
+
+In `/etc/cloud/cloud.cfg` change `preserve_hostname: false` to `true`.
+
+Change the hostname to the one you decide on for this machine. Others are named
+`antworker<num>`. Set it with:
+
+```bash
+export ANT_HOSTNAME=antworker<num>
+sudo hostnamectl set-hostname $ANT_HOSTNAME
+sudo cat /etc/hostname
+```
+
+and make sure it's the right output. Also add a line to `cat /etc/hosts`:
+
+```txt
+127.0.1.1  $ANT_HOSTNAME
+```
+
+and that's it!
+
+## Networking
+
+To get DNS working, go to the
+[CloudFlare Domain](https://dash.cloudflare.com/3196bd788e22028260c62531239ac7c2/typesofants.org/dns/records)
+and add a record for `antworker<num>.hosts.typesofants.org` pointing to the
+LOCAL IP. This makes local lookups work, but doesn't expose anything.
+
+To get the SSH key you have working to login to that user, locally from your Mac
+on the network, run:
+
+```bash
+ssh-copy-id -i ~/.ssh/id_typesofants_ed25519 ant@<hostname>.hosts.typesofants.org
+```
+
+Please! Test logging into this machine with `ssh2ant <hostname_or_num>` and make
+sure it works before logging out again! Finally, restart the various services we
+have changed with, on the new host:
+
+```bash
+sudo systemctl restart sshd
+```
+
+and remove the default user, either `ubuntu` or `pi`:
+
+```bash
+sudo deluser ubuntu
+sudo deluser pi
+```
+
+Then logout, you can log back in with:
+
+```bash
+ssh2ant <number>
+```
+
+## Tool onboarding
+
+Then, run (this will take a while):
+
+```bash
+sudo apt update
+sudo apt upgrade
+sudo apt install -y net-tools dirmngr ca-certificates software-properties-common apt-transport-https lsb-release curl
+sudo apt-get install -y autoconf
+sudo snap install jq docker btop
+echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"' | sudo tee /etc/environment
+```
+
+Install NodeJS with NVM like:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+ln -s $(nvm which node) /home/ant/.nvm/versions/node/current
+node -v
+```
+
+Install a postgresql client matching the version `ant-data-farm` uses:
+
+```bash
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
+sudo apt update
+sudo apt install -y postgresql-client-15 postgresql-client-17
+```
+
+## Terminal setup
+
+To get cmd+left, opt+left, and other keybinds to work remotely, from the local
+computer run:
+
+```bash
+infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
+```
+
+And set it to be globally available (on the host):
+
+```bash
+sudo ln -s $HOME/.terminfo/x/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty
+```
+
+And enable colors for the terminal by editing the `~/.bashrc` file:
+
+```diff
+case "$TERM" in
+-    xterm-color|*-256color) color_prompt=yes;;
++    xterm-color|*-256color|xterm-ghostty) color_prompt=yes;;
+esac
+```
+
+## Docker installation
+
+Make sure you can use `docker` tools:
+
+```bash
+sudo groupadd docker
+sudo usermod -aG docker ant
+newgrp docker
+sudo systemctl restart snap.docker.dockerd.service
+```
+
+Alternatively, if the `systemctl restart` command doesn't work, this might:
+
+```bash
+sudo systemctl restart docker
+```
+
+Make sure Docker is up by getting a response from `docker ps`. You might need to
+`sudo reboot`, which is safe at this point.
+
+## Other tools installation
+
+Install `mo`, a mustache template implementation.
+
+```bash
+mkdir -p ~/installs
+
+curl -sSL https://raw.githubusercontent.com/tests-always-included/mo/master/mo \
+  -o ~/installs/mo
+chmod +x ~/installs/mo
+
+echo 'export PATH="$PATH:/home/ant/installs"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## Record in `services.jsonc`
+
+Record the host in `services.jsonc` to receive deployments. Mark at least
+`ant-host-agent` being deployed `prod`-ly there.
+
 ## Deploy deployment support server `ant-host-agent`
 
 The ant-host-agent server is responsible for responding to requests for service
@@ -259,6 +272,8 @@ $ pwd
 /home/ant/service/ant-host-agent/467-2025-11-28-19-51-48310c0
 
 $ sudo systemctl enable /home/ant/service/ant-host-agent/467-2025-11-28-19-51-48310c0/ant-host-agent.service
+
+$ sudo systemctl start /home/ant/service/ant-host-agent/467-2025-11-28-19-51-48310c0/ant-host-agent.service
 
 $ sudo systemctl status ant-host-agent.service
 ● ant-host-agent.service - The typesofants host agent!

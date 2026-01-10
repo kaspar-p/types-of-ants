@@ -126,11 +126,11 @@ deployment_size="$(du -hs "${deployment_file_path}" | cut -f 1)"
 log "... deployment file size: ${deployment_size}"
 
 log "... registering artifact"
-register_artifact "$project" "$version" "$arch" "$deployment_file_path"
+# register_artifact "$project" "$version" "$arch" "$deployment_file_path"
 
-exit 1
+# exit 1
 
-# # Interpret mustache template into the systemctl unit file
+# Interpret mustache template into the systemctl unit file
 # log "... creating unit file"
 # INSTALL_DIR="$INSTALL_DIR" HOME="$remote_home" VERSION="$version" mo "$project_src/$project.service.mo" > "${tmp_build_dir}/$project.service"
 

@@ -68,6 +68,18 @@
         { "env": "prod", "service": "ant-fs" }
       ]
     },
+    "antworker005.hosts.typesofants.org": {
+      "architecture": "arm",
+      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+    },
+    "antworker006.hosts.typesofants.org": {
+      "architecture": "arm",
+      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+    },
+    "antworker007.hosts.typesofants.org": {
+      "architecture": "arm",
+      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+    },
     "hisbaan01.hosts.typesofants.org": {
       "architecture": "x86",
       "services": [{ "env": "prod", "service": "ant-fs" }]
