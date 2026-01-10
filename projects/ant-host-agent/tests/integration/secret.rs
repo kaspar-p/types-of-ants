@@ -13,7 +13,7 @@ use crate::fixture::TestFixture;
 #[tokio::test]
 #[traced_test]
 async fn bytes_smoke() {
-    let fixture = TestFixture::new(function_name!()).await;
+    let fixture = TestFixture::new(function_name!(), None).await;
 
     {
         let json = json!({
@@ -42,7 +42,7 @@ async fn bytes_smoke() {
 #[tokio::test]
 #[traced_test]
 async fn put_secret_then_peek_works() {
-    let fixture = TestFixture::new(function_name!()).await;
+    let fixture = TestFixture::new(function_name!(), None).await;
 
     {
         let req = PutSecretRequest {
@@ -76,7 +76,7 @@ async fn put_secret_then_peek_works() {
 #[tokio::test]
 #[traced_test]
 async fn delete_secret_works_if_no_secret() {
-    let fixture = TestFixture::new(function_name!()).await;
+    let fixture = TestFixture::new(function_name!(), None).await;
 
     {
         let req = PeekSecretRequest {
@@ -121,7 +121,7 @@ async fn delete_secret_works_if_no_secret() {
 #[tokio::test]
 #[traced_test]
 async fn put_then_delete_works() {
-    let fixture = TestFixture::new(function_name!()).await;
+    let fixture = TestFixture::new(function_name!(), None).await;
 
     {
         let req = PeekSecretRequest {

@@ -9,7 +9,7 @@ insert into architecture
     prometheus_arch
   )
 values
-  ('raspbian', 'armv7-unknown-linux-gnueabihf', 'linux/arm64', 'linux', 'armv7'),
+  ('armv7', 'armv7-unknown-linux-gnueabihf', 'linux/arm64', 'linux', 'armv7'),
   ('aarch64', 'aarch64-unknown-linux-gnu', 'linux/arm64', 'linux', 'arm64'),
   ('x86_64', 'x86_64-unknown-linux-gnu', 'linux/amd64', 'linux', 'amd64')
 ;
@@ -17,7 +17,7 @@ values
 insert into host
   (host_id, architecture_id)
 values
-  ('antworker000.hosts.typesofants.org', 'raspbian'),
+  ('antworker000.hosts.typesofants.org', 'armv7'),
   ('antworker001.hosts.typesofants.org', 'aarch64'),
   ('antworker002.hosts.typesofants.org', 'aarch64'),
   ('antworker003.hosts.typesofants.org', 'aarch64'),
@@ -48,6 +48,12 @@ insert into deployment_pipeline
 select (project_id)
 from project
 where owned = true
+;
+
+insert into deployment_pipeline_stage
+  (deployment_pipeline_id, stage_type, stage_name, stage_order)
+select deployment_pipeline_id, 'build', 'build', 0
+from deployment_pipeline
 ;
 
 -- insert into project_instance

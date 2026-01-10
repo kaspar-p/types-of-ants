@@ -139,10 +139,12 @@ create table deployment_pipeline_stage (
 
   unique (deployment_pipeline_id, stage_name), -- Stages unique in a pipeline.
 
-  host_group_id text not null, -- The hosts to deploy to, in this stage.
   stage_order int not null, -- The order of the stages, lower is earlier. 0 is the first stage.
 
-  unique (deployment_pipeline_id, host_group_id), -- Cannot deploy to same set of hosts twice in the same pipeline.
+  stage_type text not null, -- Either 'build' or 'deploy', right now.
+
+  stage_type_deploy_host_group_id text, -- The hosts to deploy to, in this stage. Only if stage_type is 'deploy'.
+
   unique (deployment_pipeline_id, stage_name, stage_order), -- No two stages can have the same order.
 
   created_at timestamp with time zone not null default now(),
@@ -150,20 +152,34 @@ create table deployment_pipeline_stage (
   deleted_at timestamp with time zone,
 
   foreign key (deployment_pipeline_id) references deployment_pipeline(deployment_pipeline_id),
-  foreign key (host_group_id) references host_group(host_group_id)
+  foreign key (stage_type_deploy_host_group_id) references host_group(host_group_id)
 );
 
 create table deployment (
   deployment_id text primary key default ('d-' || random_string(16)),
 
-  host_group_id text not null, -- The host group that got this project revision.
-  project_revision_id text not null, -- The revision that was deployed to that stage.
+  deployment_pipeline_stage_id text not null, -- The stage that was deployed by this deployment.
+  project_revision_id text not null, -- The project revision that was deployed to that stage.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone,
 
-  foreign key (host_group_id) references host_group(host_group_id)
+  foreign key (deployment_pipeline_stage_id) references deployment_pipeline_stage(deployment_pipeline_stage_id)
+);
+
+create table deployment_approval (
+  deployment_approval_id text primary key default ('approval-' || random_string(16)),
+
+  deployment_id text not null, -- The deployment that this approval is approving.
+
+  is_human boolean not null, -- Whether the deployment was approved by a human.
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  deleted_at timestamp with time zone,
+
+  foreign key (deployment_id) references deployment(deployment_id)
 );
 
 create table secret (

@@ -31,7 +31,7 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
     // artifact::initialize()?;
 
     let db = Arc::new(
-        AntDataFarmClient::connect_from_env(None)
+        AntDataFarmClient::connect_from_env(vec![])
             .await
             .expect("Failed to connect to database!"),
     );

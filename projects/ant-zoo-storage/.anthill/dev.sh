@@ -8,4 +8,12 @@ export SECRETS_DIR="$repository_root/secrets/dev"
 export VERSION="dev"
 export PERSIST_DIR="$repository_root/projects/ant-zoo-storage/database-files"
 
-docker-compose up --build --force-recreate ant-zoo-storage "${@:2}"
+mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/compose.yaml"
+
+docker-compose \
+  --project-directory "${repository_root}" \
+  --file /tmp/compose.yaml \
+  up \
+  --build \
+  --force-recreate \
+  ant-zoo-storage "${@:2}"

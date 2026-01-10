@@ -17,7 +17,7 @@ async fn main() {
 
         // None config for production use-case
         dao: Arc::new(
-            AntDataFarmClient::connect_from_env(None)
+            AntDataFarmClient::connect_from_env(vec![])
                 .await
                 .expect("db connection failed"),
         ),

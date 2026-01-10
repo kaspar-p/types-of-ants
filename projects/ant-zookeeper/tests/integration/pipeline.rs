@@ -4,6 +4,7 @@ use ant_zookeeper::routes::pipeline::{
     PutPipelineRequest, PutPipelineStage, RemoveHostFromHostGroupRequest,
 };
 use http::StatusCode;
+use stdext::function_name;
 use tokio::test;
 use tracing_test::traced_test;
 
@@ -12,7 +13,7 @@ use crate::fixture::{self, Fixture};
 #[test]
 #[traced_test]
 async fn pipeline_host_group_host_group_get_returns_4xx() {
-    let fixture = fixture::Fixture::new().await;
+    let fixture = fixture::Fixture::new(function_name!()).await;
 
     {
         let req = GetHostGroupRequest {
@@ -33,7 +34,7 @@ async fn pipeline_host_group_host_group_get_returns_4xx() {
 #[test]
 #[traced_test]
 async fn pipeline_host_group_host_post_returns_4xx_if_no_host_group() {
-    let fixture = fixture::Fixture::new().await;
+    let fixture = fixture::Fixture::new(function_name!()).await;
 
     {
         let req = AddHostToHostGroupRequest {
@@ -90,7 +91,7 @@ async fn pipeline_host_group_host_post_returns_4xx_if_no_host_group() {
 #[test]
 #[traced_test]
 async fn pipeline_host_group_host_delete_returns_4xx_if_no_host_group() {
-    let fixture = fixture::Fixture::new().await;
+    let fixture = fixture::Fixture::new(function_name!()).await;
 
     {
         let req = RemoveHostFromHostGroupRequest {
@@ -147,7 +148,7 @@ async fn pipeline_host_group_host_delete_returns_4xx_if_no_host_group() {
 #[test]
 #[traced_test]
 async fn pipeline_host_group_host_post_returns_400_if_double_add() {
-    let fixture = fixture::Fixture::new().await;
+    let fixture = fixture::Fixture::new(function_name!()).await;
 
     // create group
     let host_group_id = {
@@ -208,7 +209,7 @@ async fn pipeline_host_group_host_post_returns_400_if_double_add() {
 #[test]
 #[traced_test]
 async fn pipeline_host_group_host_post_then_delete_returns_200() {
-    let fixture = fixture::Fixture::new().await;
+    let fixture = fixture::Fixture::new(function_name!()).await;
 
     let host_group_id = {
         let req = CreateHostGroupRequest {
@@ -317,7 +318,7 @@ async fn pipeline_host_group_host_post_then_delete_returns_200() {
 #[test]
 #[traced_test]
 async fn pipeline_pipeline_post_returns_4xx_bad_host_group() {
-    let fixture = Fixture::new().await;
+    let fixture = Fixture::new(function_name!()).await;
 
     let req = PutPipelineRequest {
         project: "ant-data-farm".to_string(),
@@ -341,7 +342,7 @@ async fn pipeline_pipeline_post_returns_4xx_bad_host_group() {
 #[test]
 #[traced_test]
 async fn pipeline_pipeline_post_returns_200_empty_pipeline() {
-    let fixture = Fixture::new().await;
+    let fixture = Fixture::new(function_name!()).await;
 
     let req = PutPipelineRequest {
         project: "ant-data-farm".to_string(),
@@ -361,7 +362,7 @@ async fn pipeline_pipeline_post_returns_200_empty_pipeline() {
 #[test]
 #[traced_test]
 async fn pipeline_pipeline_post_returns_4xx_for_empty_group() {
-    let fixture = Fixture::new().await;
+    let fixture = Fixture::new(function_name!()).await;
 
     // make group
     let host_group_id = {
@@ -409,7 +410,7 @@ async fn pipeline_pipeline_post_returns_4xx_for_empty_group() {
 #[test]
 #[traced_test]
 async fn pipeline_pipeline_post_returns_200_full_pipeline() {
-    let fixture = Fixture::new().await;
+    let fixture = Fixture::new(function_name!()).await;
 
     // make group
     let host_group_id = {
@@ -485,22 +486,26 @@ async fn pipeline_pipeline_post_returns_200_full_pipeline() {
         let body: GetPipelineResponse = res.json().await;
 
         assert_eq!(body.project, "ant-data-farm");
-        assert_eq!(body.stages[0].stage_name, "stage1");
+        assert_eq!(body.stages[0].stage_name, "build");
+        let build_stage = body.stages[0].clone().build_stage();
+        assert!(build_stage.builds.is_empty());
+
+        assert_eq!(body.stages[1].stage_name, "stage1");
+        let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            body.stages[0].hosts[0].host_name,
+            deploy_stage.hosts[0].host_name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(body.stages[0].hosts[0].deployed_artifact_version, None);
-        assert_eq!(body.stages[0].hosts[0].deployed_at, None);
-        assert_eq!(body.stages[0].hosts.len(), 1);
-        assert_eq!(body.stages.len(), 1);
+        assert_eq!(deploy_stage.hosts[0].deployment, None);
+        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(body.stages.len(), 2);
     }
 }
 
 #[test]
 #[traced_test]
 async fn pipeline_pipeline_post_returns_200_for_different_projects() {
-    let fixture = Fixture::new().await;
+    let fixture = Fixture::new(function_name!()).await;
 
     // make group ant-data-farm/beta
     let ant_data_farm_group = {
@@ -612,15 +617,19 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
         let body: GetPipelineResponse = res.json().await;
 
         assert_eq!(body.project, "ant-data-farm");
-        assert_eq!(body.stages[0].stage_name, "beta-stage");
+        assert_eq!(body.stages[0].stage_name, "build");
+        let build_stage = body.stages[0].clone().build_stage();
+        assert!(build_stage.builds.is_empty());
+
+        assert_eq!(body.stages[1].stage_name, "beta-stage");
+        let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            body.stages[0].hosts[0].host_name,
+            deploy_stage.hosts[0].host_name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(body.stages[0].hosts[0].deployed_artifact_version, None);
-        assert_eq!(body.stages[0].hosts[0].deployed_at, None);
-        assert_eq!(body.stages[0].hosts.len(), 1);
-        assert_eq!(body.stages.len(), 1);
+        assert_eq!(deploy_stage.hosts[0].deployment, None);
+        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(body.stages.len(), 2);
     }
 
     // make pipeline for ant-on-the-web
@@ -661,14 +670,18 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
         let body: GetPipelineResponse = res.json().await;
 
         assert_eq!(body.project, "ant-on-the-web");
-        assert_eq!(body.stages[0].stage_name, "beta-website");
+        assert_eq!(body.stages[0].stage_name, "build");
+        let build_stage = body.stages[0].clone().build_stage();
+        assert!(build_stage.builds.is_empty());
+
+        assert_eq!(body.stages[1].stage_name, "beta-website");
+        let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            body.stages[0].hosts[0].host_name,
+            deploy_stage.hosts[0].host_name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(body.stages[0].hosts[0].deployed_artifact_version, None);
-        assert_eq!(body.stages[0].hosts[0].deployed_at, None);
-        assert_eq!(body.stages[0].hosts.len(), 1);
-        assert_eq!(body.stages.len(), 1);
+        assert_eq!(deploy_stage.hosts[0].deployment, None);
+        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(body.stages.len(), 2);
     }
 }

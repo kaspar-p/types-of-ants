@@ -7,7 +7,7 @@ use crate::fixture::TestFixture;
 #[traced_test]
 #[tokio::test]
 async fn ping_healthy() {
-    let fixture = TestFixture::new(function_name!()).await;
+    let fixture = TestFixture::new(function_name!(), None).await;
 
     let response = fixture.client.get("/ping").send().await;
 

@@ -195,7 +195,7 @@ pub fn get_config() -> Result<Config, anyhow::Error> {
             database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
             host: dotenv::var("ANT_DATA_FARM_HOST")?,
             port: dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?,
-            migration_dir: None,
+            migration_dirs: vec![],
         },
     };
 

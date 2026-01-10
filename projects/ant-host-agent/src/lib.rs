@@ -1,4 +1,5 @@
 pub mod clients;
+mod err;
 pub mod routes;
 pub mod state;
 

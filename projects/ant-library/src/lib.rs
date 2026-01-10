@@ -12,6 +12,8 @@ use tracing::{debug, error, Level};
 use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
 
 pub mod db;
+pub mod headers;
+pub mod host_architecture;
 pub mod manifest_file;
 pub mod secret;
 

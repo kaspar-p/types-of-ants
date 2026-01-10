@@ -1,6 +1,10 @@
 use std::path::PathBuf;
+use std::{fs::File, io::Write};
 
-use ant_zoo_storage::host_architecture::HostArchitecture;
+use ant_library::{
+    headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
+    host_architecture::HostArchitecture,
+};
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
@@ -8,20 +12,16 @@ use axum::{
     Json, Router,
 };
 use axum_extra::{routing::RouterExt, TypedHeader};
+use flate2::read::GzDecoder;
 use http::StatusCode;
 use humansize::DECIMAL;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    fs::{create_dir_all, File},
-    io::AsyncWriteExt,
-};
+use tar::Archive;
+use tempfile::tempdir_in;
+use tokio::fs::create_dir_all;
 use tracing::info;
 
-use crate::{
-    err::AntZookeeperError,
-    routes::headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
-    state::AntZookeeperState,
-};
+use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -134,56 +134,137 @@ async fn register_artifact(
         state.db.register_project(&project.0, is_owned).await?;
     }
 
+    let global_tmp_dir = state.root_dir.join("tmp");
+    create_dir_all(&global_tmp_dir).await?;
+
     let dir = persist_dir(&state.root_dir);
     create_dir_all(&dir).await?;
 
-    let path = dir.join(service_file_name(&project.0, arch.0.as_ref(), &version.0));
-    let mut file = File::create(&path).await?;
+    let temp_dir = tempdir_in(&global_tmp_dir)?;
+    let temp_file_path = temp_dir.path().join("input.tar.gz");
+    let mut temp_file = File::create_new(&temp_file_path)?;
+    {
+        let mut field = multipart
+            .next_field()
+            .await
+            .map_err(|e| {
+                AntZookeeperError::validation(
+                    "No field found in multipart request!",
+                    Some(e.into()),
+                )
+            })?
+            .ok_or(AntZookeeperError::validation(
+                "No bytes field found in request!",
+                None,
+            ))?;
 
-    let mut field = multipart
-        .next_field()
-        .await
-        .map_err(|e| {
-            AntZookeeperError::validation("No field found in multipart request!", Some(e.into()))
-        })?
-        .ok_or(AntZookeeperError::validation(
-            "No bytes field found in request!",
-            None,
-        ))?;
-
-    while let Some(bytes) = field.chunk().await.unwrap() {
-        info!(
-            "Wrote [{}] to [{}]...",
-            humansize::format_size(bytes.len(), DECIMAL),
-            path.display()
-        );
-        file.write_all(&bytes).await?;
+        while let Some(bytes) = field.chunk().await.unwrap() {
+            info!(
+                "Wrote [{}] to [{}]...",
+                humansize::format_size(bytes.len(), DECIMAL),
+                temp_file_path.display()
+            );
+            temp_file.write_all(&bytes)?;
+        }
+        temp_file.flush()?;
+        info!("Finished writing to [{}]...", temp_file_path.display());
     }
-    file.flush().await?;
 
-    info!("Finished writing to [{}]...", path.display());
+    info!(
+        "Validating file contents of [{}]...",
+        temp_file_path.display()
+    );
 
-    if state
+    {
+        let temp_file = File::open(&temp_file_path)?;
+        let gz = GzDecoder::new(&temp_file);
+        let mut archive = Archive::new(gz);
+
+        let mut service_file_found = false;
+
+        for entry in archive.entries()? {
+            let entry = entry?;
+            let path = entry.path()?;
+            if path.is_dir() {
+                continue;
+            }
+            let file_name = path
+                .file_name()
+                .expect(format!("entry {} has file name", path.display()).as_str());
+
+            if file_name == ".env" {
+                return Err(AntZookeeperError::validation_msg(
+                    "Deployment tarball cannot contain any files named '.env'.",
+                ));
+            }
+
+            if file_name == format!("{}.service", project.0).as_str() {
+                service_file_found = true;
+            }
+        }
+
+        if !service_file_found {
+            return Err(AntZookeeperError::validation_msg(
+                format!(
+                    "Service file '{}.service' must be included in deployment tarball.",
+                    project.0
+                )
+                .as_str(),
+            ));
+        }
+    }
+
+    // Write the file to final location
+    let filepath = dir.join(service_file_name(&project.0, arch.0.as_ref(), &version.0));
+    {
+        info!("Writing tarball to [{}]", filepath.display());
+        std::fs::copy(&temp_file_path, &filepath)?;
+    }
+
+    info!("Registering or updating artifact...");
+    let artifact_id = state
         .db
         .artifact_exists(&project.0, arch.0.as_ref(), &version.0)
-        .await?
-    {
-        info!("Updating existing artifact");
+        .await?;
+
+    match artifact_id {
+        Some(artifact_id) => {
+            info!("Updating existing artifact");
+            state.db.update_artifact(&artifact_id).await?;
+        }
+        None => {
+            info!("Registering new artifact");
+            let relative = filepath.strip_prefix(&dir).expect(&format!(
+                "[{}] was not parent of [{}]",
+                dir.display(),
+                filepath.display()
+            ));
+            state
+                .db
+                .register_artifact(&project.0, arch.0.as_ref(), &version.0, &relative)
+                .await?;
+        }
+    }
+
+    info!("Determining pipeline promotions...");
+    // if all architectures are done for a given (project, version), then we are done with the 'build' stage in a pipeline.
+    let missing_architectures = state
+        .db
+        .missing_artifacts_for_project_version(&project.0, &version.0)
+        .await?;
+    if missing_architectures.is_empty() {
+        info!("All architectures for a project have been built, build stage fulfilled.");
+        let build_stage_id = state
+            .db
+            .get_deployment_pipeline_build_stage(&project.0)
+            .await?;
+
         state
             .db
-            .update_artifact(&project.0, arch.0.as_ref(), &version.0)
+            .make_deployment(&build_stage_id, &project.0, &version.0)
             .await?;
     } else {
-        info!("Registering new artifact");
-        let relative = path.strip_prefix(&dir).expect(&format!(
-            "[{}] was not parent of [{}]",
-            dir.display(),
-            path.display()
-        ));
-        state
-            .db
-            .register_artifact(&project.0, arch.0.as_ref(), &version.0, &relative)
-            .await?;
+        info!("Still missing architectures: {missing_architectures:?}");
     }
 
     Ok((StatusCode::OK, "Version registered"))

@@ -2,4 +2,4 @@
 tests/integration/test-fs/
 
 dev-fs/dev-fs/*
-!dev-fs/dev-fs/envs-db
+!dev-fs/dev-fs/envs

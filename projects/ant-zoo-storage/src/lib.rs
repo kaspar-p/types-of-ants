@@ -5,9 +5,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::host_architecture::HostArchitecture;
-
-pub mod host_architecture;
+use ant_library::host_architecture::HostArchitecture;
 
 #[derive(Clone)]
 pub struct AntZooStorageClient {
@@ -83,12 +81,34 @@ impl AntZooStorageClient {
         Ok(row.is_some())
     }
 
+    pub async fn get_latest_artifacts_for_project_for_all_architectures(
+        &self,
+        project: &str,
+    ) -> Result<Vec<(String, String, DateTime<Utc>)>, anyhow::Error> {
+        let con = self.db.get().await?;
+
+        let artifacts = con.query("
+            select
+                project_revision.deployment_version,
+                artifact.architecture_id,
+                artifact.created_at
+            from artifact
+                join project_revision on artifact.project_revision_id = project_revision.project_revision_id
+            where project_id = $1
+            order by artifact.created_at desc
+        ", &[&project]).await?
+        
+        .iter().map(|r| (r.get("deployment_version") ,r.get("architecture_id"), r.get("created_at"))).collect();
+
+        Ok(artifacts)
+    }
+
     pub async fn artifact_exists(
         &self,
         project: &str,
         arch: Option<&HostArchitecture>,
         version: &str,
-    ) -> Result<bool, anyhow::Error> {
+    ) -> Result<Option<String>, anyhow::Error> {
         let con = self.db.get().await?;
 
         let exists = con
@@ -105,9 +125,54 @@ impl AntZooStorageClient {
                 &[&project, &arch.map(|a| a.as_str()), &version],
             )
             .await?
-            .is_some();
+            .map(|row| row.get("artifact_id"));
 
         Ok(exists)
+    }
+
+    pub async fn missing_artifacts_for_project_version(
+        &self,
+        project: &str,
+        version: &str,
+    ) -> Result<Vec<HostArchitecture>, anyhow::Error> {
+        let mut con = self.db.get().await?;
+
+        let tx = con.transaction().await?;
+
+        let revision: String = tx
+            .query_one(
+                "
+            select project_revision_id
+            from project_revision
+            where
+                project_id = $1 and
+                deployment_version = $2",
+                &[&project, &version],
+            )
+            .await?
+            .get("project_revision_id");
+
+        let rows = tx
+            .query(
+                "
+        select architecture.architecture_id
+        from architecture
+        where architecture.architecture_id not in (
+            select artifact.architecture_id
+            from artifact
+            where artifact.project_revision_id = $1
+        )
+        ",
+                &[&revision],
+            )
+            .await?;
+
+        let architectures = rows
+            .iter()
+            .map(|row| HostArchitecture::from_str(row.get("architecture_id")))
+            .collect::<Result<Vec<HostArchitecture>, anyhow::Error>>()?;
+
+        Ok(architectures)
     }
 
     pub async fn register_artifact(
@@ -116,7 +181,7 @@ impl AntZooStorageClient {
         arch: Option<&HostArchitecture>,
         version: &str,
         path: &Path,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<String, anyhow::Error> {
         let mut con = self.db.get().await?;
 
         let tx = con.transaction().await?;
@@ -156,35 +221,33 @@ impl AntZooStorageClient {
             Some(id) => id,
         };
 
-        tx.execute(
-            "
+        let artifact_id = tx
+            .query_one(
+                "
             insert into artifact
                 (project_revision_id, architecture_id, local_path)
             values
                 ($1, $2, $3)
+            returning artifact_id
             ",
-            &[
-                &revision_id,
-                &arch.map(|a| a.as_str()),
-                &path
-                    .as_os_str()
-                    .to_str()
-                    .expect(&format!("bad artifact path: {}", path.display())),
-            ],
-        )
-        .await?;
+                &[
+                    &revision_id,
+                    &arch.map(|a| a.as_str()),
+                    &path
+                        .as_os_str()
+                        .to_str()
+                        .expect(&format!("bad artifact path: {}", path.display())),
+                ],
+            )
+            .await?
+            .get("artifact_id");
 
         tx.commit().await?;
 
-        Ok(())
+        Ok(artifact_id)
     }
 
-    pub async fn update_artifact(
-        &self,
-        project: &str,
-        arch: Option<&HostArchitecture>,
-        version: &str,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn update_artifact(&self, artifact_id: &str) -> Result<(), anyhow::Error> {
         let con = self.db.get().await?;
 
         con.execute(
@@ -193,11 +256,9 @@ impl AntZooStorageClient {
             set
                 updated_at = now()
             where
-                project_id = $1 and
-                architecture_id = $2 and
-                deployment_version = $3
+                artifact_id = $1
             ",
-            &[&project, &arch.map(|a| a.as_str()), &version],
+            &[&artifact_id],
         )
         .await?;
 
@@ -285,12 +346,13 @@ impl AntZooStorageClient {
     pub async fn get_deployment_pipeline_stages(
         &self,
         project: &str,
-    ) -> Result<Vec<(String, String)>, anyhow::Error> {
+    ) -> Result<Vec<(String, String, String)>, anyhow::Error> {
         let rows = self.db.get().await?.query(
             "
             select
                 stage_name,
-                deployment_pipeline_stage_id
+                deployment_pipeline_stage_id,
+                stage_type
             from deployment_pipeline_stage
                 join deployment_pipeline on deployment_pipeline_stage.deployment_pipeline_id = deployment_pipeline.deployment_pipeline_id
             where
@@ -302,38 +364,96 @@ impl AntZooStorageClient {
 
         let stages = rows
             .iter()
-            .map(|row| -> (String, String) {
+            .map(|row| -> (String, String, String) {
                 (
                     row.get("stage_name"),
                     row.get("deployment_pipeline_stage_id"),
+                    row.get("stage_type"),
                 )
             })
-            .collect::<Vec<(String, String)>>();
+            .collect();
 
         Ok(stages)
+    }
+
+    pub async fn get_deployment_pipeline_stage_by_name(
+        &self,
+        deployment_pipeline_id: &str,
+        stage_name: &str,
+    ) -> Result<Option<String>, anyhow::Error> {
+        let stage_id = self
+            .db
+            .get()
+            .await?
+            .query_opt(
+                "
+            select deployment_pipeline_stage_id
+            from deployment_pipeline_stage
+            where
+                deployment_pipeline_id = $1 and
+                stage_name = $2
+        ",
+                &[&deployment_pipeline_id, &stage_name],
+            )
+            .await?
+            .map(|row| row.get("deployment_pipeline_stage_id"));
+
+        Ok(stage_id)
+    }
+
+    pub async fn get_deployment_pipeline_build_stage(
+        &self,
+        deployment_pipeline_id: &str,
+    ) -> Result<String, anyhow::Error> {
+        let stage_id = self
+            .db
+            .get()
+            .await?
+            .query_opt(
+                "
+            select deployment_pipeline_stage_id
+            from deployment_pipeline_stage
+                join deployment_pipeline on deployment_pipeline.deployment_pipeline_id = deployment_pipeline_stage.deployment_pipeline_id
+            where
+                project_id = $1 and
+                stage_type = 'build'
+        ",
+                &[&deployment_pipeline_id],
+            )
+            .await?
+            .map(|r|r.get("deployment_pipeline_stage_id"))
+            .ok_or_else(||anyhow::Error::msg(format!("Could not find a build stage for pipeline {deployment_pipeline_id}, but all pipelines should have one!")))?;
+
+            Ok(stage_id)
     }
 
     pub async fn delete_deployment_pipeline_stage(
         &self,
         stage_id: &str,
     ) -> Result<(), anyhow::Error> {
-        self.db
+        let deleted = self
+            .db
             .get()
             .await?
-            .query_one(
+            .execute(
                 "
             delete from deployment_pipeline_stage
             where deployment_pipeline_stage_id = $1
-            limit 1
-        ",
+            ",
                 &[&stage_id],
             )
             .await?;
 
+        if deleted != 1 {
+            panic!(
+                "Deleted {deleted} stages '{stage_id}' but meant to just delete a single stage!"
+            );
+        }
+
         Ok(())
     }
 
-    pub async fn create_deployment_pipeline_stage(
+    pub async fn create_deployment_pipeline_deployment_stage(
         &self,
         deployment_pipeline_id: &str,
         stage_name: &str,
@@ -350,11 +470,12 @@ impl AntZooStorageClient {
             (
                 deployment_pipeline_id,
                 stage_name,
-                host_group_id,
+                stage_type,
+                stage_type_deploy_host_group_id,
                 stage_order
             )
             values
-                ($1, $2, $3, $4)
+                ($1, $2, 'deploy', $3, $4)
             returning deployment_pipeline_stage_id
         ",
                 &[
@@ -377,7 +498,7 @@ impl AntZooStorageClient {
                 host.host_id
             from host
                 join host_group_host on host_group_host.host_id = host.host_id
-                join deployment_pipeline_stage on deployment_pipeline_stage.host_group_id = host_group_host.host_group_id
+                join deployment_pipeline_stage on deployment_pipeline_stage.stage_type_deploy_host_group_id = host_group_host.host_group_id
             where
                 deployment_pipeline_stage_id = $1
         ",
@@ -395,7 +516,7 @@ impl AntZooStorageClient {
     pub async fn get_deployment_history_on_host(
         &self,
         host_id: &str,
-    ) -> Result<Vec<(String, DateTime<Utc>)>, anyhow::Error> {
+    ) -> Result<Vec<(String, String, DateTime<Utc>)>, anyhow::Error> {
         let rows = self
             .db
             .get()
@@ -403,12 +524,14 @@ impl AntZooStorageClient {
             .query(
                 "
             select
+                deployment.deployment_id,
                 project_revision.deployment_version,
                 project_revision.created_at
             from deployment
                 join project_revision on deployment.project_revision_id = project_revision.project_revision_id
+                join deployment_pipeline_stage on deployment.deployment_pipeline_stage_id = deployment_pipeline_stage.deployment_pipeline_stage_id
             where
-                deployment.host_group_id =
+                deployment_pipeline_stage.stage_type_deploy_host_group_id =
                     (select host_group_id from host_group_host where host_id = $1)
             order by created_at desc
         ",
@@ -418,12 +541,54 @@ impl AntZooStorageClient {
 
         let revisions = rows
             .iter()
-            .map(|row| -> (String, DateTime<Utc>) {
-                (row.get("deployment_version"), row.get("created_at"))
+            .map(|row| {
+                (row.get("deployment_id"), row.get("deployment_version"), row.get("created_at"))
             })
-            .collect::<Vec<(String, DateTime<Utc>)>>();
+            .collect::<Vec<(String, String, DateTime<Utc>)>>();
 
         Ok(revisions)
+    }
+
+    pub async fn make_deployment(
+        &self,
+        stage_id: &str,
+        project: &str,
+        version: &str,
+    ) -> Result<String, anyhow::Error> {
+        let mut con = self.db.get().await?;
+
+        let tx = con.transaction().await?;
+
+        let revision: String = tx
+            .query_one(
+                "
+            select project_revision_id
+            from project_revision
+            where
+                project_id = $1 and
+                deployment_version = $2",
+                &[&project, &version],
+            )
+            .await?
+            .get("project_revision_id");
+
+        let deployment_id = tx
+            .query_one(
+                "
+        insert into deployment
+            (deployment_pipeline_stage_id, project_revision_id)
+        values
+            ($1, $2)
+        returning deployment_id
+        ",
+                &[&stage_id, &revision],
+            )
+            .await?
+            .get("deployment_id");
+
+        tx.commit().await?;
+
+        Ok(deployment_id)
     }
 
     pub async fn host_in_host_group(

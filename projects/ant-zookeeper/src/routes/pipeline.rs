@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use ant_library::host_architecture::HostArchitecture;
 use ant_zoo_storage::HostGroup;
 use axum::{
     debug_handler,
@@ -14,28 +17,79 @@ use tracing::info;
 
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPipelineRequest {
     pub project: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineHost {
     pub host_name: String,
-    pub deployed_artifact_version: Option<String>,
-    pub deployed_at: Option<DateTime<Utc>>,
+    pub deployment: Option<PipelineHostDeployment>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineHostDeployment {
+    deployment_id: String,
+    deployed_artifact_version: String,
+    deployed_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineStage {
     pub stage_name: String,
-    pub hosts: Vec<PipelineHost>,
+    pub stage_type: PipelineStageType,
 }
 
-#[derive(Serialize, Deserialize)]
+impl PipelineStage {
+    pub fn build_stage(self) -> PipelineBuildStage {
+        match self.stage_type {
+            PipelineStageType::Build(s) => s,
+            _ => panic!("Not a build stage!"),
+        }
+    }
+
+    pub fn deploy_stage(self) -> PipelineDeployStage {
+        match self.stage_type {
+            PipelineStageType::Deploy(s) => s,
+            _ => panic!("Not a deploy stage!"),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum PipelineStageType {
+    Build(PipelineBuildStage),
+    Deploy(PipelineDeployStage),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineBuild {
+    built_version: String,
+    architecture: HostArchitecture,
+    built_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineBuildStage {
+    pub builds: Vec<PipelineBuild>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineDeployStage {
+    pub hosts: Vec<PipelineHost>,
+    pub approved: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPipelineResponse {
     pub project: String,
@@ -61,7 +115,33 @@ async fn get_pipeline(
 
     let mut pipeline_stages: Vec<PipelineStage> = vec![];
 
-    for (stage_name, stage_id) in stages {
+    for (stage_name, stage_id, stage_type) in stages {
+        if stage_type == "build" {
+            let artifacts = state
+                .db
+                .get_latest_artifacts_for_project_for_all_architectures(&req.project)
+                .await?;
+
+            pipeline_stages.push(PipelineStage {
+                stage_name,
+                stage_type: PipelineStageType::Build(PipelineBuildStage {
+                    builds: artifacts
+                        .into_iter()
+                        .map(
+                            |(version, arch, built_at)| -> Result<PipelineBuild, anyhow::Error> {
+                                Ok(PipelineBuild {
+                                    architecture: HostArchitecture::from_str(&arch)?,
+                                    built_version: version,
+                                    built_at: built_at,
+                                })
+                            },
+                        )
+                        .collect::<Result<Vec<PipelineBuild>, anyhow::Error>>()?,
+                }),
+            });
+            continue;
+        }
+
         info!("Building stage {stage_name}...");
         let hosts = state.db.get_hosts_in_stage(&stage_id).await?;
 
@@ -73,14 +153,20 @@ async fn get_pipeline(
 
             pipeline_hosts.push(PipelineHost {
                 host_name: host_id,
-                deployed_artifact_version: latest.clone().map(|l| l.0),
-                deployed_at: latest.map(|l| l.1),
+                deployment: latest.map(|l| PipelineHostDeployment {
+                    deployment_id: l.0,
+                    deployed_artifact_version: l.1,
+                    deployed_at: l.2,
+                }),
             });
         }
 
         pipeline_stages.push(PipelineStage {
             stage_name,
-            hosts: pipeline_hosts,
+            stage_type: PipelineStageType::Deploy(PipelineDeployStage {
+                hosts: pipeline_hosts,
+                approved: false,
+            }),
         });
     }
 
@@ -149,20 +235,25 @@ async fn put_pipeline(
         .await?;
 
     // delete previous pipeline definition
-    for (stage_name, stage_id) in stages {
+    for (stage_name, stage_id, stage_type) in stages {
+        if stage_type == "build" {
+            continue;
+        }
+
         info!("Deleting stage {stage_name} ({stage_id})");
         state.db.delete_deployment_pipeline_stage(&stage_id).await?;
     }
 
     // create new pipeline definition
+
     for (i, stage) in req.stages.iter().enumerate() {
         info!(
-            "Creating stage {} with host group {}",
+            "Creating deployment stage {} with host group {}",
             stage.name, stage.host_group_id
         );
         state
             .db
-            .create_deployment_pipeline_stage(
+            .create_deployment_pipeline_deployment_stage(
                 &pipeline_id,
                 &stage.name,
                 &stage.host_group_id,

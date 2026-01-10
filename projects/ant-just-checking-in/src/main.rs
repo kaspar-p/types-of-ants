@@ -23,7 +23,7 @@ async fn main() {
         .finish();
     let _ = tracing::subscriber::set_default(subscriber);
 
-    let client = match AntDataFarmClient::connect_from_env(None).await {
+    let client = match AntDataFarmClient::connect_from_env(vec![]).await {
         Err(e) => {
             error!("Failed to initialize database: {}", e);
             error!("Ending CRON early!");

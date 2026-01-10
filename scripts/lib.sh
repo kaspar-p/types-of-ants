@@ -132,11 +132,12 @@ function get_architecture() {
   echo "$arch"
 }
 
-function get_prometheus_os() {
-  local host="$1"
+function get_all_architectures() {
+  get_services | jq -r '.architectures | keys | join(" ")'
+}
 
-  local arch
-  arch="$(get_architecture "$host")"
+function get_prometheus_os() {
+  local arch="$1"
 
   local rust_target
   prometheus_os="$(get_services | jq -r ".architectures[\"$arch\"].prometheus_os")"
@@ -145,10 +146,7 @@ function get_prometheus_os() {
 }
 
 function get_prometheus_arch() {
-  local host="$1"
-
-  local arch
-  arch="$(get_architecture "$host")"
+  local arch="$1"
 
   local rust_target
   prometheus_arch="$(get_services | jq -r ".architectures[\"$arch\"].prometheus_arch")"
@@ -174,7 +172,10 @@ function register_artifact() {
   local path="$4"
 
   curl \
+    --no-progress-meter \
     -X POST \
+    --fail-with-body \
+    -w "\n" \
     -H "X-Ant-Project: $project" \
     -H "X-Ant-Version: $version" \
     -H "X-Ant-Architecture: $arch" \
@@ -183,9 +184,8 @@ function register_artifact() {
 }
 
 function get_rust_target() {
-  local host="$1"
-  local arch
-  arch="$(get_architecture "$host")"
+  local arch="$1"
+
   local rust_target
   rust_target="$(get_services | jq -r ".architectures[\"$arch\"].rust_target")"
 

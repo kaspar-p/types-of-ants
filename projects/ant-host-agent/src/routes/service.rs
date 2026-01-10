@@ -1,18 +1,25 @@
+use ant_library::headers::{XAntProjectHeader, XAntVersionHeader};
+use humansize::DECIMAL;
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use tokio_util::codec;
 
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
-use axum_extra::routing::RouterExt;
+use axum::{
+    extract::{DefaultBodyLimit, Multipart, State},
+    response::IntoResponse,
+    routing::post,
+    Json, Router,
+};
+use axum_extra::{routing::RouterExt, TypedHeader};
 use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio::{fs::File, time::sleep};
+use tokio::{fs::File, io::AsyncWriteExt, time::sleep};
 use tracing::{debug, error, info, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
 
 use std::default::Default;
 
-use crate::state::AntHostAgentState;
+use crate::{err::AntHostAgentError, state::AntHostAgentState};
 
 fn unit_name(project: &str) -> String {
     format!("{project}.service")
@@ -316,15 +323,56 @@ async fn disable_service(Json(req): Json<DisableServiceRequest>) -> impl IntoRes
     (StatusCode::OK, "Service disabled.")
 }
 
+async fn register_service(
+    State(state): State<AntHostAgentState>,
+    TypedHeader(project): TypedHeader<XAntProjectHeader>,
+    TypedHeader(version): TypedHeader<XAntVersionHeader>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, AntHostAgentError> {
+    let path = state
+        .archive_root_dir
+        .join(deployment_file_name(&project.0, &version.0));
+    let mut file = File::create(&path).await?;
+
+    let mut field = multipart
+        .next_field()
+        .await
+        .map_err(|e| {
+            AntHostAgentError::validation("No field found in multipart request!", Some(e.into()))
+        })?
+        .ok_or(AntHostAgentError::validation_msg(
+            "No bytes field found in request!",
+        ))?;
+
+    while let Some(bytes) = field.chunk().await.unwrap() {
+        info!(
+            "Wrote [{}] to [{}]...",
+            humansize::format_size(bytes.len(), DECIMAL),
+            path.display()
+        );
+        file.write_all(&bytes).await?;
+    }
+    file.flush().await?;
+
+    Ok((StatusCode::OK, "Service registered."))
+}
+
 pub fn make_routes() -> Router<AntHostAgentState> {
     Router::new()
         .route_with_tsr("/service", post(enable_service).delete(disable_service))
         .route_with_tsr("/service-installation", post(install_service))
+        .route_with_tsr(
+            "/service-registration",
+            post(register_service).layer(
+                DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
+            ),
+        )
         .fallback(|| async {
             ant_library::api_fallback(&[
                 "POST /service/service",
                 "DELETE /service/service",
                 "POST /service/service-installation",
+                "POST /service/service-registration",
             ])
         })
 }

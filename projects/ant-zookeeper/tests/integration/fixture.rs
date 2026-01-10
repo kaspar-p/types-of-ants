@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, fs::remove_dir_all, path::PathBuf, sync::Arc};
 
 use ant_library::db::TypesOfAntsDatabase;
 use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
@@ -11,7 +11,7 @@ use ant_zookeeper::{
 use async_trait::async_trait;
 use chrono::Utc;
 use rsa::rand_core::OsRng;
-use tokio::sync::Mutex;
+use tokio::{fs::create_dir_all, sync::Mutex};
 
 struct TestDns {
     records: Mutex<HashMap<String, Vec<TxtRecord>>>,
@@ -83,8 +83,14 @@ pub struct Fixture {
     _guard: postgresql_embedded::PostgreSQL,
 }
 
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        let _ = remove_dir_all(&self.state.root_dir);
+    }
+}
+
 impl Fixture {
-    pub async fn new() -> Self {
+    pub async fn new(function_name: &str) -> Self {
         let (_guard, test_db_config) = test_database_config("ant-zoo-storage").await;
 
         let state = AntZookeeperState {
@@ -95,9 +101,12 @@ impl Fixture {
             root_dir: PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
                 .join("tests")
                 .join("integration")
-                .join("test-fs"),
+                .join("test-fs")
+                .join(function_name),
             db: AntZooStorageClient::connect(&test_db_config).await.unwrap(),
         };
+
+        create_dir_all(&state.root_dir).await.unwrap();
 
         let routes = make_routes(state.clone()).unwrap();
 
