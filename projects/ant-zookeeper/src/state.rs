@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use acme_lib::DirectoryUrl;
+use ant_host_agent::client::AntHostAgentClientFactory;
 use ant_zoo_storage::AntZooStorageClient;
 use tokio::sync::Mutex;
 
@@ -17,4 +18,6 @@ pub struct AntZookeeperState {
     pub acme_url: DirectoryUrl<'static>,
 
     pub rng: rsa::rand_core::OsRng,
+
+    pub ant_host_agent_factory: Arc<Mutex<dyn AntHostAgentClientFactory>>,
 }

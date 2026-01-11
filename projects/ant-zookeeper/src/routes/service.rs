@@ -21,6 +21,7 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::info;
 
+use crate::routes::deployment::{envs_file_name, envs_persist_dir};
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
 #[derive(Serialize, Deserialize)]
@@ -107,11 +108,15 @@ WantedBy=multi-user.target
 ")
 }
 
-fn persist_dir(root_dir: &PathBuf) -> PathBuf {
-    root_dir.join("services-db")
+pub(super) fn artifact_persist_dir(root_dir: &PathBuf) -> PathBuf {
+    root_dir.join("artifacts-db")
 }
 
-fn service_file_name(project: &str, arch: Option<&HostArchitecture>, version: &str) -> String {
+pub(super) fn artifact_file_name(
+    project: &str,
+    arch: Option<&HostArchitecture>,
+    version: &str,
+) -> String {
     format!(
         "{}.{}.{}.bld",
         project,
@@ -137,7 +142,7 @@ async fn register_artifact(
     let global_tmp_dir = state.root_dir.join("tmp");
     create_dir_all(&global_tmp_dir).await?;
 
-    let dir = persist_dir(&state.root_dir);
+    let dir = artifact_persist_dir(&state.root_dir);
     create_dir_all(&dir).await?;
 
     let temp_dir = tempdir_in(&global_tmp_dir)?;
@@ -188,6 +193,7 @@ async fn register_artifact(
             if path.is_dir() {
                 continue;
             }
+
             let file_name = path
                 .file_name()
                 .expect(format!("entry {} has file name", path.display()).as_str());
@@ -215,7 +221,7 @@ async fn register_artifact(
     }
 
     // Write the file to final location
-    let filepath = dir.join(service_file_name(&project.0, arch.0.as_ref(), &version.0));
+    let filepath = dir.join(artifact_file_name(&project.0, arch.0.as_ref(), &version.0));
     {
         info!("Writing tarball to [{}]", filepath.display());
         std::fs::copy(&temp_file_path, &filepath)?;
@@ -224,11 +230,11 @@ async fn register_artifact(
     info!("Registering or updating artifact...");
     let artifact_id = state
         .db
-        .artifact_exists(&project.0, arch.0.as_ref(), &version.0)
+        .get_artifact(&project.0, arch.0.as_ref(), &version.0)
         .await?;
 
     match artifact_id {
-        Some(artifact_id) => {
+        Some((artifact_id, _)) => {
             info!("Updating existing artifact");
             state.db.update_artifact(&artifact_id).await?;
         }
@@ -270,9 +276,65 @@ async fn register_artifact(
     Ok((StatusCode::OK, "Version registered"))
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectEnvironmentVariable {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutProjectEnvironmentRequest {
+    pub project: String,
+    pub environment: String,
+    pub variables: Vec<ProjectEnvironmentVariable>,
+}
+
+async fn put_project_environment(
+    State(state): State<AntZookeeperState>,
+    Json(req): Json<PutProjectEnvironmentRequest>,
+) -> Result<impl IntoResponse, AntZookeeperError> {
+    create_dir_all(envs_persist_dir(&state.root_dir)).await?;
+    let envs_file_path =
+        envs_persist_dir(&state.root_dir).join(envs_file_name(&req.project, &req.environment));
+
+    let mut file = File::create(envs_file_path)?;
+
+    for variable in req.variables {
+        let text = format!("{}=\"{}\"\n", variable.key, variable.value);
+        file.write_all(text.as_bytes())?
+    }
+
+    Ok((StatusCode::OK, "Project environment registered"))
+}
+
+// #[derive(Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// pub struct GetProjectEnvironmentRequest {
+//     pub project: String,
+//     pub environment: String,
+// }
+
+// // #[derive(Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// pub struct GetProjectEnvironmentResponse {
+//     pub variables: Vec<ProjectEnvironmentVariable>,
+// }
+// async fn get_project_environment(
+//     State(state): State<AntZookeeperState>,
+//     Json(req): Json<GetProjectEnvironmentRequest>,
+// ) -> Result<impl IntoResponse, AntZookeeperError> {
+//     let envs_file_path =
+//         envs_persist_dir(&state.root_dir).join(envs_file_name(&req.project, &req.environment));
+
+//     Ok((StatusCode::OK, Json(GetProjectEnvironmentResponse{variables})))
+// }
+
 pub fn make_routes() -> Router<AntZookeeperState> {
     Router::new()
         .route("/service", post(register_service))
+        .route("/env", post(put_project_environment))
         .route_with_tsr(
             "/artifact",
             post(register_artifact).layer(

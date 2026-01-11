@@ -301,6 +301,7 @@ async fn get_host_group(
 #[serde(rename_all = "camelCase")]
 pub struct CreateHostGroupRequest {
     pub name: String,
+    pub environment: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -320,7 +321,19 @@ async fn create_host_group(
         ));
     }
 
-    let id = state.db.create_host_group(&req.name).await?;
+    match req.environment.as_str() {
+        "dev" | "beta" | "prod" => {}
+        _ => {
+            return Err(AntZookeeperError::validation_msg(
+                "Environment must be 'dev', 'beta', or 'prod'.",
+            ));
+        }
+    };
+
+    let id = state
+        .db
+        .create_host_group(&req.name, &req.environment)
+        .await?;
 
     Ok((
         StatusCode::OK,
@@ -343,7 +356,7 @@ async fn add_host_to_host_group(
         return Err(AntZookeeperError::validation_msg("No such host group."));
     }
 
-    if !state.db.get_host(&req.host_id).await? {
+    if state.db.get_host(&req.host_id).await?.is_none() {
         return Err(AntZookeeperError::validation_msg("No such host."));
     }
 
@@ -382,7 +395,7 @@ async fn remove_host_from_host_group(
         return Err(AntZookeeperError::validation_msg("No such host group."));
     }
 
-    if !state.db.get_host(&req.host_id).await? {
+    if state.db.get_host(&req.host_id).await?.is_none() {
         return Err(AntZookeeperError::validation_msg("No such host."));
     }
 

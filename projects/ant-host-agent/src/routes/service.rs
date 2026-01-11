@@ -1,4 +1,5 @@
 use ant_library::headers::{XAntProjectHeader, XAntVersionHeader};
+use flate2::read::GzDecoder;
 use humansize::DECIMAL;
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use tokio_util::codec;
@@ -135,11 +136,15 @@ pub struct InstallServiceRequest {
 
     /// If the service is a docker project, we require loading the image. Assumes the image is contained
     /// in the deployment TAR file is called "docker-image.tar" and will install that tagged image.
+    ///
+    /// None is interpreted as is_docker: false.
     pub is_docker: Option<bool>,
 
     /// The list of secret IDs/names that this project needs, e.g. ["jwt", "ant_fs_client_creds", ...]
     /// These secrets are replicated into the right directory for ant_library::load_secret() to find them
     /// when they are needed.
+    ///
+    /// None is interpreted as no secrets.
     pub secrets: Option<Vec<String>>,
 }
 
@@ -160,7 +165,7 @@ fn secrets_dir(install_dir: &PathBuf) -> PathBuf {
 async fn install_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<InstallServiceRequest>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
+) -> Result<impl IntoResponse, AntHostAgentError> {
     let file_name = deployment_file_name(&req.project, &req.version);
     let file_path = state.archive_root_dir.join(file_name);
     info!(
@@ -171,39 +176,41 @@ async fn install_service(
     );
 
     let file = std::fs::File::open(&file_path).map_err(|e| match e.kind() {
-        ErrorKind::NotFound => {
-            error!("No such deployment file {}: {e}", &file_path.display());
-            return (
-                StatusCode::BAD_REQUEST,
-                format!(
-                    "No deployment tarball found for: {} version {}",
-                    req.project, req.version
-                ),
-            );
-        }
-        _ => {
-            error!("Unknown error {}: {e}", file_path.display());
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Invalid deployment file: {}", &file_path.display()),
-            );
-        }
+        ErrorKind::NotFound => AntHostAgentError::validation_msg(
+            format!(
+                "No deployment tarball found for: {} version {}",
+                req.project, req.version
+            )
+            .as_str(),
+        ),
+        _ => AntHostAgentError::InternalServerError(Some(e.into())),
     })?;
 
-    let file = flate2::read::GzDecoder::new(file);
-
-    let mut deployment = tar::Archive::new(file);
+    let mut deployment = tar::Archive::new(GzDecoder::new(file));
 
     let dst = install_location_path(&state.install_root_dir, &req.project, &req.version);
-    std::fs::create_dir_all(dst.parent().unwrap()).expect("mkdir");
+    std::fs::create_dir_all(&dst)?;
 
-    info!("Unpacking installation to: {}", &dst.display());
-    deployment.unpack(&dst).expect("unpack");
+    info!("Unpacking installation to: {}", dst.display());
+    deployment.unpack(&dst)?;
+
+    let template_variables = mustache::MapBuilder::new()
+        .insert_str("INSTALL_DIR", dst.to_str().unwrap())
+        .build();
+
+    let unit_file_path = dst.join(unit_name(&req.project));
+    let unit_file_template = mustache::compile_path(&unit_file_path)?;
+
+    info!("Rewriting unit file with data: {:?}", template_variables);
+    unit_file_template.render_data(
+        &mut std::fs::File::create(&unit_file_path)?,
+        &template_variables,
+    )?;
 
     let num_secrets = req.secrets.as_ref().map(|s| s.len()).unwrap_or(0);
     info!("Finding {} secret(s)...", num_secrets);
     let dst_secrets_dir = secrets_dir(&dst);
-    std::fs::create_dir_all(&dst_secrets_dir).expect("mkdir secrets");
+    std::fs::create_dir_all(&dst_secrets_dir)?;
 
     for secret in req.secrets.unwrap_or(vec![]) {
         info!("Copying secret {secret}...");
@@ -213,16 +220,9 @@ async fn install_service(
         let dst_secret = dst_secrets_dir.join(ant_library::secret::secret_name(&secret));
         std::fs::copy(source_secret, dst_secret).map_err(|e| match e.kind() {
             ErrorKind::NotFound => {
-                error!("Failed to find secret {secret}: {e}");
-                return (StatusCode::BAD_REQUEST, format!("Invalid secret: {secret}"));
+                AntHostAgentError::validation_msg(format!("Invalid secret: {secret}").as_str())
             }
-            _ => {
-                error!("Unknown error occurred: {e}");
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal server error, please retry.".to_string(),
-                );
-            }
+            _ => AntHostAgentError::InternalServerError(Some(e.into())),
         })?;
     }
 
@@ -230,9 +230,8 @@ async fn install_service(
         info!("Loading docker image...");
         let docker_img_path = dst.join("docker-image.tar");
         if !std::fs::exists(&docker_img_path).unwrap() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Docker mentioned bu no docker-image.tar included".to_string(),
+            return Err(AntHostAgentError::validation_msg(
+                "Docker mentioned bu no docker-image.tar included",
             ));
         }
 
@@ -260,9 +259,8 @@ async fn install_service(
                     "Failed to load image: {}",
                     build_info.error.unwrap_or("".to_string())
                 );
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Failed to load docker image.".to_string(),
+                return Err(AntHostAgentError::validation_msg(
+                    "Failed to load docker image.",
                 ));
             }
 

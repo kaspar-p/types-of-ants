@@ -1,5 +1,6 @@
 use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc};
 
+use ant_host_agent::client::RemoteAntHostAgentClientFactory;
 use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
 use ant_zoo_storage::AntZooStorageClient;
 use ant_zookeeper::{dns::CloudFlareDns, state::AntZookeeperState};
@@ -48,6 +49,8 @@ async fn main() -> Result<(), anyhow::Error> {
         acme_url: acme_lib::DirectoryUrl::LetsEncrypt,
         acme_contact_email: std::env::var("ANT_ZOOKEEPER_ACME_CONTACT_EMAIL")
             .context("ANT_ZOOKEEPER_ACME_CONTACT_EMAIL")?,
+
+        ant_host_agent_factory: Arc::new(Mutex::new(RemoteAntHostAgentClientFactory)),
     };
 
     let app = ant_zookeeper::make_routes(state)?;

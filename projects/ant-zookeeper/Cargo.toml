@@ -53,6 +53,7 @@ postgres-types = { version = "0.2.11", features = ["derive"] }
 flate2 = "1.1.5"
 tar = "0.4.44"
 tempfile = "3.24.0"
+ant-host-agent = { version = "0.1.0", path = "../ant-host-agent" }
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }

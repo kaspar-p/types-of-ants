@@ -1,3 +1,4 @@
+pub mod client;
 pub mod clients;
 mod err;
 pub mod routes;
@@ -14,7 +15,7 @@ use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, trace::TraceLaye
 
 use crate::state::AntHostAgentState;
 
-pub async fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
+pub fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(tower_http::cors::Any)

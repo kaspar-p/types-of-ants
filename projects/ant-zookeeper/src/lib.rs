@@ -29,6 +29,7 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
     debug!("Initializing site routes...");
     let app = Router::new()
         .nest("/pipeline", routes::pipeline::make_routes())
+        .nest("/deployment", routes::deployment::make_routes())
         .nest("/service", routes::service::make_routes())
         .nest("/cert", routes::cert::make_routes())
         .with_state(s)

@@ -56,6 +56,7 @@ async fn pipeline_host_group_host_post_returns_4xx_if_no_host_group() {
         let host_group_id = {
             let req = CreateHostGroupRequest {
                 name: "group1".to_string(),
+                environment: "beta".to_string(),
             };
 
             let res = fixture
@@ -113,6 +114,7 @@ async fn pipeline_host_group_host_delete_returns_4xx_if_no_host_group() {
         let host_group_id = {
             let req = CreateHostGroupRequest {
                 name: "group1".to_string(),
+                environment: "beta".to_string(),
             };
 
             let res = fixture
@@ -154,6 +156,7 @@ async fn pipeline_host_group_host_post_returns_400_if_double_add() {
     let host_group_id = {
         let req = CreateHostGroupRequest {
             name: "group1".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture
@@ -214,6 +217,7 @@ async fn pipeline_host_group_host_post_then_delete_returns_200() {
     let host_group_id = {
         let req = CreateHostGroupRequest {
             name: "group1".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture
@@ -368,6 +372,7 @@ async fn pipeline_pipeline_post_returns_4xx_for_empty_group() {
     let host_group_id = {
         let req = CreateHostGroupRequest {
             name: "ant-data-farm/beta".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture
@@ -416,6 +421,7 @@ async fn pipeline_pipeline_post_returns_200_full_pipeline() {
     let host_group_id = {
         let req = CreateHostGroupRequest {
             name: "ant-data-farm/beta".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture
@@ -511,6 +517,7 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
     let ant_data_farm_group = {
         let req = CreateHostGroupRequest {
             name: "ant-data-farm/beta".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture
@@ -547,6 +554,7 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
     let ant_on_the_web_group = {
         let req = CreateHostGroupRequest {
             name: "ant-on-the-web/beta".to_string(),
+            environment: "beta".to_string(),
         };
 
         let res = fixture

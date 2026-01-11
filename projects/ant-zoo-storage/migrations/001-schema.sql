@@ -112,6 +112,10 @@ create table host_group (
   host_group_name text unique not null, -- Human readable name.
   host_group_description text,
 
+  -- The environment deployed onto these hosts. One of "dev", "beta", or "prod".
+  -- This selects the environment variables this host is given.
+  environment text not null, 
+
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone
@@ -181,6 +185,21 @@ create table deployment_approval (
 
   foreign key (deployment_id) references deployment(deployment_id)
 );
+
+-- create table environment (
+--   environment_variable_id text primary key ('env-' || random_string(16)),
+
+--   project_id text not null, -- The variable the project is for
+--   environment text not null, -- "dev", "beta", or "prod".
+
+--   variable_name text not null, -- The name of the environment variable, e.g. "ANT_HOST_AGENT_PORT"
+--   variable_value text not null, -- The value of the environment variable, e.g. "3232"
+--   variable_version int not null, -- A sequential version of the variable.
+
+--   unique (project_id, environment, variable_name, variable_version), -- The same environment variable can't be declared multiple times for a project
+
+--   foreign key (project_id) references project(project_id)
+-- );
 
 create table secret (
   secret_id text primary key default ('secret-' || random_string(32)),

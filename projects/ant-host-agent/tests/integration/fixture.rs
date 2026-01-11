@@ -46,7 +46,7 @@ impl TestFixture {
             secrets_root_dir: test_secrets_dir.clone(),
         };
 
-        let client = TestClient::new(make_routes(state.clone()).await.unwrap()).await;
+        let client = TestClient::new(make_routes(state.clone()).unwrap()).await;
 
         {
             let req = PutSecretRequest {

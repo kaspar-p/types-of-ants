@@ -32,7 +32,7 @@ async fn main() {
         .expect(format!("Failed mkdir: {}", state.install_root_dir.display()).as_str());
 
     info!("Initializing routes...");
-    let api = make_routes(state).await.expect("init api");
+    let api = make_routes(state).expect("init api");
 
     info!("Starting server...");
     let port = dotenv::var("ANT_HOST_AGENT_PORT")
