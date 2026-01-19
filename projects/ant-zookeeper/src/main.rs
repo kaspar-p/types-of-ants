@@ -9,8 +9,6 @@ use rsa::rand_core::OsRng;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-mod deployment;
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     ant_library::set_global_logs("ant-zookeeper");

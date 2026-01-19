@@ -110,7 +110,7 @@ async fn service_artifact_returns_200_happy_path() {
     let output_path = fixture
         .state
         .root_dir
-        .join("services-db")
+        .join("artifacts-db")
         .join("ant-gateway.aarch64.v1.bld");
 
     assert_eq!(

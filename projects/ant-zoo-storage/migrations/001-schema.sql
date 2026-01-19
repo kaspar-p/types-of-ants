@@ -46,7 +46,7 @@ create table host (
 -- A generic revision/version of a project. May have multiple artifacts,
 -- one per architecture of the destination hosts.
 create table project_revision (
-  project_revision_id text primary key default ('proj-rev-' || random_string(10)),
+  project_revision_id text primary key default ('rev-' || random_string(10)),
 
   project_id text not null, -- The project this is a version of.
   deployment_version text not null, -- The version.
@@ -135,6 +135,17 @@ create table host_group_host (
   foreign key (host_id) references host(host_id)
 );
 
+-- create table lock(
+--   lock_id text primary key default ('lock-' || random_string(32)),
+
+--   target_id text not null, -- The resource being locked.
+--   authority_id text not null, -- The authority who locked this resource.
+
+--   created_at timestamp with time zone not null default now(),
+--   updated_at timestamp with time zone not null default now(),
+--   deleted_at timestamp with time zone
+-- );
+
 create table deployment_pipeline_stage (
   deployment_pipeline_stage_id text primary key default ('stage-' || random_string(10)),
 
@@ -144,6 +155,7 @@ create table deployment_pipeline_stage (
   unique (deployment_pipeline_id, stage_name), -- Stages unique in a pipeline.
 
   stage_order int not null, -- The order of the stages, lower is earlier. 0 is the first stage.
+  unique (deployment_pipeline_id, stage_order), -- Two stages cannot have the same order in a pipeline.
 
   stage_type text not null, -- Either 'build' or 'deploy', right now.
 
@@ -162,44 +174,40 @@ create table deployment_pipeline_stage (
 create table deployment (
   deployment_id text primary key default ('d-' || random_string(16)),
 
-  deployment_pipeline_stage_id text not null, -- The stage that was deployed by this deployment.
   project_revision_id text not null, -- The project revision that was deployed to that stage.
+  target_id text not null, -- The target (stage, pipeline, ...) that this deployment happened to.
+  event_name text not null, -- The name of the deployment event, e.g. "host-started"
+
+  unique(project_revision_id, target_id, event_name),
+
+  created_at timestamp with time zone not null default now(),
+
+  foreign key (project_revision_id) references project_revision(project_revision_id)
+);
+
+create table deployment_job (
+  deployment_job_id text primary key default ('djob-' || random_string(16)),
+
+  project_revision_id text not null, -- The project revision that was deployed to that stage.
+  target_type text not null, -- The type of target ('stage', 'pipeline') for this job.
+  target_id text not null, -- The target (stage, pipeline, ...) that this deployment happened to.
+  event_name text not null, -- The name of the deployment event, e.g. "host-started"
+
+  unique(project_revision_id, target_type, target_id, event_name),
+
+  deployment_pipeline_id text not null, -- The deployment project this job is scheduled within.
+  project_id text not null, -- The project this job is scheduled for
+
+  is_success boolean, -- Once the job was finished, was it successful?
+  finished_at timestamp with time zone, -- Once the job is finished, the timestamp it finished at.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
-  deleted_at timestamp with time zone,
 
-  foreign key (deployment_pipeline_stage_id) references deployment_pipeline_stage(deployment_pipeline_stage_id)
+  foreign key (project_revision_id) references project_revision(project_revision_id),
+  foreign key (deployment_pipeline_id) references deployment_pipeline(deployment_pipeline_id),
+  foreign key (project_id) references project(project_id)
 );
-
-create table deployment_approval (
-  deployment_approval_id text primary key default ('approval-' || random_string(16)),
-
-  deployment_id text not null, -- The deployment that this approval is approving.
-
-  is_human boolean not null, -- Whether the deployment was approved by a human.
-
-  created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now(),
-  deleted_at timestamp with time zone,
-
-  foreign key (deployment_id) references deployment(deployment_id)
-);
-
--- create table environment (
---   environment_variable_id text primary key ('env-' || random_string(16)),
-
---   project_id text not null, -- The variable the project is for
---   environment text not null, -- "dev", "beta", or "prod".
-
---   variable_name text not null, -- The name of the environment variable, e.g. "ANT_HOST_AGENT_PORT"
---   variable_value text not null, -- The value of the environment variable, e.g. "3232"
---   variable_version int not null, -- A sequential version of the variable.
-
---   unique (project_id, environment, variable_name, variable_version), -- The same environment variable can't be declared multiple times for a project
-
---   foreign key (project_id) references project(project_id)
--- );
 
 create table secret (
   secret_id text primary key default ('secret-' || random_string(32)),

@@ -5,7 +5,7 @@ use reqwest::{
 };
 use tracing::info;
 
-use crate::routes::service::InstallServiceRequest;
+use crate::routes::service::{DisableServiceRequest, EnableServiceRequest, InstallServiceRequest};
 
 #[derive(Clone)]
 pub struct AntHostAgentClient {
@@ -20,6 +20,13 @@ pub struct AntHostAgentClientConfig {
 }
 
 impl AntHostAgentClient {
+    pub fn new(cfg: AntHostAgentClientConfig) -> Self {
+        Self {
+            client: Client::new(),
+            cfg,
+        }
+    }
+
     fn endpoint(&self, path: &str) -> String {
         format!("http://{}:{}{path}", self.cfg.endpoint, self.cfg.port)
     }
@@ -64,26 +71,46 @@ impl AntHostAgentClient {
 
         Ok(())
     }
+
+    pub async fn enable_service(&self, req: EnableServiceRequest) -> Result<(), anyhow::Error> {
+        info!(
+            "ant_host_agent POST /service/service : {}",
+            serde_json::to_string(&req)?
+        );
+        self.client
+            .post(self.endpoint("/service/service"))
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
+    }
+
+    pub async fn disable_service(&self, req: DisableServiceRequest) -> Result<(), anyhow::Error> {
+        info!(
+            "ant_host_agent DELETE /service/service : {}",
+            serde_json::to_string(&req)?
+        );
+        self.client
+            .delete(self.endpoint("/service/service"))
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 pub trait AntHostAgentClientFactory: Send {
-    async fn new_client(
-        &self,
-        cfg: AntHostAgentClientConfig,
-    ) -> Result<AntHostAgentClient, anyhow::Error>;
+    fn new_client(&self, cfg: AntHostAgentClientConfig) -> AntHostAgentClient;
 }
 pub struct RemoteAntHostAgentClientFactory;
 
-#[async_trait]
 impl AntHostAgentClientFactory for RemoteAntHostAgentClientFactory {
-    async fn new_client(
-        &self,
-        cfg: AntHostAgentClientConfig,
-    ) -> Result<AntHostAgentClient, anyhow::Error> {
-        Ok(AntHostAgentClient {
-            client: Client::new(),
-            cfg,
-        })
+    fn new_client(&self, cfg: AntHostAgentClientConfig) -> AntHostAgentClient {
+        AntHostAgentClient::new(cfg)
     }
 }

@@ -1,10 +1,7 @@
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
-use ant_library::{
-    headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
-    host_architecture::HostArchitecture,
-};
+use ant_library::headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader};
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
@@ -21,7 +18,7 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::info;
 
-use crate::routes::deployment::{envs_file_name, envs_persist_dir};
+use crate::fs::{artifact_file_name, artifact_persist_dir, envs_file_name, envs_persist_dir};
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
 #[derive(Serialize, Deserialize)]
@@ -106,23 +103,6 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 ")
-}
-
-pub(super) fn artifact_persist_dir(root_dir: &PathBuf) -> PathBuf {
-    root_dir.join("artifacts-db")
-}
-
-pub(super) fn artifact_file_name(
-    project: &str,
-    arch: Option<&HostArchitecture>,
-    version: &str,
-) -> String {
-    format!(
-        "{}.{}.{}.bld",
-        project,
-        arch.map(|a| a.as_str()).unwrap_or("noarch").to_string(),
-        version
-    )
 }
 
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
@@ -227,14 +207,16 @@ async fn register_artifact(
         std::fs::copy(&temp_file_path, &filepath)?;
     }
 
+    let revision_id = state.db.upsert_revision(&project.0, &version.0).await?;
+
     info!("Registering or updating artifact...");
     let artifact_id = state
         .db
-        .get_artifact(&project.0, arch.0.as_ref(), &version.0)
+        .get_artifact_by_revision(arch.0.as_ref(), &revision_id)
         .await?;
 
     match artifact_id {
-        Some((artifact_id, _)) => {
+        Some((artifact_id, _, _)) => {
             info!("Updating existing artifact");
             state.db.update_artifact(&artifact_id).await?;
         }
@@ -247,7 +229,7 @@ async fn register_artifact(
             ));
             state
                 .db
-                .register_artifact(&project.0, arch.0.as_ref(), &version.0, &relative)
+                .register_artifact(&revision_id, arch.0.as_ref(), &relative)
                 .await?;
         }
     }
@@ -260,15 +242,6 @@ async fn register_artifact(
         .await?;
     if missing_architectures.is_empty() {
         info!("All architectures for a project have been built, build stage fulfilled.");
-        let build_stage_id = state
-            .db
-            .get_deployment_pipeline_build_stage(&project.0)
-            .await?;
-
-        state
-            .db
-            .make_deployment(&build_stage_id, &project.0, &version.0)
-            .await?;
     } else {
         info!("Still missing architectures: {missing_architectures:?}");
     }

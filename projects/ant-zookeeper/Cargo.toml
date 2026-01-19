@@ -54,6 +54,9 @@ flate2 = "1.1.5"
 tar = "0.4.44"
 tempfile = "3.24.0"
 ant-host-agent = { version = "0.1.0", path = "../ant-host-agent" }
+stdext = "0.3.3"
+strum = "0.27.2"
+strum_macros = "0.27.2"
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }

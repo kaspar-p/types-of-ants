@@ -95,8 +95,9 @@ impl Drop for Fixture {
 
 #[derive(Clone)]
 struct TestAntHostAgentService {
+    _ant_host_agent_handle: Arc<JoinHandle<()>>,
+
     cfg: AntHostAgentClientConfig,
-    ant_host_agent_handle: Arc<JoinHandle<()>>,
 }
 
 impl TestAntHostAgentService {
@@ -117,26 +118,15 @@ impl TestAntHostAgentService {
         };
 
         Ok(Self {
-            ant_host_agent_handle: Arc::new(handle),
+            _ant_host_agent_handle: Arc::new(handle),
             cfg,
         })
     }
 }
 
-#[async_trait]
 impl AntHostAgentClientFactory for TestAntHostAgentService {
-    async fn new_client(
-        &self,
-        _cfg: AntHostAgentClientConfig,
-    ) -> Result<AntHostAgentClient, anyhow::Error> {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
-
-        Ok(AntHostAgentClient {
-            cfg: self.cfg.clone(),
-            client,
-        })
+    fn new_client(&self, _cfg: AntHostAgentClientConfig) -> AntHostAgentClient {
+        AntHostAgentClient::new(self.cfg.clone())
     }
 }
 

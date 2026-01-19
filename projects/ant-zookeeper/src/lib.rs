@@ -10,6 +10,8 @@ use crate::state::AntZookeeperState;
 pub mod client;
 pub mod dns;
 pub mod err;
+mod event_loop;
+mod fs;
 pub mod routes;
 pub mod state;
 

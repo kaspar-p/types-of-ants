@@ -199,8 +199,14 @@ async fn put_pipeline(
 ) -> Result<impl IntoResponse, AntZookeeperError> {
     let pipeline_id = state
         .db
-        .deployment_pipeline_exists_by_project(&req.project)
+        .get_deployment_pipeline_by_project(&req.project)
         .await?;
+    if pipeline_id.is_none() {
+        return Err(AntZookeeperError::validation_msg(
+            "No such deployment pipeline.",
+        ));
+    }
+    let pipeline_id = pipeline_id.unwrap();
 
     for stage in &req.stages {
         let group = state.db.get_host_group_by_id(&stage.host_group_id).await?;
@@ -222,22 +228,15 @@ async fn put_pipeline(
         }
     }
 
-    if pipeline_id.is_none() {
-        return Err(AntZookeeperError::validation_msg(
-            "No such deployment pipeline.",
-        ));
-    }
-    let pipeline_id = pipeline_id.unwrap();
-
     let stages = state
         .db
         .get_deployment_pipeline_stages(&req.project)
         .await?;
 
     // delete previous pipeline definition
-    for (stage_name, stage_id, stage_type) in stages {
-        if stage_type == "build" {
-            continue;
+    for (i, (stage_name, stage_id, _)) in stages.iter().enumerate() {
+        if i == 0 {
+            continue; // build stage can't be deleted
         }
 
         info!("Deleting stage {stage_name} ({stage_id})");
@@ -245,21 +244,20 @@ async fn put_pipeline(
     }
 
     // create new pipeline definition
-
     for (i, stage) in req.stages.iter().enumerate() {
-        info!(
-            "Creating deployment stage {} with host group {}",
-            stage.name, stage.host_group_id
-        );
-        state
+        let id = state
             .db
             .create_deployment_pipeline_deployment_stage(
                 &pipeline_id,
                 &stage.name,
                 &stage.host_group_id,
-                i as i32,
+                i as i32 + 1, // build stage is always 0
             )
             .await?;
+        info!(
+            "Created deployment stage {} (id {}) with host group {}",
+            stage.name, id, stage.host_group_id
+        );
     }
 
     Ok(StatusCode::OK)
