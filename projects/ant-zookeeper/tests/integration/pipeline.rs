@@ -1,7 +1,11 @@
-use ant_zookeeper::routes::pipeline::{
-    AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
-    GetHostGroupRequest, GetHostGroupResponse, GetPipelineRequest, GetPipelineResponse,
-    PutPipelineRequest, PutPipelineStage, RemoveHostFromHostGroupRequest,
+use ant_library::host_architecture::HostArchitecture;
+use ant_zookeeper::{
+    err::AntZookeeperError,
+    routes::pipeline::{
+        AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
+        GetHostGroupResponse, GetPipelineResponse, PutPipelineRequest, PutPipelineStage,
+        RemoveHostFromHostGroupRequest,
+    },
 };
 use http::StatusCode;
 use stdext::function_name;
@@ -16,14 +20,9 @@ async fn pipeline_host_group_host_group_get_returns_4xx() {
     let fixture = fixture::Fixture::new(function_name!()).await;
 
     {
-        let req = GetHostGroupRequest {
-            name: "some-bad-name".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/host-group/host-group")
-            .json(&req)
+            .get("/pipeline/host-group/host-group?name=some-bad-name")
             .send()
             .await;
 
@@ -149,7 +148,7 @@ async fn pipeline_host_group_host_delete_returns_4xx_if_no_host_group() {
 
 #[test]
 #[traced_test]
-async fn pipeline_host_group_host_post_returns_400_if_double_add() {
+async fn pipeline_host_group_host_post_returns_200_if_double_add() {
     let fixture = fixture::Fixture::new(function_name!()).await;
 
     // create group
@@ -190,7 +189,7 @@ async fn pipeline_host_group_host_post_returns_400_if_double_add() {
         assert_eq!(res.status(), StatusCode::OK);
     }
 
-    // double add
+    // double add works fine
     {
         let req = AddHostToHostGroupRequest {
             host_group_id: host_group_id.clone(),
@@ -204,8 +203,7 @@ async fn pipeline_host_group_host_post_returns_400_if_double_add() {
             .send()
             .await;
 
-        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(res.text().await, "Host already in host group.")
+        assert_eq!(res.status(), StatusCode::OK);
     }
 }
 
@@ -253,14 +251,9 @@ async fn pipeline_host_group_host_post_then_delete_returns_200() {
 
     // read 1
     {
-        let req = GetHostGroupRequest {
-            name: "group1".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/host-group/host-group")
-            .json(&req)
+            .get("/pipeline/host-group/host-group?name=group1")
             .send()
             .await;
 
@@ -297,14 +290,9 @@ async fn pipeline_host_group_host_post_then_delete_returns_200() {
 
     // read 2
     {
-        let req = GetHostGroupRequest {
-            name: "group1".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/host-group/host-group")
-            .json(&req)
+            .get("/pipeline/host-group/host-group?name=group1")
             .send()
             .await;
 
@@ -340,7 +328,11 @@ async fn pipeline_pipeline_post_returns_4xx_bad_host_group() {
         .await;
 
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(res.text().await, "No such host group: bad-id");
+
+    assert!(matches!(
+        res.json::<AntZookeeperError>().await,
+        AntZookeeperError::ValidationError(msg) if msg == "No such host group: bad-id",
+    ));
 }
 
 #[test]
@@ -405,10 +397,14 @@ async fn pipeline_pipeline_post_returns_4xx_for_empty_group() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        let err_msg = res.text().await;
-        assert!(err_msg.contains("Host group "));
-        assert!(err_msg.contains(&host_group_id));
-        assert!(err_msg.contains(" cannot be added to a pipeline because it has no hosts."));
+        assert!(
+            matches!(res.json::<AntZookeeperError>().await, 
+            AntZookeeperError::ValidationError(msg) if msg ==
+            format!("Host group {host_group_id} cannot be added to a pipeline because it has no hosts."))
+        )
+        // assert!(err_msg.contains("Host group "));
+        // assert!(err_msg.contains(&host_group_id));
+        // assert!(err_msg.contains(" cannot be added to a pipeline because it has no hosts."));
     }
 }
 
@@ -476,14 +472,9 @@ async fn pipeline_pipeline_post_returns_200_full_pipeline() {
 
     // get pipeline
     {
-        let req = GetPipelineRequest {
-            project: "ant-data-farm".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/pipeline")
-            .json(&req)
+            .get("/pipeline/pipeline?project=ant-data-farm")
             .send()
             .await;
 
@@ -493,17 +484,18 @@ async fn pipeline_pipeline_post_returns_200_full_pipeline() {
 
         assert_eq!(body.project, "ant-data-farm");
         assert_eq!(body.stages[0].stage_name, "build");
-        let build_stage = body.stages[0].clone().build_stage();
-        assert!(build_stage.builds.is_empty());
 
         assert_eq!(body.stages[1].stage_name, "stage1");
         let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            deploy_stage.hosts[0].host_name,
+            deploy_stage.host_group.hosts[0].name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(deploy_stage.hosts[0].deployment, None);
-        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(
+            deploy_stage.host_group.hosts[0].arch,
+            HostArchitecture::ArmV7
+        );
+        assert_eq!(deploy_stage.host_group.hosts.len(), 1);
         assert_eq!(body.stages.len(), 2);
     }
 }
@@ -609,14 +601,9 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
 
     // get pipeline for ant-data-farm
     {
-        let req = GetPipelineRequest {
-            project: "ant-data-farm".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/pipeline")
-            .json(&req)
+            .get("/pipeline/pipeline?project=ant-data-farm")
             .send()
             .await;
 
@@ -626,17 +613,18 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
 
         assert_eq!(body.project, "ant-data-farm");
         assert_eq!(body.stages[0].stage_name, "build");
-        let build_stage = body.stages[0].clone().build_stage();
-        assert!(build_stage.builds.is_empty());
 
         assert_eq!(body.stages[1].stage_name, "beta-stage");
         let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            deploy_stage.hosts[0].host_name,
+            deploy_stage.host_group.hosts[0].name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(deploy_stage.hosts[0].deployment, None);
-        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(
+            deploy_stage.host_group.hosts[0].arch,
+            HostArchitecture::ArmV7
+        );
+        assert_eq!(deploy_stage.host_group.hosts.len(), 1);
         assert_eq!(body.stages.len(), 2);
     }
 
@@ -662,14 +650,9 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
 
     // get pipeline for ant-on-the-web
     {
-        let req = GetPipelineRequest {
-            project: "ant-on-the-web".to_string(),
-        };
-
         let res = fixture
             .client
-            .get("/pipeline/pipeline")
-            .json(&req)
+            .get("/pipeline/pipeline?project=ant-on-the-web")
             .send()
             .await;
 
@@ -679,17 +662,18 @@ async fn pipeline_pipeline_post_returns_200_for_different_projects() {
 
         assert_eq!(body.project, "ant-on-the-web");
         assert_eq!(body.stages[0].stage_name, "build");
-        let build_stage = body.stages[0].clone().build_stage();
-        assert!(build_stage.builds.is_empty());
 
         assert_eq!(body.stages[1].stage_name, "beta-website");
         let deploy_stage = body.stages[1].clone().deploy_stage();
         assert_eq!(
-            deploy_stage.hosts[0].host_name,
+            deploy_stage.host_group.hosts[0].name,
             "antworker000.hosts.typesofants.org"
         );
-        assert_eq!(deploy_stage.hosts[0].deployment, None);
-        assert_eq!(deploy_stage.hosts.len(), 1);
+        assert_eq!(
+            deploy_stage.host_group.hosts[0].arch,
+            HostArchitecture::ArmV7
+        );
+        assert_eq!(deploy_stage.host_group.hosts.len(), 1);
         assert_eq!(body.stages.len(), 2);
     }
 }

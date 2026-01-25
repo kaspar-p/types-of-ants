@@ -45,8 +45,8 @@ create table host (
 
 -- A generic revision/version of a project. May have multiple artifacts,
 -- one per architecture of the destination hosts.
-create table project_revision (
-  project_revision_id text primary key default ('rev-' || random_string(10)),
+create table revision (
+  revision_id text primary key default ('rev-' || random_string(10)),
 
   project_id text not null, -- The project this is a version of.
   deployment_version text not null, -- The version.
@@ -63,10 +63,10 @@ create table project_revision (
 create table artifact (
   artifact_id text primary key default ('a-' || random_string(10)),
 
-  project_revision_id text not null, -- The revision of this project.
+  revision_id text not null, -- The revision of this project.
   architecture_id text, -- The architecture this project was built for. If NULL, is platform-agnostic.
 
-  unique (project_revision_id, architecture_id), -- Cannot have multiple of the same project and version
+  unique (revision_id, architecture_id), -- Cannot have multiple of the same project and version
 
   local_path text not null, -- The local filesystem path to the artifact, where it was saved.
 
@@ -74,7 +74,7 @@ create table artifact (
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone,
 
-  foreign key (project_revision_id) references project_revision(project_revision_id),
+  foreign key (revision_id) references revision(revision_id),
   foreign key (architecture_id) references architecture(architecture_id)
 );
 
@@ -174,37 +174,39 @@ create table deployment_pipeline_stage (
 create table deployment (
   deployment_id text primary key default ('d-' || random_string(16)),
 
-  project_revision_id text not null, -- The project revision that was deployed to that stage.
-  target_id text not null, -- The target (stage, pipeline, ...) that this deployment happened to.
+  revision_id text not null, -- The project revision that was deployed to that stage.
+  target_type text not null, -- The type of the target (stage, pipeline) that this deployment happened to.
+  target_id text not null, -- The unique ID of the target.
   event_name text not null, -- The name of the deployment event, e.g. "host-started"
 
-  unique(project_revision_id, target_id, event_name),
+  unique(revision_id, target_id, event_name),
 
   created_at timestamp with time zone not null default now(),
 
-  foreign key (project_revision_id) references project_revision(project_revision_id)
+  foreign key (revision_id) references revision(revision_id)
 );
 
 create table deployment_job (
   deployment_job_id text primary key default ('djob-' || random_string(16)),
 
-  project_revision_id text not null, -- The project revision that was deployed to that stage.
+  revision_id text not null, -- The project revision that was deployed to that stage.
   target_type text not null, -- The type of target ('stage', 'pipeline') for this job.
   target_id text not null, -- The target (stage, pipeline, ...) that this deployment happened to.
   event_name text not null, -- The name of the deployment event, e.g. "host-started"
 
-  unique(project_revision_id, target_type, target_id, event_name),
+  -- unique(revision_id, target_type, target_id, event_name),
 
   deployment_pipeline_id text not null, -- The deployment project this job is scheduled within.
   project_id text not null, -- The project this job is scheduled for
 
   is_success boolean, -- Once the job was finished, was it successful?
   finished_at timestamp with time zone, -- Once the job is finished, the timestamp it finished at.
+  is_retryable boolean, -- This will be true if the job is marked as retryable, and then future iterations will try again.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
 
-  foreign key (project_revision_id) references project_revision(project_revision_id),
+  foreign key (revision_id) references revision(revision_id),
   foreign key (deployment_pipeline_id) references deployment_pipeline(deployment_pipeline_id),
   foreign key (project_id) references project(project_id)
 );

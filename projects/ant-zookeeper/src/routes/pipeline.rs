@@ -1,11 +1,8 @@
-use std::str::FromStr;
-
 use ant_library::host_architecture::HostArchitecture;
 use ant_zoo_storage::HostGroup;
+use anyhow::Context;
 use axum::{
-    debug_handler,
-    extract::State,
-    response::IntoResponse,
+    extract::{Query, State},
     routing::{get, post},
     Json, Router,
 };
@@ -15,27 +12,16 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{err::AntZookeeperError, state::AntZookeeperState};
+use crate::{
+    err::AntZookeeperError,
+    event_loop::transition::{DeploymentTarget, EventName},
+    state::AntZookeeperState,
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPipelineRequest {
     pub project: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PipelineHost {
-    pub host_name: String,
-    pub deployment: Option<PipelineHostDeployment>,
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PipelineHostDeployment {
-    deployment_id: String,
-    deployed_artifact_version: String,
-    deployed_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -70,113 +56,220 @@ pub enum PipelineStageType {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PipelineBuild {
-    built_version: String,
-    architecture: HostArchitecture,
-    built_at: DateTime<Utc>,
+pub struct PipelineBuildStage {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineHost {
+    pub name: String,
+    pub arch: HostArchitecture,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PipelineBuildStage {
-    pub builds: Vec<PipelineBuild>,
+pub struct PipelineHostGroup {
+    pub name: String,
+    pub environment: String,
+    pub hosts: Vec<PipelineHost>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineDeployStage {
-    pub hosts: Vec<PipelineHost>,
-    pub approved: bool,
+    pub host_group: PipelineHostGroup,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPipelineResponse {
     pub project: String,
+
     pub stages: Vec<PipelineStage>,
+
+    pub events: Vec<PipelineEvent>,
 }
 
-#[debug_handler]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineEvent {
+    pub deployment_id: String,
+    pub revision_id: String,
+    pub target: DeploymentTarget,
+    pub event: EventName,
+    pub created_at: DateTime<Utc>,
+}
+
 async fn get_pipeline(
     State(state): State<AntZookeeperState>,
-    Json(req): Json<GetPipelineRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+    Query(req): Query<GetPipelineRequest>,
+) -> Result<(StatusCode, Json<GetPipelineResponse>), AntZookeeperError> {
     if !state.db.get_project(&req.project).await? {
-        return Err(AntZookeeperError::ValidationError {
-            msg: format!("No such project: {}", req.project),
-            e: None,
-        });
+        return Err(AntZookeeperError::ValidationError(format!(
+            "No such project: {}",
+            req.project
+        )));
     }
 
-    let stages = state
+    let pipeline_id = state
+        .db
+        .get_deployment_pipeline_by_project(&req.project)
+        .await?
+        .unwrap();
+
+    // Construct the structure of the pipeline
+
+    let mut stages: Vec<PipelineStage> = vec![];
+
+    for (stage_name, stage_id, stage_type) in state
         .db
         .get_deployment_pipeline_stages(&req.project)
-        .await?;
-
-    let mut pipeline_stages: Vec<PipelineStage> = vec![];
-
-    for (stage_name, stage_id, stage_type) in stages {
-        if stage_type == "build" {
-            let artifacts = state
-                .db
-                .get_latest_artifacts_for_project_for_all_architectures(&req.project)
-                .await?;
-
-            pipeline_stages.push(PipelineStage {
-                stage_name,
-                stage_type: PipelineStageType::Build(PipelineBuildStage {
-                    builds: artifacts
-                        .into_iter()
-                        .map(
-                            |(version, arch, built_at)| -> Result<PipelineBuild, anyhow::Error> {
-                                Ok(PipelineBuild {
-                                    architecture: HostArchitecture::from_str(&arch)?,
-                                    built_version: version,
-                                    built_at: built_at,
-                                })
-                            },
-                        )
-                        .collect::<Result<Vec<PipelineBuild>, anyhow::Error>>()?,
-                }),
-            });
-            continue;
-        }
-
-        info!("Building stage {stage_name}...");
-        let hosts = state.db.get_hosts_in_stage(&stage_id).await?;
-
-        let mut pipeline_hosts = vec![];
-        for host_id in hosts {
-            info!("Building host {host_id}...");
-            let history = state.db.get_deployment_history_on_host(&host_id).await?;
-            let latest = history.first().cloned();
-
-            pipeline_hosts.push(PipelineHost {
-                host_name: host_id,
-                deployment: latest.map(|l| PipelineHostDeployment {
-                    deployment_id: l.0,
-                    deployed_artifact_version: l.1,
-                    deployed_at: l.2,
-                }),
-            });
-        }
-
-        pipeline_stages.push(PipelineStage {
-            stage_name,
-            stage_type: PipelineStageType::Deploy(PipelineDeployStage {
-                hosts: pipeline_hosts,
-                approved: false,
+        .await?
+    {
+        match stage_type.as_str() {
+            "build" => stages.push(PipelineStage {
+                stage_name: stage_name,
+                stage_type: PipelineStageType::Build(PipelineBuildStage {}),
             }),
-        });
+            "deploy" => {
+                let hg = state
+                    .db
+                    .get_host_group_by_stage_id(&stage_id)
+                    .await?
+                    .context(format!("Stage has no host group: {stage_name} {stage_id}"))?;
+
+                let hg = PipelineHostGroup {
+                    name: hg.name,
+                    environment: hg.environment,
+                    hosts: hg
+                        .hosts
+                        .into_iter()
+                        .map(|h| PipelineHost {
+                            name: h.name,
+                            arch: h.arch,
+                        })
+                        .collect(),
+                };
+
+                stages.push(PipelineStage {
+                    stage_name,
+                    stage_type: PipelineStageType::Deploy(PipelineDeployStage { host_group: hg }),
+                })
+            }
+            t => {
+                return Err(AntZookeeperError::InternalServerError(Some(
+                    anyhow::Error::msg(format!("Unknown stage format: {t}")),
+                )))
+            }
+        }
+    }
+
+    // Get events applied to the pipeline
+
+    let active_revisions = state
+        .db
+        .list_revisions_missing_event(&EventName::PipelineFinished.to_string())
+        .await?
+        .into_iter()
+        .filter_map(|(revision, pipe_id)| match *pipe_id == pipeline_id {
+            true => Some(revision),
+            _ => None,
+        })
+        .collect::<Vec<String>>();
+
+    let mut all_pipeline_events: Vec<PipelineEvent> = vec![];
+
+    for revision_id in active_revisions {
+        let mut pipeline_events = state
+            .db
+            .list_deployment_events_in_pipeline_revision(&req.project, &revision_id)
+            .await?
+            .into_iter()
+            .map(|e| {
+                Ok(PipelineEvent {
+                    deployment_id: e.deployment_id,
+                    revision_id: e.revision_id,
+                    target: match e.target_type.as_str() {
+                        "pipeline" => DeploymentTarget::Pipeline(e.target_id),
+                        "stage" => DeploymentTarget::Stage(e.target_id),
+                        "host-group" => DeploymentTarget::HostGroup(e.target_id),
+                        "host" => DeploymentTarget::Host(e.target_id),
+                        t => {
+                            return Err(AntZookeeperError::InternalServerError(Some(
+                                anyhow::Error::msg(format!("Unknown target {t}")),
+                            )))
+                        }
+                    },
+                    event: EventName::from(e.event_name),
+                    created_at: e.created_at,
+                })
+            })
+            .collect::<Result<Vec<PipelineEvent>, AntZookeeperError>>()?;
+
+        all_pipeline_events.append(&mut pipeline_events);
     }
 
     Ok((
         StatusCode::OK,
         Json(GetPipelineResponse {
             project: req.project,
-            stages: pipeline_stages,
+            stages: stages,
+            events: all_pipeline_events,
         }),
     ))
+
+    // for (stage_name, stage_id, stage_type) in stages {
+    //     if stage_type == "build" {
+    //         let artifacts = state
+    //             .db
+    //             .get_latest_artifacts_for_project_for_all_architectures(&req.project)
+    //             .await?;
+
+    //         pipeline_stages.push(PipelineStage {
+    //             stage_name,
+    //             stage_type: PipelineStageType::Build(PipelineBuildStage {
+    //                 builds: artifacts
+    //                     .into_iter()
+    //                     .map(
+    //                         |(version, arch, built_at)| -> Result<PipelineBuild, anyhow::Error> {
+    //                             Ok(PipelineBuild {
+    //                                 architecture: HostArchitecture::from_str(&arch)?,
+    //                                 built_version: version,
+    //                                 built_at: built_at,
+    //                             })
+    //                         },
+    //                     )
+    //                     .collect::<Result<Vec<PipelineBuild>, anyhow::Error>>()?,
+    //             }),
+    //         });
+    //         continue;
+    //     }
+
+    //     info!("Building stage {stage_name}...");
+    //     let hosts = state.db.get_hosts_in_stage(&stage_id).await?;
+
+    //     let mut pipeline_hosts = vec![];
+    //     for host_id in hosts {
+    //         info!("Building host {host_id}...");
+    //         let history = state.db.get_deployment_history_on_host(&host_id).await?;
+    //         let latest = history.first().cloned();
+
+    //         pipeline_hosts.push(PipelineHost {
+    //             host_name: host_id,
+    //             deployment: latest.map(|l| PipelineHostDeployment {
+    //                 deployment_id: l.0,
+    //                 deployed_artifact_version: l.1,
+    //                 deployed_at: l.2,
+    //             }),
+    //         });
+    //     }
+
+    //     pipeline_stages.push(PipelineStage {
+    //         stage_name,
+    //         stage_type: PipelineStageType::Deploy(PipelineDeployStage {
+    //             hosts: pipeline_hosts,
+    //             approved: false,
+    //         }),
+    //     });
+    // }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -193,18 +286,25 @@ pub struct PutPipelineRequest {
     pub stages: Vec<PutPipelineStage>,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutPipelineResponse {
+    pub created_at: DateTime<Utc>,
+}
+
 async fn put_pipeline(
     State(state): State<AntZookeeperState>,
     Json(req): Json<PutPipelineRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+) -> Result<(StatusCode, Json<PutPipelineResponse>), AntZookeeperError> {
     let pipeline_id = state
         .db
         .get_deployment_pipeline_by_project(&req.project)
         .await?;
     if pipeline_id.is_none() {
-        return Err(AntZookeeperError::validation_msg(
-            "No such deployment pipeline.",
-        ));
+        return Err(AntZookeeperError::ValidationError(format!(
+            "No pipeline for project: {}",
+            req.project
+        )));
     }
     let pipeline_id = pipeline_id.unwrap();
 
@@ -213,13 +313,13 @@ async fn put_pipeline(
 
         match group {
             None => {
-                return Err(AntZookeeperError::validation_msg(&format!(
+                return Err(AntZookeeperError::ValidationError(format!(
                     "No such host group: {}",
                     stage.host_group_id
                 )));
             }
             Some(group) if group.hosts.is_empty() => {
-                return Err(AntZookeeperError::validation_msg(&format!(
+                return Err(AntZookeeperError::ValidationError(format!(
                     "Host group {} cannot be added to a pipeline because it has no hosts.",
                     stage.host_group_id
                 )));
@@ -260,7 +360,12 @@ async fn put_pipeline(
         );
     }
 
-    Ok(StatusCode::OK)
+    Ok((
+        StatusCode::OK,
+        Json(PutPipelineResponse {
+            created_at: Utc::now(),
+        }),
+    ))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -277,11 +382,11 @@ pub struct GetHostGroupResponse {
 
 async fn get_host_group(
     State(state): State<AntZookeeperState>,
-    Json(req): Json<GetHostGroupRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+    Query(req): Query<GetHostGroupRequest>,
+) -> Result<(StatusCode, Json<GetHostGroupResponse>), AntZookeeperError> {
     match state.db.get_host_group_by_name(&req.name).await? {
         None => {
-            return Err(AntZookeeperError::validation_msg(&format!(
+            return Err(AntZookeeperError::ValidationError(format!(
                 "No host group named: {}",
                 req.name
             )))
@@ -312,7 +417,7 @@ pub struct CreateHostGroupResponse {
 async fn create_host_group(
     State(state): State<AntZookeeperState>,
     Json(req): Json<CreateHostGroupRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+) -> Result<(StatusCode, Json<CreateHostGroupResponse>), AntZookeeperError> {
     if state.db.get_host_group_by_name(&req.name).await?.is_some() {
         return Err(AntZookeeperError::validation_msg(
             "Host group with that name already exists.",
@@ -346,10 +451,16 @@ pub struct AddHostToHostGroupRequest {
     pub host_id: String,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddHostToHostGroupResponse {
+    host_already_in_host_group: bool,
+}
+
 async fn add_host_to_host_group(
     State(state): State<AntZookeeperState>,
     Json(req): Json<AddHostToHostGroupRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+) -> Result<(StatusCode, Json<AddHostToHostGroupResponse>), AntZookeeperError> {
     if !state.db.host_group_exists_by_id(&req.host_group_id).await? {
         return Err(AntZookeeperError::validation_msg("No such host group."));
     }
@@ -363,8 +474,12 @@ async fn add_host_to_host_group(
         .host_in_host_group(&req.host_group_id, &req.host_id)
         .await?
     {
-        return Err(AntZookeeperError::validation_msg(
-            "Host already in host group.",
+        info!("Host already in host group...");
+        return Ok((
+            StatusCode::OK,
+            Json(AddHostToHostGroupResponse {
+                host_already_in_host_group: true,
+            }),
         ));
     }
 
@@ -375,7 +490,12 @@ async fn add_host_to_host_group(
         .add_host_to_host_group(&req.host_group_id, &req.host_id)
         .await?;
 
-    Ok(StatusCode::OK)
+    Ok((
+        StatusCode::OK,
+        Json(AddHostToHostGroupResponse {
+            host_already_in_host_group: false,
+        }),
+    ))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -385,10 +505,16 @@ pub struct RemoveHostFromHostGroupRequest {
     pub host_id: String,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveHostFromHostGroupResponse {
+    pub host_was_present: bool,
+}
+
 async fn remove_host_from_host_group(
     State(state): State<AntZookeeperState>,
     Json(req): Json<RemoveHostFromHostGroupRequest>,
-) -> Result<impl IntoResponse, AntZookeeperError> {
+) -> Result<(StatusCode, Json<RemoveHostFromHostGroupResponse>), AntZookeeperError> {
     if !state.db.host_group_exists_by_id(&req.host_group_id).await? {
         return Err(AntZookeeperError::validation_msg("No such host group."));
     }
@@ -397,12 +523,15 @@ async fn remove_host_from_host_group(
         return Err(AntZookeeperError::validation_msg("No such host."));
     }
 
-    state
+    let host_was_present = state
         .db
         .remove_host_from_host_group(&req.host_group_id, &req.host_id)
         .await?;
 
-    Ok(StatusCode::OK)
+    Ok((
+        StatusCode::OK,
+        Json(RemoveHostFromHostGroupResponse { host_was_present }),
+    ))
 }
 
 pub fn make_routes() -> Router<AntZookeeperState> {

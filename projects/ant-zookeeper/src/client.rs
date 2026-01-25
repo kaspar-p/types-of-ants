@@ -1,11 +1,12 @@
 use http::Method;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::routes::pipeline::{
-    AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
-    GetHostGroupRequest, GetHostGroupResponse, GetPipelineRequest, GetPipelineResponse,
-    PutPipelineRequest, RemoveHostFromHostGroupRequest,
+    AddHostToHostGroupRequest, AddHostToHostGroupResponse, CreateHostGroupRequest,
+    CreateHostGroupResponse, GetHostGroupRequest, GetHostGroupResponse, GetPipelineRequest,
+    GetPipelineResponse, PutPipelineRequest, PutPipelineResponse, RemoveHostFromHostGroupRequest,
 };
 
 pub struct AntZookeeperClient {
@@ -16,6 +17,10 @@ pub struct AntZookeeperClient {
 pub struct AntZookeeperClientConfig {
     pub tls: bool,
     pub endpoint: String,
+}
+
+pub struct AntZookeeperClientError<E> {
+    error: E,
 }
 
 impl AntZookeeperClient {
@@ -44,12 +49,25 @@ impl AntZookeeperClient {
 
         let res = self
             .client
-            .request(method, endpoint)
+            .request(method.clone(), &endpoint)
             .json(&req)
             .send()
-            .await?;
+            .await?
+            .error_for_status();
+        // .error_for_status()?
+        // .json::<Res>()
+        // .await;
 
-        Ok(res.json().await?)
+        match res {
+            Ok(res) => {
+                let body = res.json::<Res>().await?;
+                return Ok(body);
+            }
+            Err(err) => {
+                error!("Error sending {} {}: {}", method.as_str(), endpoint, err);
+                return Err(err.into());
+            }
+        }
     }
 
     pub async fn get_host_group(
@@ -71,7 +89,7 @@ impl AntZookeeperClient {
     pub async fn add_host_to_host_group(
         &self,
         req: AddHostToHostGroupRequest,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<AddHostToHostGroupResponse, anyhow::Error> {
         self.send(Method::POST, "/pipeline/host-group/host", req)
             .await
     }
@@ -91,7 +109,10 @@ impl AntZookeeperClient {
         self.send(Method::GET, "/pipeline/pipeline", req).await
     }
 
-    pub async fn put_pipeline(&self, req: PutPipelineRequest) -> Result<(), anyhow::Error> {
+    pub async fn put_pipeline(
+        &self,
+        req: PutPipelineRequest,
+    ) -> Result<PutPipelineResponse, anyhow::Error> {
         self.send(Method::POST, "/pipeline/pipeline", req).await
     }
 }

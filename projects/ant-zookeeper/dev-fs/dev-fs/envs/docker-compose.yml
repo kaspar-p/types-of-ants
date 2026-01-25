@@ -1,6 +1,6 @@
 services:
   ant-data-farm:
-    image: ant-data-farm:${VERSION}
+    image: ant-data-farm:{{VERSION}}
     container_name: ant-data-farm
     build:
       context: ./projects/ant-data-farm
@@ -9,7 +9,7 @@ services:
     ports:
       - "{{ANT_DATA_FARM_PORT}}:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
     environment:
-      VERSION: ${VERSION}
+      VERSION: "{{VERSION}}"
       POSTGRES_DB_FILE: /run/secrets/ant_data_farm_db
       POSTGRES_USER_FILE: /run/secrets/ant_data_farm_user
       POSTGRES_PASSWORD_FILE: /run/secrets/ant_data_farm_password
@@ -105,10 +105,10 @@ services:
   #     context: ./projects/ant-renewing-certificates
   #     dockerfile: Dockerfile
   #     args:
-  #       - ANT_RENEWING_CERTIFICATES_FQDN=${ANT_RENEWING_CERTIFICATES_FQDN}
+  #       - ANT_RENEWING_CERTIFICATES_FQDN={{ANT_RENEWING_CERTIFICATES_FQDN}}
   #     tags:
   #       - ant-renewing-certificates:latest
-  #       - ant-renewing-certificates:${VERSION}
+  #       - ant-renewing-certificates:{{VERSION}}
   #   secrets:
   #     - cloudflare_api_token
 

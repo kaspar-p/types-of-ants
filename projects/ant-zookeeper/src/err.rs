@@ -1,27 +1,31 @@
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Json, Response};
 use http::StatusCode;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, error};
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum AntZookeeperError {
-    InternalServerError(Option<anyhow::Error>),
-    ValidationError {
-        msg: String,
-        e: Option<anyhow::Error>,
-    },
+    InternalServerError(#[serde(skip)] Option<anyhow::Error>),
+    ValidationError(String),
+    ResourceNotFound(String),
 }
 
 impl AntZookeeperError {
     pub fn validation_msg(msg: &str) -> Self {
-        Self::ValidationError {
-            msg: msg.to_string(),
-            e: None,
-        }
+        Self::ValidationError(msg.to_string())
     }
 
-    pub fn validation(msg: &str, e: Option<anyhow::Error>) -> Self {
-        Self::ValidationError {
-            msg: msg.to_string(),
-            e,
+    pub fn json(self) -> (StatusCode, Json<Self>) {
+        match self {
+            Self::InternalServerError(_) => {
+                error!("Error: {:?}", self);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(self));
+            }
+            Self::ResourceNotFound(_) | Self::ValidationError(_) => {
+                debug!("Error: {:?}", self);
+                (StatusCode::BAD_REQUEST, Json(self))
+            }
         }
     }
 }
@@ -37,30 +41,13 @@ where
 
 impl IntoResponse for AntZookeeperError {
     fn into_response(self) -> Response {
-        let val: (StatusCode, String) = self.into();
+        let val: (StatusCode, Json<AntZookeeperError>) = self.into();
         val.into_response()
     }
 }
 
-impl Into<(StatusCode, String)> for AntZookeeperError {
-    fn into(self) -> (StatusCode, String) {
-        match self {
-            AntZookeeperError::InternalServerError(e) => {
-                error!("AntZookeeperError::InternalServerError: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong, please retry.".to_string(),
-                )
-            }
-
-            AntZookeeperError::ValidationError { msg, e } => {
-                debug!(
-                    "AntZookeeperError::ValidationError: {:?} caused by {:?}",
-                    msg, e
-                );
-
-                (StatusCode::BAD_REQUEST, msg)
-            }
-        }
+impl Into<(StatusCode, Json<AntZookeeperError>)> for AntZookeeperError {
+    fn into(self) -> (StatusCode, Json<AntZookeeperError>) {
+        self.json()
     }
 }

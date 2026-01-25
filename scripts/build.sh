@@ -96,11 +96,18 @@ for arch in "${arches[@]}"; do
   if is_project_docker "$project"; then
     is_docker=true
     log "... creating docker image"
+
     VERSION="$version" \
       PERSIST_DIR="$PERSIST_DIR" \
       INSTALL_DIR="$INSTALL_DIR" \
       SECRETS_DIR="$SECRETS_DIR" \
-      run_command docker-compose build "${project}"
+        mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/compose.yaml"
+      
+      run_command \
+        docker-compose \
+          --project-directory "$repository_root" \
+          --file "/tmp/compose.yaml" \
+        build "${project}"
     
     log "... exporting docker image"
     docker_image_file="docker-image.tar"
@@ -112,7 +119,10 @@ for arch in "${arches[@]}"; do
       PERSIST_DIR="$PERSIST_DIR" \
       INSTALL_DIR="$INSTALL_DIR" \
       SECRETS_DIR="$SECRETS_DIR" \
-      docker-compose config "${project}" > "$tmp_build_dir/docker-compose.yml"
+      docker-compose \
+          --project-directory "$repository_root" \
+          --file "/tmp/compose.yaml" \
+          config "${project}" > "$tmp_build_dir/docker-compose.yml"
   fi
 
   # Create a small manifest.json file into the build directory

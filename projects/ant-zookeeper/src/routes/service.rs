@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tar::Archive;
 use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::fs::{artifact_file_name, artifact_persist_dir, envs_file_name, envs_persist_dir};
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
@@ -133,14 +133,11 @@ async fn register_artifact(
             .next_field()
             .await
             .map_err(|e| {
-                AntZookeeperError::validation(
-                    "No field found in multipart request!",
-                    Some(e.into()),
-                )
+                warn!("No field in multipart: {e}");
+                AntZookeeperError::validation_msg("No field found in multipart request!")
             })?
-            .ok_or(AntZookeeperError::validation(
+            .ok_or(AntZookeeperError::validation_msg(
                 "No bytes field found in request!",
-                None,
             ))?;
 
         while let Some(bytes) = field.chunk().await.unwrap() {

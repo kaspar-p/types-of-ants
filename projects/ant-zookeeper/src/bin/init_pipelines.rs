@@ -1,0 +1,115 @@
+use ant_zookeeper::{
+    client::{AntZookeeperClient, AntZookeeperClientConfig},
+    routes::pipeline::{
+        AddHostToHostGroupRequest, CreateHostGroupRequest, GetHostGroupRequest, PutPipelineRequest,
+        PutPipelineStage,
+    },
+};
+use tracing::info;
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    tracing_subscriber::fmt().init();
+
+    let client = AntZookeeperClient::new(AntZookeeperClientConfig {
+        tls: false,
+        endpoint: "localhost:3235".to_string(),
+    });
+
+    make_ant_zoo_storage(&client).await?;
+    make_ant_host_agent(&client).await?;
+
+    Ok(())
+}
+
+async fn make_ant_host_agent(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
+    let beta_hg_id = {
+        let hg = client
+            .create_host_group(CreateHostGroupRequest {
+                name: "ant-host-agent/beta".to_string(),
+                environment: "beta".to_string(),
+            })
+            .await?;
+
+        client
+            .add_host_to_host_group(AddHostToHostGroupRequest {
+                host_group_id: hg.id.clone(),
+                host_id: "antworker002.hosts.typesofants.org".to_string(),
+            })
+            .await?;
+
+        client
+            .add_host_to_host_group(AddHostToHostGroupRequest {
+                host_group_id: hg.id.clone(),
+                host_id: "antworker007.hosts.typesofants.org".to_string(),
+            })
+            .await?;
+
+        hg.id
+    };
+
+    let prod_wave1_hg_id = {
+        let hg = client
+            .create_host_group(CreateHostGroupRequest {
+                name: "ant-host-agent/prod-wave1".to_string(),
+                environment: "prod".to_string(),
+            })
+            .await?;
+
+        client
+            .add_host_to_host_group(AddHostToHostGroupRequest {
+                host_group_id: hg.id.clone(),
+                host_id: "antworker001.hosts.typesofants.org".to_string(),
+            })
+            .await?;
+
+        hg.id
+    };
+
+    client
+        .put_pipeline(PutPipelineRequest {
+            project: "ant-host-agent".to_string(),
+            stages: vec![
+                PutPipelineStage {
+                    name: "beta".to_string(),
+                    host_group_id: beta_hg_id,
+                },
+                PutPipelineStage {
+                    name: "prod-wave1".to_string(),
+                    host_group_id: prod_wave1_hg_id,
+                },
+            ],
+        })
+        .await?;
+
+    Ok(())
+}
+
+async fn make_ant_zoo_storage(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
+    let hg = client
+        .create_host_group(CreateHostGroupRequest {
+            name: "ant-zoo-storage/only".to_string(),
+            environment: "prod".to_string(),
+        })
+        .await?;
+
+    info!("here1");
+    client
+        .add_host_to_host_group(AddHostToHostGroupRequest {
+            host_group_id: hg.id.clone(),
+            host_id: "antworker007.hosts.typesofants.org".to_string(),
+        })
+        .await?;
+
+    client
+        .put_pipeline(PutPipelineRequest {
+            project: "ant-zoo-storage".to_string(),
+            stages: vec![PutPipelineStage {
+                name: "deploy".to_string(),
+                host_group_id: hg.id.clone(),
+            }],
+        })
+        .await?;
+
+    Ok(())
+}

@@ -22,6 +22,9 @@ values
   ('antworker002.hosts.typesofants.org', 'aarch64'),
   ('antworker003.hosts.typesofants.org', 'aarch64'),
   ('antworker004.hosts.typesofants.org', 'aarch64'),
+  ('antworker005.hosts.typesofants.org', 'aarch64'),
+  ('antworker006.hosts.typesofants.org', 'aarch64'),
+  ('antworker007.hosts.typesofants.org', 'aarch64'),
   ('ant.hisbaan.com', 'x86_64'),
   ('ant.flower.beer', 'x86_64')
 ;
@@ -40,6 +43,8 @@ values
   ('ant-who-tweets', true),
   ('ant-worker-metrics-exporter', true),
   ('ant-gateway', true),
+  ('ant-zoo-storage', true),
+  ('ant-zookeeper', true),
   ('nextcloud-webdav', false)
 ;
 

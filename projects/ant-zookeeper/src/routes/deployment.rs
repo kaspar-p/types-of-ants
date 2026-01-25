@@ -1,8 +1,10 @@
-use axum::{extract::State, response::IntoResponse, routing::post, Router};
+use anyhow::Context;
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use axum_extra::routing::RouterExt;
 use futures::{future::join_all, TryFutureExt};
 use http::StatusCode;
-use tracing::info;
+use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
 use crate::{
     err::AntZookeeperError,
@@ -12,6 +14,10 @@ use crate::{
     },
     state::AntZookeeperState,
 };
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IteratePipelineResponse {}
 
 async fn iterate_pipeline(
     State(state): State<AntZookeeperState>,
@@ -44,30 +50,54 @@ async fn iterate_pipeline(
         tokio::spawn(async move {
             // Do the work.
             info!("Performing: {event:?}");
-            let work = perform(&state2, &job.deployment_pipeline_id.clone(), event).await;
+
+            let state3 = state2.clone();
+            let job_id = job.job_id.clone();
+            let work: Result<Result<JobCompletion<()>, anyhow::Error>, tokio::task::JoinError> =
+                tokio::spawn(async move {
+                    perform(&state3, &job.deployment_pipeline_id.clone(), &event)
+                        .await
+                        .with_context(|| {
+                            format!(
+                                "Failed to perform scheduled deployment job [{}] for event [{}]",
+                                job_id, event
+                            )
+                        })
+                })
+                .await;
 
             let is_success: Option<bool> = match &work {
-                Ok(JobCompletion::Pending) => None,
-                Ok(JobCompletion::Finished(_)) => Some(true),
-                Err(_) => Some(false),
+                Ok(Ok(JobCompletion::Pending)) => None,
+                Ok(Ok(JobCompletion::Finished(_))) => Some(true),
+                Ok(Err(e)) => {
+                    error!("Handler Error: {:?}", e);
+                    Some(false)
+                }
+                Err(e) => {
+                    error!("Orchestration Error: {:?}", e);
+                    Some(false)
+                }
             };
 
             // Record it.
             if let Some(is_success) = is_success {
-                info!("Marking {} complete is_success={}", &job.job_id, is_success);
+                info!(
+                    "Job {} complete, success={}",
+                    job.job_id.clone(),
+                    is_success
+                );
                 state2
                     .db
                     .complete_deployment_job(
                         &job.job_id,
                         &job.revision,
+                        &job.target_type,
                         &job.target_id,
                         &job.event_name,
                         is_success,
                     )
                     .await?;
             }
-
-            work?; // Exit if error
 
             return Ok(());
         })
@@ -80,7 +110,7 @@ async fn iterate_pipeline(
         .into_iter()
         .collect::<Result<Vec<()>, anyhow::Error>>()?;
 
-    Ok((StatusCode::OK, "Pipeline iteration complete."))
+    Ok((StatusCode::OK, Json(IteratePipelineResponse {})))
 }
 
 pub fn make_routes() -> Router<AntZookeeperState> {

@@ -2,7 +2,8 @@ use ant_zoo_storage::AntZooStorageClient;
 use tracing::info;
 
 use crate::event_loop::transition::{
-    frontier, is_doable, transition, DeploymentEvent, EventName, PipelineError,
+    frontier, is_deployment_complete, is_doable, transition, DeploymentEvent, EventName,
+    PipelineError,
 };
 
 mod deploy;
@@ -77,12 +78,36 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 
     let transition = transition(db, deployment_pipeline_id, &event).await?;
 
+    if is_deployment_complete(db, event).await? {
+        info!("Event {event:?} is already finished, progressing pipeline...");
+        return Ok(transition.next);
+    }
+
     let project = db
         .get_project_from_deployment_pipeline(deployment_pipeline_id)
         .await?;
 
+    let previous = db
+        .get_job_previously_failed(
+            &event.0,
+            &project,
+            &deployment_pipeline_id,
+            &event.1.as_target_type(),
+            &event.1.as_target_id(),
+            &event.2.to_string(),
+        )
+        .await?;
+    if let Some(prev) = previous {
+        if !prev.1 {
+            info!("Previous job {} failed, and is not retryable...", prev.0);
+            return Ok(vec![]);
+        } else {
+            info!("Previous job {} failed but is retryable...", prev.0);
+        }
+    }
+
     // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!
-    let (finish_status, job_id) = db
+    let job_id = db
         .create_deployment_job(
             &event.0,
             &project,
@@ -92,14 +117,8 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
             &event.2.to_string(),
         )
         .await?;
-    match finish_status {
-        None => {
-            info!("Scheduled job: {job_id} for event {event:?}");
-            return Ok(vec![]);
-        }
-        Some(status) => {
-            info!("Job {job_id} already completed {event:?} with status success={status}, progressing pipeline...");
-            return Ok(transition.next);
-        }
-    };
+
+    info!("Scheduled job: {job_id} for event {event:?}");
+
+    Ok(vec![])
 }

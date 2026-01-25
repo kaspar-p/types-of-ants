@@ -1,7 +1,12 @@
 [package]
+default-run = "ant-zookeeper"
 name = "ant-zookeeper"
 version = "1.0.0"
 edition = "2021"
+
+[[bin]]
+name = "init-pipelines"
+path = "src/bin/init_pipelines.rs"
 
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }

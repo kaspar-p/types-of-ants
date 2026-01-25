@@ -22,8 +22,8 @@ Each log entry at minimum, looks like:
 (id, target_id, revision, event_name, created_at)
 ```
 
-Meaning that for deployment `id`, the `event_name` has happened to `target_id`
-at `created_at` time, with version `revision`.
+Meaning that the `event_name` has happened to `target_id` at `created_at` time,
+with version `revision`. The unique of this triple is `id`.
 
 ## Multiple granularities
 

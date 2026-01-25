@@ -145,23 +145,24 @@ async fn deployment_deployment_returns_200_happy_path() {
             .unwrap()
     };
 
-    let jobs = get_unfinished_jobs().await;
-    assert_eq!(jobs.len(), 0);
+    {
+        let jobs = get_unfinished_jobs().await;
+        assert_eq!(jobs.len(), 0);
 
-    let events = get_events().await;
-
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].3, "stage-started");
+        let e = get_events().await;
+        assert_eq!(e.len(), 1);
+        assert_eq!(e[0].event_name, "stage-started");
+    }
 
     // Iterate pipeline once
     {
         let res = fixture.client.post("/deployment/iteration").send().await;
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
-        let events = get_events().await;
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
+        let e = get_events().await;
+        assert_eq!(e.len(), 2);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
     }
 
     // Iterate pipeline once
@@ -173,10 +174,10 @@ async fn deployment_deployment_returns_200_happy_path() {
         // The build stage's StageFinished event is on the frontier, but not READY because the arch
         // tasks are pointing to it still.
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
-        let events = get_events().await;
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
+        let e = get_events().await;
+        assert_eq!(e.len(), 2);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
     }
 
     // Register the x86 artifact
@@ -207,11 +208,11 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(res.status(), StatusCode::OK);
 
         assert_eq!(get_unfinished_jobs().await.len(), 1); // only ArmV7 remaining
-        let events = get_events().await;
-        assert_eq!(events.len(), 3);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
-        assert_eq!(events[2].3, "artifact-architecture-registered:x86_64");
+        let e = get_events().await;
+        assert_eq!(e.len(), 3);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
     }
 
     // Register the (FINAL) Raspian artifact
@@ -242,12 +243,12 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(res.status(), StatusCode::OK);
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
-        let events = get_events().await;
-        assert_eq!(events.len(), 4);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
-        assert_eq!(events[2].3, "artifact-architecture-registered:x86_64");
-        assert_eq!(events[3].3, "artifact-architecture-registered:armv7");
+        let e = get_events().await;
+        assert_eq!(e.len(), 4);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
     }
 
     // Iterate pipeline once
@@ -256,13 +257,13 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(res.status(), StatusCode::OK);
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
-        let events = get_events().await;
-        assert_eq!(events.len(), 5);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
-        assert_eq!(events[2].3, "artifact-architecture-registered:x86_64");
-        assert_eq!(events[3].3, "artifact-architecture-registered:armv7");
-        assert_eq!(events[4].3, "stage-finished");
+        let e = get_events().await;
+        assert_eq!(e.len(), 5);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
+        assert_eq!(e[4].event_name, "stage-finished");
     }
 
     // Iterate pipeline 4 times, before requiring a deployment (fails locally, no systemd on MacOS)
@@ -280,16 +281,16 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(res.status(), StatusCode::OK);
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
-        let events = get_events().await;
-        assert_eq!(events.len(), 9);
-        assert_eq!(events[0].3, "stage-started");
-        assert_eq!(events[1].3, "artifact-architecture-registered:aarch64");
-        assert_eq!(events[2].3, "artifact-architecture-registered:x86_64");
-        assert_eq!(events[3].3, "artifact-architecture-registered:armv7");
-        assert_eq!(events[4].3, "stage-finished");
-        assert_eq!(events[5].3, "stage-started");
-        assert_eq!(events[6].3, "host-group-started");
-        assert_eq!(events[7].3, "host-started");
-        assert_eq!(events[8].3, "host-artifact-replicated");
+        let e = get_events().await;
+        assert_eq!(e.len(), 9);
+        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
+        assert_eq!(e[4].event_name, "stage-finished");
+        assert_eq!(e[5].event_name, "stage-started");
+        assert_eq!(e[6].event_name, "host-group-started");
+        assert_eq!(e[7].event_name, "host-started");
+        assert_eq!(e[8].event_name, "host-artifact-replicated");
     }
 }

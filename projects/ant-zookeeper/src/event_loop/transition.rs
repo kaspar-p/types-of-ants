@@ -7,11 +7,16 @@ use std::{
 use ant_library::host_architecture::HostArchitecture;
 use ant_zoo_storage::AntZooStorageClient;
 use anyhow::Context;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{event_loop::replicate::replicate_artifact_step, state::AntZookeeperState};
+use crate::{
+    event_loop::{deploy::deploy_artifact, replicate::replicate_artifact_step},
+    state::AntZookeeperState,
+};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum DeploymentTarget {
     Pipeline(String),
     Stage(String),
@@ -60,7 +65,8 @@ impl ToString for DeploymentTarget {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
 pub enum EventName {
     PipelineStarted,
 
@@ -169,7 +175,7 @@ pub struct Transition {
     // pub previous: DeploymentEvent,
 }
 
-async fn is_deployment_complete(
+pub(crate) async fn is_deployment_complete(
     db: &AntZooStorageClient,
     e: &DeploymentEvent,
 ) -> Result<bool, anyhow::Error> {
@@ -211,10 +217,11 @@ async fn after(
 
 /// Determine whether a step is DOABLE, based on a few criteria:
 ///
+/// INCOMPLETE(a): the event `a` is incomplete.
 /// NEW(a): all events in `after(a)` must be incomplete.
 /// READY(a): given a frontier `f`, the steps in `after(f)` do not contain `a`.
 ///
-/// This function returns whether the event is both NEW and READY.
+/// This function returns whether the event is INCOMPLETE, NEW, and READY.
 pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
@@ -485,7 +492,7 @@ pub enum JobCompletion<T> {
 pub async fn perform(
     state: &AntZookeeperState,
     deployment_pipeline_id: &str,
-    event: DeploymentEvent,
+    event: &DeploymentEvent,
 ) -> Result<JobCompletion<()>, anyhow::Error> {
     type T = DeploymentTarget;
     type E = EventName;
@@ -512,6 +519,19 @@ pub async fn perform(
                 .await?;
 
             replicate_artifact_step(state, &project, &revision, &host_group, &host).await?;
+
+            Ok(JobCompletion::Finished(()))
+        }
+
+        DeploymentEvent(revision, T::Host(host), E::HostArtifactDeployed) => {
+            let project = state
+                .db
+                .get_project_from_deployment_pipeline(deployment_pipeline_id)
+                .await?;
+
+            let version = state.db.get_revision_version(&revision).await?;
+
+            deploy_artifact(state, &project, &version, &host).await?;
 
             Ok(JobCompletion::Finished(()))
         }

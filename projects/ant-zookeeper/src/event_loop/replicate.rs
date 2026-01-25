@@ -42,6 +42,7 @@ pub async fn replicate_artifact_step(
 
         // Unpack to a directory
         let unpack_dir_path = {
+            info!("Unpacking tarball to [{}].", artifact_path.display());
             let artifact = File::open(&artifact_path)?;
             let gz = GzDecoder::new(&artifact);
             let mut archive = Archive::new(gz);
@@ -60,6 +61,7 @@ pub async fn replicate_artifact_step(
         // Create a new tarball with the new files injected
         let pack_file_path = {
             let pack_file_path = dir.path().join("pack.tar");
+            info!("Repacking tarball to [{}].", pack_file_path.display());
 
             let pack_file = File::create_new(&pack_file_path)?;
             let mut archive = tar::Builder::new(GzEncoder::new(pack_file, Compression::default()));
@@ -98,10 +100,12 @@ pub async fn replicate_artifact_step(
                 port: 3232,
             });
 
+    info!("Replicating service file to: {host}");
     ant_host_agent
         .register_service(&project, &version, service_file)
         .await?;
 
+    info!("Installing service file file to: {host}");
     ant_host_agent
         .install_service(ant_host_agent::routes::service::InstallServiceRequest {
             project: project.to_string(),
