@@ -1,0 +1,106 @@
+@config "../../tailwind.config.js";
+
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+/* @import "tailwindcss/preflight.css" layer(base); */
+@import "tailwindcss/utilities.css" layer(utilities);
+
+*,
+*::before,
+*::after {
+  position: relative;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+#banner {
+  display: block;
+  width: 100%;
+  background-color: gold;
+  border-radius: 5px;
+  padding: 10px;
+  padding-right: 0;
+}
+
+.banner-ant {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+.form-form {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  padding: 10px;
+}
+
+.form-label {
+  margin: 2.5px;
+  padding-left: 10px;
+}
+
+.form-text {
+  margin: 2.5px;
+}
+
+.form-submit {
+  margin: 2.5px;
+}
+
+.replacer {
+  padding-left: 12.5px;
+  height: 18px;
+  margin-bottom: 15px;
+}
+
+#scroll-container {
+  overflow: hidden;
+}
+
+#scroll-helper-wrapper {
+  align-items: center;
+  display: flex;
+  left: 0px;
+  transform: translateZ(0);
+  transition-property: left;
+  transition-timing-function: linear;
+}
+
+#ant-filler {
+  column-count: 2;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#ant-filler > div {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+@media (min-width: 768px) {
+  #ant-filler {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1024px) {
+  #ant-filler {
+    column-count: 4;
+  }
+}
+
+@media (min-width: 1200px) {
+  #ant-filler {
+    column-count: 5;
+  }
+}
+
+@media (min-width: 1200px) {
+  #ant-filler {
+    column-count: 6;
+  }
+}
