@@ -15,7 +15,13 @@ use ant_zookeeper::{
 use async_trait::async_trait;
 use chrono::Utc;
 use rsa::rand_core::OsRng;
-use tokio::{fs::create_dir_all, net::TcpListener, sync::Mutex, task::JoinHandle};
+use tokio::{
+    fs::{create_dir_all, File},
+    io::AsyncWriteExt,
+    net::TcpListener,
+    sync::Mutex,
+    task::JoinHandle,
+};
 
 struct TestDns {
     records: Mutex<HashMap<String, Vec<TxtRecord>>>,
@@ -83,6 +89,7 @@ impl Dns for TestDns {
 pub struct Fixture {
     pub client: TestClient,
     pub state: AntZookeeperState,
+    pub ant_host_agent_state: AntHostAgentState,
 
     _guard: postgresql_embedded::PostgreSQL,
 }
@@ -156,7 +163,29 @@ impl Fixture {
             .await
             .unwrap();
 
-        let ant_host_agent_service = ant_host_agent::make_routes(ant_host_agent_state).unwrap();
+        let ant_host_agent_service =
+            ant_host_agent::make_routes(ant_host_agent_state.clone()).unwrap();
+
+        {
+            create_dir_all(root_dir.join("envs")).await.unwrap();
+
+            let mut ant_host_agent_env =
+                File::create(root_dir.join("envs").join("ant-host-agent.beta.build.cfg"))
+                    .await
+                    .unwrap();
+            ant_host_agent_env
+                .write_all("ANT_HOST_AGENT_PORT=3232\n".as_bytes())
+                .await
+                .unwrap();
+
+            let mut beta_env = File::create(root_dir.join("envs").join("beta.build.cfg"))
+                .await
+                .unwrap();
+            beta_env
+                .write_all("TYPESOFANTS_ENV=beta\n".as_bytes())
+                .await
+                .unwrap();
+        }
 
         let state = AntZookeeperState {
             dns: Arc::new(Mutex::new(TestDns::new())),
@@ -179,6 +208,7 @@ impl Fixture {
         Fixture {
             client,
             state,
+            ant_host_agent_state,
             _guard,
         }
     }

@@ -5,13 +5,13 @@ use ant_zoo_storage::HostGroup;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use tar::Archive;
 use tempfile::tempdir_in;
-use tokio::fs::create_dir_all;
+use tokio::fs::{create_dir_all, OpenOptions};
 use tracing::info;
 
 use crate::{
     fs::{
-        artifact_persist_dir, envs_file_name, envs_persist_dir, services_file_name,
-        services_persist_dir,
+        artifact_persist_dir, envs_persist_dir, global_envs_file_name, project_envs_file_name,
+        services_file_name, services_persist_dir,
     },
     state::AntZookeeperState,
 };
@@ -24,9 +24,6 @@ pub async fn replicate_artifact_step(
     host: &str,
 ) -> Result<(), anyhow::Error> {
     let (_, host_arch) = state.db.get_host(&host).await?.expect("host exists");
-
-    let env_file_path =
-        envs_persist_dir(&state.root_dir).join(envs_file_name(&project, &host_group.environment));
 
     let (_, version, artifact_relative_path) = state
         .db
@@ -51,8 +48,32 @@ pub async fn replicate_artifact_step(
             archive.unpack(&unpack_dir_path)?;
 
             // Inject the right environment variables with a .env into project
-            if exists(&env_file_path)? {
-                std::fs::copy(env_file_path, unpack_dir_path.join(".env"))?;
+            {
+                let source_env_file_paths = vec![
+                    envs_persist_dir(&state.root_dir)
+                        .join(global_envs_file_name(&host_group.environment)),
+                    envs_persist_dir(&state.root_dir)
+                        .join(project_envs_file_name(&project, &host_group.environment)),
+                ];
+
+                let mut env_file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(unpack_dir_path.join(".env"))
+                    .await?;
+                for path in source_env_file_paths {
+                    if exists(&path)? {
+                        info!(
+                            "Copying env config from [{}] to [{}]",
+                            path.display(),
+                            unpack_dir_path.join(".env").display()
+                        );
+                        let mut source = tokio::fs::File::open(path).await?;
+                        tokio::io::copy(&mut source, &mut env_file).await?;
+                    } else {
+                        info!("No such env config [{}]", path.display());
+                    }
+                }
             }
 
             unpack_dir_path

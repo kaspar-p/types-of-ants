@@ -17,7 +17,75 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     make_ant_zoo_storage(&client).await?;
+    make_ant_on_the_web(&client).await?;
+    make_ant_looking_pretty(&client).await?;
     make_ant_host_agent(&client).await?;
+
+    info!("Done!");
+
+    Ok(())
+}
+
+async fn make_ant_on_the_web(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
+    let beta_hg_id = {
+        let hg = client
+            .create_host_group(CreateHostGroupRequest {
+                name: "ant-on-the-web/beta".to_string(),
+                environment: "beta".to_string(),
+            })
+            .await?;
+
+        client
+            .add_host_to_host_group(AddHostToHostGroupRequest {
+                host_group_id: hg.id.clone(),
+                host_id: "antworker002.hosts.typesofants.org".to_string(),
+            })
+            .await?;
+
+        hg.id
+    };
+
+    client
+        .put_pipeline(PutPipelineRequest {
+            project: "ant-on-the-web".to_string(),
+            stages: vec![PutPipelineStage {
+                name: "beta-website".to_string(),
+                host_group_id: beta_hg_id,
+            }],
+        })
+        .await?;
+
+    Ok(())
+}
+
+async fn make_ant_looking_pretty(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
+    let beta_hg_id = {
+        let hg = client
+            .create_host_group(CreateHostGroupRequest {
+                name: "ant-looking-pretty/beta".to_string(),
+                environment: "beta".to_string(),
+            })
+            .await?;
+
+        client
+            .add_host_to_host_group(AddHostToHostGroupRequest {
+                host_group_id: hg.id.clone(),
+                host_id: "antworker002.hosts.typesofants.org".to_string(),
+            })
+            .await?;
+
+        hg.id
+    };
+
+    client
+        .put_pipeline(PutPipelineRequest {
+            project: "ant-looking-pretty".to_string(),
+            stages: vec![PutPipelineStage {
+                name: "beta-website".to_string(),
+                host_group_id: beta_hg_id,
+            }],
+        })
+        .await?;
 
     Ok(())
 }
@@ -93,7 +161,6 @@ async fn make_ant_zoo_storage(client: &AntZookeeperClient) -> Result<(), anyhow:
         })
         .await?;
 
-    info!("here1");
     client
         .add_host_to_host_group(AddHostToHostGroupRequest {
             host_group_id: hg.id.clone(),

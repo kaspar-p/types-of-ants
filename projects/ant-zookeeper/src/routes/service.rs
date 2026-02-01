@@ -18,7 +18,9 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
-use crate::fs::{artifact_file_name, artifact_persist_dir, envs_file_name, envs_persist_dir};
+use crate::fs::{
+    artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
+};
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
 #[derive(Serialize, Deserialize)]
@@ -266,8 +268,8 @@ async fn put_project_environment(
     Json(req): Json<PutProjectEnvironmentRequest>,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
     create_dir_all(envs_persist_dir(&state.root_dir)).await?;
-    let envs_file_path =
-        envs_persist_dir(&state.root_dir).join(envs_file_name(&req.project, &req.environment));
+    let envs_file_path = envs_persist_dir(&state.root_dir)
+        .join(project_envs_file_name(&req.project, &req.environment));
 
     let mut file = File::create(envs_file_path)?;
 
