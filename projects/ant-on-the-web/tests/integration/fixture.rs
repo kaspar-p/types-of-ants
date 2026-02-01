@@ -17,6 +17,8 @@ use ant_on_the_web::{
 use http::{header::SET_COOKIE, HeaderMap, StatusCode};
 use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
+use serde_json::json;
+use serde_json_assert::assert_json_eq;
 use tokio::sync::Mutex;
 
 use crate::fixture_sms::first_otp;
@@ -250,7 +252,10 @@ pub async fn test_router_weak_auth(opts: FixtureOptions) -> (TestFixture, String
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     }
 
     let token = {

@@ -40,7 +40,7 @@ export default function Page() {
     e.preventDefault();
 
     const res = await passwordResetCode({ username, phoneNumber });
-    switch (res.status) {
+    switch (res.__status) {
       case 200: {
         setCodeRequestValidationMsg({
           valid: true,
@@ -50,9 +50,7 @@ export default function Page() {
         break;
       }
       case 400: {
-        const e: { errors: { field: string; msg: string }[] } =
-          await res.json();
-        for (const err of e.errors) {
+        for (const err of res.errors) {
           switch (err.field) {
             case "phoneNumber": {
               setPhoneNumberValidationMsg(err.msg.toLocaleLowerCase());
@@ -80,10 +78,9 @@ export default function Page() {
     e.preventDefault();
 
     const res = await passwordResetSecret({ phoneNumber, otp });
-    switch (res.status) {
+    switch (res.__status) {
       case 200: {
-        const body: { secret: string } = await res.json();
-        setSecret(body.secret);
+        setSecret(res.secret);
         setSecretRequestValidationMsg({
           valid: true,
           msg: "one-time code valid!",
@@ -100,31 +97,6 @@ export default function Page() {
           valid: false,
           msg: "something went wrong, please retry",
         });
-        break;
-      }
-    }
-  }
-
-  async function handleNewPasswords(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    const res = await password({ secret, password1, password2 });
-
-    switch (res.status) {
-      case 400: {
-        const e: { errors: { field: string; msg: string }[] } =
-          await res.json();
-
-        setPasswordValidationMsg({
-          valid: false,
-          msg: e.errors[0].msg.toLocaleLowerCase(),
-        });
-
-        break;
-      }
-      case 200: {
-        setPasswordValidationMsg({ valid: true, msg: "password changed!" });
-        setStep(3);
         break;
       }
     }

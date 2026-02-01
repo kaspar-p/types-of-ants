@@ -1,9 +1,12 @@
 import { signup } from "@/server/posts";
-import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function SignupBox() {
+export type SignupBoxProps = {
+  setWeakAuth: (weakAuth: boolean) => void;
+};
+
+export function SignupBox(props: SignupBoxProps) {
   const [formState, setFormState] = useState<
     { loading: false; success: boolean; msg: string } | { loading: true }
   >({ loading: false, success: false, msg: "" });
@@ -15,40 +18,32 @@ export function SignupBox() {
   const [password2, setPassword2] = useState("");
   const [passwordValidationMsg, setPasswordValidationMsg] = useState("");
 
-  const { setUser } = useUser();
   const { push } = useRouter();
 
   async function handle(e: any) {
     e.preventDefault();
 
     setFormState({ loading: true });
-    const response = await signup({ username, password, password2 });
+    const res = await signup({ username, password, password2 });
 
-    switch (response.status) {
+    switch (res.__status) {
       default:
       case 500: {
-        setFormState({
-          loading: false,
-          success: false,
-          msg: "something went wrong, please retry.",
-        });
+        setFormState({ loading: false, success: false, msg: res.msg });
         break;
       }
 
       case 409: {
-        const msg = await response.text();
         setFormState({
           loading: false,
           success: false,
-          msg: msg.toLowerCase(),
+          msg: res.msg.toLowerCase(),
         });
         break;
       }
 
       case 400: {
-        const errors: { errors: { field: string; msg: string }[] } =
-          await response.json();
-        for (const error of errors.errors) {
+        for (const error of res.errors) {
           switch (error.field) {
             case "username": {
               setUsernameValidationMsg(error.msg.toLowerCase());
@@ -72,8 +67,6 @@ export function SignupBox() {
       }
 
       case 200: {
-        const j = await response.text();
-
         setUsername("");
         setUsernameValidationMsg("");
         setPassword("");
@@ -85,7 +78,7 @@ export function SignupBox() {
           msg: "signup complete, welcome!",
         });
 
-        setUser({ weakAuth: true, loggedIn: false });
+        props.setWeakAuth(true);
 
         push("/login/two-factor");
         break;

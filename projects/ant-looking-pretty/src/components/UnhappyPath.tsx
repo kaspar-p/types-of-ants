@@ -2,17 +2,20 @@ import React, { ReactNode } from "react";
 
 export function ErrorBoundary(props: {
   isError: boolean;
+  fallback?: ReactNode;
   children: ReactNode;
 }) {
-  if (props.isError) return <div>error...</div>;
-  return props.children;
+  return props.isError
+    ? (props.fallback ?? <div>error...</div>)
+    : props.children;
 }
 
 export function LoadingBoundary(props: {
   isLoading: boolean;
+  fallback?: ReactNode;
   children: ReactNode;
 }) {
-  if (props.isLoading) return <div>loading...</div>;
+  if (props.isLoading) return props.fallback ?? <div>loading...</div>;
   return props.children;
 }
 

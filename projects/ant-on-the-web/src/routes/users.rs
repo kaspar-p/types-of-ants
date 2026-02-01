@@ -5,6 +5,7 @@ use crate::{
     routes::lib::{
         auth::{make_auth_cookie, make_weak_auth_cookie, AUTH_COOKIE_NAME},
         err::ValidationMessage,
+        response::AntOnTheWebResponse,
         two_factor,
     },
     state::{ApiRouter, ApiState, InnerApiState},
@@ -13,8 +14,6 @@ use crate::{
 use ant_data_farm::users::{verify_password_hash, User, UserId};
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
-    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -33,7 +32,8 @@ use super::lib::{
     jwt::{decode_jwt, encode_jwt},
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EmailRequest {
     pub email: String,
 }
@@ -43,14 +43,14 @@ async fn subscribe_email(
     Json(EmailRequest {
         email: unsafe_email,
     }): Json<EmailRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     let canonical_email = match canonicalize_email(&unsafe_email) {
         Ok(e) => e,
         Err(e) => {
             info!("email invalid {e}");
-            return Err(AntOnTheWebError::Validation(ValidationError::one(
+            return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::invalid("email"),
             )));
         }
@@ -61,13 +61,17 @@ async fn subscribe_email(
 
         if let Some(u) = users.get_one_by_email(&canonical_email).await? {
             if u != user {
-                return Err(AntOnTheWebError::ConflictError("Already subscribed!"));
+                return Err(AntOnTheWebError::ConflictError {
+                    msg: "Already subscribed!",
+                });
             }
         }
     }
 
     if user.emails.contains(&canonical_email) {
-        return Err(AntOnTheWebError::ConflictError("Already subscribed!"));
+        return Err(AntOnTheWebError::ConflictError {
+            msg: "Already subscribed!",
+        });
     }
 
     let mut user_write = dao.users.write().await;
@@ -75,7 +79,7 @@ async fn subscribe_email(
         .add_email_to_user(&user.user_id, &canonical_email)
         .await?;
 
-    return Ok((StatusCode::OK, "Subscribed!"));
+    return Ok(AntOnTheWebResponse::SubscribeNewsletterResponse);
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -86,15 +90,14 @@ async fn get_user_by_name(
     auth: AuthClaims,
     path: Option<Path<String>>,
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN
     let user = authenticate(&auth, &dao).await?;
 
     if path.is_none() {
-        return Ok((
-            StatusCode::OK,
-            Json(GetUserResponse { user }).into_response(),
-        ));
+        return Ok(AntOnTheWebResponse::GetUserResponse(GetUserResponse {
+            user,
+        }));
     }
 
     let user_name = path.unwrap().0;
@@ -109,27 +112,25 @@ async fn get_user_by_name(
 
     let users = dao.users.read().await;
     let user = users.get_one_by_user_name(&user_name).await?.unwrap();
-    return Ok((
-        StatusCode::OK,
-        Json(GetUserResponse { user }).into_response(),
-    ));
+    return Ok(AntOnTheWebResponse::GetUserResponse(GetUserResponse {
+        user,
+    }));
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChangeUsernameRequest {
     pub username: String,
 }
-
 async fn change_username(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<ChangeUsernameRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
 
     let validations = validate_username(&req.username);
     if validations.len() > 0 {
-        return Err(AntOnTheWebError::Validation(ValidationError::many(
+        return Err(AntOnTheWebError::ValidationError(ValidationError::many(
             validations,
         )));
     }
@@ -141,11 +142,13 @@ async fn change_username(
     match other {
         Some(other) => {
             if other.user_id == user.user_id {
-                return Err(AntOnTheWebError::Validation(ValidationError::one(
+                return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                     ValidationMessage::new("username", "Must not be your current username."),
                 )));
             } else {
-                return Err(AntOnTheWebError::ConflictError("Username already in use."));
+                return Err(AntOnTheWebError::ConflictError {
+                    msg: "Username already in use.",
+                });
             }
         }
         None => {
@@ -153,7 +156,7 @@ async fn change_username(
                 .change_username(&user.user_id, &req.username)
                 .await?;
 
-            Ok((StatusCode::OK, "Username changed."))
+            Ok(AntOnTheWebResponse::ChangeUsernameResponse)
         }
     }
 }
@@ -162,7 +165,7 @@ async fn logout(
     auth: AuthClaims,
     cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     authenticate(&auth, &dao).await?;
 
     let mut cookie_expiration = cookie_defaults(AUTH_COOKIE_NAME, "".to_string()).build();
@@ -170,7 +173,7 @@ async fn logout(
 
     cookies.add(cookie_expiration);
 
-    return Ok((StatusCode::OK, "Logout successful."));
+    return Ok(AntOnTheWebResponse::LogoutResponse);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -200,18 +203,16 @@ fn canonicalize_email(email: &str) -> Result<String, anyhow::Error> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
-    #[serde(rename = "userId")]
     pub user_id: UserId,
-
-    #[serde(rename = "accessToken")]
     pub access_token: String,
 }
 async fn login(
     cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(login_request): Json<LoginRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN: This is the starting entry point for AuthN, so we don't need any auth claims here
 
     let users = dao.users.read().await;
@@ -235,7 +236,7 @@ async fn login(
 
     let user = match user {
         Err(v) => {
-            return Err(AntOnTheWebError::Validation(ValidationError::one(v)));
+            return Err(AntOnTheWebError::ValidationError(ValidationError::one(v)));
         }
         Ok(None) => {
             info!("No user found");
@@ -259,17 +260,13 @@ async fn login(
 
     cookies.add(cookie);
 
-    return Ok((
-        StatusCode::OK,
-        Json(LoginResponse {
-            user_id: user.user_id.clone(),
-            access_token: jwt,
-        }),
-    )
-        .into_response());
+    return Ok(AntOnTheWebResponse::LoginResponse(LoginResponse {
+        user_id: user.user_id.clone(),
+        access_token: jwt,
+    }));
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum VerificationSubmission {
     #[serde(rename = "email")]
     Email { email: String, otp: String },
@@ -282,9 +279,16 @@ pub enum VerificationSubmission {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VerificationAttemptRequest {
     pub method: VerificationSubmission,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum VerificationAttemptResponse {
+    WrongInput,
+    Success,
 }
 
 async fn two_factor_verification_attempt(
@@ -292,7 +296,7 @@ async fn two_factor_verification_attempt(
     cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<VerificationAttemptRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN: Allow weak validations here because the user has to exist, but if this is their first
     // phone number/email 2fa then they won't be able to be strongly authenticated.
     let user = authenticate_weak(&auth, &dao).await?;
@@ -300,14 +304,14 @@ async fn two_factor_verification_attempt(
     let canonical = match &req.method {
         VerificationSubmission::Phone { phone_number, .. } => {
             canonicalize_phone_number(&phone_number).map_err(|_| {
-                AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+                AntOnTheWebError::ValidationError(ValidationError::one(ValidationMessage::invalid(
                     "submission.phoneNumber",
                 )))
             })?
         }
         VerificationSubmission::Email { email, .. } => {
             canonicalize_email(&email).map_err(|_| {
-                AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+                AntOnTheWebError::ValidationError(ValidationError::one(ValidationMessage::invalid(
                     "submission.email",
                 )))
             })?
@@ -336,7 +340,9 @@ async fn two_factor_verification_attempt(
 
     match verification {
         VerificationReceipt::Failed => {
-            return Ok((StatusCode::BAD_REQUEST, Json(false)).into_response())
+            return Err(AntOnTheWebError::ValidationError(ValidationError::one(
+                ValidationMessage::msg("Invalid token."),
+            )))
         }
 
         VerificationReceipt::Success { user_id: _ } => {
@@ -382,12 +388,14 @@ async fn two_factor_verification_attempt(
             // Overwrite the old cookie with a new 2fa cookie
             cookies.add(make_auth_cookie(user.user_id.clone())?.1);
 
-            return Ok((StatusCode::OK, "Verification successful.").into_response());
+            return Ok(AntOnTheWebResponse::VerificationAttemptResponse(
+                VerificationAttemptResponse::Success,
+            ));
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddPhoneNumberRequest {
     #[serde(rename = "phoneNumber")]
     pub phone_number: String,
@@ -405,7 +413,7 @@ pub enum AddResolution {
     AlreadyAdded,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddPhoneNumberResponse {
     pub resolution: AddResolution,
 }
@@ -414,7 +422,7 @@ async fn add_phone_number(
     auth: AuthClaims,
     State(InnerApiState { dao, sms, rng, .. }): ApiState,
     Json(req): Json<AddPhoneNumberRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
     // to add a phone number to get it validated. However, we only allow the user to be weakly
     // authenticated if they don't have any phone numbers or emails associated.
@@ -441,7 +449,7 @@ async fn add_phone_number(
             }
         };
 
-        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?
+        validations.map_err(|v| AntOnTheWebError::ValidationError(ValidationError::many(v)))?
     };
 
     let method = two_factor::VerificationMethod::Phone(canonical_phone_number.clone());
@@ -459,7 +467,9 @@ async fn add_phone_number(
             None => false,
             Some(other) if other.user_id == user.user_id => true,
             Some(_) => {
-                return Ok((StatusCode::CONFLICT, "Phone number already exists.").into_response())
+                return Err(AntOnTheWebError::ConflictError {
+                    msg: "Phone number already exists.",
+                })
             }
         };
 
@@ -480,33 +490,24 @@ async fn add_phone_number(
         .await?;
     }
 
-    if already_added {
-        Ok((
-            StatusCode::OK,
-            Json(AddPhoneNumberResponse {
-                resolution: AddResolution::AlreadyAdded,
-            }),
-        )
-            .into_response())
-    } else {
-        Ok((
-            StatusCode::OK,
-            Json(AddPhoneNumberResponse {
-                resolution: AddResolution::Added,
-            }),
-        )
-            .into_response())
-    }
+    Ok(AntOnTheWebResponse::AddPhoneNumberResponse(
+        AddPhoneNumberResponse {
+            resolution: match already_added {
+                true => AddResolution::AlreadyAdded,
+                false => AddResolution::Added,
+            },
+        },
+    ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AddEmailRequest {
     pub email: String,
-    #[serde(rename = "forceSend")]
     pub force_send: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddEmailResponse {
     pub resolution: AddResolution,
 }
@@ -517,7 +518,7 @@ async fn add_email(
         dao, rng, email, ..
     }): ApiState,
     Json(req): Json<AddEmailRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN: Allow weak authentication here because during signup process they need to be able
     // to add an email to get it validated.
     let user = authenticate_weak(&auth, &dao).await?;
@@ -543,7 +544,7 @@ async fn add_email(
             }
         };
 
-        validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?
+        validations.map_err(|v| AntOnTheWebError::ValidationError(ValidationError::many(v)))?
     };
 
     let method = two_factor::VerificationMethod::Email(canonical_email.clone());
@@ -560,7 +561,11 @@ async fn add_email(
         match by_email {
             None => false,
             Some(other) if other.user_id == user.user_id => true,
-            Some(_) => return Ok((StatusCode::CONFLICT, "Email already exists.").into_response()),
+            Some(_) => {
+                return Err(AntOnTheWebError::ConflictError {
+                    msg: "Email already exists.",
+                })
+            }
         }
     };
 
@@ -577,31 +582,24 @@ async fn add_email(
         .await?
     }
 
-    if already_added {
-        Ok((
-            StatusCode::OK,
-            Json(AddEmailResponse {
-                resolution: AddResolution::AlreadyAdded,
-            }),
-        )
-            .into_response())
-    } else {
-        Ok((
-            StatusCode::OK,
-            Json(AddEmailResponse {
-                resolution: AddResolution::Added,
-            }),
-        )
-            .into_response())
-    }
+    Ok(AntOnTheWebResponse::AddEmailResponse(AddEmailResponse {
+        resolution: match already_added {
+            true => AddResolution::AlreadyAdded,
+            false => AddResolution::Added,
+        },
+    }))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PasswordResetCodeRequest {
     pub username: String,
-
-    #[serde(rename = "phoneNumber")]
     pub phone_number: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PasswordResetCodeResponse {
+    pub msg: String,
 }
 
 /// The first step in the password reset process, the user submits their information and receives
@@ -609,9 +607,9 @@ pub struct PasswordResetCodeRequest {
 async fn password_reset_code(
     State(InnerApiState { dao, rng, sms, .. }): ApiState,
     Json(req): Json<PasswordResetCodeRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let phone_number = canonicalize_phone_number(&req.phone_number).map_err(|_| {
-        AntOnTheWebError::Validation(ValidationError::one(ValidationMessage::invalid(
+        AntOnTheWebError::ValidationError(ValidationError::one(ValidationMessage::invalid(
             "phoneNumber",
         )))
     })?;
@@ -656,10 +654,14 @@ async fn password_reset_code(
     }
 
     // Important, return the same response no matter if the user is wrong or right.
-    return Ok((StatusCode::OK, "One-time code sent.").into_response());
+    return Ok(AntOnTheWebResponse::PasswordResetCodeResponse(
+        PasswordResetCodeResponse {
+            msg: "One-time code sent.".to_string(),
+        },
+    ));
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PasswordResetSecretRequest {
     #[serde(rename = "phoneNumber")]
     pub phone_number: String,
@@ -667,7 +669,7 @@ pub struct PasswordResetSecretRequest {
     pub otp: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PasswordResetSecretResponse {
     pub secret: String,
 }
@@ -677,23 +679,23 @@ pub struct PasswordResetSecretResponse {
 async fn password_reset_secret(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<PasswordResetSecretRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let phone_number = canonicalize_phone_number(&req.phone_number)?;
 
     match two_factor::receive_phone_verification_code(&dao, &phone_number, &req.otp).await? {
         VerificationReceipt::Failed => {
-            return Ok((StatusCode::BAD_REQUEST, "Invalid code.").into_response());
+            return Err(AntOnTheWebError::ValidationError(ValidationError::one(
+                ValidationMessage::msg("Invalid code."),
+            )));
         }
 
         VerificationReceipt::Success { user_id } => {
             let secret_claims = PasswordResetClaims::new(user_id, phone_number);
             let jwt = encode_jwt(&secret_claims)?;
 
-            return Ok((
-                StatusCode::OK,
-                Json(PasswordResetSecretResponse { secret: jwt }),
-            )
-                .into_response());
+            return Ok(AntOnTheWebResponse::PasswordResetSecretResponse(
+                PasswordResetSecretResponse { secret: jwt },
+            ));
         }
     };
 }
@@ -723,7 +725,7 @@ impl PasswordResetClaims {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PasswordRequest {
     pub secret: String,
     pub password1: String,
@@ -739,7 +741,7 @@ async fn password(
     auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<PasswordRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     {
         let mut validations: Vec<ValidationMessage> = vec![];
         if req.password1 != req.password2 {
@@ -749,7 +751,7 @@ async fn password(
         validations.append(&mut validate_password(&req.password1));
 
         if validations.len() > 0 {
-            return Err(AntOnTheWebError::Validation(ValidationError::many(
+            return Err(AntOnTheWebError::ValidationError(ValidationError::many(
                 validations,
             )));
         }
@@ -765,12 +767,12 @@ async fn password(
                 .overwrite_user_password(&user.user_id, &req.password1)
                 .await?;
 
-            return Ok((StatusCode::OK, "Password changed.").into_response());
+            return Ok(AntOnTheWebResponse::PasswordResetResponse);
         }
 
         None => {
             if req.password1 != req.password2 {
-                return Err(AntOnTheWebError::Validation(ValidationError::one(
+                return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                     ValidationMessage::new("password", "Passwords must match"),
                 )));
             }
@@ -784,7 +786,7 @@ async fn password(
                 .overwrite_user_password(&user_id, &req.password1)
                 .await?;
 
-            return Ok((StatusCode::OK, "Password changed.").into_response());
+            return Ok(AntOnTheWebResponse::PasswordResetResponse);
         }
     }
 }
@@ -832,18 +834,23 @@ fn validate_password(password: &str) -> Vec<ValidationMessage> {
     return validations;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SignupRequest {
     pub username: String,
     pub password: String,
     pub password2: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignupResponse;
+
 async fn signup_request(
     cookies: Cookies,
     State(InnerApiState { dao, .. }): ApiState,
     Json(signup_request): Json<SignupRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     info!("Validating signup request...");
 
     let validations = {
@@ -863,7 +870,7 @@ async fn signup_request(
         }
     };
 
-    let _ = validations.map_err(|v| AntOnTheWebError::Validation(ValidationError::many(v)))?;
+    let _ = validations.map_err(|v| AntOnTheWebError::ValidationError(ValidationError::many(v)))?;
 
     {
         info!("Checking if user already exists...");
@@ -875,7 +882,9 @@ async fn signup_request(
             .is_some();
 
         if by_username {
-            return Err(AntOnTheWebError::ConflictError("User already exists."));
+            return Err(AntOnTheWebError::ConflictError {
+                msg: "User already exists.",
+            });
         }
     }
 
@@ -898,7 +907,7 @@ async fn signup_request(
     // Make a weak auth token for the user for 2fa routes
     cookies.add(make_weak_auth_cookie(user.user_id.clone())?.1);
 
-    return Ok((StatusCode::OK, "Signup completed.").into_response());
+    return Ok(AntOnTheWebResponse::SignupResponse(SignupResponse));
 }
 
 pub fn router() -> ApiRouter {

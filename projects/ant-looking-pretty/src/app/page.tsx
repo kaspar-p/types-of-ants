@@ -1,7 +1,7 @@
 "use client";
 
 import { AntBanner } from "../components/AntBanner";
-import { getReleasedAnts, ReleasedAnt } from "../server/queries";
+import { getReleasedAnts, ReleasedAnt, unwrap } from "../server/queries";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { InputBanner } from "@/components/InputBanner";
 import { AntText } from "@/components/AntText";
@@ -18,7 +18,7 @@ export default function Home() {
   } = useInfiniteQuery({
     initialPageParam: 0,
     queryKey: ["releasedAnts"],
-    queryFn: async (ctx) => getReleasedAnts(ctx.pageParam),
+    queryFn: async (ctx) => unwrap(getReleasedAnts(ctx.pageParam)),
     getNextPageParam: (receivedPage, allPages) => {
       return receivedPage.hasNextPage ? allPages.length : undefined;
     },
@@ -33,12 +33,12 @@ export default function Home() {
   const isMediumDevice = isServer
     ? true
     : useMediaQuery(
-        "only screen and (min-width : 769px) and (max-width : 992px)"
+        "only screen and (min-width : 769px) and (max-width : 992px)",
       );
   const isLargeDevice = isServer
     ? false
     : useMediaQuery(
-        "only screen and (min-width : 993px) and (max-width : 1200px)"
+        "only screen and (min-width : 993px) and (max-width : 1200px)",
       );
 
   let columns: number;

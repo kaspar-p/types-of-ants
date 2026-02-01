@@ -2,10 +2,9 @@
 
 import { useTimedText } from "@/components/useTimedText";
 import { addEmail, addPhoneNumber, verificationAttempt } from "@/server/posts";
-import { getUser, getUserSchema } from "@/server/queries";
-import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { useUser } from "../UserProvider";
 
 export const TwoFactorVerificationBox = () => {
   const [option, setOption] = useState<"email" | "phone">("email");
@@ -15,7 +14,7 @@ export const TwoFactorVerificationBox = () => {
   const [sent, setSent] = useState<boolean>(false);
   const [otp, setOtp] = useState<string>("");
 
-  const { setUser } = useUser();
+  const { resetUser } = useUser();
   const { push } = useRouter();
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
@@ -25,22 +24,19 @@ export const TwoFactorVerificationBox = () => {
       option === "phone"
         ? await addPhoneNumber({ phoneNumber: key, forceSend: true })
         : await addEmail({ email: key, forceSend: true });
-    switch (res.status) {
+    switch (res.__status) {
       case 500: {
-        const msg = await res.text();
-        setKeyValidationMsg(msg);
+        setKeyValidationMsg("internal server error, please retry.");
         break;
       }
       case 401: {
         setKeyValidationMsg(
-          `unverified ${option === "email" ? "email" : "phone number"}`
+          `unverified ${option === "email" ? "email" : "phone number"}`,
         );
         break;
       }
       case 400: {
-        const errors: { errors: { field: string; msg: string }[] } =
-          await res.json();
-        setKeyValidationMsg(errors.errors[0].msg);
+        setKeyValidationMsg(res.errors[0].msg);
         break;
       }
       case 409: {
@@ -48,13 +44,12 @@ export const TwoFactorVerificationBox = () => {
         break;
       }
       case 200: {
-        console.log(res.status, await res.json());
         setKeySuccessMsg("sent!");
         setSent(true);
         break;
       }
       default: {
-        console.log("unknown", res.status, await res.json());
+        console.log("unknown", res);
         break;
       }
     }
@@ -70,10 +65,9 @@ export const TwoFactorVerificationBox = () => {
           : { email: { email: key, otp } },
     });
 
-    switch (res.status) {
+    switch (res.__status) {
       case 500: {
-        const msg = await res.text();
-        setKeyValidationMsg(msg.toLocaleLowerCase());
+        setKeyValidationMsg(res.msg.toLocaleLowerCase());
         break;
       }
       case 400: {
@@ -81,19 +75,13 @@ export const TwoFactorVerificationBox = () => {
         break;
       }
       case 200: {
-        console.log(res.status);
         setKey("");
-
-        const user = getUserSchema.transformer(
-          getUserSchema.schema.parse(await (await getUser()).json())
-        );
-        setUser({ weakAuth: true, loggedIn: true, user: user.user });
-
+        resetUser();
         push("/");
         break;
       }
       default: {
-        console.log("unknown", res.status, await res.json());
+        console.log("unknown", res);
         break;
       }
     }

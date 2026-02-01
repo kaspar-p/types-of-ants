@@ -1,5 +1,5 @@
-import type { newsletterSignup, suggestAnt } from "@/server/posts";
-import React, { useState, FormEvent } from "react";
+import { AntOnTheWebResponse, QueryResponse } from "@/server/rpc";
+import { useState, FormEvent } from "react";
 
 type HandleProps<Input> = {
   messages: {
@@ -9,7 +9,9 @@ type HandleProps<Input> = {
   inputName: string;
   constructInputData: (text: string) => Input;
   clearInput: () => void;
-  postAction: (inp: Input) => Promise<Response>;
+  postAction: (
+    inp: Input,
+  ) => Promise<QueryResponse<AntOnTheWebResponse["__type"]>>;
   validator: (text: string) => { msg: string; valid: boolean };
 };
 
@@ -69,7 +71,7 @@ export function useHandle<Input>(props: HandleProps<Input>) {
     startHandling();
     const input = props.constructInputData(value) as any;
     const res = await props.postAction(input);
-    switch (res.status) {
+    switch (res.__status) {
       case 200: {
         setValidMsg(props.messages.valid);
         setErrorMsg("");
@@ -77,9 +79,8 @@ export function useHandle<Input>(props: HandleProps<Input>) {
         break;
       }
       case 409: {
-        const msg = await res.text();
         setValidMsg("");
-        setErrorMsg(msg.toLowerCase());
+        setErrorMsg(res.msg.toLowerCase());
         createMsgTimeout(setErrorMsg);
         break;
       }

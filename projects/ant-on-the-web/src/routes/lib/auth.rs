@@ -1,15 +1,11 @@
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 
 use ant_data_farm::{
     users::{User, UserId},
     AntDataFarmClient, DaoTrait,
 };
 use ant_library::{get_mode, Mode};
-use axum::{
-    extract::{FromRef, FromRequestParts, OptionalFromRequestParts},
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::extract::{FromRef, FromRequestParts, OptionalFromRequestParts};
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use cookie::{
     time::{Duration, OffsetDateTime},
@@ -19,7 +15,10 @@ use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
 use tracing::{debug, error, info, warn};
 
-use crate::{err::AntOnTheWebError, state::InnerApiState};
+use crate::{
+    err::{AntOnTheWebError, ValidationError, ValidationMessage},
+    state::InnerApiState,
+};
 
 use super::{
     jwt,
@@ -73,11 +72,11 @@ impl AuthClaims {
 async fn try_api_token_authentication(
     state: &InnerApiState,
     cookie: &str,
-) -> Result<AuthClaims, (StatusCode, String)> {
+) -> Result<AuthClaims, AntOnTheWebError> {
     let split: Vec<&str> = cookie.split(":").collect();
     if split.len() != 2 {
         warn!("API token not structured as user:token");
-        return Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()));
+        return Err(AntOnTheWebError::AccessDenied(None));
     }
 
     let username: &str = split[0];
@@ -90,16 +89,13 @@ async fn try_api_token_authentication(
         .await
         .map_err(|e| {
             error!("Attempting API Token validation failed: {e}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Something went wrong, please retry.".to_string(),
-            )
+            AntOnTheWebError::InternalServerError(Some(e))
         })?;
 
     match user {
         None => {
             warn!("API token not valid.");
-            Err((StatusCode::UNAUTHORIZED, "Access denied.".to_string()))
+            Err(AntOnTheWebError::AccessDenied(None))
         }
         // Two-factor verification not required for API access!
         Some(u) => Ok(AuthClaims::two_factor_verified(u)),
@@ -109,11 +105,11 @@ async fn try_api_token_authentication(
 async fn decode_jwt_cookie(
     state: &InnerApiState,
     cookie: &str,
-) -> Result<AuthClaims, (StatusCode, String)> {
+) -> Result<AuthClaims, AntOnTheWebError> {
     // If cookie is specified it can't be tampered with Decode claim data
     let claim_data = jwt::decode_jwt::<AuthClaims>(&cookie).map_err(|e| {
         warn!("decode jwt failed: {e:?}");
-        return (StatusCode::UNAUTHORIZED, "Access denied.".to_string());
+        return AntOnTheWebError::AccessDenied(None);
     });
 
     match claim_data {
@@ -133,7 +129,7 @@ where
     InnerApiState: FromRef<S>,
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, String);
+    type Rejection = AntOnTheWebError;
 
     async fn from_request_parts(
         parts: &mut http::request::Parts,
@@ -143,7 +139,7 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError(None).into();
+                return AntOnTheWebError::InternalServerError(None);
             })?;
 
         let cookie = match cookies.get(AUTH_COOKIE_NAME) {
@@ -172,7 +168,7 @@ where
     InnerApiState: FromRef<S>,
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, String);
+    type Rejection = AntOnTheWebError;
 
     async fn from_request_parts(
         parts: &mut http::request::Parts,
@@ -182,74 +178,20 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError(None).into();
+                return AntOnTheWebError::InternalServerError(None);
             })?;
 
-        let cookie = match cookies.get(AUTH_COOKIE_NAME) {
-            Some(cookie) => cookie,
-            None => {
-                warn!("No '{}' cookie found.", AUTH_COOKIE_NAME);
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "Invalid authorization token.".to_string(),
-                ));
-            }
-        };
+        let cookie = cookies
+            .get(AUTH_COOKIE_NAME)
+            .ok_or(AntOnTheWebError::ValidationError(ValidationError::one(
+                ValidationMessage::msg("Invalid authorization token."),
+            )))?;
 
         let state = InnerApiState::from_ref(state);
 
         let auth = decode_jwt_cookie(&state, cookie.value()).await?;
         info!("Authentication successful.");
         Ok(auth)
-    }
-}
-
-#[derive(Debug)]
-pub enum AuthError {
-    AccessDenied(Option<String>),
-    InternalServerError(anyhow::Error),
-}
-
-impl fmt::Display for AuthError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AuthError::AccessDenied(e) => {
-                write!(
-                    f,
-                    "AuthError::AccessDenied::{}",
-                    e.clone().unwrap_or("<none>".to_string())
-                )
-            }
-            AuthError::InternalServerError(e) => write!(f, "AuthError::InternalServerError::{}", e),
-        }
-    }
-}
-
-impl IntoResponse for AuthError {
-    fn into_response(self) -> Response {
-        match self {
-            AuthError::AccessDenied(identity) => {
-                warn!("Access denied to identity: {:?}", identity);
-                (StatusCode::UNAUTHORIZED, "Access denied.").into_response()
-            }
-            AuthError::InternalServerError(e) => {
-                error!("AuthError::InternalServerError::{}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong, please retry.",
-                )
-                    .into_response()
-            }
-        }
-    }
-}
-
-impl<E> From<E> for AuthError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(value: E) -> Self {
-        Self::InternalServerError(value.into())
     }
 }
 
@@ -261,7 +203,7 @@ where
 pub async fn authenticate_weak(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
-) -> Result<User, AuthError> {
+) -> Result<User, AntOnTheWebError> {
     info!("Attempting weak authentication.");
     let user = {
         let users = dao.users.read().await;
@@ -270,7 +212,7 @@ pub async fn authenticate_weak(
     };
 
     match user {
-        None => Err(AuthError::AccessDenied(Some(auth.sub.to_string()))),
+        None => Err(AntOnTheWebError::AccessDenied(Some(auth.sub.to_string()))),
         Some(user) => Ok(user),
     }
 }
@@ -283,7 +225,7 @@ pub async fn authenticate_or_weak_matching_method(
     dao: &AntDataFarmClient,
     attempt: &VerificationMethod,
     user: User,
-) -> Result<User, AuthError> {
+) -> Result<User, AntOnTheWebError> {
     // All strong auth is also weak auth, let them in.
     if !auth.needs_2fa {
         info!("Allow STRONG auth user '{}'.", user.username);
@@ -309,17 +251,17 @@ pub async fn authenticate_or_weak_matching_method(
         "Rejecting user {}:{} with verifications {:?} and attempt {:?}",
         user.user_id, user.username, verifications, attempt
     );
-    return Err(AuthError::AccessDenied(Some(
+    return Err(AntOnTheWebError::AccessDenied(Some(
         "rejecting user for bad weak matching attempt".to_string(),
     )));
 }
 
-fn upgrade_weak_auth_to_strong(auth: &AuthClaims, user: User) -> Result<User, AuthError> {
+fn upgrade_weak_auth_to_strong(auth: &AuthClaims, user: User) -> Result<User, AntOnTheWebError> {
     // We let the user in only if they don't need 2fa. This comes from AuthClaims and is signed
     // by the server's key, so we can trust that the server wrote this during /login, but it
     // never got replaced during /verification
     if auth.needs_2fa {
-        return Err(AuthError::AccessDenied(Some(
+        return Err(AntOnTheWebError::AccessDenied(Some(
             "user is not two-factor verified".to_string(),
         )));
     } else {
@@ -333,7 +275,7 @@ fn upgrade_weak_auth_to_strong(auth: &AuthClaims, user: User) -> Result<User, Au
 pub async fn authenticate(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
-) -> Result<User, AuthError> {
+) -> Result<User, AntOnTheWebError> {
     info!("Attempting authentication.");
     return upgrade_weak_auth_to_strong(&auth, authenticate_weak(&auth, &dao).await?);
 }
@@ -343,13 +285,13 @@ pub async fn authenticate(
 pub async fn authenticate_admin(
     auth: &AuthClaims,
     dao: &Arc<AntDataFarmClient>,
-) -> Result<User, AuthError> {
+) -> Result<User, AntOnTheWebError> {
     info!("Attempting admin authentication.");
     let user = authenticate(&auth, &dao).await?;
 
     match user.role_name.as_str() {
         "admin" => Ok(user),
-        _ => Err(AuthError::AccessDenied(Some(format!(
+        _ => Err(AntOnTheWebError::AccessDenied(Some(format!(
             "User is not 'admin', instead '{}'",
             user.role_name
         )))),
@@ -366,7 +308,7 @@ pub async fn authenticate_admin(
 pub async fn optional_strict_authenticate(
     auth: Option<&AuthClaims>,
     dao: &Arc<AntDataFarmClient>,
-) -> Result<Option<User>, AuthError> {
+) -> Result<Option<User>, AntOnTheWebError> {
     return match auth.map(async |claims| {
         authenticate_weak(&claims, &dao)
             .await
@@ -388,7 +330,7 @@ pub async fn optional_strict_authenticate(
 pub async fn optional_authenticate(
     auth: Option<&AuthClaims>,
     dao: &Arc<AntDataFarmClient>,
-) -> Result<User, AuthError> {
+) -> Result<User, AntOnTheWebError> {
     match optional_strict_authenticate(auth, dao).await? {
         None => {
             let users = dao.users.read().await;

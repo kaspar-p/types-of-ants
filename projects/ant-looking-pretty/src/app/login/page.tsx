@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SignupBox } from "./signup";
 import { LoginBox } from "./login";
-import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/app/UserProvider";
 
 export default function LoginPage() {
   const { user } = useUser();
   const { push } = useRouter();
 
+  const [weakAuth, setWeakAuth] = useState(false);
+
   useEffect(() => {
-    if (user.weakAuth && user.loggedIn) {
+    if (user.loggedIn) {
       push("/");
     }
   });
@@ -21,11 +23,11 @@ export default function LoginPage() {
       <>
         <div className="m-4 w-full md:w-8/12 xl:w-3/12">
           <h2>login</h2>
-          <LoginBox />
+          <LoginBox setWeakAuth={setWeakAuth} />
         </div>
         <div className="m-4 w-full md:w-8/12 xl:w-3/12">
           <h2>signup</h2>
-          <SignupBox />
+          <SignupBox setWeakAuth={setWeakAuth} />
         </div>
       </>
     </div>

@@ -3,10 +3,9 @@
 import { InputBanner } from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
 import { webAction } from "@/server/posts";
-import { Ant, getUnseenAnts } from "@/server/queries";
+import { Ant, getUnseenAnts, unwrap } from "@/server/queries";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import React, { useState } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
   const months = [
@@ -51,9 +50,7 @@ function AntPost({ ant }: AntPostProps) {
   );
 }
 
-export default function Feed() {
-  const [page] = useState(0);
-
+export default function FeedPage() {
   const {
     isLoading,
     isError,
@@ -61,41 +58,42 @@ export default function Feed() {
     refetch,
   } = useQuery({
     queryKey: ["unseenAnts"],
-    queryFn: () => getUnseenAnts(page),
+    queryFn: () => unwrap(getUnseenAnts(0)),
     refetchInterval: 10_000,
   });
 
   return (
-    <ErrorBoundary isError={isError}>
-      <LoadingBoundary isLoading={isLoading}>
-        <div>
-          <InputBanner
-            onSuggestion={async () => {
-              await refetch();
-            }}
-          />
+    <div>
+      <InputBanner
+        onSuggestion={async () => {
+          await refetch();
+        }}
+      />
 
-          <h3 className="mb-1">
-            latest ant submissions ({unseenAnts?.length}):{" "}
-            <button
-              id="feed-refresh"
-              onClick={() => {
-                webAction({
-                  action: "click",
-                  targetType: "button",
-                  target: "feed-refresh",
-                });
-                refetch();
-              }}
-            >
-              refresh
-            </button>
-          </h3>
+      <h3 className="mb-1">
+        latest ant submissions ({unseenAnts?.length ?? 0}):{" "}
+        <button
+          id="feed-refresh"
+          onClick={() => {
+            webAction({
+              action: "click",
+              targetType: "button",
+              target: "feed-refresh",
+            });
+            refetch();
+          }}
+        >
+          refresh
+        </button>
+      </h3>
+
+      <ErrorBoundary isError={isError}>
+        <LoadingBoundary isLoading={isLoading}>
           {unseenAnts?.map((ant, i) => (
             <AntPost key={i} ant={ant} />
           ))}
-        </div>
-      </LoadingBoundary>
-    </ErrorBoundary>
+        </LoadingBoundary>
+      </ErrorBoundary>
+    </div>
   );
 }

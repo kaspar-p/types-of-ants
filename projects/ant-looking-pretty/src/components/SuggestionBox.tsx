@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { suggestAnt } from "../server/posts";
 import { useHandle } from "@/utils/useHandle";
 

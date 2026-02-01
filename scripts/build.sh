@@ -126,9 +126,7 @@ for arch in "${arches[@]}"; do
   fi
 
   # Create a small manifest.json file into the build directory
-  echo "{
-    \"commit_number\": \"$commit_number\"
-  }" > "$tmp_build_dir/manifest.json"
+  echo "{\"commit_number\":\"$commit_number\"}" > "$tmp_build_dir/manifest.json"
 
   # Copy all other build files into the build directory
   cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"

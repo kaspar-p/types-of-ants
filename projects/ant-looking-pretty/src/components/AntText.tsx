@@ -5,8 +5,8 @@ import { ReleasedAnt } from "@/server/queries";
 import { useEffect, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 import { favorite, unfavorite } from "@/server/posts";
-import { useUser } from "@/state/userContext";
 import { useRouter } from "next/navigation";
+import { useUser } from "../app/UserProvider";
 
 export type AntTextProps = {
   ant: ReleasedAnt;
@@ -30,7 +30,7 @@ export function AntText(props: AntTextProps) {
   const [hover, setHover] = useState<boolean>(false);
   const [clicked, setClicked] = useState<boolean>(false);
 
-  const canLike = user.weakAuth && user.loggedIn;
+  const canLike = user.loggedIn;
   const liked = canLike && !!ant?.favoritedAt;
 
   const cannotHover = useMediaQuery("only screen and (max-width : 768px)");
@@ -75,12 +75,12 @@ export function AntText(props: AntTextProps) {
                 if (liked) {
                   const res = await unfavorite({ antId: ant.antId });
 
-                  switch (res.status) {
+                  switch (res.__status) {
                     case 500: {
                       break;
                     }
                     case 400: {
-                      console.error(await res.json());
+                      console.error(res.errors);
                       break;
                     }
                     case 200: {
@@ -91,19 +91,24 @@ export function AntText(props: AntTextProps) {
                   }
                 } else {
                   const res = await favorite({ antId: ant.antId });
+                  console.log(res);
 
-                  switch (res.status) {
+                  switch (res.__status) {
                     case 500: {
                       break;
                     }
                     case 400: {
-                      console.error(await res.json());
+                      console.error(res.errors);
                       break;
                     }
                     case 200: {
-                      const body: { favoritedAt: string } = await res.json();
-                      ant.favoritedAt = body.favoritedAt;
-                      setAnt({ ...ant, favoritedAt: body.favoritedAt });
+                      ant.favoritedAt = formatDatetime(
+                        new Date(res.favoritedAt),
+                      );
+                      setAnt({
+                        ...ant,
+                        favoritedAt: formatDatetime(new Date(res.favoritedAt)),
+                      });
                       break;
                     }
                   }
@@ -191,8 +196,8 @@ function AntHeart({ liked, enableHover, handleClick }: AntHeartProps) {
             ? "#991b1b"
             : "red"
           : likeHover && enableHover
-          ? "black"
-          : "gray"
+            ? "black"
+            : "gray"
       }
     />
   );

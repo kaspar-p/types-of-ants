@@ -128,14 +128,14 @@ impl ReleasesDao {
         Ok(release_number)
     }
 
-    pub async fn get_latest_release(&self) -> Result<Release, anyhow::Error> {
-        let row = self
+    pub async fn get_latest_release(&self) -> Result<Option<Release>, anyhow::Error> {
+        let release = self
             .database
             .lock()
             .await
             .get()
             .await?
-            .query_one(
+            .query_opt(
                 "select
                     release_number, release_label, created_at, creator_user_id
                 from release
@@ -143,9 +143,10 @@ impl ReleasesDao {
                 limit 1;",
                 &[],
             )
-            .await?;
+            .await?
+            .map(|row| row_to_release(&row));
 
-        return Ok(row_to_release(&row));
+        return Ok(release);
     }
 }
 

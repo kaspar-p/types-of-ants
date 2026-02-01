@@ -198,7 +198,7 @@ async fn send_phone_verification_code(
         .send_msg(&phone_number, &content)
         .await
         .map_err(|e| match e {
-            SmsError::BadPhoneNumber => AntOnTheWebError::Validation(ValidationError::one(
+            SmsError::BadPhoneNumber => AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("phone", "Phone number cannot receive messages"),
             )),
             SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),

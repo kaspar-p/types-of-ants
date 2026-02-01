@@ -1,32 +1,31 @@
-"use client";
-
 import { getTotalAnts, getVersion } from "@/server/queries";
-import { useQuery } from "@tanstack/react-query";
-import React from "react";
-import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { useRouter } from "next/navigation";
-import { useUser } from "@/state/userContext";
-import { webAction, logout } from "@/server/posts";
-import Link from "next/link";
+import {
+  dehydrate,
+  HydrationBoundary,
+  QueryClient,
+} from "@tanstack/react-query";
+import { Link } from "./Link";
+import { Button } from "./Button";
+import { LogoutButton } from "./LogoutButton";
+import { VersionNumber } from "./VersionNumber";
+import { AntsDiscoveredToDate } from "./AntsDiscoveredToDate";
+import { getAuth } from "@/state/user";
+import { webAction } from "@/server/posts";
 
-export function Header() {
-  const { user, setUser } = useUser();
-  const { push } = useRouter();
+export async function Header() {
+  const user = await getAuth();
 
-  const totalAntsResult = useQuery({
+  const queryClient = new QueryClient();
+
+  await queryClient.prefetchQuery({
     queryKey: ["totalAnts"],
     queryFn: () => getTotalAnts(),
   });
 
-  const version = useQuery({
+  await queryClient.prefetchQuery({
     queryKey: ["version"],
     queryFn: getVersion,
   });
-
-  const handleLogout = async () => {
-    await logout();
-    setUser({ weakAuth: false });
-  };
 
   return (
     <>
@@ -34,89 +33,47 @@ export function Header() {
         <div className="flex flex-row align-center justify-center">
           <h1 className="mb-0 pb-5">
             types of ants{" "}
-            <span className="text-xs font-mono">v1.{version.data}</span>
+            <span className="text-xs font-mono">
+              v1.
+              <HydrationBoundary state={dehydrate(queryClient)}>
+                <VersionNumber />
+              </HydrationBoundary>
+            </span>
           </h1>
         </div>
 
-        <ErrorBoundary isError={totalAntsResult.isError || version.isError}>
-          <LoadingBoundary
-            isLoading={totalAntsResult.isLoading || version.isLoading}
-          >
-            <h3 className="text-center m-0">
-              ants discovered to date: {totalAntsResult?.data}
-            </h3>
-            <div className="flex flex-col gap-y-2 py-4 max-w-md mx-auto">
-              <div className="text-center flex flex-row gap-x-2 align-center justify-center">
-                {!(user.weakAuth && user.loggedIn) && (
-                  <button
-                    className="cursor-pointer"
-                    onClick={() => push("/login")}
-                  >
-                    log in / signup
-                  </button>
-                )}
-                <button className="cursor-pointer" onClick={() => push("/")}>
-                  home
-                </button>
-                {user.weakAuth && user.loggedIn && (
-                  <>
-                    <button
-                      className="cursor-pointer"
-                      onClick={() => push("/profile")}
-                    >
-                      profile
-                    </button>
-                    <button
-                      className="cursor-pointer"
-                      onClick={() => push("/feed")}
-                    >
-                      feed
-                    </button>
-                  </>
-                )}
+        <h3 className="text-center m-0">
+          ants discovered to date:{" "}
+          <HydrationBoundary state={dehydrate(queryClient)}>
+            <AntsDiscoveredToDate />
+          </HydrationBoundary>
+        </h3>
 
-                {user.weakAuth && user.loggedIn && (
-                  <button
-                    className="cursor-pointer"
-                    onClick={() => handleLogout()}
-                  >
-                    logout
-                  </button>
-                )}
-              </div>
-              <div className="text-center flex flex-row gap-x-2 align-center justify-center">
-                <Link
-                  href="https://twitter.com/typesofants"
-                  onClick={() =>
-                    webAction({
-                      action: "visit",
-                      targetType: "page",
-                      target: "https://twitter.com/typesofants",
-                    })
-                  }
-                >
-                  <button className="cursor-pointer">
-                    twitter @typesofants
-                  </button>
-                </Link>
-                <Link
-                  href="https://github.com/kaspar-p/types-of-ants"
-                  onClick={() =>
-                    webAction({
-                      action: "visit",
-                      targetType: "page",
-                      target: "https://github.com/kaspar-p/types-of-ants",
-                    })
-                  }
-                >
-                  <button id="github-link" className="cursor-pointer">
-                    ant who wants to read the code
-                  </button>
-                </Link>
-              </div>
-            </div>
-          </LoadingBoundary>
-        </ErrorBoundary>
+        <div className="flex flex-col gap-y-2 py-4 max-w-md mx-auto">
+          <div className="text-center flex flex-row gap-x-2 align-center justify-center">
+            {!user.loggedIn && <Button path="/login">log in / signup</Button>}
+            <Button path="/">home</Button>
+            {user.loggedIn && (
+              <>
+                <Button path="/profile">profile</Button>
+                <Button path="/feed">feed</Button>
+              </>
+            )}
+
+            {user.loggedIn && <LogoutButton>logout</LogoutButton>}
+          </div>
+
+          <div className="text-center flex flex-row gap-x-2 align-center justify-center">
+            <Link href="https://twitter.com/typesofants">
+              <button className="cursor-pointer">twitter @typesofants</button>
+            </Link>
+            <Link href="https://github.com/kaspar-p/types-of-ants">
+              <button id="github-link" className="cursor-pointer">
+                ant who wants to read the code
+              </button>
+            </Link>
+          </div>
+        </div>
       </div>
     </>
   );

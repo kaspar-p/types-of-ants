@@ -21,8 +21,6 @@ elif [[ $project = "ant-data-farm" ]]; then
 elif [[ $project = "ant-on-the-web" ]]; then
   export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
   cargo run -p ant-on-the-web
-elif [[ $project = "ant-looking-pretty" ]]; then
-  cd projects/ant-looking-pretty && npm ci && npm run dev
 elif [[ $project = "ant-fs" ]]; then
   export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
   cd projects/ant-fs && cargo run

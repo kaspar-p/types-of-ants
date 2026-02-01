@@ -1,14 +1,17 @@
 import { z } from "zod";
 import { getEndpoint, getFetchOptions } from "./lib";
+import { QueryResponse } from "./rpc";
 
 const posts = {
   suggestAnt: {
+    responseType: "SuggestionResponse",
     path: "/api/ants/suggest",
     inputDataSchema: z.object({
       suggestionContent: z.string(),
     }),
   },
   signup: {
+    responseType: "SignupResponse",
     path: "/api/users/signup",
     inputDataSchema: z.object({
       username: z.string(),
@@ -17,6 +20,7 @@ const posts = {
     }),
   },
   login: {
+    responseType: "LoginResponse",
     path: "/api/users/login",
     inputDataSchema: z.object({
       method: z.union([
@@ -28,16 +32,19 @@ const posts = {
     }),
   },
   logout: {
+    responseType: "LogoutResponse",
     path: "/api/users/logout",
     inputDataSchema: z.object({}),
   },
   changeUsername: {
+    responseType: "ChangeUsernameResponse",
     path: "/api/users/username",
     inputDataSchema: z.object({
       username: z.string(),
     }),
   },
   addPhoneNumber: {
+    responseType: "AddPhoneNumberResponse",
     path: "/api/users/phone-number",
     inputDataSchema: z.object({
       phoneNumber: z.string(),
@@ -45,6 +52,7 @@ const posts = {
     }),
   },
   addEmail: {
+    responseType: "AddEmailResponse",
     path: "/api/users/email",
     inputDataSchema: z.object({
       email: z.string(),
@@ -52,6 +60,7 @@ const posts = {
     }),
   },
   verificationAttempt: {
+    responseType: "VerificationAttemptResponse",
     path: "/api/users/verification-attempt",
     inputDataSchema: z.object({
       method: z.union([
@@ -71,6 +80,7 @@ const posts = {
     }),
   },
   passwordResetCode: {
+    responseType: "PasswordResetCodeResponse",
     path: "/api/users/password-reset-code",
     inputDataSchema: z.object({
       username: z.string(),
@@ -78,6 +88,7 @@ const posts = {
     }),
   },
   passwordResetSecret: {
+    responseType: "PasswordResetSecretResponse",
     path: "/api/users/password-reset-secret",
     inputDataSchema: z.object({
       phoneNumber: z.string(),
@@ -85,6 +96,7 @@ const posts = {
     }),
   },
   password: {
+    responseType: "PasswordResetResponse" as const,
     path: "/api/users/password",
     inputDataSchema: z.object({
       secret: z.string(),
@@ -93,12 +105,14 @@ const posts = {
     }),
   },
   newsletterSignup: {
+    responseType: "SubscribeNewsletterResponse" as const,
     path: "/api/users/subscribe-newsletter",
     inputDataSchema: z.object({
       email: z.string(),
     }),
   },
   webAction: {
+    responseType: "WebActionResponse" as const,
     path: "/api/web-actions/action",
     inputDataSchema: z.object({
       action: z.union([
@@ -111,81 +125,101 @@ const posts = {
     }),
   },
   favorite: {
+    responseType: "FavoriteAntResponse" as const,
     path: "/api/ants/favorite",
     inputDataSchema: z.object({
       antId: z.string(),
     }),
   },
   unfavorite: {
+    responseType: "UnfavoriteAntResponse" as const,
     path: "/api/ants/unfavorite",
     inputDataSchema: z.object({
       antId: z.string(),
     }),
   },
-};
+} as const;
 
 type Query = (typeof posts)[keyof typeof posts];
 
 async function constructPost<Q extends Query>(
   query: Q,
-  inputData: z.infer<Q["inputDataSchema"]>
-): Promise<Response> {
-  const { path, inputDataSchema } = query;
+  inputData: z.infer<Q["inputDataSchema"]>,
+): Promise<QueryResponse<Q["responseType"]>> {
+  const { responseType, path, inputDataSchema } = query;
 
   const input = inputDataSchema.parse(inputData);
   const endpoint = getEndpoint(path);
 
   console.log("POST: ", endpoint.toString());
 
-  return await fetch(endpoint, {
+  const opts = await getFetchOptions();
+  const headers = {
+    ...(opts.headers ?? {}),
+    "Content-Type": "application/json",
+  };
+  const res = await fetch(endpoint, {
+    ...opts,
+    cache: "no-store",
     method: "POST",
-    headers: {
-      "Content-type": "application/json",
-    },
+    headers: headers,
     body: JSON.stringify(input),
-    ...getFetchOptions(),
   });
+
+  const body = await res.json();
+
+  if (res.ok && body.__type !== responseType) {
+    throw new Error(
+      `Expected response __type=${responseType} but received ${body.__type}`,
+    );
+  }
+
+  return {
+    __status: res.status,
+    ...body,
+  };
 }
 
-export const suggestAnt = (
-  inputData: z.infer<typeof posts.suggestAnt.inputDataSchema>
-) => constructPost(posts.suggestAnt, inputData);
-export const newsletterSignup = (
-  inputData: z.infer<typeof posts.newsletterSignup.inputDataSchema>
-) => constructPost(posts.newsletterSignup, inputData);
-export const signup = (
-  inputData: z.infer<typeof posts.signup.inputDataSchema>
-) => constructPost(posts.signup, inputData);
-export const logout = () => constructPost(posts.logout, {});
-export const login = (inputData: z.infer<typeof posts.login.inputDataSchema>) =>
-  constructPost(posts.login, inputData);
-export const changeUsername = (
-  inputData: z.infer<typeof posts.changeUsername.inputDataSchema>
-) => constructPost(posts.changeUsername, inputData);
-export const addPhoneNumber = (
-  inputData: z.infer<typeof posts.addPhoneNumber.inputDataSchema>
-) => constructPost(posts.addPhoneNumber, inputData);
-export const addEmail = (
-  inputData: z.infer<typeof posts.addEmail.inputDataSchema>
-) => constructPost(posts.addEmail, inputData);
-export const verificationAttempt = (
-  inputData: z.infer<typeof posts.verificationAttempt.inputDataSchema>
-) => constructPost(posts.verificationAttempt, inputData);
-export const passwordResetCode = (
-  inputData: z.infer<typeof posts.passwordResetCode.inputDataSchema>
-) => constructPost(posts.passwordResetCode, inputData);
-export const passwordResetSecret = (
-  inputData: z.infer<typeof posts.passwordResetSecret.inputDataSchema>
-) => constructPost(posts.passwordResetSecret, inputData);
-export const password = (
-  inputData: z.infer<typeof posts.password.inputDataSchema>
-) => constructPost(posts.password, inputData);
-export const webAction = (
-  inputData: z.infer<typeof posts.webAction.inputDataSchema>
-) => constructPost(posts.webAction, inputData);
-export const favorite = (
-  inputData: z.infer<typeof posts.favorite.inputDataSchema>
-) => constructPost(posts.favorite, inputData);
-export const unfavorite = (
-  inputData: z.infer<typeof posts.unfavorite.inputDataSchema>
-) => constructPost(posts.unfavorite, inputData);
+export const suggestAnt = async (
+  inputData: z.infer<typeof posts.suggestAnt.inputDataSchema>,
+) => await constructPost(posts.suggestAnt, inputData);
+export const newsletterSignup = async (
+  inputData: z.infer<typeof posts.newsletterSignup.inputDataSchema>,
+) => await constructPost(posts.newsletterSignup, inputData);
+export const signup = async (
+  inputData: z.infer<typeof posts.signup.inputDataSchema>,
+) => await constructPost(posts.signup, inputData);
+export const logout = async () => await constructPost(posts.logout, {});
+export const login = async (
+  inputData: z.infer<typeof posts.login.inputDataSchema>,
+) => constructPost(posts.login, inputData);
+export const changeUsername = async (
+  inputData: z.infer<typeof posts.changeUsername.inputDataSchema>,
+) => await constructPost(posts.changeUsername, inputData);
+export const addPhoneNumber = async (
+  inputData: z.infer<typeof posts.addPhoneNumber.inputDataSchema>,
+) => await constructPost(posts.addPhoneNumber, inputData);
+export const addEmail = async (
+  inputData: z.infer<typeof posts.addEmail.inputDataSchema>,
+) => await constructPost(posts.addEmail, inputData);
+export const verificationAttempt = async (
+  inputData: z.infer<typeof posts.verificationAttempt.inputDataSchema>,
+) => await constructPost(posts.verificationAttempt, inputData);
+export const passwordResetCode = async (
+  inputData: z.infer<typeof posts.passwordResetCode.inputDataSchema>,
+) => await constructPost(posts.passwordResetCode, inputData);
+export const passwordResetSecret = async (
+  inputData: z.infer<typeof posts.passwordResetSecret.inputDataSchema>,
+) => await constructPost(posts.passwordResetSecret, inputData);
+export const password = async (
+  inputData: z.infer<typeof posts.password.inputDataSchema>,
+) => await constructPost(posts.password, inputData);
+export const webAction = async (
+  inputData: z.infer<typeof posts.webAction.inputDataSchema>,
+) => await constructPost(posts.webAction, inputData);
+export const favorite = async (
+  inputData: z.infer<typeof posts.favorite.inputDataSchema>,
+) => await constructPost(posts.favorite, inputData);
+export const unfavorite = async (
+  inputData: z.infer<typeof posts.unfavorite.inputDataSchema>,
+) => await constructPost(posts.unfavorite, inputData);

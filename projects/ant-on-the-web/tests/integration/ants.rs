@@ -189,7 +189,7 @@ async fn ants_favorite_returns_400_if_no_such_ant() {
         let body: ValidationError = res.json().await;
 
         assert_eq!(body.errors.len(), 1);
-        assert_eq!(body.errors.first().unwrap().field, "antId");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "antId");
         assert_eq!(body.errors.first().unwrap().msg, "No such ant.");
     }
 }
@@ -310,7 +310,7 @@ async fn ants_unfavorite_returns_400_if_no_such_ant() {
         let body: ValidationError = res.json().await;
 
         assert_eq!(body.errors.len(), 1);
-        assert_eq!(body.errors.first().unwrap().field, "antId");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "antId");
         assert_eq!(body.errors.first().unwrap().msg, "No such ant.");
     }
 }
@@ -544,7 +544,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "ants");
         assert_eq!(body.errors.first().unwrap().msg, "Ants cannot be empty.");
     }
 
@@ -571,7 +571,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "ants");
         assert_eq!(
             body.errors.first().unwrap().msg,
             "Ants too long, cannot exceed 256."
@@ -604,7 +604,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "ants");
         assert_eq!(
             body.errors.first().unwrap().msg,
             format!("Ant {} suggested more than once.", ids[0])
@@ -640,7 +640,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "ants");
         assert_eq!(
             body.errors.first().unwrap().msg,
             format!(
@@ -670,7 +670,10 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "content");
+        assert_eq!(
+            body.errors.first().unwrap().field.clone().unwrap(),
+            "content"
+        );
         assert_eq!(
             body.errors.first().unwrap().msg,
             "Ant content must be between 3 and 100 characters."
@@ -697,7 +700,10 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "content");
+        assert_eq!(
+            body.errors.first().unwrap().field.clone().unwrap(),
+            "content"
+        );
         assert_eq!(
             body.errors.first().unwrap().msg,
             "Ant content must be between 3 and 100 characters."
@@ -724,7 +730,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         let body: ValidationError = res.json().await;
-        assert_eq!(body.errors.first().unwrap().field, "ants");
+        assert_eq!(body.errors.first().unwrap().field.clone().unwrap(), "ants");
         assert_eq!(
             body.errors.first().unwrap().msg,
             format!("No such ant: {}", Uuid::nil()),
@@ -854,7 +860,7 @@ async fn ants_decline_returns_400_if_ant_not_exists() {
 
         let body: ValidationError = res.json().await;
         assert_eq!(body.errors.len(), 1);
-        assert_eq!(body.errors[0].field, "ant_id");
+        assert_eq!(body.errors[0].field.clone().unwrap(), "ant_id");
         assert_eq!(body.errors[0].msg, "No such ant.");
     }
 }
@@ -896,7 +902,7 @@ async fn ants_decline_returns_400_if_ant_already_declined_or_released() {
 
             let body: ValidationError = res.json().await;
             assert_eq!(body.errors.len(), 1);
-            assert_eq!(body.errors[0].field, "ant_id");
+            assert_eq!(body.errors[0].field.clone().unwrap(), "ant_id");
             assert_eq!(body.errors[0].msg, "Ant already declined.");
         }
     }
@@ -932,7 +938,7 @@ async fn ants_decline_returns_400_if_ant_already_declined_or_released() {
 
             let body: ValidationError = res.json().await;
             assert_eq!(body.errors.len(), 1);
-            assert_eq!(body.errors[0].field, "ant_id");
+            assert_eq!(body.errors[0].field.clone().unwrap(), "ant_id");
             assert_eq!(body.errors[0].msg, "Ant already released.");
         }
     }
@@ -988,7 +994,7 @@ async fn ants_decline_returns_200_for_declining_new_ant() {
 
         let body: ValidationError = res.json().await;
         assert_eq!(body.errors.len(), 1);
-        assert_eq!(body.errors[0].field, "ant_id");
+        assert_eq!(body.errors[0].field.clone().unwrap(), "ant_id");
         assert_eq!(body.errors[0].msg, "Ant already declined.");
     }
 }

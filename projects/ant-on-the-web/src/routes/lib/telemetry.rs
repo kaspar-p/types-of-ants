@@ -4,7 +4,6 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
 use tracing::{error, info};
@@ -37,7 +36,7 @@ impl<S> FromRequestParts<S> for TelemetryCookie
 where
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, String);
+    type Rejection = AntOnTheWebError;
 
     async fn from_request_parts(
         parts: &mut http::request::Parts,
@@ -47,7 +46,7 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError(None).into();
+                return AntOnTheWebError::InternalServerError(None);
             })?;
 
         let telemetry = match cookies.get(TELEMETRY_COOKIE_NAME) {
@@ -76,12 +75,8 @@ pub async fn telemetry_cookie_middleware(
     let user = optional_authenticate(auth.as_ref(), &dao)
         .await
         .map_err(|e| {
-            error!("error finding user during telemetry: {e}");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error, please retry.",
-            )
-                .into_response();
+            error!("error finding user during telemetry: {e:?}");
+            return AntOnTheWebError::InternalServerError(None).into_response();
         });
 
     let uri = req.uri().to_string().clone();

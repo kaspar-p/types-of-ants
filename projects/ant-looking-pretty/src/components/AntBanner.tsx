@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Marquee from "react-fast-marquee";
-import { getLatestAnts } from "../server/queries";
+import { getLatestAnts, unwrap } from "../server/queries";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorBoundary, LoadingBoundary } from "./UnhappyPath";
 
@@ -33,7 +33,7 @@ export function AntBanner() {
     data: bannerAnts,
   } = useQuery({
     queryKey: ["bannerAnts"],
-    queryFn: getLatestAnts,
+    queryFn: () => unwrap(getLatestAnts()),
   });
 
   return (

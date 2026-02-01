@@ -4,9 +4,9 @@ import { ChangePasswordsBox } from "@/components/ChangePasswordsBox";
 import ChangeUsernameBox from "@/components/ChangeUsernameBox";
 import { InputBanner } from "@/components/InputBanner";
 import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
-import { useUser } from "@/state/userContext";
 import Link from "next/link";
 import { useState } from "react";
+import { useUser } from "../UserProvider";
 
 const formatPhoneNumber = (p: string): string => {
   const r = /^\+(\d)(\d{3})(\d{3})(\d{4})$/;
@@ -18,6 +18,8 @@ const formatPhoneNumber = (p: string): string => {
 export default function ProfilePage() {
   const { user } = useUser();
 
+  console.log(user);
+
   const [changingPassword, setChangingPassword] = useState<boolean>(false);
   const [changingUsername, setChangingUsername] = useState<boolean>(false);
 
@@ -28,7 +30,7 @@ export default function ProfilePage() {
           <InputBanner />
 
           <div className="m-3">
-            {!(user.weakAuth && user.loggedIn) ? (
+            {!user.loggedIn ? (
               <h3>
                 seems like you aren&apos;t logged in:{" "}
                 <Link href={"/login"}>/login</Link>

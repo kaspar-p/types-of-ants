@@ -1,8 +1,7 @@
 "use client";
 
+import { useUser } from "@/app/UserProvider";
 import { changeUsername } from "@/server/posts";
-import { getUser, getUserSchema } from "@/server/queries";
-import { useUser } from "@/state/userContext";
 import { FormEvent, useState } from "react";
 
 type ChangeUsernameBoxProps = {
@@ -10,7 +9,7 @@ type ChangeUsernameBoxProps = {
 };
 
 export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
-  const { user, setUser } = useUser();
+  const { user, resetUser } = useUser();
   const [username, setUsername] = useState<string>("");
   const [usernameValidationMsg, setUsernameValidationMsg] = useState<{
     valid: boolean;
@@ -20,8 +19,8 @@ export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
   async function handleNewUsername(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const usernameRes = await changeUsername({ username });
-    switch (usernameRes.status) {
+    const res = await changeUsername({ username });
+    switch (res.__status) {
       case 500: {
         setUsernameValidationMsg({
           valid: false,
@@ -40,12 +39,9 @@ export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
       }
 
       case 400: {
-        const e: { errors: { field: string; msg: string }[] } =
-          await usernameRes.json();
-
         setUsernameValidationMsg({
           valid: false,
-          msg: e.errors[0].msg.toLocaleLowerCase(),
+          msg: res.errors[0].msg.toLocaleLowerCase(),
         });
 
         break;
@@ -55,12 +51,7 @@ export default function ChangeUsernameBox(props: ChangeUsernameBoxProps) {
         setUsernameValidationMsg({ valid: true, msg: "username changed!" });
         setUsername("");
 
-        const userRes = await getUser();
-        if (!userRes.ok) return;
-        const user = getUserSchema.transformer(
-          getUserSchema.schema.parse(await userRes.json())
-        );
-        setUser({ weakAuth: true, loggedIn: true, user: user.user });
+        resetUser();
 
         await props.onSuccess();
       }

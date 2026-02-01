@@ -14,6 +14,8 @@ use ant_on_the_web::users::{
     VerificationSubmission,
 };
 use http::StatusCode;
+use serde_json::json;
+use serde_json_assert::assert_json_eq;
 use tracing_test::traced_test;
 
 #[tokio::test]
@@ -254,7 +256,10 @@ async fn users_verification_attempt_returns_200_after_only_signup_no_login() {
         assert_eq!(res.status(), StatusCode::OK);
 
         let cookie = get_auth_cookie(res.headers());
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
 
         cookie
     };
@@ -617,7 +622,10 @@ async fn users_phone_number_returns_200_after_only_signup_no_login() {
         assert_eq!(res.status(), StatusCode::OK);
 
         let cookie = get_auth_cookie(res.headers());
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
 
         cookie
     };
@@ -811,7 +819,10 @@ async fn users_email_returns_200_after_only_signup_no_login() {
         assert_eq!(res.status(), StatusCode::OK);
 
         let cookie = get_auth_cookie(res.headers());
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
 
         cookie
     };

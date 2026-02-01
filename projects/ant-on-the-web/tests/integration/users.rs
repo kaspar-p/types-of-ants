@@ -6,6 +6,8 @@ use crate::{
     fixture_sms::first_otp,
 };
 use http::StatusCode;
+use serde_json::json;
+use serde_json_assert::assert_json_eq;
 use tracing_test::traced_test;
 
 use ant_on_the_web::{
@@ -52,7 +54,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "username");
+        assert_eq!(err.field.clone().unwrap(), "username");
         assert_eq!(err.msg, "Field must be between 3 and 16 characters.");
     }
 
@@ -72,7 +74,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "username");
+        assert_eq!(err.field.clone().unwrap(), "username");
         assert_eq!(err.msg, "Field must be between 3 and 16 characters.");
     }
 
@@ -92,7 +94,7 @@ async fn users_signup_returns_400_if_username_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "username");
+        assert_eq!(err.field.clone().unwrap(), "username");
         assert_eq!(
             err.msg,
             "Field must contain only lowercase characters (a-z) and numbers (0-9)."
@@ -155,7 +157,7 @@ async fn users_phone_number_returns_400_if_invalid() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     let j: ValidationError = res.json().await;
     let err = j.errors.first().unwrap();
-    assert_eq!(err.field, "phoneNumber");
+    assert_eq!(err.field.clone().unwrap(), "phoneNumber");
     assert_eq!(err.msg, "Field invalid.");
 }
 
@@ -178,7 +180,13 @@ async fn users_phone_number_returns_409_if_already_taken() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "Phone number already exists.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ConflictError",
+                "msg": "Phone number already exists."
+            })
+        );
     }
 }
 
@@ -262,7 +270,7 @@ async fn users_email_returns_400_if_invalid() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     let j: ValidationError = res.json().await;
     let err = j.errors.first().unwrap();
-    assert_eq!(err.field, "email");
+    assert_eq!(err.field.clone().unwrap(), "email");
     assert_eq!(err.msg, "Field invalid.");
 }
 
@@ -285,7 +293,13 @@ async fn users_email_returns_409_if_already_taken() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "Email already exists.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ConflictError",
+                "msg": "Email already exists."
+            })
+        );
     }
 }
 
@@ -309,16 +323,20 @@ async fn users_signup_returns_400_with_multiple_errors() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
 
-        let e_password = j.errors.iter().find(|f| f.field == "password").unwrap();
-        assert_eq!(e_password.field, "password");
+        let e_password = j
+            .errors
+            .iter()
+            .find(|f| f.field.clone().unwrap() == "password")
+            .unwrap();
+        assert_eq!(e_password.field.clone().unwrap(), "password");
         assert_eq!(e_password.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
 
         let e_username_len = j
             .errors
             .iter()
-            .find(|f| f.field == "username" && f.msg.contains("between"))
+            .find(|f| f.field.clone().unwrap() == "username" && f.msg.contains("between"))
             .unwrap();
-        assert_eq!(e_username_len.field, "username");
+        assert_eq!(e_username_len.field.clone().unwrap(), "username");
         assert_eq!(
             e_username_len.msg,
             "Field must be between 3 and 16 characters."
@@ -327,9 +345,9 @@ async fn users_signup_returns_400_with_multiple_errors() {
         let e_username_chars = j
             .errors
             .iter()
-            .find(|f| f.field == "username" && f.msg.contains("contain"))
+            .find(|f| f.field.clone().unwrap() == "username" && f.msg.contains("contain"))
             .unwrap();
-        assert_eq!(e_username_chars.field, "username");
+        assert_eq!(e_username_chars.field.clone().unwrap(), "username");
         assert_eq!(
             e_username_chars.msg,
             "Field must contain only lowercase characters (a-z) and numbers (0-9)."
@@ -360,7 +378,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
 
-        assert_eq!(err.field, "password");
+        assert_eq!(err.field.clone().unwrap(), "password");
         assert_eq!(err.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
     }
 
@@ -380,7 +398,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "password");
+        assert_eq!(err.field.clone().unwrap(), "password");
         assert_eq!(err.msg, "Field must be between 8 and 64 characters.");
     }
 
@@ -400,7 +418,7 @@ async fn users_signup_returns_400_if_password_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "password");
+        assert_eq!(err.field.clone().unwrap(), "password");
         assert_eq!(err.msg, "Field must be between 8 and 64 characters.");
     }
 
@@ -420,8 +438,19 @@ async fn users_signup_returns_400_if_password_invalid() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let j: ValidationError = res.json().await;
         let err = j.errors.first().unwrap();
-        assert_eq!(err.field, "password");
+        assert_eq!(err.field.clone().unwrap(), "password");
         assert_eq!(err.msg, "Passwords must match.");
+
+        assert_eq!(
+            serde_json::to_string(&j).unwrap(),
+            json!({
+                "__type": "ValidationError",
+                "errors": [
+                    { "field": "password", "msg": "Passwords must match." }
+                ]
+            })
+            .to_string()
+        );
     }
 }
 
@@ -444,7 +473,13 @@ async fn users_signup_returns_409_if_user_already_exists() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ConflictError",
+                "msg": "User already exists."
+            })
+        );
     }
 }
 
@@ -471,9 +506,10 @@ async fn users_signup_succeeds() {
         let cookie = get_auth_cookie(res.headers());
         assert!(cookie.contains("typesofants_auth="));
         assert!(cookie.contains("HttpOnly"));
-
-        let text = res.text().await;
-        assert_eq!(text, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     }
 }
 
@@ -496,7 +532,10 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     }
 
     {
@@ -513,7 +552,13 @@ async fn users_signup_returns_409_if_user_already_signed_up() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "User already exists.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ConflictError",
+                "msg": "User already exists."
+            })
+        );
     }
 }
 
@@ -536,7 +581,12 @@ async fn users_login_returns_401_if_no_corresponding_user() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 
     // Phone
@@ -553,7 +603,12 @@ async fn users_login_returns_401_if_no_corresponding_user() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 
     // Email
@@ -570,7 +625,12 @@ async fn users_login_returns_401_if_no_corresponding_user() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 }
 
@@ -583,7 +643,13 @@ async fn users_logout_returns_4xx_if_not_authenticated() {
         let res = fixture.client.post("/api/users/logout").send().await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(res.text().await, "Invalid authorization token.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ValidationError",
+                "errors": [{ "msg": "Invalid authorization token." }]
+            })
+        );
     }
 
     {
@@ -595,7 +661,10 @@ async fn users_logout_returns_4xx_if_not_authenticated() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "AccessDenied" })
+        );
     }
 }
 
@@ -620,8 +689,10 @@ async fn users_logout_returns_200_if_authenticated() {
         assert!(expiration_cookie.contains("HttpOnly"));
         assert!(expiration_cookie.contains("SameSite"));
 
-        let text = res.text().await;
-        assert_eq!(text, "Logout successful.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "LogoutResponse" })
+        );
     }
 }
 
@@ -644,7 +715,10 @@ async fn users_login_returns_401_if_wrong_fields() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     }
 
     // Right password, wrong username.
@@ -662,7 +736,12 @@ async fn users_login_returns_401_if_wrong_fields() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 
     // Right password, wrong phone number.
@@ -680,7 +759,12 @@ async fn users_login_returns_401_if_wrong_fields() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 
     // Right password, wrong email.
@@ -698,7 +782,12 @@ async fn users_login_returns_401_if_wrong_fields() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 }
 
@@ -721,7 +810,10 @@ async fn users_login_returns_200_with_cookie_headers() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     }
 
     // Login includes Set-Cookie header with the right properties.
@@ -781,7 +873,10 @@ async fn users_login_returns_200_if_user_fully_verified_by_phone() {
             assert_eq!(res.status(), StatusCode::OK);
 
             let cookie = get_auth_cookie(res.headers());
-            assert_eq!(res.text().await, "Signup completed.");
+            assert_json_eq!(
+                serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+                json!({ "__type": "SignupResponse" })
+            );
 
             cookie
         };
@@ -910,9 +1005,10 @@ async fn users_login_returns_200_if_user_never_verified_2fa() {
             .await;
 
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.status(), StatusCode::OK);
-
-        assert_eq!(res.text().await, "Signup completed.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({ "__type": "SignupResponse" })
+        );
     };
 
     // Login via username
@@ -990,7 +1086,12 @@ async fn users_user_returns_401_if_token_has_been_tampered_with() {
             .await;
 
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(res.text().await, "Access denied.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "AccessDenied"
+            })
+        );
     }
 }
 
@@ -1004,7 +1105,15 @@ async fn users_user_returns_400_if_missing_token() {
         let res = fixture.client.get("/api/users/user/nobody").send().await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(res.text().await, "Invalid authorization token.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ValidationError",
+                "errors": [
+                    { "msg": "Invalid authorization token." }
+                ]
+            })
+        );
     }
 
     // Not using the typesofants_auth name
@@ -1017,7 +1126,15 @@ async fn users_user_returns_400_if_missing_token() {
             .await;
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(res.text().await, "Invalid authorization token.");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ValidationError",
+                "errors": [
+                    { "msg": "Invalid authorization token." }
+                ]
+            })
+        );
     }
 }
 
@@ -1064,7 +1181,7 @@ async fn users_subscribe_newsletter_returns_400_if_malformed_email() {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         let res: ValidationError = res.json().await;
         let v = res.errors.first().unwrap();
-        assert_eq!(v.field, "email");
+        assert_eq!(v.field.clone().unwrap(), "email");
         assert_eq!(v.msg, "Field invalid.");
     }
 }
@@ -1102,7 +1219,13 @@ async fn users_subscribe_newsletter_returns_409_if_email_already_registered() {
             .await;
 
         assert_eq!(res.status(), StatusCode::CONFLICT);
-        assert_eq!(res.text().await, "Already subscribed!");
+        assert_json_eq!(
+            serde_json::from_str::<serde_json::Value>(&res.text().await).unwrap(),
+            json!({
+                "__type": "ConflictError",
+                "msg": "Already subscribed!"
+            })
+        );
     }
 }
 

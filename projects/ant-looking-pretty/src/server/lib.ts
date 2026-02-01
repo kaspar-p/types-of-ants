@@ -9,7 +9,7 @@ const environmentSchema = z.union([
 
 function generateBaseUrl(): string {
   const environment = environmentSchema.parse(
-    process.env.NEXT_PUBLIC_TYPESOFANTS_ENV
+    process.env.NEXT_PUBLIC_TYPESOFANTS_ENV,
   );
 
   let url: string;
@@ -47,16 +47,30 @@ export function getEndpoint(path: string): URL {
   return new URL(path, baseUrl);
 }
 
-export function getFetchOptions(): { credentials?: "include" } {
+export async function getFetchOptions(): Promise<RequestInit> {
   const environment = environmentSchema.parse(
-    process.env.NEXT_PUBLIC_TYPESOFANTS_ENV
+    process.env.NEXT_PUBLIC_TYPESOFANTS_ENV,
   );
+
+  const headers = {
+    Cookie:
+      typeof window === "undefined"
+        ? (await (await import("next/headers")).cookies()).toString()
+        : "",
+  };
+
   switch (environment) {
     case "prod":
-    case "beta":
+    case "beta": {
       return {};
+    }
+
     case undefined:
-    case "dev":
-      return { credentials: "include" };
+    case "dev": {
+      return {
+        credentials: "include",
+        headers: headers,
+      };
+    }
   }
 }

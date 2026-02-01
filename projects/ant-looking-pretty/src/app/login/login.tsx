@@ -1,18 +1,19 @@
 import { login } from "@/server/posts";
 import { useState } from "react";
-import { useUser } from "../../state/userContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export const LoginBox = () => {
+export type LoginBoxProps = {
+  setWeakAuth: (weakAuth: boolean) => void;
+};
+
+export const LoginBox = (props: LoginBoxProps) => {
   const [loginUnique, setLoginUnique] = useState("");
   const [loginValidationMsg, setLoginValidationMsg] = useState("");
 
   const [passwordAttempt, setPasswordAttempt] = useState("");
   const [passwordAttemptValidationMsg, setPasswordAttemptValidationMsg] =
     useState("");
-
-  const { setUser } = useUser();
 
   const { push } = useRouter();
 
@@ -28,12 +29,12 @@ export const LoginBox = () => {
       password: passwordAttempt,
     });
 
-    switch (response.status) {
+    switch (response.__status) {
       case 500: {
         return setFormState({
           loading: false,
           success: false,
-          msg: "something went wrong, please retry.",
+          msg: response.msg,
         });
       }
 
@@ -46,10 +47,7 @@ export const LoginBox = () => {
       }
 
       case 400: {
-        const resp: { errors: { field: string; msg: string }[] } =
-          await response.json();
-
-        for (const error of resp.errors) {
+        for (const error of response.errors) {
           switch (error.field) {
             case "method.email":
             case "method.username":
@@ -74,7 +72,6 @@ export const LoginBox = () => {
       }
 
       case 200: {
-        const body: { userId: string } = await response.json();
         setLoginUnique("");
         setLoginValidationMsg("");
 
@@ -86,7 +83,8 @@ export const LoginBox = () => {
           success: true,
           msg: "login complete, welcome!",
         });
-        setUser({ weakAuth: true, loggedIn: false });
+
+        props.setWeakAuth(true);
 
         push("/login/two-factor");
 

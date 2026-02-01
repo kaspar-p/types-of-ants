@@ -1,13 +1,14 @@
 use crate::{
     err::{AntOnTheWebError, ValidationError, ValidationMessage},
-    routes::lib::auth::{authenticate, authenticate_admin, optional_strict_authenticate},
+    routes::lib::{
+        auth::{authenticate, authenticate_admin, optional_strict_authenticate},
+        response::AntOnTheWebResponse,
+    },
     state::{ApiRouter, ApiState, InnerApiState},
 };
 use ant_data_farm::users::UserId;
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
-    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -22,26 +23,28 @@ pub use ant_data_farm::releases::{AntReleaseRequest, Release};
 
 const PAGE_SIZE: usize = 1_000_usize;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AllAntsResponse {
     pub ants: Vec<Ant>,
 }
 async fn all_ants(
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await.get_all().await?;
-    Ok((
-        StatusCode::OK,
-        Json(AllAntsResponse { ants }).into_response(),
-    ))
+    Ok(AntOnTheWebResponse::AllAntsResponse(AllAntsResponse {
+        ants,
+    }))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Pagination {
-    page: usize,
+    page: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UnreleasedAntsResponse {
     pub ants: Vec<Ant>,
 }
@@ -49,7 +52,7 @@ pub struct UnreleasedAntsResponse {
 async fn unreleased_ants(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let mut unreleased_ants = ants
@@ -64,32 +67,25 @@ async fn unreleased_ants(
     unreleased_ants.sort();
     unreleased_ants.reverse();
 
-    let ants_page = unreleased_ants.chunks(PAGE_SIZE).nth(query.page);
-    match ants_page {
-        None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                Json(format!("No page {} exists!", query.page)).into_response(),
-            ))
-        }
-        Some(unreleased_ants) => {
-            return Ok((
-                StatusCode::OK,
-                Json(UnreleasedAntsResponse {
-                    ants: unreleased_ants.to_vec(),
-                })
-                .into_response(),
-            ));
-        }
-    }
+    let ants_page = unreleased_ants
+        .chunks(PAGE_SIZE)
+        .nth(query.page as usize)
+        .ok_or(AntOnTheWebError::NoSuchPage { page: query.page })?;
+
+    return Ok(AntOnTheWebResponse::UnreleasedAntsResponse(
+        UnreleasedAntsResponse {
+            ants: ants_page.to_vec(),
+        },
+    ));
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeclinedAntsRequest {
     pub page: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeclinedAntsResponse {
     pub ants: Vec<Ant>,
@@ -99,7 +95,7 @@ pub struct DeclinedAntsResponse {
 async fn declined_ants(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<DeclinedAntsRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
 
     let declined_ants = ants
@@ -113,29 +109,19 @@ async fn declined_ants(
         .collect::<Vec<Ant>>();
 
     let mut chunks = declined_ants.chunks(PAGE_SIZE);
-    let ants_page = chunks.nth(req.page.try_into().unwrap());
+    let ants_page = chunks
+        .nth(req.page.try_into().unwrap())
+        .ok_or(AntOnTheWebError::NoSuchPage { page: req.page })?;
 
-    match ants_page {
-        None => {
-            return Ok((
-                StatusCode::NOT_FOUND,
-                Json(format!("No page {} exists!", req.page)).into_response(),
-            ))
-        }
-        Some(declined_ants) => {
-            return Ok((
-                StatusCode::OK,
-                Json(DeclinedAntsResponse {
-                    ants: declined_ants.to_vec(),
-                    has_next_page: chunks.len() > 0,
-                })
-                .into_response(),
-            ));
-        }
-    }
+    return Ok(AntOnTheWebResponse::DeclinedAntsResponse(
+        DeclinedAntsResponse {
+            ants: ants_page.to_vec(),
+            has_next_page: chunks.len() > 0,
+        },
+    ));
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleasedAnt {
     pub ant_id: AntId,
@@ -150,7 +136,7 @@ pub struct ReleasedAnt {
     pub favorited_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleasedAntsResponse {
     pub ants: Vec<ReleasedAnt>,
@@ -160,7 +146,7 @@ async fn released_ants(
     auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = optional_strict_authenticate(auth.as_ref(), &dao).await?;
 
     let ants = dao.ants.read().await;
@@ -189,16 +175,14 @@ async fn released_ants(
 
     let mut chunks = released_ants.chunks(PAGE_SIZE);
 
-    let has_next_page = (chunks.len() - 1) > query.page;
-    let ants_page = chunks.nth(query.page).unwrap_or(&[]);
+    let has_next_page = (chunks.len() - 1) > query.page as usize;
+    let ants_page = chunks.nth(query.page as usize).unwrap_or(&[]);
 
-    return Ok((
-        StatusCode::OK,
-        Json(ReleasedAntsResponse {
+    return Ok(AntOnTheWebResponse::ReleasedAntsResponse(
+        ReleasedAntsResponse {
             ants: ants_page.to_vec(),
             has_next_page,
-        })
-        .into_response(),
+        },
     ));
 }
 
@@ -206,25 +190,32 @@ async fn released_ants(
 pub struct LatestReleaseResponse {
     pub release: Release,
 }
-async fn latest_release(State(InnerApiState { dao, .. }): ApiState) -> impl IntoResponse {
-    match dao.releases.read().await.get_latest_release().await {
-        Err(_) => (StatusCode::NOT_FOUND).into_response(),
-        Ok(latest_release) => (
-            StatusCode::OK,
-            Json(LatestReleaseResponse {
-                release: latest_release,
-            }),
-        )
-            .into_response(),
-    }
+async fn latest_release(
+    State(InnerApiState { dao, .. }): ApiState,
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
+    let latest_release = dao
+        .releases
+        .read()
+        .await
+        .get_latest_release()
+        .await?
+        .ok_or(AntOnTheWebError::NoSuchResource)?;
+
+    Ok(AntOnTheWebResponse::LatestReleaseResponse(
+        LatestReleaseResponse {
+            release: latest_release,
+        },
+    ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetReleaseRequest {
     pub release: i32,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct GetReleaseResponse {
     pub release: Release,
 }
@@ -232,23 +223,27 @@ pub struct GetReleaseResponse {
 async fn get_release(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<GetReleaseRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let releases = dao.releases.read().await;
-    let release = releases.get_release(req.release).await?;
+    let release = releases
+        .get_release(req.release)
+        .await?
+        .ok_or(AntOnTheWebError::NoSuchResource)?;
 
-    match release {
-        None => Ok((StatusCode::NOT_FOUND).into_response()),
-        Some(release) => Ok((StatusCode::OK, Json(GetReleaseResponse { release })).into_response()),
-    }
+    Ok(AntOnTheWebResponse::GetReleaseResponse(
+        GetReleaseResponse { release },
+    ))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateReleaseRequest {
     pub label: String,
     pub ants: Vec<AntReleaseRequest>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateReleaseResponse {
     pub release: i32,
 }
@@ -257,7 +252,7 @@ async fn create_release(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<CreateReleaseRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate_admin(&auth, &dao).await?;
 
     {
@@ -314,7 +309,7 @@ async fn create_release(
         }
 
         if validations.len() > 0 {
-            return Err(AntOnTheWebError::Validation(ValidationError::many(
+            return Err(AntOnTheWebError::ValidationError(ValidationError::many(
                 validations,
             )));
         }
@@ -326,22 +321,27 @@ async fn create_release(
         .make_release(&user.user_id, req.label, req.ants)
         .await?;
 
-    Ok((StatusCode::OK, Json(CreateReleaseResponse { release })))
+    Ok(AntOnTheWebResponse::CreateReleaseResponse(
+        CreateReleaseResponse { release },
+    ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TotalResponse {
     pub total: usize,
 }
 async fn total(
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
     let total = ants.get_all_released().await?.len();
-    Ok((StatusCode::OK, Json(TotalResponse { total })))
+
+    Ok(AntOnTheWebResponse::TotalResponse(TotalResponse { total }))
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct LatestAntsResponse {
     #[serde(with = "chrono::serde::ts_seconds")]
     pub date: chrono::DateTime<chrono::Utc>,
@@ -350,45 +350,42 @@ pub struct LatestAntsResponse {
 }
 async fn latest_ants(
     State(InnerApiState { dao, .. }): ApiState,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
     let releases = dao.releases.read().await;
 
     let all_ants: Vec<Ant> = ants.get_all().await?;
-    match releases.get_latest_release().await {
-        Err(_) => {
-            return Ok((StatusCode::NOT_FOUND).into_response());
-        }
-        Ok(latest_release) => {
-            let current_release_ants = all_ants
-                .iter()
-                .filter(|ant| match &ant.status {
-                    AntStatus::Released(n) => n.release_number == latest_release.release_number,
-                    _ => false,
-                })
-                .map(std::clone::Clone::clone)
-                .collect::<Vec<Ant>>();
+    let latest_release = releases
+        .get_latest_release()
+        .await?
+        .ok_or(AntOnTheWebError::NoSuchResource)?;
+    let current_release_ants = all_ants
+        .iter()
+        .filter(|ant| match &ant.status {
+            AntStatus::Released(n) => n.release_number == latest_release.release_number,
+            _ => false,
+        })
+        .map(std::clone::Clone::clone)
+        .collect::<Vec<Ant>>();
 
-            return Ok((
-                StatusCode::OK,
-                Json(LatestAntsResponse {
-                    date: latest_release.created_at,
-                    release: latest_release.release_number,
-                    ants: current_release_ants,
-                }),
-            )
-                .into_response());
-        }
-    }
+    Ok(AntOnTheWebResponse::LatestAntsResponse(
+        LatestAntsResponse {
+            date: latest_release.created_at,
+            release: latest_release.release_number,
+            ants: current_release_ants,
+        },
+    ))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SuggestionRequest {
     #[serde(rename = "suggestionContent")]
     pub suggestion_content: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SuggestionResponse {
     pub ant: Ant,
 }
@@ -408,7 +405,7 @@ async fn make_suggestion(
     auth: Option<AuthClaims>,
     State(InnerApiState { dao, .. }): ApiState,
     Json(suggestion): Json<SuggestionRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     {
@@ -416,7 +413,7 @@ async fn make_suggestion(
         validate_suggested_content(&suggestion.suggestion_content).map(|v| validations.push(v));
 
         if validations.len() > 0 {
-            return Err(AntOnTheWebError::Validation(ValidationError::many(
+            return Err(AntOnTheWebError::ValidationError(ValidationError::many(
                 validations,
             )));
         }
@@ -428,19 +425,18 @@ async fn make_suggestion(
         .add_unreleased_ant(suggestion.suggestion_content, user.user_id, user.username)
         .await?;
 
-    Ok((
-        StatusCode::OK,
-        Json(SuggestionResponse { ant }).into_response(),
+    Ok(AntOnTheWebResponse::SuggestionResponse(
+        SuggestionResponse { ant },
     ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeclineAntRequest {
     pub ant_id: AntId,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeclineAntResponse {
     pub declined_at: DateTime<Utc>,
@@ -450,22 +446,22 @@ async fn decline_ant(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<DeclineAntRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate_admin(&auth, &dao).await?;
 
     let mut ants = dao.ants.write().await;
 
     let declined_at = match ants.get_one_by_id(&req.ant_id).await? {
         None => {
-            return Err(AntOnTheWebError::Validation(ValidationError::one(
+            return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("ant_id", "No such ant."),
             )));
         }
         Some(ant) => match ant.status {
-            AntStatus::Declined => Err(AntOnTheWebError::Validation(ValidationError::one(
+            AntStatus::Declined => Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("ant_id", format!("Ant already declined.")),
             ))),
-            AntStatus::Released(_) => Err(AntOnTheWebError::Validation(ValidationError::one(
+            AntStatus::Released(_) => Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("ant_id", format!("Ant already released.")),
             ))),
             AntStatus::Unreleased => {
@@ -476,16 +472,18 @@ async fn decline_ant(
         },
     }?;
 
-    return Ok((StatusCode::OK, Json(DeclineAntResponse { declined_at })));
+    Ok(AntOnTheWebResponse::DeclineAntResponse(
+        DeclineAntResponse { declined_at },
+    ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FavoriteAntRequest {
     pub ant_id: AntId,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FavoriteAntResponse {
     pub favorited_at: DateTime<Utc>,
@@ -495,13 +493,13 @@ async fn favorite_ant(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<FavoriteAntRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
 
     let mut ants = dao.ants.write().await;
 
     if ants.get_one_by_id(&req.ant_id).await?.is_none() {
-        return Err(AntOnTheWebError::Validation(ValidationError::one(
+        return Err(AntOnTheWebError::ValidationError(ValidationError::one(
             ValidationMessage::new("antId", "No such ant."),
         )));
     }
@@ -512,12 +510,14 @@ async fn favorite_ant(
         None => ants.favorite_ant(&user.user_id, &req.ant_id).await?,
     };
 
-    Ok((StatusCode::OK, Json(FavoriteAntResponse { favorited_at })))
+    Ok(AntOnTheWebResponse::FavoriteAntResponse(
+        FavoriteAntResponse { favorited_at },
+    ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UnfavoriteAntRequest {
-    #[serde(rename = "antId")]
     pub ant_id: AntId,
 }
 
@@ -525,13 +525,13 @@ async fn unfavorite_ant(
     auth: AuthClaims,
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<UnfavoriteAntRequest>,
-) -> Result<impl IntoResponse, AntOnTheWebError> {
+) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
 
     let mut ants = dao.ants.write().await;
 
     if ants.get_one_by_id(&req.ant_id).await?.is_none() {
-        return Err(AntOnTheWebError::Validation(ValidationError::one(
+        return Err(AntOnTheWebError::ValidationError(ValidationError::one(
             ValidationMessage::new("antId", "No such ant."),
         )));
     }
@@ -544,10 +544,11 @@ async fn unfavorite_ant(
         ants.unfavorite_ant(&user.user_id, &req.ant_id).await?;
     };
 
-    Ok((StatusCode::OK, "Ant unfavorited."))
+    Ok(AntOnTheWebResponse::UnfavoriteAntResponse)
 }
 
-// #[derive(Serialize, Deserialize)]
+// #[derive(Debug, Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
 // struct TweetData {
 //     pub ant_id: Uuid,
 // }

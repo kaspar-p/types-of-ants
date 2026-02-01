@@ -19,14 +19,11 @@ export function ChangePasswordsBox(props: ChangePasswordsBoxProps) {
 
     const res = await password({ secret: props.secret, password1, password2 });
 
-    switch (res.status) {
+    switch (res.__status) {
       case 400: {
-        const e: { errors: { field: string; msg: string }[] } =
-          await res.json();
-
         setPasswordValidationMsg({
           valid: false,
-          msg: e.errors[0].msg.toLocaleLowerCase(),
+          msg: res.errors[0].msg.toLocaleLowerCase(),
         });
 
         break;

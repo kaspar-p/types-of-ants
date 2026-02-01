@@ -131,7 +131,7 @@ const queries = {
         data.ants.map(async (a) => ({
           ...a,
           hash: a.hash ?? (await contentHash(a.antName)),
-        }))
+        })),
       );
 
       ants.sort((a, b) => (a.hash < b.hash ? -1 : 1));
@@ -192,23 +192,42 @@ type QueryParams<Q extends Query> = Q extends { queryParams: any }
   ? { [x in Q["queryParams"][number]]: unknown }
   : undefined;
 
+export const unwrap = async <Q extends Query>(
+  f: Promise<QueryResult<Q>>,
+): Promise<ReturnType<Q["transformer"]>> => {
+  const r = await f;
+  if (!r.success) {
+    throw new Error(r.error);
+  } else {
+    return r.data;
+  }
+};
+
+type QueryResult<Q extends Query> =
+  | { success: true; data: ReturnType<Q["transformer"]>; error: undefined }
+  | { success: false; data: undefined; error: string };
+
 async function constructQuery<Q extends Query>(
   query: Q,
-  inputData?: QueryParams<Q>
-): Promise<Awaited<ReturnType<Q["transformer"]>>> {
+  inputData?: QueryParams<Q>,
+): Promise<Awaited<QueryResult<Q>>> {
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
       endpoint.searchParams.set(
         param,
-        encodeURIComponent(JSON.stringify(inputData[param]))
+        encodeURIComponent(JSON.stringify(inputData[param])),
       );
     }
   }
 
   console.log("GET: ", endpoint.toString());
 
-  const res = await fetch(endpoint, getFetchOptions());
+  const res = await fetch(endpoint, await getFetchOptions());
+
+  if (!res.ok) {
+    return { success: false, data: undefined, error: await res.text() };
+  }
 
   let data: any;
   if ("isJson" in query && !query.isJson) {
@@ -218,7 +237,11 @@ async function constructQuery<Q extends Query>(
   }
 
   const transformedData = await query.transformer(data);
-  return transformedData as any as Awaited<QueryRet<Q>>;
+  return {
+    success: true,
+    data: transformedData as any as Awaited<QueryRet<Q>>,
+    error: undefined,
+  };
 }
 
 export const getVersion = () => constructQuery(queries.getVersion);
@@ -232,20 +255,20 @@ export const getLatestRelease = () => constructQuery(queries.getLatestRelease);
 
 async function constructQuery2<Q extends Query>(
   query: Q,
-  inputData?: QueryParams<Q>
+  inputData?: QueryParams<Q>,
 ): Promise<Response> {
   const endpoint = getEndpoint(query.path);
   if ("queryParams" in query && inputData !== undefined) {
     for (const param of query.queryParams) {
       endpoint.searchParams.set(
         param,
-        encodeURIComponent(JSON.stringify(inputData[param]))
+        encodeURIComponent(JSON.stringify(inputData[param])),
       );
     }
   }
 
   console.log("GET: ", endpoint.toString());
-  const response = await fetch(endpoint, getFetchOptions());
+  const response = await fetch(endpoint, await getFetchOptions());
 
   return response;
 }
