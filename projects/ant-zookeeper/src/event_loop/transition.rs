@@ -52,6 +52,24 @@ impl DeploymentTarget {
             DeploymentTarget::Host(p) => p,
         }
     }
+
+    pub fn started_event(&self) -> EventName {
+        match self {
+            DeploymentTarget::Host(_) => EventName::HostStarted,
+            DeploymentTarget::HostGroup(_) => EventName::HostGroupStarted,
+            DeploymentTarget::Stage(_) => EventName::StageStarted,
+            DeploymentTarget::Pipeline(_) => EventName::PipelineStarted,
+        }
+    }
+
+    pub fn finished_event(&self) -> EventName {
+        match self {
+            DeploymentTarget::Host(_) => EventName::HostFinished,
+            DeploymentTarget::HostGroup(_) => EventName::HostGroupFinished,
+            DeploymentTarget::Stage(_) => EventName::StageFinished,
+            DeploymentTarget::Pipeline(_) => EventName::PipelineFinished,
+        }
+    }
 }
 
 impl ToString for DeploymentTarget {
@@ -366,15 +384,13 @@ pub async fn transition(
             Ok(Transition { next: next_stages })
         }
 
-        DeploymentEvent(id, T::Stage(s), E::ArtifactArchitectureRegistered(arch)) => {
-            Ok(Transition {
-                next: vec![DeploymentEvent(
-                    id.clone(),
-                    T::Stage(s.clone()),
-                    E::StageFinished,
-                )],
-            })
-        }
+        DeploymentEvent(id, T::Stage(s), E::ArtifactArchitectureRegistered(_)) => Ok(Transition {
+            next: vec![DeploymentEvent(
+                id.clone(),
+                T::Stage(s.clone()),
+                E::StageFinished,
+            )],
+        }),
 
         DeploymentEvent(id, T::HostGroup(hg), E::HostGroupStarted) => {
             // Start deployment to all hosts in the host group, in parallel.
@@ -415,7 +431,7 @@ pub async fn transition(
             next: vec![DeploymentEvent(
                 id.clone(),
                 DeploymentTarget::Host(host.clone()),
-                E::HostFinished,
+                event.1.finished_event(),
             )],
         }),
 
@@ -536,7 +552,7 @@ pub async fn perform(
             Ok(JobCompletion::Finished(()))
         }
 
-        DeploymentEvent(revision, T::Stage(s), E::ArtifactArchitectureRegistered(arch)) => {
+        DeploymentEvent(revision, T::Stage(_), E::ArtifactArchitectureRegistered(arch)) => {
             let missing = state
                 .db
                 .missing_artifacts_for_revision_id(&revision)

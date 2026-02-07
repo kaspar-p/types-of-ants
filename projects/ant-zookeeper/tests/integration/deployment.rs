@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::{
+    fs::{create_dir_all, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use ant_zookeeper::routes::{
     pipeline::{
@@ -19,6 +23,20 @@ use crate::fixture::Fixture;
 #[traced_test]
 async fn deployment_deployment_returns_200_happy_path() {
     let fixture = Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("jwt.secret"),
+            secret_root.join("prod").join("jwt.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
 
     // Create host group ant-host-agent/beta
     let host_group_id = {

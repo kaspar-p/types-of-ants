@@ -192,9 +192,9 @@ impl AntZooStorageClient {
             .map(|r| r.get("revision_id"));
 
         match revision_id {
-            Some(id) => Ok(id),
+            Some(id) => return Ok(id),
             None => {
-                let revision_id = tx
+                let revision_id: String = tx
                     .query_one(
                         "
                     insert into revision
@@ -208,9 +208,25 @@ impl AntZooStorageClient {
                     .await?
                     .get("revision_id");
 
+                let pipeline_id = self
+                    .get_deployment_pipeline_by_project(project)
+                    .await?
+                    .unwrap();
+
+                tx.execute(
+                    "
+                insert into deployment
+                    (revision_id, target_type, target_id, event_name)
+                values
+                    ($1, 'pipeline', $2, 'pipeline-started')
+                ",
+                    &[&revision_id, &pipeline_id],
+                )
+                .await?;
+
                 tx.commit().await?;
 
-                Ok(revision_id)
+                return Ok(revision_id);
             }
         }
     }
@@ -371,6 +387,36 @@ impl AntZooStorageClient {
 
         Ok(())
     }
+
+    // pub async fn environments_without_secret(
+    //     &self,
+    //     secret_name: &str,
+    // ) -> Result<Vec<String>, anyhow::Error> {
+    //     let environments_without_secret: Vec<String> = self
+    //         .db
+    //         .get()
+    //         .await?
+    //         .query(
+    //             "
+    //     select distinct secret_environment
+    //     from secret
+    //     where secret_id not in (
+    //         select secret_id
+    //         from secret
+    //         where secret_name = $1 and deleted_at is null
+    //     )
+    //     order by created_at desc
+    //     ",
+    //             &[&secret_name],
+    //         )
+    //         .await?
+    //         .iter()
+    //         .map(|row| row.get("secret_environment"))
+    //         .collect();
+
+    //     return Ok(environments_without_secret);
+    // }
+
     pub async fn register_new_secret_version(
         &self,
         secret_name: &str,
@@ -775,114 +821,52 @@ impl AntZooStorageClient {
         Ok(revisions)
     }
 
-    /// Returns the last fully successfully deployed revision to a stage.
-    pub async fn get_latest_successful_revision_on_stage(
+    /// Returns the latest revision that has the given event on that target.
+    ///
+    /// For example:
+    ///  - Used to return the latest revision with 'stage-finished' on a stage, representing the
+    ///    last successful deployment to that entire stage.
+    ///
+    ///  - Used to return the latest revision with 'host-group-started' on a host. If it's the same
+    ///    as the one with 'host-group-finished' then there's nothing in progress!
+    ///
+    pub async fn get_latest_revision_with_event(
         &self,
-        stage_id: &str,
-    ) -> Result<Option<String>, anyhow::Error> {
+        deployment_pipeline_id: &str,
+        target_type: &str,
+        target_id: &str,
+        event_name: &str,
+    ) -> Result<Option<(String, DateTime<Utc>)>, anyhow::Error> {
         let con = self.db.get().await?;
 
         let revision = con
             .query_opt(
                 "
-            select revision_id
-            from deployment_pipeline_stage
-                join deployment on deployment.deployment_pipeline_stage_id
-                    = deployment_pipeline_stage.deployment_pipeline_stage_id
+            select deployment.revision_id, deployment.created_at
+            from deployment
+                join revision r on r.revision_id = deployment.revision_id
+                join deployment_pipeline p on p.project_id = 
+                    r.project_id
             where
-                deployment_pipeline_stage.deployment_pipeline_stage_id = $1 and
-                deployment.deployment_state = 'FINISHED' and
-            order by deployment.revision_id desc
+                deployment_pipeline_id = $1 and
+                target_type = $2 and
+                target_id = $3 and
+                event_name = $4
+            order by deployment_seq desc
             limit 1
         ",
-                &[&stage_id],
+                &[
+                    &deployment_pipeline_id,
+                    &target_type,
+                    &target_id,
+                    &event_name,
+                ],
             )
             .await?
-            .map(|row| row.get("revision_id"));
+            .map(|row| (row.get("revision_id"), row.get("created_at")));
 
         Ok(revision)
     }
-
-    // pub async fn get_latest_failed_revision_on_stage(
-    //     &self,
-    //     stage_id: &str,
-    // ) -> Result<Option<String>, anyhow::Error> {
-    //     let con = self.db.get().await?;
-
-    //     let revision = con
-    //         .query_opt(
-    //             "
-    //         select revision_id
-    //         from deployment_pipeline_stage
-    //             join deployment on deployment.deployment_pipeline_stage_id
-    //                 = deployment_pipeline_stage.deployment_pipeline_stage_id
-    //         where
-    //             deployment_pipeline_stage.deployment_pipeline_stage_id = $1 and
-    //             deployment.deployment_state = 'FINISHED' and
-    //         order by deployment.revision_id desc
-    //         limit 1
-    //     ",
-    //             &[&stage_id],
-    //         )
-    //         .await?
-    //         .map(|row| row.get("revision_id"));
-
-    //     Ok(revision)
-    // }
-
-    // /// Returns whether the stage has any on-going deployments at the moment.
-    // pub async fn get_revision_in_progress_on_stage(
-    //     &self,
-    //     stage_id: &str,
-    // ) -> Result<bool, anyhow::Error> {
-    //     let con = self.db.get().await?;
-
-    //     let revision = con
-    //         .query_opt(
-    //             "
-    //         select count(deployment_id)
-    //         from deployment_pipeline_stage
-    //             join deployment on deployment.deployment_pipeline_stage_id
-    //                 = deployment_pipeline_stage.deployment_pipeline_stage_id
-    //         where
-    //             deployment_pipeline_stage.deployment_pipeline_stage_id = $1 and
-    //             deployment.deployment_state != 'FINISHED' and
-    //         order by deployment.revision_id desc
-    //         limit 1
-    //     ",
-    //             &[&stage_id],
-    //         )
-    //         .await?
-    //         .map(|row| row.get("revision_id"));
-
-    //     Ok(revision)
-    // }
-
-    // pub async fn get_project_version_from_deployment(
-    //     &self,
-    //     deployment_id: &str,
-    // ) -> Result<(String, String), anyhow::Error> {
-    //     let con = self.db.get().await?;
-
-    //     let row = con
-    //         .query_one(
-    //             "
-    //         select project_id, deployment_version
-    //         from deployment d
-    //             join deployment_pipeline_stage s on s.deployment_pipeline_stage_id
-    //                 = d.deployment_pipeline_stage_id
-    //             join deployment_pipeline p on p.deployment_pipeline_id = s.deployment_pipeline_id
-    //             join revision r on r.revision_id = deployment.revision_id
-    //         where deployment_id = $1
-    //         ",
-    //             &[&deployment_id],
-    //         )
-    //         .await?;
-
-    //     let project_version = (row.get("project_id"), row.get("deployment_version"));
-
-    //     Ok(project_version)
-    // }
 
     pub async fn get_deployment(
         &self,
@@ -918,6 +902,43 @@ impl AntZooStorageClient {
             .map(|row| row.get("deployment_id"));
 
         Ok(deployment_id)
+    }
+
+    pub async fn start_deployment_job(&self, deployment_job_id: &str) -> Result<(), anyhow::Error> {
+        self.db
+            .get()
+            .await?
+            .execute(
+                "
+            update deployment_job
+            set started_at = now()
+            where deployment_job_id = $1
+            ",
+                &[&deployment_job_id],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn unstart_deployment_job(
+        &self,
+        deployment_job_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.db
+            .get()
+            .await?
+            .execute(
+                "
+            update deployment_job
+            set started_at = null
+            where deployment_job_id = $1
+            ",
+                &[&deployment_job_id],
+            )
+            .await?;
+
+        Ok(())
     }
 
     /// Returns Some(created Deployment ID) if the job was successful, None if it wasn't,
@@ -1217,6 +1238,7 @@ impl AntZooStorageClient {
                 event_name
             from deployment_job
             where
+                started_at is null and
                 finished_at is null and
                 is_success is null
             ",
@@ -1298,6 +1320,7 @@ impl AntZooStorageClient {
                 from deployment
                 where deployment.event_name = $1
             )
+            order by revision_id desc;
             ",
                 &[&event_name],
             )

@@ -181,6 +181,7 @@ create table deployment (
 
   unique(revision_id, target_id, event_name),
 
+  deployment_seq serial not null, -- The sequence number, in order. Logical clock to order events.
   created_at timestamp with time zone not null default now(),
 
   foreign key (revision_id) references revision(revision_id)
@@ -200,8 +201,15 @@ create table deployment_job (
   project_id text not null, -- The project this job is scheduled for
 
   is_success boolean, -- Once the job was finished, was it successful?
-  finished_at timestamp with time zone, -- Once the job is finished, the timestamp it finished at.
   is_retryable boolean, -- This will be true if the job is marked as retryable, and then future iterations will try again.
+  
+  -- The states of a job (started_at, finished_at):
+  --   started_at=null, finished_at=null: The job is PENDING and ready to be taken.
+  --   started_at=..., finished_at=null: The job has been taken and is actively being worked on.
+  --   started_at=..., finished_at=...: The job is finished, see is_success for the outcome status
+  --   started_at=null, finished_at=...: IMPOSSIBLE
+  started_at timestamp with time zone, -- Once the job is STARTED. If this is NULL, the job can be taken and is effectively pending.
+  finished_at timestamp with time zone, -- Once the job is finished, the timestamp it finished at.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),

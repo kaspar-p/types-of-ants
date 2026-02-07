@@ -51,6 +51,8 @@ async fn iterate_pipeline(
             // Do the work.
             info!("Performing: {event:?}");
 
+            state2.db.start_deployment_job(&job.job_id).await?;
+
             let state3 = state2.clone();
             let job_id = job.job_id.clone();
             let work: Result<Result<JobCompletion<()>, anyhow::Error>, tokio::task::JoinError> =
@@ -79,7 +81,7 @@ async fn iterate_pipeline(
                 }
             };
 
-            // Record it.
+            // If the job finished, set its status and finished_at timestamp.
             if let Some(is_success) = is_success {
                 info!(
                     "Job {} complete, success={}",
@@ -97,6 +99,9 @@ async fn iterate_pipeline(
                         is_success,
                     )
                     .await?;
+            } else {
+                // Clear the started_at field to set the job back to pending.
+                state2.db.unstart_deployment_job(&job.job_id).await?;
             }
 
             return Ok(());

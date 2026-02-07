@@ -31,6 +31,21 @@ pub(crate) fn global_envs_file_name(environment: &str) -> String {
     format!("{environment}.build.cfg")
 }
 
+pub(crate) fn secret_file_path(
+    root_dir: &PathBuf,
+    environment: &str,
+    secret_name: &str,
+) -> PathBuf {
+    root_dir
+        .join("secrets-db")
+        .join(environment)
+        .join(secret_file_name(secret_name))
+}
+
+pub(crate) fn secret_file_name(secret_name: &str) -> String {
+    format!("{secret_name}.secret")
+}
+
 pub(crate) fn services_persist_dir(root_dir: &PathBuf) -> PathBuf {
     root_dir.join("services-db")
 }

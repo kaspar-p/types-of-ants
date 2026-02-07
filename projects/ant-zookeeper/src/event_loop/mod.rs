@@ -12,16 +12,13 @@ pub mod transition;
 
 pub async fn drive_revisions(
     db: &AntZooStorageClient,
-    iterations: i32,
+    _iterations: i32,
 ) -> Result<(), PipelineError> {
     for (revision, deployment_pipeline_id) in db
         .list_revisions_missing_event(&EventName::PipelineFinished.to_string())
         .await?
     {
-        info!(
-            "Driving pipeline {deployment_pipeline_id} version {revision} x{iterations} times..."
-        );
-        // assume most pipelines end-to-end generate < 10k events
+        info!("[p={deployment_pipeline_id} v={revision}] Driving pipeline.");
         drive_pipeline(db, &revision, &deployment_pipeline_id).await?;
     }
 
@@ -34,21 +31,17 @@ async fn drive_pipeline(
     deployment_pipeline_id: &str,
 ) -> Result<(), PipelineError> {
     let mut frontier = Vec::from(frontier(&db, &revision, &deployment_pipeline_id).await?);
-    info!(
-        "[p={deployment_pipeline_id} v={revision}] Frontier calculated, size={}",
-        frontier.len()
-    );
 
     loop {
         let mut new_frontier = Vec::new();
 
         for event in &frontier {
-            info!("Driving frontier event: {event:?}");
+            info!("[p={deployment_pipeline_id} v={revision}] Driving frontier event: {event:?}");
             let mut requeue_events =
                 drive_iteration(db, deployment_pipeline_id, frontier.iter(), &event).await?;
 
             info!(
-                "Event {event:?} fans out to {} new events: {:?}",
+                "[p={deployment_pipeline_id} v={revision}] Event {event:?} fans out to {} new events: {:?}",
                 requeue_events.len(),
                 requeue_events
             );
@@ -72,14 +65,17 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     event: &DeploymentEvent,
 ) -> Result<Vec<DeploymentEvent>, PipelineError> {
     if !is_doable(&db, deployment_pipeline_id, frontier, &event).await? {
-        info!("Event {event:?} is not doable.");
+        info!(
+            "[p={deployment_pipeline_id} v={}] Event {event:?} is not doable.",
+            event.0
+        );
         return Ok(vec![]);
     }
 
     let transition = transition(db, deployment_pipeline_id, &event).await?;
 
     if is_deployment_complete(db, event).await? {
-        info!("Event {event:?} is already finished, progressing pipeline...");
+        info!("[p={deployment_pipeline_id} v={}] Event {event:?} is already finished, progressing pipeline...", event.0);
         return Ok(transition.next);
     }
 
@@ -99,10 +95,16 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
         .await?;
     if let Some(prev) = previous {
         if !prev.1 {
-            info!("Previous job {} failed, and is not retryable...", prev.0);
+            info!(
+                "[p={deployment_pipeline_id} v={}] Previous job {} failed, and is not retryable...",
+                event.0, prev.0
+            );
             return Ok(vec![]);
         } else {
-            info!("Previous job {} failed but is retryable...", prev.0);
+            info!(
+                "[p={deployment_pipeline_id} v={}] Previous job {} failed but is retryable...",
+                event.0, prev.0
+            );
         }
     }
 
@@ -118,7 +120,10 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
         )
         .await?;
 
-    info!("Scheduled job: {job_id} for event {event:?}");
+    info!(
+        "[p={deployment_pipeline_id} v={}] Scheduled job {job_id} for event {event:?}",
+        event.0
+    );
 
     Ok(vec![])
 }

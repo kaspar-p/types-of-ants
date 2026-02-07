@@ -9,7 +9,7 @@ use http_body_util::BodyExt;
 use http_body_util::Full;
 use std::{env::set_var, fmt::Display};
 use tracing::{debug, error, Level};
-use tracing_subscriber::{fmt::writer::Tee, FmtSubscriber};
+use tracing_subscriber::{fmt::writer::Tee, EnvFilter, FmtSubscriber};
 
 pub mod db;
 pub mod headers;
@@ -42,20 +42,26 @@ pub fn set_global_logs(project: &str) -> () {
     // this function is unsafe if-and-only-if there is FFI code modifying the environment lock that the
     // rust standard library sets. We don't use FFI!
     unsafe {
-        set_var(
-        "RUST_LOG",
-        format!(
-            "{}=debug,ant_library=debug,ant_data_farm=debug,glimmer=debug,tower_http=debug,axum::rejection=trace",
-            project
-        ),
-    );
+        set_var("RUST_LOG", "debug");
     }
     dotenv::dotenv().expect("No .env file found!");
 
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
-        .with_file(true)
+        .with_file(false)
+        .with_env_filter(
+            EnvFilter::try_from_env("RUST_LOG")
+                .unwrap()
+                .add_directive(format!("{}=debug", project).parse().unwrap())
+                .add_directive("ant_library=debug".parse().unwrap())
+                .add_directive("ant_data_farm=debug".parse().unwrap())
+                .add_directive("glimmer=debug".parse().unwrap())
+                .add_directive("tower_http=debug".parse().unwrap())
+                .add_directive("axum::rejection=trace".parse().unwrap())
+                .add_directive("tokio_cron_scheduler=debug".parse().unwrap())
+                .add_directive("hyper=off".parse().unwrap()),
+        )
         .with_ansi(false)
         .with_writer(Tee::new(
             std::io::stdout,

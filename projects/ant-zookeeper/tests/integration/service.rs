@@ -1,4 +1,8 @@
-use std::{fs::exists, path::PathBuf};
+use std::{
+    fs::{create_dir_all, exists, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use ant_zookeeper::routes::pipeline::{
     AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse, PutPipelineRequest,
@@ -84,8 +88,54 @@ async fn service_artifact_returns_400_if_no_headers() {
 
 #[test]
 #[traced_test]
+async fn service_artifact_returns_400_if_asking_for_unknown_secrets() {
+    let fixture = fixture::Fixture::new(function_name!()).await;
+
+    let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("tests")
+        .join("integration")
+        .join("test-archives")
+        .join("ant-gateway-v1.tar.gz");
+    let input_digest = digest(&archive);
+
+    let req = reqwest::multipart::Form::new()
+        .file("file", archive)
+        .await
+        .unwrap();
+
+    let res = fixture
+        .client
+        .post("/service/artifact")
+        .header("X-Ant-Project", "ant-gateway")
+        .header("X-Ant-Version", "v1")
+        .header("X-Ant-Architecture", "aarch64")
+        .multipart(req)
+        .send()
+        .await;
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[test]
+#[traced_test]
 async fn service_artifact_returns_200_happy_path() {
     let fixture = fixture::Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("tls_cert.secret"),
+            secret_root.join("prod").join("tls_cert.secret"),
+            secret_root.join("beta").join("tls_key.secret"),
+            secret_root.join("prod").join("tls_key.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
 
     let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
         .join("tests")
@@ -131,6 +181,20 @@ async fn service_artifact_returns_200_happy_path() {
 #[traced_test]
 async fn service_artifact_includes_env_file() {
     let fixture = fixture::Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("jwt.secret"),
+            secret_root.join("prod").join("jwt.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
 
     // REPLICATE
     {

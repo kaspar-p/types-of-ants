@@ -1,0 +1,44 @@
+name: types-of-ants
+services:
+  ant-gateway:
+    build:
+      context: /Users/kasparpoland/Desktop/Developing/types-of-ants/projects/ant-gateway
+      dockerfile: Dockerfile
+      tags:
+        - ant-gateway:latest
+        - ant-gateway:485-2026-01-10-13-19-2ee32a9
+    container_name: ant-gateway
+    environment:
+      ANT_GATEWAY_FQDN: ""
+      ANT_LOOKING_PRETTY_PORT: ""
+      ANT_ON_THE_WEB_PORT: ""
+      ANT_ON_THE_WEB_WORKER_NUM: ""
+      VERSION: 485-2026-01-10-13-19-2ee32a9
+    image: ant-gateway:485-2026-01-10-13-19-2ee32a9
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "80"
+        protocol: tcp
+      - mode: ingress
+        target: 443
+        published: "443"
+        protocol: tcp
+    restart: always
+    secrets:
+      - source: tls_cert
+        target: /run/secrets/tls_cert
+      - source: tls_key
+        target: /run/secrets/tls_key
+networks:
+  default:
+    name: types-of-ants_default
+secrets:
+  tls_cert:
+    name: types-of-ants_tls_cert
+    file: /home/ant/service/ant-gateway/485-2026-01-10-13-19-2ee32a9/secrets/tls_cert.secret
+  tls_key:
+    name: types-of-ants_tls_key
+    file: /home/ant/service/ant-gateway/485-2026-01-10-13-19-2ee32a9/secrets/tls_key.secret

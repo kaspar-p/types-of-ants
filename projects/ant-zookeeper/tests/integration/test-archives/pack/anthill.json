@@ -1,0 +1,7 @@
+{
+  "project": "ant-gateway",
+  "secrets": [
+    "tls_cert",
+    "tls_key"
+  ]
+}

@@ -1,7 +1,10 @@
+use std::fs::exists;
+use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
 use ant_library::headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader};
+use axum::debug_handler;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
@@ -18,8 +21,10 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
+use crate::anthill::{get_manifest_from_file, AnthillManifest};
 use crate::fs::{
     artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
+    secret_file_path,
 };
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
@@ -108,6 +113,7 @@ WantedBy=multi-user.target
 }
 
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
+#[debug_handler]
 async fn register_artifact(
     State(state): State<AntZookeeperState>,
     TypedHeader(project): TypedHeader<XAntProjectHeader>,
@@ -164,10 +170,11 @@ async fn register_artifact(
         let gz = GzDecoder::new(&temp_file);
         let mut archive = Archive::new(gz);
 
+        let mut anthill_file_found = false;
         let mut service_file_found = false;
 
         for entry in archive.entries()? {
-            let entry = entry?;
+            let mut entry = entry?;
             let path = entry.path()?;
             if path.is_dir() {
                 continue;
@@ -175,7 +182,10 @@ async fn register_artifact(
 
             let file_name = path
                 .file_name()
-                .expect(format!("entry {} has file name", path.display()).as_str());
+                .expect(format!("entry {} has file name", path.display()).as_str())
+                .to_owned();
+
+            info!("Unpacked {}", file_name.display());
 
             if file_name == ".env" {
                 return Err(AntZookeeperError::validation_msg(
@@ -183,9 +193,47 @@ async fn register_artifact(
                 ));
             }
 
+            if file_name == "anthill.json" {
+                anthill_file_found = true;
+
+                let mut manifest_buf = String::new();
+                entry.read_to_string(&mut manifest_buf)?;
+
+                let manifest =
+                    serde_json::from_str::<AnthillManifest>(&manifest_buf).map_err(|e| {
+                        warn!(
+                            "Failed to read manifest: {}, {e}",
+                            temp_file_path.join(&file_name).display()
+                        );
+                        AntZookeeperError::validation_msg(
+                            "Project configuration file 'anthill.json' was malformed.",
+                        )
+                    })?;
+
+                info!("Read manifest: {:?}", manifest);
+
+                for secret in manifest.secrets.unwrap_or_default() {
+                    // TODO better way to get environments
+                    for environment in ["beta", "prod"] {
+                        if !exists(secret_file_path(&state.root_dir, environment, &secret))? {
+                            return Err(AntZookeeperError::validation_msg(
+                                format!("Secret '{}' is not present in '{}'.", secret, environment)
+                                    .as_str(),
+                            ));
+                        }
+                    }
+                }
+            }
+
             if file_name == format!("{}.service", project.0).as_str() {
                 service_file_found = true;
             }
+        }
+
+        if !anthill_file_found {
+            return Err(AntZookeeperError::validation_msg(
+                "Project configuration file 'anthill.json' must be included in deployment tarball.",
+            ));
         }
 
         if !service_file_found {

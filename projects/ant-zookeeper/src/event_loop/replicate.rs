@@ -1,4 +1,8 @@
-use std::fs::{exists, File};
+use std::{
+    fs::{exists, File},
+    io::Read,
+    path::PathBuf,
+};
 
 use ant_host_agent::client::AntHostAgentClientConfig;
 use ant_zoo_storage::HostGroup;
@@ -9,12 +13,67 @@ use tokio::fs::{create_dir_all, OpenOptions};
 use tracing::info;
 
 use crate::{
+    anthill::{get_manifest_from_file, AnthillManifest},
     fs::{
         artifact_persist_dir, envs_persist_dir, global_envs_file_name, project_envs_file_name,
-        services_file_name, services_persist_dir,
+        secret_file_name, secret_file_path, services_file_name, services_persist_dir,
     },
     state::AntZookeeperState,
 };
+
+async fn inject_secrets(
+    state: &AntZookeeperState,
+    dest: &PathBuf,
+    environment: &str,
+) -> Result<(), anyhow::Error> {
+    let manifest: AnthillManifest = get_manifest_from_file(&dest.join("anthill.json"))?;
+
+    create_dir_all(dest.join("secrets")).await?;
+
+    for secret in manifest.secrets.unwrap_or_default() {
+        info!("Copying secret {secret}");
+        tokio::fs::copy(
+            secret_file_path(&state.root_dir, environment, &secret),
+            dest.join("secrets").join(secret_file_name(&secret)),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn inject_env_file(
+    state: &AntZookeeperState,
+    dest: &PathBuf,
+    project: &str,
+    environment: &str,
+) -> Result<(), anyhow::Error> {
+    let source_env_file_paths = vec![
+        envs_persist_dir(&state.root_dir).join(global_envs_file_name(&environment)),
+        envs_persist_dir(&state.root_dir).join(project_envs_file_name(&project, &environment)),
+    ];
+
+    let mut env_file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(dest.join(".env"))
+        .await?;
+    for path in source_env_file_paths {
+        if exists(&path)? {
+            info!(
+                "Copying env config from [{}] to [{}]",
+                path.display(),
+                dest.join(".env").display()
+            );
+            let mut source = tokio::fs::File::open(path).await?;
+            tokio::io::copy(&mut source, &mut env_file).await?;
+        } else {
+            info!("No such env config [{}]", path.display());
+        }
+    }
+
+    Ok(())
+}
 
 pub async fn replicate_artifact_step(
     state: &AntZookeeperState,
@@ -47,34 +106,8 @@ pub async fn replicate_artifact_step(
             let unpack_dir_path = dir.path().join("unpack");
             archive.unpack(&unpack_dir_path)?;
 
-            // Inject the right environment variables with a .env into project
-            {
-                let source_env_file_paths = vec![
-                    envs_persist_dir(&state.root_dir)
-                        .join(global_envs_file_name(&host_group.environment)),
-                    envs_persist_dir(&state.root_dir)
-                        .join(project_envs_file_name(&project, &host_group.environment)),
-                ];
-
-                let mut env_file = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(unpack_dir_path.join(".env"))
-                    .await?;
-                for path in source_env_file_paths {
-                    if exists(&path)? {
-                        info!(
-                            "Copying env config from [{}] to [{}]",
-                            path.display(),
-                            unpack_dir_path.join(".env").display()
-                        );
-                        let mut source = tokio::fs::File::open(path).await?;
-                        tokio::io::copy(&mut source, &mut env_file).await?;
-                    } else {
-                        info!("No such env config [{}]", path.display());
-                    }
-                }
-            }
+            inject_env_file(state, &unpack_dir_path, project, &host_group.environment).await?;
+            inject_secrets(state, &unpack_dir_path, &host_group.environment).await?;
 
             unpack_dir_path
         };

@@ -134,6 +134,9 @@ for arch in "${arches[@]}"; do
   # Copy the systemd service template into the build directory
   cp "${project_src}/${project}.service" "${tmp_build_dir}/"
 
+  # Copy the anthill.json manifest into the build directory
+  cp "${project_src}/anthill.json" "${tmp_build_dir}/"
+
   deployment_file_name="${project}.${arch}.${version}.tar.gz"
   log "... building deployment file: ${deployment_file_name}"
 

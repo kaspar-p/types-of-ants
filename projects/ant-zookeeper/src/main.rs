@@ -6,7 +6,8 @@ use ant_zoo_storage::AntZooStorageClient;
 use ant_zookeeper::{dns::CloudFlareDns, state::AntZookeeperState};
 use anyhow::Context;
 use rsa::rand_core::OsRng;
-use tokio::sync::Mutex;
+use tokio::{signal, sync::Mutex};
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::debug;
 
 #[tokio::main]
@@ -53,10 +54,36 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let app = ant_zookeeper::make_routes(state)?;
 
+    // Setup the iteration thread, to slowly progress the pipeline
     let port: u16 = dotenv::var("ANT_ZOOKEEPER_PORT")
         .context("ANT_ZOOKEEPER_PORT")?
         .parse()?;
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
+    let port2 = port.clone();
+    let scheduler = JobScheduler::new().await.unwrap();
+    scheduler
+        .add(
+            Job::new_async("every 2 seconds", move |_, _| {
+                Box::pin(async move {
+                    reqwest::Client::new()
+                        .post(format!("http://localhost:{}/deployment/iteration", port2))
+                        .send()
+                        .await
+                        .unwrap()
+                        .error_for_status()
+                        .unwrap();
+                })
+            })
+            .expect("job creation"),
+        )
+        .await
+        .expect("deployment iteration job");
+
+    scheduler.shutdown_on_ctrl_c();
+
+    scheduler.start().await.expect("start schedular");
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], port.clone()));
     debug!(
         "Starting [{}] server on [{}]...",
         ant_library::get_mode(),
@@ -65,7 +92,34 @@ async fn main() -> Result<(), anyhow::Error> {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect(format!("failed to bind server to {port}").as_str());
-    axum::serve(listener, app).await.expect("server failed");
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("server failed");
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => { println!("shutdown_signal");},
+        _ = terminate => {println!("terminating");},
+    }
 }

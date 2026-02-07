@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ant_library::host_architecture::HostArchitecture;
 use ant_zoo_storage::HostGroup;
 use anyhow::Context;
@@ -27,6 +29,7 @@ pub struct GetPipelineRequest {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineStage {
+    pub stage_id: String,
     pub stage_name: String,
     pub stage_type: PipelineStageType,
 }
@@ -61,12 +64,17 @@ pub struct PipelineBuildStage {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineHost {
+    pub host_id: String,
+
     pub name: String,
     pub arch: HostArchitecture,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PipelineHostGroup {
+    pub host_group_id: String,
+
     pub name: String,
     pub environment: String,
     pub hosts: Vec<PipelineHost>,
@@ -80,22 +88,81 @@ pub struct PipelineDeployStage {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GetPipelineResponse {
-    pub project: String,
-
-    pub stages: Vec<PipelineStage>,
-
-    pub events: Vec<PipelineEvent>,
+pub struct RevisionProgress {
+    revision: String,
+    created_at: DateTime<Utc>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // finished_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PipelineEvent {
-    pub deployment_id: String,
-    pub revision_id: String,
-    pub target: DeploymentTarget,
-    pub event: EventName,
-    pub created_at: DateTime<Utc>,
+pub struct TargetRevisionProgress {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_started_revision: Option<RevisionProgress>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_successful_revision: Option<RevisionProgress>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_failed_revision: Option<RevisionProgress>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // in_progress_revision: Option<RevisionProgress>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetPipelineResponse {
+    pub pipeline_id: String,
+
+    pub project: String,
+
+    pub stages: Vec<PipelineStage>,
+
+    /// The key is a unique identifier
+    pub progress: HashMap<String, TargetRevisionProgress>,
+
+    /// The active revisions for a pipeline. All revisions that aren't "pipeline finished",
+    /// plus the latest one that IS "pipeline finished"
+    pub revisions: Vec<String>,
+}
+
+async fn revision_progress(
+    state: &AntZookeeperState,
+    pipeline_id: &str,
+    target: DeploymentTarget,
+) -> Result<TargetRevisionProgress, AntZookeeperError> {
+    let started = state
+        .db
+        .get_latest_revision_with_event(
+            pipeline_id,
+            target.as_target_type(),
+            target.as_target_id(),
+            &target.started_event().to_string(),
+        )
+        .await?;
+
+    let finished = state
+        .db
+        .get_latest_revision_with_event(
+            pipeline_id,
+            target.as_target_type(),
+            target.as_target_id(),
+            &target.finished_event().to_string(),
+        )
+        .await?;
+
+    Ok(TargetRevisionProgress {
+        latest_started_revision: started.map(|rev| RevisionProgress {
+            revision: rev.0,
+            created_at: rev.1,
+        }),
+        latest_successful_revision: finished.map(|rev| RevisionProgress {
+            revision: rev.0,
+            created_at: rev.1,
+        }),
+        latest_failed_revision: None, // TODO
+    })
 }
 
 async fn get_pipeline(
@@ -115,7 +182,18 @@ async fn get_pipeline(
         .await?
         .unwrap();
 
-    // Construct the structure of the pipeline
+    let mut progress: HashMap<String, TargetRevisionProgress> = HashMap::new();
+
+    // Insert revision progress of the entire pipeline
+    progress.insert(
+        pipeline_id.clone(),
+        revision_progress(
+            &state,
+            &pipeline_id,
+            DeploymentTarget::Pipeline(pipeline_id.clone()),
+        )
+        .await?,
+    );
 
     let mut stages: Vec<PipelineStage> = vec![];
 
@@ -124,8 +202,15 @@ async fn get_pipeline(
         .get_deployment_pipeline_stages(&req.project)
         .await?
     {
+        let stage_target = DeploymentTarget::Stage(stage_id.clone());
+        progress.insert(
+            stage_id.clone(),
+            revision_progress(&state, &pipeline_id, stage_target).await?,
+        );
+
         match stage_type.as_str() {
             "build" => stages.push(PipelineStage {
+                stage_id,
                 stage_name: stage_name,
                 stage_type: PipelineStageType::Build(PipelineBuildStage {}),
             }),
@@ -136,13 +221,33 @@ async fn get_pipeline(
                     .await?
                     .context(format!("Stage has no host group: {stage_name} {stage_id}"))?;
 
+                // Insert revision progress for host group
+                {
+                    let hg_target = DeploymentTarget::HostGroup(hg.id.clone());
+                    progress.insert(
+                        hg.id.clone(),
+                        revision_progress(&state, &pipeline_id, hg_target).await?,
+                    );
+                }
+
+                // Insert revision progress for each host
+                for host in &hg.hosts {
+                    let host_target = DeploymentTarget::Host(host.name.clone());
+                    progress.insert(
+                        host.name.clone(),
+                        revision_progress(&state, &pipeline_id, host_target).await?,
+                    );
+                }
+
                 let hg = PipelineHostGroup {
+                    host_group_id: hg.id,
                     name: hg.name,
                     environment: hg.environment,
                     hosts: hg
                         .hosts
                         .into_iter()
                         .map(|h| PipelineHost {
+                            host_id: h.name.clone(),
                             name: h.name,
                             arch: h.arch,
                         })
@@ -150,6 +255,7 @@ async fn get_pipeline(
                 };
 
                 stages.push(PipelineStage {
+                    stage_id,
                     stage_name,
                     stage_type: PipelineStageType::Deploy(PipelineDeployStage { host_group: hg }),
                 })
@@ -162,57 +268,42 @@ async fn get_pipeline(
         }
     }
 
-    // Get events applied to the pipeline
-
-    let active_revisions = state
+    let mut revisions = state
         .db
         .list_revisions_missing_event(&EventName::PipelineFinished.to_string())
         .await?
         .into_iter()
-        .filter_map(|(revision, pipe_id)| match *pipe_id == pipeline_id {
-            true => Some(revision),
-            _ => None,
+        .filter_map(|(rev, pipeline)| match *pipeline == pipeline_id {
+            true => Some(rev),
+            false => None,
         })
         .collect::<Vec<String>>();
 
-    let mut all_pipeline_events: Vec<PipelineEvent> = vec![];
-
-    for revision_id in active_revisions {
-        let mut pipeline_events = state
+    {
+        let target = DeploymentTarget::Pipeline(pipeline_id.clone());
+        let latest_finished = state
             .db
-            .list_deployment_events_in_pipeline_revision(&req.project, &revision_id)
-            .await?
-            .into_iter()
-            .map(|e| {
-                Ok(PipelineEvent {
-                    deployment_id: e.deployment_id,
-                    revision_id: e.revision_id,
-                    target: match e.target_type.as_str() {
-                        "pipeline" => DeploymentTarget::Pipeline(e.target_id),
-                        "stage" => DeploymentTarget::Stage(e.target_id),
-                        "host-group" => DeploymentTarget::HostGroup(e.target_id),
-                        "host" => DeploymentTarget::Host(e.target_id),
-                        t => {
-                            return Err(AntZookeeperError::InternalServerError(Some(
-                                anyhow::Error::msg(format!("Unknown target {t}")),
-                            )))
-                        }
-                    },
-                    event: EventName::from(e.event_name),
-                    created_at: e.created_at,
-                })
-            })
-            .collect::<Result<Vec<PipelineEvent>, AntZookeeperError>>()?;
+            .get_latest_revision_with_event(
+                &pipeline_id,
+                target.as_target_type(),
+                target.as_target_id(),
+                &target.finished_event().to_string(),
+            )
+            .await?;
 
-        all_pipeline_events.append(&mut pipeline_events);
+        if let Some(latest) = latest_finished {
+            revisions.push(latest.0);
+        }
     }
 
     Ok((
         StatusCode::OK,
         Json(GetPipelineResponse {
+            pipeline_id,
             project: req.project,
-            stages: stages,
-            events: all_pipeline_events,
+            stages,
+            progress,
+            revisions,
         }),
     ))
 

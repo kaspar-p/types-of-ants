@@ -25,76 +25,6 @@ Each log entry at minimum, looks like:
 Meaning that the `event_name` has happened to `target_id` at `created_at` time,
 with version `revision`. The unique of this triple is `id`.
 
-## Multiple granularities
-
-### Deploying through an entire pipeline
-
-Deploying an entire pipeline begins with an entry like:
-
-```sql
-("deployment-id", "p-id", "version-123", "pipeline-finished-successfully", now())
-```
-
-And we can quickly lookup interesting questions about a pipeline:
-
-- _What's the latest revision deployed through the entire pipeline?_ Go through
-  and find `"pipeline-finished-successfully"` events, ordered by the revision,
-  select the latest one.
-
-- _What's the latest failed revision?_ Go through and find `"pipeline-failed"`
-  events, ordered by the revision, select the latest one.
-
-- _What are the in-progress revisions?_ Filter all events targeting that
-  pipeline id that have revisions that don't have a corresponding
-  `"pipeline-finished-successfully"` or `"pipeline-failed"` event.
-
-### Deploying through a single stage
-
-This _also_ works for multiple granularities:
-
-- _What's the latest revision deployed through this stage?_ Go through and find
-  `"stage-finished-successfully"` events targeting the stage's ID, ordered by
-  the revision, select the latest one.
-
-- _What's the latest failed revision?_ Go through and find `"stage-failed"`
-  events, ordered by the revision, select the latest one.
-
-- _What are the in-progress revisions?_ Filter all events targeting that
-  pipeline id that have revisions that don't have a corresponding
-  `"stage-finished-successfully"` or `"stage-failed"` event.
-
-And it works for all other granularities.
-
-## Step-count agnostic
-
-The step-count and number of steps composes really nicely. Since each query just
-looks for its specific markers (e.g. stages look for
-`"stage-finished-successfully"`), new steps within the workflow can be added
-ad-hoc into the event stream, preserving backwards compatibility.
-
-The Deployment ID has to be generated brand-new at the beginning of the entire
-pipeline, since nothing composes on _top_ of a pipeline, it's the topmost layer.
-But all other layers (stage, host group, host) compose nicely.
-
-## Build stages
-
-This is simple to do. If a deployment has begun but the `build` stage is not
-finished (see
-[Deploying through a single stage](#deploying-through-a-single-stage)), then the
-build is requested/waited on.
-
-Since building is something that (at the time of writing) doesn't have a service
-attached, it's really that events are emitted into the deployment log when build
-artifacts are registered. For example, if a certain project only wants to deploy
-onto `x86` architecture hosts, then it can emit the
-`"stage-finished-successfully"` event right when that artifact is received.
-
-Other projects may choose to emit single events for "registered an artifact" and
-wait until all 3 are in the log before emitting the final step.
-
-This allows new architectures to be introduced without complicating
-previous/ongoing deployments.
-
 ## Progressing the event log
 
 The algorithm is simple to describe. Let us define the functions:
@@ -554,3 +484,73 @@ match (completed_step, todo_step, todo_step) {
 Steps that are old _don't change_. The code immediately starts knowing
 `next("host-deployed")` is `"host-deployment-tested"`, which gets skipped if
 appropriate.
+
+## Multiple granularities
+
+### Deploying through an entire pipeline
+
+Deploying an entire pipeline begins with an entry like:
+
+```sql
+("deployment-id", "p-id", "version-123", "pipeline-finished-successfully", now())
+```
+
+And we can quickly lookup interesting questions about a pipeline:
+
+- _What's the latest revision deployed through the entire pipeline?_ Go through
+  and find `"pipeline-finished-successfully"` events, ordered by the revision,
+  select the latest one.
+
+- _What's the latest failed revision?_ Go through and find `"pipeline-failed"`
+  events, ordered by the revision, select the latest one.
+
+- _What are the in-progress revisions?_ Filter all events targeting that
+  pipeline id that have revisions that don't have a corresponding
+  `"pipeline-finished-successfully"` or `"pipeline-failed"` event.
+
+### Deploying through a single stage
+
+This _also_ works for multiple granularities:
+
+- _What's the latest revision deployed through this stage?_ Go through and find
+  `"stage-finished-successfully"` events targeting the stage's ID, ordered by
+  the revision, select the latest one.
+
+- _What's the latest failed revision?_ Go through and find `"stage-failed"`
+  events, ordered by the revision, select the latest one.
+
+- _What are the in-progress revisions?_ Filter all events targeting that
+  pipeline id that have revisions that don't have a corresponding
+  `"stage-finished-successfully"` or `"stage-failed"` event.
+
+And it works for all other granularities.
+
+## Step-count agnostic
+
+The step-count and number of steps composes really nicely. Since each query just
+looks for its specific markers (e.g. stages look for
+`"stage-finished-successfully"`), new steps within the workflow can be added
+ad-hoc into the event stream, preserving backwards compatibility.
+
+The Deployment ID has to be generated brand-new at the beginning of the entire
+pipeline, since nothing composes on _top_ of a pipeline, it's the topmost layer.
+But all other layers (stage, host group, host) compose nicely.
+
+## Build stages
+
+This is simple to do. If a deployment has begun but the `build` stage is not
+finished (see
+[Deploying through a single stage](#deploying-through-a-single-stage)), then the
+build is requested/waited on.
+
+Since building is something that (at the time of writing) doesn't have a service
+attached, it's really that events are emitted into the deployment log when build
+artifacts are registered. For example, if a certain project only wants to deploy
+onto `x86` architecture hosts, then it can emit the
+`"stage-finished-successfully"` event right when that artifact is received.
+
+Other projects may choose to emit single events for "registered an artifact" and
+wait until all 3 are in the log before emitting the final step.
+
+This allows new architectures to be introduced without complicating
+previous/ongoing deployments.
