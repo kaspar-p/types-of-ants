@@ -404,6 +404,7 @@ async fn service_artifact_includes_env_file() {
         assert!(std::fs::exists(dir.join(".env")).unwrap());
         let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
         assert!(env_file_content.contains("TYPESOFANTS_ENV=beta"));
+        assert!(env_file_content.contains("PERSIST_DIR=/home/ant/persist/ant-host-agent"));
         assert!(env_file_content.contains("ANT_HOST_AGENT_PORT=3232"));
     }
 }

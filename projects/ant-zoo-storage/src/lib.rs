@@ -871,6 +871,7 @@ impl AntZooStorageClient {
     pub async fn get_deployment(
         &self,
         revision_id: &str,
+        target_type: &str,
         target_id: &str,
         event_name: &str,
     ) -> Result<Option<String>, anyhow::Error> {
@@ -884,17 +885,19 @@ impl AntZooStorageClient {
             from deployment
             where
                 revision_id = $1 and
-                target_id = $2 and
-                event_name = $3
+                target_type = $2 and
+                target_id = $3 and
+                event_name = $4
             ",
-                &[&revision_id, &target_id, &event_name],
+                &[&revision_id, &target_type, &target_id, &event_name],
             )
             .await
             .with_context(|| {
                 format!(
-                    "{}: {} {} {}",
+                    "{}: {} {} {} {}",
                     function_name!(),
                     revision_id,
+                    target_type,
                     target_id,
                     event_name
                 )
@@ -1004,7 +1007,9 @@ impl AntZooStorageClient {
         }
     }
 
-    /// If there was a job with these parameters that failed, returns it.
+    /// If the last job with these parameters failed, return it and its retryable status.
+    ///
+    /// If the last job with these parameters SUCCEEDED, or there was no such job, return None.
     ///
     /// Returns (job_id, is_retryable)
     pub async fn get_job_previously_failed(
@@ -1019,19 +1024,20 @@ impl AntZooStorageClient {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
-        let job = tx
+        let job: Option<(String, bool, bool)> = tx
             .query_opt(
                 "
-            select deployment_job_id, is_retryable
+            select deployment_job_id, is_retryable, is_success
             from deployment_job
             where
                 revision_id = $1 and
                 target_type = $2 and
                 target_id = $3 and
                 event_name = $4 and
-                finished_at is not null and
-                is_success = false
-            ",
+                finished_at is not null
+            order by created_at desc
+            limit 1
+            ", // Get only the LATEST try, since every try is a new entry in deployment_job
                 &[&revision_id, &target_type, &target_id, &event_name],
             )
             .await
@@ -1047,14 +1053,32 @@ impl AntZooStorageClient {
                     event_name
                 )
             })?
-            .map(|r| (r.get("deployment_job_id"), r.get("is_retryable")));
+            .map(|r| {
+                (
+                    r.get("deployment_job_id"),
+                    r.get("is_retryable"),
+                    r.get("is_success"),
+                )
+            });
+
+        // The last job for these params succeeded, likely a retry that was successful.
+        if let Some(job) = &job {
+            if job.2 {
+                return Ok(None);
+            }
+        }
 
         tx.commit().await?;
 
-        Ok(job)
+        Ok(job.map(|job| (job.0, job.1)))
     }
 
     /// Creates a deployment job if it doesn't already exist.
+    ///
+    /// Returns an existing job if:
+    ///  - The job exists and is unfinished for the same tuple (revision, target_type, target_id, event), or,
+    ///
+    /// This means retries ARE jobs with very similar parameters!
     ///
     /// Returns job_id
     pub async fn create_deployment_job(
@@ -1081,7 +1105,9 @@ impl AntZooStorageClient {
                 target_id = $3 and
                 event_name = $4 and
                 finished_at is null
-            ",
+            order by created_at desc
+            limit 1
+            ", // Get only the latest attempt, since retries kickoff new deployment jobs
                 &[&revision_id, &target_type, &target_id, &event_name],
             )
             .await

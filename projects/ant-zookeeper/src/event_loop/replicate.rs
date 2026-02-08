@@ -1,6 +1,5 @@
 use std::{
     fs::{exists, File},
-    io::Read,
     path::PathBuf,
 };
 
@@ -9,7 +8,10 @@ use ant_zoo_storage::HostGroup;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use tar::Archive;
 use tempfile::tempdir_in;
-use tokio::fs::{create_dir_all, OpenOptions};
+use tokio::{
+    fs::{create_dir_all, OpenOptions},
+    io::AsyncWriteExt,
+};
 use tracing::info;
 
 use crate::{
@@ -71,6 +73,10 @@ async fn inject_env_file(
             info!("No such env config [{}]", path.display());
         }
     }
+
+    env_file
+        .write_all(format!("PERSIST_DIR=/home/ant/persist/{project}\n").as_bytes())
+        .await?;
 
     Ok(())
 }
@@ -164,8 +170,6 @@ pub async fn replicate_artifact_step(
         .install_service(ant_host_agent::routes::service::InstallServiceRequest {
             project: project.to_string(),
             version: version.to_string(),
-            is_docker: Some(false),
-            secrets: Some(vec![]),
         })
         .await?;
 

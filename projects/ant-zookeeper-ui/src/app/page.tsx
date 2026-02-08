@@ -1,4 +1,5 @@
 import { Pipeline } from "@/components/Pipeline";
+import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshTimer } from "@/components/RefreshTimer";
 
 export default async function Home() {
@@ -21,9 +22,6 @@ export default async function Home() {
         next: { revalidate: 2 },
         method: "GET",
         headers: h,
-        // body: JSON.stringify({
-        //   project: "ant-zoo-storage",
-        // }),
       },
     ).then((x) => x.json());
     console.log(res.project, res.events);
@@ -42,8 +40,8 @@ export default async function Home() {
   return (
     <div className="flex flex-col space-y-4">
       <h1>zoo.typesofants.org</h1>
-      <div>
-        <RefreshTimer />
+      <div className="flex flex-row space-x-4">
+        <RefreshTimer /> <RefreshButton>refresh</RefreshButton>
       </div>
 
       {responses.map((p) => (

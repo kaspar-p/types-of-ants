@@ -21,7 +21,7 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
-use crate::anthill::{get_manifest_from_file, AnthillManifest};
+use crate::anthill::AnthillManifest;
 use crate::fs::{
     artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
     secret_file_path,

@@ -197,9 +197,14 @@ pub(crate) async fn is_deployment_complete(
     db: &AntZooStorageClient,
     e: &DeploymentEvent,
 ) -> Result<bool, anyhow::Error> {
-    db.get_deployment(&e.0, &e.1.to_string(), &e.2.to_string())
-        .await
-        .map(|r| r.is_some())
+    db.get_deployment(
+        &e.0,
+        e.1.as_target_type(),
+        &e.1.as_target_id(),
+        &e.2.to_string(),
+    )
+    .await
+    .map(|r| r.is_some())
 }
 
 /// Return all events that come AFTER the `event`, not including the input.

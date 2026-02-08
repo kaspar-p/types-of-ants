@@ -133,19 +133,6 @@ pub struct InstallServiceRequest {
     /// version multiple times is still fine, but there may be files in the 'cwd' that the process doesn't
     /// expect.
     pub version: String,
-
-    /// If the service is a docker project, we require loading the image. Assumes the image is contained
-    /// in the deployment TAR file is called "docker-image.tar" and will install that tagged image.
-    ///
-    /// None is interpreted as is_docker: false.
-    pub is_docker: Option<bool>,
-
-    /// The list of secret IDs/names that this project needs, e.g. ["jwt", "ant_fs_client_creds", ...]
-    /// These secrets are replicated into the right directory for ant_library::load_secret() to find them
-    /// when they are needed.
-    ///
-    /// None is interpreted as no secrets.
-    pub secrets: Option<Vec<String>>,
 }
 
 fn deployment_file_name(project: &str, version: &str) -> String {
@@ -155,11 +142,6 @@ fn deployment_file_name(project: &str, version: &str) -> String {
 /// The directory where all installable files for the project will live
 fn install_location_path(install_root: &PathBuf, project: &str, version: &str) -> PathBuf {
     install_root.join(project).join(version)
-}
-
-/// The directory where the secrets files will be replicated
-fn secrets_dir(install_dir: &PathBuf) -> PathBuf {
-    install_dir.join("secrets")
 }
 
 async fn install_service(
@@ -207,33 +189,9 @@ async fn install_service(
         &template_variables,
     )?;
 
-    let num_secrets = req.secrets.as_ref().map(|s| s.len()).unwrap_or(0);
-    info!("Finding {} secret(s)...", num_secrets);
-    let dst_secrets_dir = secrets_dir(&dst);
-    std::fs::create_dir_all(&dst_secrets_dir)?;
-
-    for secret in req.secrets.unwrap_or(vec![]) {
-        info!("Copying secret {secret}...");
-        let source_secret =
-            ant_library::secret::find_secret(&secret, Some(state.secrets_root_dir.clone()));
-
-        let dst_secret = dst_secrets_dir.join(ant_library::secret::secret_name(&secret));
-        std::fs::copy(source_secret, dst_secret).map_err(|e| match e.kind() {
-            ErrorKind::NotFound => {
-                AntHostAgentError::validation_msg(format!("Invalid secret: {secret}").as_str())
-            }
-            _ => AntHostAgentError::InternalServerError(Some(e.into())),
-        })?;
-    }
-
-    if req.is_docker.unwrap_or(false) {
+    let docker_img_path = dst.join("docker-image.tar");
+    if std::fs::exists(&docker_img_path)? {
         info!("Loading docker image...");
-        let docker_img_path = dst.join("docker-image.tar");
-        if !std::fs::exists(&docker_img_path).unwrap() {
-            return Err(AntHostAgentError::validation_msg(
-                "Docker mentioned bu no docker-image.tar included",
-            ));
-        }
 
         let docker_img_file = File::open(docker_img_path).await.unwrap();
         let docker_img_bytes = codec::FramedRead::new(docker_img_file, codec::BytesCodec::new())

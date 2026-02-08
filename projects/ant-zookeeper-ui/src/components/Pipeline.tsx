@@ -55,7 +55,7 @@ const color = (
   if (!revision)
     return {
       bg: "text-black bg-gray-200",
-      i: "",
+      i: "n/a",
     }; // targets that have never been deployed to get no background
 
   const i = revisions.indexOf(revision);
@@ -106,9 +106,7 @@ export function Pipeline({ res }: PipelineProps) {
 
   return (
     <div className="p-3 border flex flex-col space-y-3">
-      <h3>
-        {res.project} <RefreshButton>refresh</RefreshButton>
-      </h3>
+      <h3>{res.project}</h3>
 
       <div>
         <div className="flex flex-row space-x-4 space-y-2 flex-wrap">
