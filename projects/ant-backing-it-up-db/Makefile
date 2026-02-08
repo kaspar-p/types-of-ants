@@ -1,4 +1,4 @@
-PROJECT = ant-backing-it-up-storage
+PROJECT = ant-backing-it-up-db
 
 -include ../../Makefile.common
 

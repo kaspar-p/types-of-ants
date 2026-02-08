@@ -4,7 +4,7 @@ set -eo pipefail
 
 function usage() {
   echo "USAGE: dbconnect <project> [env]
-  project: The name of the database project, e.g. ant-data-farm, ant-backing-it-up-storage, ant-zookeeper-db, ...
+  project: The name of the database project, e.g. ant-data-farm, ant-backing-it-up-db, ant-zookeeper-db, ...
   env: The environment the database is deployed in, defaults to 'prod'.
 " >> /dev/stderr
   exit 1

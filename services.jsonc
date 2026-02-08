@@ -4,20 +4,20 @@
       "rust_target": "armv7-unknown-linux-gnueabihf",
       "docker_platform": "linux/arm64",
       "prometheus_os": "linux",
-      "prometheus_arch": "armv7"
+      "prometheus_arch": "armv7",
     },
     "arm": {
       "rust_target": "aarch64-unknown-linux-gnu",
       "docker_platform": "linux/arm64",
       "prometheus_os": "linux",
-      "prometheus_arch": "arm64"
+      "prometheus_arch": "arm64",
     },
     "x86": {
       "rust_target": "x86_64-unknown-linux-gnu",
       "docker_platform": "linux/amd64",
       "prometheus_os": "linux",
-      "prometheus_arch": "amd64"
-    }
+      "prometheus_arch": "amd64",
+    },
   },
   "hosts": {
     "antworker000.hosts.typesofants.org": {
@@ -26,8 +26,8 @@
         { "env": "prod", "service": "ant-host-agent" },
         { "env": "prod", "service": "ant-data-farm" },
         { "env": "prod", "service": "ant-who-tweets" },
-        { "env": "prod", "service": "ant-backing-it-up-storage" }
-      ]
+        { "env": "prod", "service": "ant-backing-it-up-db" },
+      ],
     },
     "antworker001.hosts.typesofants.org": {
       "architecture": "arm",
@@ -37,56 +37,56 @@
         { "env": "prod", "service": "ant-gateway" },
         { "env": "prod", "service": "ant-looking-pretty" },
         { "env": "prod", "service": "ant-on-the-web" },
-        { "env": "prod", "service": "ant-naming-domains" }
-      ]
+        { "env": "prod", "service": "ant-naming-domains" },
+      ],
     },
     "antworker002.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
         { "env": "beta", "service": "ant-host-agent" },
-        { "env": "beta", "service": "ant-backing-it-up-storage" },
+        { "env": "beta", "service": "ant-backing-it-up-db" },
         { "env": "beta", "service": "ant-backing-it-up" },
         { "env": "beta", "service": "ant-looking-pretty" },
         { "env": "beta", "service": "ant-on-the-web" },
         { "env": "beta", "service": "ant-data-farm" },
         { "env": "beta", "service": "ant-gateway" },
         { "env": "beta", "service": "ant-naming-domains" },
-        { "env": "beta", "service": "ant-fs" }
-      ]
+        { "env": "beta", "service": "ant-fs" },
+      ],
     },
     "antworker003.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
         { "env": "prod", "service": "ant-host-agent" },
-        { "env": "prod", "service": "ant-backing-it-up-storage" }
-      ]
+        { "env": "prod", "service": "ant-backing-it-up-db" },
+      ],
     },
     "antworker004.hosts.typesofants.org": {
       "architecture": "arm",
       "services": [
         { "env": "prod", "service": "ant-host-agent" },
-        { "env": "prod", "service": "ant-fs" }
-      ]
+        { "env": "prod", "service": "ant-fs" },
+      ],
     },
     "antworker005.hosts.typesofants.org": {
       "architecture": "arm",
-      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+      "services": [{ "env": "prod", "service": "ant-host-agent" }],
     },
     "antworker006.hosts.typesofants.org": {
       "architecture": "arm",
-      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+      "services": [{ "env": "prod", "service": "ant-host-agent" }],
     },
     "antworker007.hosts.typesofants.org": {
       "architecture": "arm",
-      "services": [{ "env": "prod", "service": "ant-host-agent" }]
+      "services": [{ "env": "prod", "service": "ant-host-agent" }],
     },
     "hisbaan01.hosts.typesofants.org": {
       "architecture": "x86",
-      "services": [{ "env": "prod", "service": "ant-fs" }]
+      "services": [{ "env": "prod", "service": "ant-fs" }],
     },
     "greg01.hosts.typesofants.org": {
       "architecture": "x86",
-      "services": [{ "env": "prod", "service": "ant-fs" }]
-    }
-  }
+      "services": [{ "env": "prod", "service": "ant-fs" }],
+    },
+  },
 }

@@ -28,10 +28,10 @@ fi
 
 echo "... RESTORING" >> /dev/stderr 
 
-PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_backing_it_up_storage_password.secret")" psql \
-  --host "$ANT_BACKING_IT_UP_STORAGE_HOST" \
-  --port "$ANT_BACKING_IT_UP_STORAGE_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/ant_backing_it_up_storage_user.secret")" \
+PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_backing_it_up_db_password.secret")" psql \
+  --host "$ANT_BACKING_IT_UP_DB_HOST" \
+  --port "$ANT_BACKING_IT_UP_DB_PORT" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_backing_it_up_db_user.secret")" \
   --dbname template1 \
   --file "$backup_filepath" \
   --echo-all \

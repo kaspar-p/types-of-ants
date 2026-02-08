@@ -1,0 +1,9 @@
+{
+  "project": "ant-backing-it-up-db",
+  "project_type": "docker",
+  "secrets": [
+    "ant_backing_it_up_db_db",
+    "ant_backing_it_up_db_user",
+    "ant_backing_it_up_db_password"
+  ]
+}

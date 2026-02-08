@@ -37,7 +37,7 @@ values
   ('ant-looking-pretty', true),
   ('ant-on-the-web', true),
   ('ant-backing-it-up', true),
-  ('ant-backing-it-up-storage', true),
+  ('ant-backing-it-up-db', true),
   ('ant-host-agent', true),
   ('ant-naming-domains', true),
   ('ant-who-tweets', true),
@@ -68,7 +68,7 @@ from deployment_pipeline
 --   ('ant-host-agent', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
 --   ('ant-data-farm', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
 --   ('ant-who-tweets', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-backing-it-up-storage', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-backing-it-up-db', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
   
 --   -- PROD 001
 --   ('ant-host-agent', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
@@ -80,7 +80,7 @@ from deployment_pipeline
   
 --   -- PROD 003
 --   ('ant-host-agent', 'antworker003.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-backing-it-up-storage', 'antworker003.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-backing-it-up-db', 'antworker003.hosts.typesofants.org', 'prod', 'live'),
   
 --   -- PROD 004
 --   ('ant-host-agent', 'antworker004.hosts.typesofants.org', 'prod', 'live'),
@@ -92,7 +92,7 @@ from deployment_pipeline
 
 --   -- BETA
 --   ('ant-host-agent', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-backing-it-up-storage', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
+--   ('ant-backing-it-up-db', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
 --   ('ant-backing-it-up', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
 --   ('ant-looking-pretty', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
 --   ('ant-on-the-web', 'antworker002.hosts.typesofants.org', 'beta', 'live'),

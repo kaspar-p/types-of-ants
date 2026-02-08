@@ -25,13 +25,13 @@ async fn main() {
     create_dir_all(&root_dir).expect("failed to create root dir");
 
     let db = AntBackingItUpStorageClient::connect(&DatabaseParams {
-        db_name: ant_library::secret::load_secret("ant_backing_it_up_storage_db").unwrap(),
-        username: ant_library::secret::load_secret("ant_backing_it_up_storage_user").unwrap(),
-        password: ant_library::secret::load_secret("ant_backing_it_up_storage_password").unwrap(),
-        host: dotenv::var("ANT_BACKING_IT_UP_STORAGE_HOST")
-            .expect("No ANT_BACKING_IT_UP_STORAGE_HOST variable."),
-        port: dotenv::var("ANT_BACKING_IT_UP_STORAGE_PORT")
-            .expect("No ANT_BACKING_IT_UP_STORAGE_PORT variable.")
+        db_name: ant_library::secret::load_secret("ant_backing_it_up_db_db").unwrap(),
+        username: ant_library::secret::load_secret("ant_backing_it_up_db_user").unwrap(),
+        password: ant_library::secret::load_secret("ant_backing_it_up_db_password").unwrap(),
+        host: dotenv::var("ANT_BACKING_IT_UP_DB_HOST")
+            .expect("No ANT_BACKING_IT_UP_DB_HOST variable."),
+        port: dotenv::var("ANT_BACKING_IT_UP_DB_PORT")
+            .expect("No ANT_BACKING_IT_UP_DB_PORT variable.")
             .parse::<u16>()
             .expect("port was not u16"),
     })
