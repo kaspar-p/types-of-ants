@@ -6,7 +6,7 @@ repository_root="$(git rev-parse --show-toplevel)"
 
 export SECRETS_DIR="$repository_root/secrets/dev"
 export VERSION="dev"
-export PERSIST_DIR="$repository_root/projects/ant-zoo-storage/database-files"
+export PERSIST_DIR="$repository_root/projects/ant-zookeeper-db/database-files"
 
 mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/compose.yaml"
 
@@ -16,4 +16,4 @@ docker-compose \
   up \
   --build \
   --force-recreate \
-  ant-zoo-storage "${@:2}"
+  ant-zookeeper-db "${@:2}"

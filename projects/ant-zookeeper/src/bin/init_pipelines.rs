@@ -15,7 +15,7 @@ async fn main() -> Result<(), anyhow::Error> {
         endpoint: "localhost:3235".to_string(),
     });
 
-    make_ant_zoo_storage(&client).await?;
+    make_ant_zookeeper_db(&client).await?;
     make_ant_on_the_web(&client).await?;
     make_ant_looking_pretty(&client).await?;
     make_ant_host_agent(&client).await?;
@@ -185,10 +185,10 @@ async fn make_ant_host_agent(client: &AntZookeeperClient) -> Result<(), anyhow::
     Ok(())
 }
 
-async fn make_ant_zoo_storage(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
+async fn make_ant_zookeeper_db(client: &AntZookeeperClient) -> Result<(), anyhow::Error> {
     let hg = client
         .create_host_group(CreateHostGroupRequest {
-            name: "ant-zoo-storage/only".to_string(),
+            name: "ant-zookeeper-db/only".to_string(),
             environment: "prod".to_string(),
         })
         .await?;
@@ -202,7 +202,7 @@ async fn make_ant_zoo_storage(client: &AntZookeeperClient) -> Result<(), anyhow:
 
     client
         .put_pipeline(PutPipelineRequest {
-            project: "ant-zoo-storage".to_string(),
+            project: "ant-zookeeper-db".to_string(),
             stages: vec![PutPipelineStage {
                 name: "deploy".to_string(),
                 host_group_id: hg.id.clone(),

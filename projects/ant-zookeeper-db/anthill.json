@@ -1,5 +1,5 @@
 {
-  "project": "ant-zoo-storage",
+  "project": "ant-zookeeper-db",
   "project_type": "docker",
   "secrets": []
 }

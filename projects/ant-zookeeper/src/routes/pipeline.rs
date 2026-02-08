@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ant_library::host_architecture::HostArchitecture;
-use ant_zoo_storage::HostGroup;
+use ant_zookeeper_db::HostGroup;
 use anyhow::Context;
 use axum::{
     extract::{Query, State},

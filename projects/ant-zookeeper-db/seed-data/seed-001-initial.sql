@@ -43,7 +43,7 @@ values
   ('ant-who-tweets', true),
   ('ant-worker-metrics-exporter', true),
   ('ant-gateway', true),
-  ('ant-zoo-storage', true),
+  ('ant-zookeeper-db', true),
   ('ant-zookeeper', true),
   ('nextcloud-webdav', false)
 ;

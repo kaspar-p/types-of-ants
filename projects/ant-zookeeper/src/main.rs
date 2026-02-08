@@ -2,8 +2,8 @@ use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use ant_host_agent::client::RemoteAntHostAgentClientFactory;
 use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
-use ant_zoo_storage::AntZooStorageClient;
 use ant_zookeeper::{dns::CloudFlareDns, state::AntZookeeperState};
+use ant_zookeeper_db::AntZooStorageClient;
 use anyhow::Context;
 use rsa::rand_core::OsRng;
 use tokio::{signal, sync::Mutex};
@@ -26,14 +26,14 @@ async fn main() -> Result<(), anyhow::Error> {
         root_dir,
 
         db: AntZooStorageClient::connect(&DatabaseConfig {
-            port: std::env::var("ANT_ZOO_STORAGE_PORT")
-                .context("ANT_ZOO_STORAGE_PORT")?
+            port: std::env::var("ANT_ZOOKEEPER_DB_PORT")
+                .context("ANT_ZOOKEEPER_DB_PORT")?
                 .parse()?,
-            database_name: ant_library::secret::load_secret("ant_zoo_storage_db")?,
-            database_password: ant_library::secret::load_secret("ant_zoo_storage_password")?,
-            database_user: ant_library::secret::load_secret("ant_zoo_storage_user")?,
-            host: std::env::var("ANT_ZOO_STORAGE_HOST")
-                .context("ANT_ZOO_STORAGE_HOST")?
+            database_name: ant_library::secret::load_secret("ant_zookeeper_db_db")?,
+            database_password: ant_library::secret::load_secret("ant_zookeeper_db_password")?,
+            database_user: ant_library::secret::load_secret("ant_zookeeper_db_user")?,
+            host: std::env::var("ANT_ZOOKEEPER_DB_HOST")
+                .context("ANT_ZOOKEEPER_DB_HOST")?
                 .parse()?,
             migration_dirs: vec![],
         })

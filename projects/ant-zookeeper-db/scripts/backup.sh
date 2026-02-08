@@ -16,11 +16,11 @@ backup_datetime="$(date "+%Y-%m-%d-%H-%M")"
 backup_file="backups/${deploy_env}/${backup_datetime}-backup.sql"
 mkdir -p "$(dirname "$backup_file")"
 
-dbname="$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_db.secret")"
-PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_password.secret")" pg_dump \
-  --host "$ANT_ZOO_STORAGE_HOST" \
-  --port "$ANT_ZOO_STORAGE_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_user.secret")" \
+dbname="$(cat "$repository_root/secrets/$deploy_env/ant_zookeeper_db_db.secret")"
+PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zookeeper_db_password.secret")" pg_dump \
+  --host "$ANT_ZOOKEEPER_DB_HOST" \
+  --port "$ANT_ZOOKEEPER_DB_PORT" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zookeeper_db_user.secret")" \
   --dbname "$dbname" \
   --create \
   --clean \

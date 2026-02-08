@@ -1,5 +1,5 @@
 [package]
-name = "ant-zoo-storage"
+name = "ant-zookeeper-db"
 version = "0.1.0"
 edition = "2024"
 

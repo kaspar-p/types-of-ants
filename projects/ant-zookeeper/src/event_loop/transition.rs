@@ -5,7 +5,7 @@ use std::{
 };
 
 use ant_library::host_architecture::HostArchitecture;
-use ant_zoo_storage::AntZooStorageClient;
+use ant_zookeeper_db::AntZooStorageClient;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use tracing::info;

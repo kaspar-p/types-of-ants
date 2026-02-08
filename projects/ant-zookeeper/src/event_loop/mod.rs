@@ -1,4 +1,4 @@
-use ant_zoo_storage::AntZooStorageClient;
+use ant_zookeeper_db::AntZooStorageClient;
 use tracing::info;
 
 use crate::event_loop::transition::{

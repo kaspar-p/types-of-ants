@@ -53,27 +53,27 @@ services:
       - ant_backing_it_up_storage_user
       - ant_backing_it_up_storage_password
 
-  ant-zoo-storage:
-    image: ant-zoo-storage:{{VERSION}}
-    container_name: ant-zoo-storage
+  ant-zookeeper-db:
+    image: ant-zookeeper-db:{{VERSION}}
+    container_name: ant-zookeeper-db
     build:
-      context: ./projects/ant-zoo-storage
+      context: ./projects/ant-zookeeper-db
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "{{ANT_ZOO_STORAGE_PORT}}:5432"
+      - "{{ANT_ZOOKEEPER_DB_PORT}}:5432"
     environment:
       VERSION: "{{VERSION}}"
-      POSTGRES_DB_FILE: /run/secrets/ant_zoo_storage_db
-      POSTGRES_USER_FILE: /run/secrets/ant_zoo_storage_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/ant_zoo_storage_password
+      POSTGRES_DB_FILE: /run/secrets/ant_zookeeper_db_db
+      POSTGRES_USER_FILE: /run/secrets/ant_zookeeper_db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_zookeeper_db_password
       PGDATA: /var/lib/postgresql/data/
     volumes:
       - "{{PERSIST_DIR}}/database-files/:/var/lib/postgresql/data"
     secrets:
-      - ant_zoo_storage_db
-      - ant_zoo_storage_user
-      - ant_zoo_storage_password
+      - ant_zookeeper_db_db
+      - ant_zookeeper_db_user
+      - ant_zookeeper_db_password
 
   ant-gateway:
     image: ant-gateway:{{VERSION}}
@@ -150,12 +150,12 @@ secrets:
   ant_fs_users.secret:
     file: "{{SECRETS_DIR}}/ant_fs_users.secret"
 
-  ant_zoo_storage_db:
-    file: "{{SECRETS_DIR}}/ant_zoo_storage_db.secret"
-  ant_zoo_storage_user:
-    file: "{{SECRETS_DIR}}/ant_zoo_storage_user.secret"
-  ant_zoo_storage_password:
-    file: "{{SECRETS_DIR}}/ant_zoo_storage_password.secret"
+  ant_zookeeper_db_db:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_db.secret"
+  ant_zookeeper_db_user:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_user.secret"
+  ant_zookeeper_db_password:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_password.secret"
 
   ant_backing_it_up_storage_db:
     file: "{{SECRETS_DIR}}/ant_backing_it_up_storage_db.secret"

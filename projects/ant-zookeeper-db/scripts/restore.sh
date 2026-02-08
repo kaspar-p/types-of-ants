@@ -33,10 +33,10 @@ fi
 
 echo "... RESTORING" >> /dev/stderr 
 
-PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_password.secret")" psql \
-  --host "$ANT_ZOO_STORAGE_HOST" \
-  --port "$ANT_ZOO_STORAGE_PORT" \
-  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zoo_storage_user.secret")" \
+PGPASSWORD="$(cat "$repository_root/secrets/$deploy_env/ant_zookeeper_db_password.secret")" psql \
+  --host "$ANT_ZOOKEEPER_DB_HOST" \
+  --port "$ANT_ZOOKEEPER_DB_PORT" \
+  --username "$(cat "$repository_root/secrets/$deploy_env/ant_zookeeper_db_user.secret")" \
   --dbname template1 \
   --file "$backup_filepath" \
   --echo-all \

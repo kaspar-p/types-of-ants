@@ -6,7 +6,7 @@ use ant_host_agent::{
 };
 use ant_library::db::TypesOfAntsDatabase;
 use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
-use ant_zoo_storage::AntZooStorageClient;
+use ant_zookeeper_db::AntZooStorageClient;
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},
     make_routes,
@@ -139,7 +139,7 @@ impl AntHostAgentClientFactory for TestAntHostAgentService {
 
 impl Fixture {
     pub async fn new(function_name: &str) -> Self {
-        let (_guard, test_db_config) = test_database_config("ant-zoo-storage").await;
+        let (_guard, test_db_config) = test_database_config("ant-zookeeper-db").await;
 
         let root_dir = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
             .join("tests")

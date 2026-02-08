@@ -1,4 +1,4 @@
-PROJECT = ant-zoo-storage
+PROJECT = ant-zookeeper-db
 
 -include ../../Makefile.common
 

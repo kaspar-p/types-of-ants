@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use acme_lib::DirectoryUrl;
 use ant_host_agent::client::AntHostAgentClientFactory;
-use ant_zoo_storage::AntZooStorageClient;
+use ant_zookeeper_db::AntZooStorageClient;
 use tokio::sync::Mutex;
 
 use crate::dns::Dns;

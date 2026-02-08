@@ -4,7 +4,7 @@ use std::{
 };
 
 use ant_host_agent::client::AntHostAgentClientConfig;
-use ant_zoo_storage::HostGroup;
+use ant_zookeeper_db::HostGroup;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use tar::Archive;
 use tempfile::tempdir_in;
