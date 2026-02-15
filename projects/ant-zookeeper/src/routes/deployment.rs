@@ -37,7 +37,9 @@ async fn iterate_pipeline(
 
     let unfinished_jobs = state.db.list_unfinished_deployment_jobs().await?;
 
-    info!("Processing {} unfinished jobs...", unfinished_jobs.len());
+    if unfinished_jobs.len() > 0 {
+        info!("Processing {} unfinished jobs...", unfinished_jobs.len());
+    }
 
     let handles = unfinished_jobs.into_iter().map(|job| {
         let event = DeploymentEvent(

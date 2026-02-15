@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_PUBLIC_TYPESOFANTS_ENV=dev next dev",
     "build": "next build >> /dev/stderr",
-    "start": "next start",
+    "start": "NEXT_PUBLIC_TYPESOFANTS_ENV=dev next start",
     "lint": "next lint"
   },
   "dependencies": {
