@@ -1,11 +1,11 @@
-"use client";
-
 import { InputBanner } from "@/components/InputBanner";
-import { ErrorBoundary, LoadingBoundary } from "@/components/UnhappyPath";
+import { ErrorBoundary } from "@/components/UnhappyPath";
 import { webAction } from "@/server/posts";
-import { Ant, getUnseenAnts, unwrap } from "@/server/queries";
-import { useQuery } from "@tanstack/react-query";
+import { Ant, getUnseenAnts } from "@/server/queries";
+import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { RefreshButton } from "./RefreshButton";
+import { Suspense } from "react";
 
 function formatDate(createdUtcMilliseconds: string): string {
   const months = [
@@ -50,49 +50,44 @@ function AntPost({ ant }: AntPostProps) {
   );
 }
 
-export default function FeedPage() {
-  const {
-    isLoading,
-    isError,
-    data: unseenAnts,
-    refetch,
-  } = useQuery({
-    queryKey: ["unseenAnts"],
-    queryFn: () => unwrap(getUnseenAnts(0)),
-    refetchInterval: 10_000,
-  });
+export default async function FeedPage() {
+  const unseenAnts = [];
+  let nextPage: number | undefined = 0;
+  let isError: boolean = false;
+  do {
+    const res = await getUnseenAnts(nextPage);
+    isError = !res.success;
+
+    if (res.success) {
+      const data = res.data;
+      nextPage = undefined;
+      unseenAnts.push(...(data ?? []));
+    } else {
+      break;
+    }
+  } while (nextPage !== undefined);
+
+  async function refreshAction() {
+    "use server";
+
+    revalidatePath("/");
+  }
 
   return (
     <div>
-      <InputBanner
-        onSuggestion={async () => {
-          await refetch();
-        }}
-      />
+      <InputBanner onSuggestion={refreshAction} />
 
       <h3 className="mb-1">
         latest ant submissions ({unseenAnts?.length ?? 0}):{" "}
-        <button
-          id="feed-refresh"
-          onClick={() => {
-            webAction({
-              action: "click",
-              targetType: "button",
-              target: "feed-refresh",
-            });
-            refetch();
-          }}
-        >
-          refresh
-        </button>
+        <RefreshButton onRefresh={refreshAction} />
       </h3>
 
       <ErrorBoundary isError={isError}>
-        <LoadingBoundary isLoading={isLoading}>
+        <Suspense fallback="loading...">
           {unseenAnts?.map((ant, i) => (
             <AntPost key={i} ant={ant} />
           ))}
-        </LoadingBoundary>
+        </Suspense>
       </ErrorBoundary>
     </div>
   );

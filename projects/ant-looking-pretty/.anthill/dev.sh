@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
-cd projects/ant-looking-pretty
+repository_root="$(git rev-parse --show-toplevel)"
+
+cd "$repository_root/projects/ant-looking-pretty"
+
 npm ci
 npm run dev

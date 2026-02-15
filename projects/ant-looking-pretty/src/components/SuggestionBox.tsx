@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { suggestAnt } from "../server/posts";
+import { suggestAnt, webAction } from "../server/posts";
 import { useHandle } from "@/utils/useHandle";
 
 function validator(text: string): { valid: boolean; msg: string } {
@@ -53,6 +53,12 @@ export function SuggestionBox(props: SuggestionBoxProps) {
         className="flex flex-row flex-wrap pl-2"
         autoComplete="off"
         onSubmit={async (event) => {
+          event.preventDefault();
+          webAction({
+            action: "click",
+            targetType: "button",
+            target: "submit-ant-suggestion",
+          });
           await handle(event);
           if (props.onSuggestion !== undefined) await props.onSuggestion();
         }}

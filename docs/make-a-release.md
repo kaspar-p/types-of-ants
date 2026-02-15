@@ -1,43 +1,56 @@
-# Make a release
+# Making a release
 
-## Step 1: add new ants
+Just run `./run-dev.sh ant-releasing-ants-into-the-wild`. It does everything.
 
-Start from the root of the Git repository.
+## Sending the emails
 
-1. Run `cd static_site && make`, which builds the `add` binary in the `cli`
-   folder. This is the CLI that makes it easy to add new ants.
-2. Run the `./static_site/cli/add` binary, and add all the ants. Type `.done`
-   when finished adding ants, it will randomly put them into `ants.txt`, the
-   ants source of truth.
-3. Run the `./bin/generate_site` file. It will update the right files.
-4. Commit via `git add .` and commit all of those changes, title it like "new
-   ants release" or something exciting! You're done!
+When a new release is made, make note of the release number, e.g. `38`.
 
-## Step 2: Make a SQL migration file
-
-Start from the root of the Git repository.
-
-1. Run the `release_to_sql.ts` script:
-
-```bash
-cd projects/ant-data-farm/data
-npx tsx src/release_to_sql.ts ../../../static_site/releases/<release-file-name> <release-number>
+```sql
+select user_name, user_email, ant_release.ant_content
+from ant_release
+  join ant on ant.ant_id = ant_release.ant_id
+  join registered_user on registered_user.user_id = ant.ant_user_id
+  join (
+    select user_id, user_email
+    from (
+      select registered_user.user_id, user_email, row_number() over (partition by registered_user.user_id order by user_email) as rn
+      from registered_user
+        left join registered_user_email on registered_user.user_id = registered_user_email.user_id
+    ) T where T.rn = 1
+  ) e on e.user_id = registered_user.user_id
+where
+  release_number = 38 and
+  user_name != 'nobody' and user_name != 'kaspar'
+order by user_email
+;
 ```
 
-> 1. The release file name is the one generated in step 1.
-> 2. The release number is 1 higher than the latest release number. If there is
->    no recent `migrations/` file that shows this (there probably is), see the
->    [README](./README.md) for info on how to log into the DB and make the query
->    yourself.
+And send an email like:
 
-1. Copy this output from the terminal (or pipe) into a new file in
-   `./projects/ant-data-farm/data/sql/migrations`.
+Sender: <ants@typesofants.org>
 
-## Step 3: Deploy the changes into the database
+Subject:
 
-Using the transaction generated, we need those changes in the database.
+```txt
+typesofants.org ant release #release_number: you're included!
+```
 
-1. Log onto the production database host, see the [README](./README.md) for
-   more.
-2. Copy-paste the migrations needed in the database, by the number. For example,
-   a migration file beginning with `09` will be DB migration item 9.
+Content:
+
+```txt
+hi @user_name,
+
+the team at typesofants.org is excited to tell you that some of your suggestions were included in the latest release, #release_number!
+
+the accepted suggestions were:
+
+  [suggestion 1]
+  [suggestion 2]
+  ...
+
+thank you for your contributions!
+
+with love,
+  the typesofants.org team
+```

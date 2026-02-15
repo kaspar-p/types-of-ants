@@ -45,16 +45,13 @@ function get_services() {
   local repository_root
   repository_root="$(git rev-parse --show-toplevel)"
 
-  cat "$repository_root/services.jsonc"
+  cat "$repository_root/services.json"
 }
 
 function find_host_project_pairs_with_env() {
   local env="$1"
 
-  local repository_root
-  repository_root="$(git rev-parse --show-toplevel)"
-
-  cat "$repository_root/services.jsonc" | jq -rc "
+  get_services | jq -rc "
     .hosts |
     to_entries | 
     map(
@@ -79,10 +76,7 @@ function find_hosts_with_agent_env() {
 function find_projects_in_env() {
   local env="$1"
 
-  local repository_root
-  repository_root="$(git rev-parse --show-toplevel)"
-
-  cat "$repository_root/services.jsonc" | jq -rc "
+  get_services | jq -rc "
     .hosts |
     to_entries[] |
     .value.services[] |

@@ -37,8 +37,6 @@ fi
 set -u
 
 for arch in "${arches[@]}"; do
-  remote_user="ant"
-  remote_home="/home/$remote_user"
   repository_root="$(git rev-parse --show-toplevel)"
   project_src="$repository_root/projects/$project"
 
@@ -62,10 +60,6 @@ for arch in "${arches[@]}"; do
 
   # Some projects require this for generating deterministic build hashes
   export commit_sha
-
-  PERSIST_DIR="${remote_home}/persist/$project"
-  INSTALL_DIR="${remote_home}/service/$project/$version"
-  SECRETS_DIR="${INSTALL_DIR}/secrets"
 
   log "BUILDING [$project] FOR [$arch]..."
 
@@ -92,37 +86,29 @@ for arch in "${arches[@]}"; do
   #   echo "PERSIST_DIR=$PERSIST_DIR"
   # } > "${tmp_build_dir}/.env"
 
-  is_docker=false
   if is_project_docker "$project"; then
-    is_docker=true
     log "... creating docker image"
 
-    VERSION="$version" \
-      PERSIST_DIR="$PERSIST_DIR" \
-      INSTALL_DIR="$INSTALL_DIR" \
-      SECRETS_DIR="$SECRETS_DIR" \
-        mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/compose.yaml"
-      
-      run_command \
-        docker-compose \
-          --project-directory "$repository_root" \
-          --file "/tmp/compose.yaml" \
-        build "${project}"
-    
+    compose_file="${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml"
+  
+    log "... copying docker-compose config"
+    # docker-compose \
+    #     --project-directory "$repository_root" \
+    #     --file "${compose_file}" \
+    #     config "${project}" > "$tmp_build_dir/docker-compose.yml"
+    run_command cp "${compose_file}" "$tmp_build_dir/docker-compose.yml"
+
+    # run_command \
+    #   docker-compose \
+    #     --project-directory "$repository_root" \
+    #     --file "${compose_file}" \
+    #   build "${project}"
+    run_command docker build "$project_src" --tag "${project}:${version}"
+
     log "... exporting docker image"
     docker_image_file="docker-image.tar"
     docker_image_path="$tmp_build_dir/$docker_image_file"
     run_command docker image save "${project}:${version}" -o "$docker_image_path"
-
-    log "... copying docker-compose config"
-    VERSION="$version" \
-      PERSIST_DIR="$PERSIST_DIR" \
-      INSTALL_DIR="$INSTALL_DIR" \
-      SECRETS_DIR="$SECRETS_DIR" \
-      docker-compose \
-          --project-directory "$repository_root" \
-          --file "/tmp/compose.yaml" \
-          config "${project}" > "$tmp_build_dir/docker-compose.yml"
   fi
 
   # Create a small manifest.json file into the build directory

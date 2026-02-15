@@ -44,12 +44,13 @@ pub fn set_global_logs(project: &str) -> () {
     unsafe {
         set_var("RUST_LOG", "debug");
     }
-    dotenv::dotenv().expect("No .env file found!");
+    dotenv::dotenv().expect("Malformed or missing .env file");
 
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
-        .with_file(false)
+        .with_file(true)
+        .with_line_number(true)
         .with_env_filter(
             EnvFilter::try_from_env("RUST_LOG")
                 .unwrap()

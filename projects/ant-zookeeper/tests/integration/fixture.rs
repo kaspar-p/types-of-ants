@@ -6,12 +6,12 @@ use ant_host_agent::{
 };
 use ant_library::db::TypesOfAntsDatabase;
 use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
-use ant_zookeeper_db::AntZooStorageClient;
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},
     make_routes,
     state::AntZookeeperState,
 };
+use ant_zookeeper_db::AntZooStorageClient;
 use async_trait::async_trait;
 use chrono::Utc;
 use rsa::rand_core::OsRng;
@@ -173,6 +173,17 @@ impl Fixture {
                 File::create(root_dir.join("envs").join("ant-host-agent.beta.build.cfg"))
                     .await
                     .unwrap();
+            ant_host_agent_env
+                .write_all(
+                    format!(
+                        "ANT_FS_HOST_PORTS={}\n",
+                        serde_json::json!([{ "url": "antworker002.hosts.typesofants.org:3237", "tls": false }])
+                    .to_string().replace("\"", "\\\""))
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+
             ant_host_agent_env
                 .write_all("ANT_HOST_AGENT_PORT=3232\n".as_bytes())
                 .await

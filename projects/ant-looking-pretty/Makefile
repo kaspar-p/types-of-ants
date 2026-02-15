@@ -15,7 +15,7 @@ out:
 	mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
 	@npm ci --silent >> /dev/stderr
 	@npm run build
-	@sed -i '' 's/process\.env\.PORT/process\.env\.ANT_LOOKING_PRETTY_PORT/' .next/standalone/server.js
+# 	@sed -i '' 's/process\.env\.PORT/process\.env\.ANT_LOOKING_PRETTY_PORT/' .next/standalone/server.js
 	@cp -r .next/standalone/ $(BUILD_DIR)/$(BUILD_MODE)/.
 	@cp -r public $(BUILD_DIR)/$(BUILD_MODE)/
 	@cp -r .next/static $(BUILD_DIR)/$(BUILD_MODE)/.next

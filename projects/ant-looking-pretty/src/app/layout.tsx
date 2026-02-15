@@ -9,6 +9,8 @@ import { revalidatePath } from "next/cache";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: PropsWithChildren<{}>) {
   const user = getAuth();
   async function resetUser() {

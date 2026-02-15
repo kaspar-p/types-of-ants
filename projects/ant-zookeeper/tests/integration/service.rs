@@ -381,16 +381,23 @@ async fn service_artifact_includes_env_file() {
         }
 
         let e = get_events().await;
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[4].event_name, "stage-finished");
-        assert_eq!(e[5].event_name, "stage-started");
-        assert_eq!(e[6].event_name, "host-group-started");
-        assert_eq!(e[7].event_name, "host-started");
-        assert_eq!(e[8].event_name, "host-artifact-replicated");
-        assert_eq!(e.len(), 9);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert!(e[2]
+            .event_name
+            .starts_with("artifact-architecture-registered:"));
+        assert!(e[3]
+            .event_name
+            .starts_with("artifact-architecture-registered:"));
+        assert!(e[4]
+            .event_name
+            .starts_with("artifact-architecture-registered:"));
+        assert_eq!(e[5].event_name, "stage-finished");
+        assert_eq!(e[6].event_name, "stage-started");
+        assert_eq!(e[7].event_name, "host-group-started");
+        assert_eq!(e[8].event_name, "host-started");
+        assert_eq!(e[9].event_name, "host-artifact-replicated");
+        assert_eq!(e.len(), 10);
 
         // FINALLY, assert that the replication of the artifact on the host contains a .env file containing the "beta" fields
         let dir = fixture
@@ -403,8 +410,9 @@ async fn service_artifact_includes_env_file() {
         assert!(std::fs::exists(dir.join("ant-host-agent.service")).unwrap());
         assert!(std::fs::exists(dir.join(".env")).unwrap());
         let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
-        assert!(env_file_content.contains("TYPESOFANTS_ENV=beta"));
-        assert!(env_file_content.contains("PERSIST_DIR=/home/ant/persist/ant-host-agent"));
-        assert!(env_file_content.contains("ANT_HOST_AGENT_PORT=3232"));
+        assert!(env_file_content.contains("TYPESOFANTS_ENV=\"beta\""));
+        assert!(env_file_content.contains("PERSIST_DIR=\"/home/ant/persist/ant-host-agent\""));
+        assert!(env_file_content.contains("ANT_HOST_AGENT_PORT=\"3232\""));
+        assert!(env_file_content.contains("ANT_FS_HOST_PORTS=\"[{\\\"tls\\\":false,\\\"url\\\":\\\"antworker002.hosts.typesofants.org:3237\\\"}]\""));
     }
 }

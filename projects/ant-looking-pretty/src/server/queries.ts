@@ -247,8 +247,8 @@ async function constructQuery<Q extends Query>(
 export const getVersion = () => constructQuery(queries.getVersion);
 export const getLatestAnts = () => constructQuery(queries.getLatestAnts);
 export const getTotalAnts = () => constructQuery(queries.getTotalAnts);
-export const getReleasedAnts = (page: number) =>
-  constructQuery(queries.getReleasedAnts, { page });
+export const getReleasedAnts = async (page: number) =>
+  await constructQuery(queries.getReleasedAnts, { page });
 export const getUnseenAnts = (page: number) =>
   constructQuery(queries.getUnseenAnts, { page });
 export const getLatestRelease = () => constructQuery(queries.getLatestRelease);

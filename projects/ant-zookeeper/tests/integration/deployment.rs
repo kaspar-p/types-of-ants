@@ -168,8 +168,9 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(jobs.len(), 0);
 
         let e = get_events().await;
-        assert_eq!(e.len(), 1);
-        assert_eq!(e[0].event_name, "stage-started");
+        assert_eq!(e.len(), 2);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
     }
 
     // Iterate pipeline once
@@ -178,9 +179,10 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
         let e = get_events().await;
-        assert_eq!(e.len(), 2);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e.len(), 3);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
     }
 
     // Iterate pipeline once
@@ -193,9 +195,10 @@ async fn deployment_deployment_returns_200_happy_path() {
         // tasks are pointing to it still.
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
         let e = get_events().await;
-        assert_eq!(e.len(), 2);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e.len(), 3);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
     }
 
     // Register the x86 artifact
@@ -227,10 +230,11 @@ async fn deployment_deployment_returns_200_happy_path() {
 
         assert_eq!(get_unfinished_jobs().await.len(), 1); // only ArmV7 remaining
         let e = get_events().await;
-        assert_eq!(e.len(), 3);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e.len(), 4);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
     }
 
     // Register the (FINAL) Raspian artifact
@@ -262,11 +266,12 @@ async fn deployment_deployment_returns_200_happy_path() {
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         let e = get_events().await;
-        assert_eq!(e.len(), 4);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
+        assert_eq!(e.len(), 5);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
     }
 
     // Iterate pipeline once
@@ -276,12 +281,13 @@ async fn deployment_deployment_returns_200_happy_path() {
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         let e = get_events().await;
-        assert_eq!(e.len(), 5);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e[4].event_name, "stage-finished");
+        assert_eq!(e.len(), 6);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
+        assert_eq!(e[5].event_name, "stage-finished");
     }
 
     // Iterate pipeline 4 times, before requiring a deployment (fails locally, no systemd on MacOS)
@@ -300,15 +306,16 @@ async fn deployment_deployment_returns_200_happy_path() {
 
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         let e = get_events().await;
-        assert_eq!(e.len(), 9);
-        assert_eq!(e[0].event_name, "stage-started");
-        assert_eq!(e[1].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e[4].event_name, "stage-finished");
-        assert_eq!(e[5].event_name, "stage-started");
-        assert_eq!(e[6].event_name, "host-group-started");
-        assert_eq!(e[7].event_name, "host-started");
-        assert_eq!(e[8].event_name, "host-artifact-replicated");
+        assert_eq!(e.len(), 10);
+        assert_eq!(e[0].event_name, "pipeline-started");
+        assert_eq!(e[1].event_name, "stage-started");
+        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
+        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
+        assert_eq!(e[5].event_name, "stage-finished");
+        assert_eq!(e[6].event_name, "stage-started");
+        assert_eq!(e[7].event_name, "host-group-started");
+        assert_eq!(e[8].event_name, "host-started");
+        assert_eq!(e[9].event_name, "host-artifact-replicated");
     }
 }
