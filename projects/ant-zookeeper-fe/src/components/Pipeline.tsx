@@ -1,39 +1,46 @@
 import { ReactNode } from "react";
-import { RefreshButton } from "./RefreshButton";
+import { Host } from "./Host";
+import { RevisionBox } from "./RevisionBox";
+import { HostGroup } from "./HostGroup";
+
+export type Host = {
+  name: string;
+  arch: string;
+};
+
+export type HostGroup = {
+  hostGroupId: string;
+  name: string;
+  environment: string;
+  hosts: Host[];
+};
+
+export type Stage = {
+  stageId: string;
+  stageName: string;
+  stageType: { type: "build" } | { type: "deploy"; hostGroup: HostGroup };
+};
+
+export type Progress = Record<
+  string,
+  {
+    latestStartedRevision?: { createdAt: string; revision: string };
+    latestSuccessfulRevision?: { createdAt: string; revision: string };
+  }
+>;
+
+export type GetPipelineResponse = {
+  pipelineId: string;
+  project: string;
+  stages: Stage[];
+
+  progress: Progress;
+
+  revisions: string[];
+};
 
 export type PipelineProps = {
-  res: {
-    pipelineId: string;
-    project: string;
-    stages: {
-      stageId: string;
-      stageName: string;
-      stageType:
-        | { type: "build" }
-        | {
-            type: "deploy";
-            hostGroup: {
-              hostGroupId: string;
-              name: string;
-              environment: string;
-              hosts: {
-                name: string;
-                arch: string;
-              }[];
-            };
-          };
-    }[];
-
-    progress: Record<
-      string,
-      {
-        latestStartedRevision?: { createdAt: string; revision: string };
-        latestSuccessfulRevision?: { createdAt: string; revision: string };
-      }
-    >;
-
-    revisions: string[];
-  };
+  res: GetPipelineResponse;
 };
 
 const COLORS = [
@@ -48,7 +55,7 @@ const COLORS = [
   "text-black bg-fuchsia-300",
   "text-white bg-black",
 ];
-const color = (
+export const color = (
   revisions: string[],
   revision: string | undefined,
 ): { bg: string; i: string } => {
@@ -85,22 +92,6 @@ export function formatDatetime(date: Date | string): string {
   return `${time} ${dateStr}`;
 }
 
-function RevisionBox({
-  revs,
-  revision,
-}: {
-  revs: string[];
-  revision: string | undefined;
-}): ReactNode {
-  return (
-    <span
-      className={`${color(revs, revision).bg} w-6 h-6 flex justify-center items-center`}
-    >
-      <div>{color(revs, revision).i}</div>
-    </span>
-  );
-}
-
 export function Pipeline({ res }: PipelineProps) {
   console.log(res.project, res.progress, res.revisions);
 
@@ -110,19 +101,7 @@ export function Pipeline({ res }: PipelineProps) {
 
       <div>
         <div className="flex flex-row space-x-4 space-y-2 flex-wrap">
-          {[
-            ...res.revisions,
-            // "rev-a",
-            // "rev-b",
-            // "rev-c",
-            // "rev-d",
-            // "rev-e",
-            // "rev-f",
-            // "rev-g",
-            // "rev-h",
-            // "rev-i",
-            // "rev-j",
-          ].map((revision, i, revs) => (
+          {res.revisions.map((revision, i, revs) => (
             <div key={revision}>
               <div className="flex flex-row border p-1">
                 <span className="self-center">
@@ -175,96 +154,26 @@ export function Pipeline({ res }: PipelineProps) {
                   <span className="flex flex-row items-center space-x-1">
                     <div>latest: </div>
                     {res.revisions.length > 0 ? (
-                      <>
-                        <RevisionBox
-                          revs={res.revisions}
-                          revision={
-                            res.progress[stage.stageId]
-                              ?.latestSuccessfulRevision?.revision
-                          }
-                        />
-                      </>
+                      <RevisionBox
+                        revs={res.revisions}
+                        revision={
+                          res.progress[stage.stageId]?.latestSuccessfulRevision
+                            ?.revision
+                        }
+                      />
                     ) : (
                       <span className="text-sm"> never</span>
                     )}
                   </span>
                 </div>
 
-                {stage.stageType.type == "deploy" && (
-                  <div className="border">
-                    <div
-                      className={`p-2 border-b border-b-black flex flex-row ${color(res.revisions, res.progress[stage.stageType.hostGroup.hostGroupId]?.latestSuccessfulRevision?.revision).bg}`}
-                    >
-                      {stage.stageType.hostGroup.name}
-                      <div className="ml-2 text-sm self-center">
-                        (
-                        <i>
-                          environment: {stage.stageType.hostGroup.environment}
-                        </i>
-                        )
-                      </div>
-                    </div>
-                    <div className="flex flex-col space-y-2 p-2">
-                      <div className="flex flex-row space-x-2">
-                        <span className="flex flex-row items-center">
-                          in progress:{" "}
-                          <RevisionBox
-                            revs={res.revisions}
-                            revision={
-                              res.progress[
-                                stage.stageType.hostGroup.hostGroupId
-                              ]?.latestStartedRevision?.revision
-                            }
-                          />
-                        </span>
-
-                        <span className="flex flex-row items-center">
-                          latest:{" "}
-                          <RevisionBox
-                            revs={res.revisions}
-                            revision={
-                              res.progress[
-                                stage.stageType.hostGroup.hostGroupId
-                              ]?.latestSuccessfulRevision?.revision
-                            }
-                          />
-                        </span>
-                      </div>
-
-                      {stage.stageType.hostGroup.hosts.length > 0 ? (
-                        stage.stageType.hostGroup.hosts.map(
-                          (host, i: number) => (
-                            <div key={i}>
-                              <div className="border">
-                                <div
-                                  className={`p-2 border-b border-b-black flex flex-row ${color(res.revisions, res.progress[host.name]?.latestSuccessfulRevision?.revision).bg}`}
-                                >
-                                  <code>{host.name}</code>{" "}
-                                  <div className="ml-2 text-sm self-center">
-                                    ({host.arch}){" "}
-                                  </div>
-                                </div>
-
-                                <div className="p-2 text-sm">
-                                  deployed at:{" "}
-                                  {res.progress[host.name]
-                                    .latestSuccessfulRevision?.createdAt
-                                    ? formatDatetime(
-                                        res.progress[host.name]
-                                          .latestSuccessfulRevision!.createdAt!,
-                                      )
-                                    : "never"}
-                                </div>
-                              </div>
-                            </div>
-                          ),
-                        )
-                      ) : (
-                        <div>No hosts!</div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {stage.stageType.type === "deploy" ? (
+                  <HostGroup
+                    stage={stage as Stage & { stageType: { type: "deploy" } }}
+                    revisions={res.revisions}
+                    progress={res.progress}
+                  />
+                ) : undefined}
               </div>
             </div>
           </div>
