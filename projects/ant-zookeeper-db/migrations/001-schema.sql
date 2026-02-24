@@ -53,6 +53,8 @@ create table revision (
 
   unique (project_id, deployment_version),
 
+  revision_seq serial not null, -- The sequence number, in order. Logical clock to order revisions.
+
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   deleted_at timestamp with time zone,

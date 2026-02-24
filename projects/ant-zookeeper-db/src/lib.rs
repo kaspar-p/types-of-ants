@@ -134,46 +134,12 @@ impl AntZooStorageClient {
         Ok(project_id)
     }
 
-    pub async fn get_latest_artifacts_for_project_for_all_architectures(
-        &self,
-        project: &str,
-    ) -> Result<Vec<(String, String, DateTime<Utc>)>, anyhow::Error> {
-        let con = self.db.get().await?;
-
-        let artifacts = con
-            .query(
-                "
-            select
-                revision.deployment_version,
-                artifact.architecture_id,
-                artifact.created_at
-            from artifact
-                join revision on artifact.revision_id 
-                    = revision.revision_id
-            where project_id = $1
-            order by artifact.created_at desc
-        ",
-                &[&project],
-            )
-            .await?
-            .iter()
-            .map(|r| {
-                (
-                    r.get("deployment_version"),
-                    r.get("architecture_id"),
-                    r.get("created_at"),
-                )
-            })
-            .collect();
-
-        Ok(artifacts)
-    }
-
+    /// Returns (revision_id, is_new)
     pub async fn upsert_revision(
         &self,
         project: &str,
         version: &str,
-    ) -> Result<String, anyhow::Error> {
+    ) -> Result<(String, bool), anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
@@ -192,7 +158,7 @@ impl AntZooStorageClient {
             .map(|r| r.get("revision_id"));
 
         match revision_id {
-            Some(id) => return Ok(id),
+            Some(id) => return Ok((id, false)),
             None => {
                 let revision_id: String = tx
                     .query_one(
@@ -226,7 +192,7 @@ impl AntZooStorageClient {
 
                 tx.commit().await?;
 
-                return Ok(revision_id);
+                return Ok((revision_id, true));
             }
         }
     }
@@ -821,53 +787,6 @@ impl AntZooStorageClient {
         Ok(revisions)
     }
 
-    /// Returns the latest revision that has the given event on that target.
-    ///
-    /// For example:
-    ///  - Used to return the latest revision with 'stage-finished' on a stage, representing the
-    ///    last successful deployment to that entire stage.
-    ///
-    ///  - Used to return the latest revision with 'host-group-started' on a host. If it's the same
-    ///    as the one with 'host-group-finished' then there's nothing in progress!
-    ///
-    pub async fn get_latest_revision_with_event(
-        &self,
-        deployment_pipeline_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
-    ) -> Result<Option<(String, DateTime<Utc>)>, anyhow::Error> {
-        let con = self.db.get().await?;
-
-        let revision = con
-            .query_opt(
-                "
-            select deployment.revision_id, deployment.created_at
-            from deployment
-                join revision r on r.revision_id = deployment.revision_id
-                join deployment_pipeline p on p.project_id = 
-                    r.project_id
-            where
-                deployment_pipeline_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4
-            order by deployment_seq desc
-            limit 1
-        ",
-                &[
-                    &deployment_pipeline_id,
-                    &target_type,
-                    &target_id,
-                    &event_name,
-                ],
-            )
-            .await?
-            .map(|row| (row.get("revision_id"), row.get("created_at")));
-
-        Ok(revision)
-    }
-
     pub async fn get_deployment(
         &self,
         revision_id: &str,
@@ -944,6 +863,34 @@ impl AntZooStorageClient {
         Ok(())
     }
 
+    pub async fn set_deployment_job_retryable(
+        &self,
+        deployment_job_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        let mut con = self.db.get().await?;
+        let tx = con.transaction().await?;
+
+        // Mark deployment job is_retryable
+        tx.query_one(
+            "
+            update deployment_job
+            set
+                is_retryable = true,
+                updated_at = now()
+            where
+                deployment_job_id = $1 and
+                is_retryable = false
+            returning deployment_job_id
+            ",
+            &[&deployment_job_id],
+        )
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     /// Returns Some(created Deployment ID) if the job was successful, None if it wasn't,
     /// since there was no deployment resulting of it.
     pub async fn complete_deployment_job(
@@ -1007,12 +954,12 @@ impl AntZooStorageClient {
         }
     }
 
-    /// If the last job with these parameters failed, return it and its retryable status.
+    /// Returns the jobs in this (revision, project, pipeline, target_type, target_id, event_name)
+    ///   that failed.
+    /// Returns jobs in the order they were created, where index 0 is the newest job
     ///
-    /// If the last job with these parameters SUCCEEDED, or there was no such job, return None.
-    ///
-    /// Returns (job_id, is_retryable)
-    pub async fn get_job_previously_failed(
+    /// Returns vec of (job_id, is_retryable, is_success)
+    pub async fn get_deployment_jobs(
         &self,
         revision_id: &str,
         project: &str,
@@ -1020,14 +967,14 @@ impl AntZooStorageClient {
         target_type: &str,
         target_id: &str,
         event_name: &str,
-    ) -> Result<Option<(String, bool)>, anyhow::Error> {
+    ) -> Result<Vec<(String, bool, bool)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
-        let job: Option<(String, bool, bool)> = tx
-            .query_opt(
+        let jobs: Vec<(String, bool, bool)> = tx
+            .query(
                 "
-            select deployment_job_id, is_retryable, is_success
+            select deployment_job_id, is_retryable
             from deployment_job
             where
                 revision_id = $1 and
@@ -1036,8 +983,7 @@ impl AntZooStorageClient {
                 event_name = $4 and
                 finished_at is not null
             order by created_at desc
-            limit 1
-            ", // Get only the LATEST try, since every try is a new entry in deployment_job
+            ",
                 &[&revision_id, &target_type, &target_id, &event_name],
             )
             .await
@@ -1053,24 +999,19 @@ impl AntZooStorageClient {
                     event_name
                 )
             })?
+            .iter()
             .map(|r| {
                 (
                     r.get("deployment_job_id"),
                     r.get("is_retryable"),
                     r.get("is_success"),
                 )
-            });
-
-        // The last job for these params succeeded, likely a retry that was successful.
-        if let Some(job) = &job {
-            if job.2 {
-                return Ok(None);
-            }
-        }
+            })
+            .collect();
 
         tx.commit().await?;
 
-        Ok(job.map(|job| (job.0, job.1)))
+        Ok(jobs)
     }
 
     /// Creates a deployment job if it doesn't already exist.
@@ -1172,46 +1113,6 @@ impl AntZooStorageClient {
         tx.commit().await?;
 
         Ok(deployment_job_id)
-    }
-
-    pub async fn list_revisions(&self) -> Result<Vec<(String, String)>, anyhow::Error> {
-        let deployment_events = self
-            .db
-            .get()
-            .await?
-            .query(
-                "
-            select revision_id, project_id
-            from revision
-            ",
-                &[],
-            )
-            .await?
-            .iter()
-            .map(|row| (row.get("revision_id"), row.get("project_id")))
-            .collect();
-
-        Ok(deployment_events)
-    }
-
-    pub async fn get_revision_version(&self, revision_id: &str) -> Result<String, anyhow::Error> {
-        let version = self
-            .db
-            .get()
-            .await?
-            .query_one(
-                "
-            select deployment_version
-            from revision
-            where revision_id = $1
-            ",
-                &[&revision_id],
-            )
-            .await
-            .context(format!("{}: {}", function_name!(), revision_id))?
-            .get("deployment_version");
-
-        Ok(version)
     }
 
     fn row_to_deployment_event(row: &Row) -> Deployment {
@@ -1322,31 +1223,141 @@ impl AntZooStorageClient {
 
         Ok(deployment_events)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Revision {
+    pub id: String,
+    pub seq: i32,
+    pub project_id: String,
+    pub version: String,
+}
+
+impl AntZooStorageClient {
+    fn row_to_revision(&self, row: &Row) -> Revision {
+        Revision {
+            id: row.get("revision_id"),
+            seq: row.get("revision_seq"),
+            project_id: row.get("project_id"),
+            version: row.get("deployment_version"),
+        }
+    }
+
+    pub async fn list_revisions(&self) -> Result<Vec<Revision>, anyhow::Error> {
+        let deployment_events = self
+            .db
+            .get()
+            .await?
+            .query(
+                "
+            select revision_id, project_id, deployment_version, revision_seq
+            from revision
+            order by revision_seq desc
+            ",
+                &[],
+            )
+            .await?
+            .iter()
+            .map(|row| self.row_to_revision(row))
+            .collect();
+
+        Ok(deployment_events)
+    }
+
+    pub async fn get_revision(&self, revision_id: &str) -> Result<Revision, anyhow::Error> {
+        let row = self
+            .db
+            .get()
+            .await?
+            .query_one(
+                "
+            select revision_id, project_id, deployment_version, revision_seq
+            from revision
+            where revision_id = $1
+            ",
+                &[&revision_id],
+            )
+            .await
+            .context(format!("{}: {}", function_name!(), revision_id))?;
+
+        Ok(self.row_to_revision(&row))
+    }
+
+    /// Returns revisions that have the given event on that target.
+    ///
+    /// For example:
+    ///  - Used to return the latest revision with 'stage-finished' on a stage, representing the
+    ///    last successful deployment to that entire stage.
+    ///
+    ///  - Used to return the latest revision with 'host-group-started' on a host. If it's the same
+    ///    as the one with 'host-group-finished' then there's nothing in progress!
+    ///
+    /// Returns vec of (Revision, deployment created at)
+    pub async fn list_revisions_with_event(
+        &self,
+        deployment_pipeline_id: &str,
+        target_type: &str,
+        target_id: &str,
+        event_name: &str,
+    ) -> Result<Vec<(Revision, DateTime<Utc>)>, anyhow::Error> {
+        let con = self.db.get().await?;
+
+        let revisions = con
+            .query(
+                "
+            select deployment.revision_id, r.revision_seq, r.project_id, r.deployment_version, deployment.created_at
+            from deployment
+                join revision r on r.revision_id = deployment.revision_id
+                join deployment_pipeline p on p.project_id = 
+                    r.project_id
+            where
+                deployment_pipeline_id = $1 and
+                target_type = $2 and
+                target_id = $3 and
+                event_name = $4
+            order by deployment_seq desc
+            ",
+                &[
+                    &deployment_pipeline_id,
+                    &target_type,
+                    &target_id,
+                    &event_name,
+                ],
+            )
+            .await?
+            .iter().map(|row| (self.row_to_revision(&row), row.get("created_at"))).collect();
+
+        Ok(revisions)
+    }
 
     /// For example, finding all revisions without a "pipeline-finished" event would be finding
     /// all IN PROGRESS revisions.
     ///
-    /// Returns (revision_id, pipeline_id)
+    /// Returns (Revision, pipeline_id)
     pub async fn list_revisions_missing_event(
         &self,
         event_name: &str,
-    ) -> Result<Vec<(String, String)>, anyhow::Error> {
+    ) -> Result<Vec<(Revision, String)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
         let rows = tx
             .query(
                 "
-            select revision_id, deployment_pipeline_id
-            from revision
-                join deployment_pipeline on deployment_pipeline.project_id
-                    = revision.project_id
-            where revision.revision_id not in (
+            select
+                r.revision_id,
+                r.revision_seq,
+                r.project_id,
+                r.deployment_version,
+                p.deployment_pipeline_id
+            from revision r
+                join deployment_pipeline p on p.project_id = r.project_id
+            where r.revision_id not in (
                 select revision_id
                 from deployment
                 where deployment.event_name = $1
             )
-            order by revision_id desc;
+            order by r.revision_seq desc;
             ",
                 &[&event_name],
             )
@@ -1355,7 +1366,7 @@ impl AntZooStorageClient {
 
         let deployments = rows
             .iter()
-            .map(|row| (row.get("revision_id"), row.get("deployment_pipeline_id")))
+            .map(|row| (self.row_to_revision(row), row.get("deployment_pipeline_id")))
             .collect();
 
         Ok(deployments)

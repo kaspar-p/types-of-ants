@@ -254,9 +254,12 @@ async fn register_artifact(
         std::fs::copy(&temp_file_path, &filepath)?;
     }
 
-    let revision_id = state.db.upsert_revision(&project.0, &version.0).await?;
+    let (revision_id, is_new) = state.db.upsert_revision(&project.0, &version.0).await?;
 
-    info!("Registering or updating artifact...");
+    info!(
+        "Registering or updating artifact for [new={}] revision [{}]",
+        is_new, revision_id
+    );
     let artifact_id = state
         .db
         .get_artifact_by_revision(arch.0.as_ref(), &revision_id)

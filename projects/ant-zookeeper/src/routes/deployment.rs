@@ -10,7 +10,8 @@ use crate::{
     err::AntZookeeperError,
     event_loop::{
         drive_revisions,
-        transition::{perform, DeploymentEvent, DeploymentTarget, JobCompletion, PipelineError},
+        perform::{perform, JobCompletion},
+        transition::{DeploymentEvent, DeploymentTarget, PipelineError},
     },
     state::AntZookeeperState,
 };
@@ -42,31 +43,33 @@ async fn iterate_pipeline(
     }
 
     let handles = unfinished_jobs.into_iter().map(|job| {
-        let event = DeploymentEvent(
-            job.revision.clone(),
-            DeploymentTarget::from_strings(&job.target_type, job.target_id.clone()),
-            job.event_name.clone().into(),
-        );
+        let state = state.clone();
+        async move {
+            let event = DeploymentEvent(
+                job.revision.clone(),
+                DeploymentTarget::from_strings(&job.target_type, job.target_id.clone()),
+                job.event_name.clone().into(),
+            );
 
-        let state2 = state.clone();
-        tokio::spawn(async move {
             // Do the work.
             info!("Performing: {event:?}");
 
-            state2.db.start_deployment_job(&job.job_id).await?;
+            state.db.start_deployment_job(&job.job_id).await?;
 
-            let state3 = state2.clone();
-            let job_id = job.job_id.clone();
             let work: Result<Result<JobCompletion<()>, anyhow::Error>, tokio::task::JoinError> =
-                tokio::spawn(async move {
-                    perform(&state3, &job.deployment_pipeline_id.clone(), &event)
-                        .await
-                        .with_context(|| {
-                            format!(
+                tokio::spawn({
+                    let job_id = job.job_id.clone();
+                    let state = state.clone();
+                    async move {
+                        perform(&state, &job.deployment_pipeline_id.clone(), &event)
+                            .await
+                            .with_context(|| {
+                                format!(
                                 "Failed to perform scheduled deployment job [{}] for event [{}]",
                                 job_id, event
                             )
-                        })
+                            })
+                    }
                 })
                 .await;
 
@@ -90,7 +93,7 @@ async fn iterate_pipeline(
                     job.job_id.clone(),
                     is_success
                 );
-                state2
+                state
                     .db
                     .complete_deployment_job(
                         &job.job_id,
@@ -103,19 +106,17 @@ async fn iterate_pipeline(
                     .await?;
             } else {
                 // Clear the started_at field to set the job back to pending.
-                state2.db.unstart_deployment_job(&job.job_id).await?;
+                state.db.unstart_deployment_job(&job.job_id).await?;
             }
 
             return Ok(());
-        })
+        }
     });
 
     join_all(handles)
         .await
         .into_iter()
-        .collect::<Result<Vec<Result<(), anyhow::Error>>, tokio::task::JoinError>>()?
-        .into_iter()
-        .collect::<Result<Vec<()>, anyhow::Error>>()?;
+        .collect::<Result<(), anyhow::Error>>()?;
 
     Ok((StatusCode::OK, Json(IteratePipelineResponse {})))
 }

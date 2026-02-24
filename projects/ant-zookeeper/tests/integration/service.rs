@@ -96,7 +96,6 @@ async fn service_artifact_returns_400_if_asking_for_unknown_secrets() {
         .join("integration")
         .join("test-archives")
         .join("ant-gateway-v1.tar.gz");
-    let input_digest = digest(&archive);
 
     let req = reqwest::multipart::Form::new()
         .file("file", archive)
@@ -362,9 +361,9 @@ async fn service_artifact_includes_env_file() {
 
         let revisions = fixture.state.db.list_revisions().await.unwrap();
         let rev = &revisions[0];
-        assert_eq!(rev.1, "ant-host-agent");
+        assert_eq!(rev.project_id, "ant-host-agent");
         assert_eq!(revisions.len(), 1);
-        let revision_id = rev.0.clone();
+        let revision_id = rev.id.clone();
 
         let get_events = || async {
             fixture

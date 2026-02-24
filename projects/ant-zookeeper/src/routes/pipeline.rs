@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ant_library::host_architecture::HostArchitecture;
-use ant_zookeeper_db::HostGroup;
+use ant_zookeeper_db::{HostGroup, Revision};
 use anyhow::Context;
 use axum::{
     extract::{Query, State},
@@ -90,7 +90,7 @@ pub struct PipelineDeployStage {
 #[serde(rename_all = "camelCase")]
 pub struct RevisionProgress {
     revision: String,
-    created_at: DateTime<Utc>,
+    reached_at: DateTime<Utc>,
     // #[serde(skip_serializing_if = "Option::is_none")]
     // finished_at: Option<DateTime<Utc>>,
 }
@@ -98,16 +98,14 @@ pub struct RevisionProgress {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetRevisionProgress {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    latest_started_revision: Option<RevisionProgress>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    started_revisions: Vec<RevisionProgress>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    finished_revisions: Vec<RevisionProgress>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    latest_successful_revision: Option<RevisionProgress>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    latest_failed_revision: Option<RevisionProgress>,
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // in_progress_revision: Option<RevisionProgress>,
+    failed_revisions: Option<Vec<RevisionProgress>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -134,7 +132,7 @@ async fn revision_progress(
 ) -> Result<TargetRevisionProgress, AntZookeeperError> {
     let started = state
         .db
-        .get_latest_revision_with_event(
+        .list_revisions_with_event(
             pipeline_id,
             target.as_target_type(),
             target.as_target_id(),
@@ -144,7 +142,7 @@ async fn revision_progress(
 
     let finished = state
         .db
-        .get_latest_revision_with_event(
+        .list_revisions_with_event(
             pipeline_id,
             target.as_target_type(),
             target.as_target_id(),
@@ -152,16 +150,44 @@ async fn revision_progress(
         )
         .await?;
 
+    // let failed_jobs = match started {
+    //     None => None,
+    //     Some(revision) => {
+    //         // let has_failed_jobs = state
+    //         //     .db
+    //         //     .get_deployment_jobs(
+    //         //         revision_id,
+    //         //         project,
+    //         //         deployment_pipeline_id,
+    //         //         target_type,
+    //         //         target_id,
+    //         //         event_name,
+    //         //     )
+    //         //     .await?
+    //         //     .iter()
+    //         //     .filter(|(_, _, is_success)| !*is_success)
+    //         //     .map(|j| j.0.as_ref())
+    //         //     .last()
+    //         //     .is_some();
+    //     }
+    // };
+
     Ok(TargetRevisionProgress {
-        latest_started_revision: started.map(|rev| RevisionProgress {
-            revision: rev.0,
-            created_at: rev.1,
-        }),
-        latest_successful_revision: finished.map(|rev| RevisionProgress {
-            revision: rev.0,
-            created_at: rev.1,
-        }),
-        latest_failed_revision: None, // TODO
+        started_revisions: started
+            .into_iter()
+            .map(|rev| RevisionProgress {
+                revision: rev.0.id,
+                reached_at: rev.1,
+            })
+            .collect(),
+        finished_revisions: finished
+            .into_iter()
+            .map(|rev| RevisionProgress {
+                revision: rev.0.id,
+                reached_at: rev.1,
+            })
+            .collect(),
+        failed_revisions: None, // TODO
     })
 }
 
@@ -268,33 +294,36 @@ async fn get_pipeline(
         }
     }
 
-    let mut revisions = state
-        .db
-        .list_revisions_missing_event(&EventName::PipelineFinished.to_string())
-        .await?
-        .into_iter()
-        .filter_map(|(rev, pipeline)| match *pipeline == pipeline_id {
-            true => Some(rev),
-            false => None,
-        })
-        .collect::<Vec<String>>();
-
-    {
-        let target = DeploymentTarget::Pipeline(pipeline_id.clone());
-        let latest_finished = state
+    let revisions = {
+        let mut revisions = state
             .db
-            .get_latest_revision_with_event(
+            .list_revisions_missing_event(&EventName::PipelineFinished.to_string())
+            .await?
+            .into_iter()
+            .filter_map(|(rev, pipeline)| match *pipeline == pipeline_id {
+                true => Some(rev),
+                false => None,
+            })
+            .collect::<Vec<Revision>>();
+
+        let target = DeploymentTarget::Pipeline(pipeline_id.clone());
+        let mut latest_finished = state
+            .db
+            .list_revisions_with_event(
                 &pipeline_id,
                 target.as_target_type(),
                 target.as_target_id(),
                 &target.finished_event().to_string(),
             )
             .await?;
+        latest_finished.sort_by(|a, b| a.0.seq.cmp(&b.0.seq));
 
-        if let Some(latest) = latest_finished {
+        if let Some(latest) = latest_finished.pop() {
             revisions.push(latest.0);
         }
-    }
+
+        revisions
+    };
 
     Ok((
         StatusCode::OK,
@@ -303,64 +332,9 @@ async fn get_pipeline(
             project: req.project,
             stages,
             progress,
-            revisions,
+            revisions: revisions.into_iter().map(|r| r.id).collect(),
         }),
     ))
-
-    // for (stage_name, stage_id, stage_type) in stages {
-    //     if stage_type == "build" {
-    //         let artifacts = state
-    //             .db
-    //             .get_latest_artifacts_for_project_for_all_architectures(&req.project)
-    //             .await?;
-
-    //         pipeline_stages.push(PipelineStage {
-    //             stage_name,
-    //             stage_type: PipelineStageType::Build(PipelineBuildStage {
-    //                 builds: artifacts
-    //                     .into_iter()
-    //                     .map(
-    //                         |(version, arch, built_at)| -> Result<PipelineBuild, anyhow::Error> {
-    //                             Ok(PipelineBuild {
-    //                                 architecture: HostArchitecture::from_str(&arch)?,
-    //                                 built_version: version,
-    //                                 built_at: built_at,
-    //                             })
-    //                         },
-    //                     )
-    //                     .collect::<Result<Vec<PipelineBuild>, anyhow::Error>>()?,
-    //             }),
-    //         });
-    //         continue;
-    //     }
-
-    //     info!("Building stage {stage_name}...");
-    //     let hosts = state.db.get_hosts_in_stage(&stage_id).await?;
-
-    //     let mut pipeline_hosts = vec![];
-    //     for host_id in hosts {
-    //         info!("Building host {host_id}...");
-    //         let history = state.db.get_deployment_history_on_host(&host_id).await?;
-    //         let latest = history.first().cloned();
-
-    //         pipeline_hosts.push(PipelineHost {
-    //             host_name: host_id,
-    //             deployment: latest.map(|l| PipelineHostDeployment {
-    //                 deployment_id: l.0,
-    //                 deployed_artifact_version: l.1,
-    //                 deployed_at: l.2,
-    //             }),
-    //         });
-    //     }
-
-    //     pipeline_stages.push(PipelineStage {
-    //         stage_name,
-    //         stage_type: PipelineStageType::Deploy(PipelineDeployStage {
-    //             hosts: pipeline_hosts,
-    //             approved: false,
-    //         }),
-    //     });
-    // }
 }
 
 #[derive(Serialize, Deserialize)]

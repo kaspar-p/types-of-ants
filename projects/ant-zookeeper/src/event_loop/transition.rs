@@ -10,11 +10,6 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{
-    event_loop::{deploy::deploy_artifact, replicate::replicate_artifact_step},
-    state::AntZookeeperState,
-};
-
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DeploymentTarget {
@@ -160,8 +155,15 @@ where
     }
 }
 
+/// Represents (revision_id, target, event)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DeploymentEvent(pub String, pub DeploymentTarget, pub EventName);
+
+impl DeploymentEvent {
+    pub fn for_other_revision(&self, rev: String) -> Self {
+        DeploymentEvent(rev, self.1.clone(), self.2.clone())
+    }
+}
 
 impl Display for DeploymentEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -208,7 +210,7 @@ pub(crate) async fn is_deployment_complete(
 }
 
 /// Return all events that come AFTER the `event`, not including the input.
-async fn after(
+pub(crate) async fn after(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
     event: &DeploymentEvent,
@@ -273,47 +275,6 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     Ok(true)
 }
 
-/// The set of actions currently "ready to go" for the pipeline.
-///
-/// Formally, they are the steps `a` such that `next(s) = a`, where `s` is a completed event.
-pub async fn frontier(
-    db: &AntZooStorageClient,
-    revision: &str,
-    deployment_pipeline_id: &str,
-) -> Result<Vec<DeploymentEvent>, PipelineError> {
-    let event = DeploymentEvent(
-        revision.to_string(),
-        DeploymentTarget::Pipeline(deployment_pipeline_id.to_string()),
-        EventName::PipelineStarted,
-    );
-
-    let mut frontier: Vec<DeploymentEvent> = Vec::new();
-
-    let mut seen: HashSet<DeploymentEvent> = HashSet::new();
-    let mut queue: VecDeque<DeploymentEvent> = VecDeque::new();
-    seen.insert(event.clone());
-    queue.push_back(event.clone());
-
-    loop {
-        if let Some(event) = queue.pop_front() {
-            for next_event in transition(&db, deployment_pipeline_id, &event).await?.next {
-                if is_deployment_complete(db, &next_event).await? {
-                    if !seen.contains(&next_event) {
-                        queue.push_back(next_event.clone());
-                        seen.insert(next_event.clone());
-                    }
-                } else {
-                    frontier.push(next_event);
-                }
-            }
-        } else {
-            break;
-        }
-    }
-
-    return Ok(frontier);
-}
-
 pub async fn transition(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
@@ -323,7 +284,7 @@ pub async fn transition(
     type E = EventName;
 
     match event {
-        DeploymentEvent(id, T::Pipeline(p), E::PipelineStarted) => {
+        DeploymentEvent(rev, T::Pipeline(p), E::PipelineStarted) => {
             // The pipeline has begun! Start the first stage.
 
             let build_stage_id = db
@@ -334,14 +295,14 @@ pub async fn transition(
             // Find the first stage of the pipeline and start that.
             Ok(Transition {
                 next: vec![DeploymentEvent(
-                    id.clone(),
+                    rev.clone(),
                     T::Stage(build_stage_id),
                     E::StageStarted,
                 )],
             })
         }
 
-        DeploymentEvent(id, T::Stage(s), E::StageStarted) => {
+        DeploymentEvent(rev, T::Stage(s), E::StageStarted) => {
             // A pipeline stage has begun, start the host group within it
             let stage = db
                 .get_deployment_pipeline_stage(s)
@@ -358,7 +319,7 @@ pub async fn transition(
                         .into_iter()
                         .map(|arch| {
                             DeploymentEvent(
-                                id.clone(),
+                                rev.clone(),
                                 T::Stage(s.clone()),
                                 E::ArtifactArchitectureRegistered(arch),
                             )
@@ -373,7 +334,7 @@ pub async fn transition(
                         .context("deploy stages should have a host group attached")?;
 
                     vec![DeploymentEvent(
-                        id.clone(),
+                        rev.clone(),
                         T::HostGroup(hg.id),
                         E::HostGroupStarted,
                     )]
@@ -389,15 +350,15 @@ pub async fn transition(
             Ok(Transition { next: next_stages })
         }
 
-        DeploymentEvent(id, T::Stage(s), E::ArtifactArchitectureRegistered(_)) => Ok(Transition {
+        DeploymentEvent(rev, T::Stage(s), E::ArtifactArchitectureRegistered(_)) => Ok(Transition {
             next: vec![DeploymentEvent(
-                id.clone(),
+                rev.clone(),
                 T::Stage(s.clone()),
                 E::StageFinished,
             )],
         }),
 
-        DeploymentEvent(id, T::HostGroup(hg), E::HostGroupStarted) => {
+        DeploymentEvent(rev, T::HostGroup(hg), E::HostGroupStarted) => {
             // Start deployment to all hosts in the host group, in parallel.
             let hg = db.get_host_group_by_id(hg).await?.context(event.clone())?;
 
@@ -406,7 +367,7 @@ pub async fn transition(
                 .into_iter()
                 .map(|host| {
                     DeploymentEvent(
-                        id.clone(),
+                        rev.clone(),
                         DeploymentTarget::Host(host.name),
                         E::HostStarted,
                     )
@@ -416,31 +377,31 @@ pub async fn transition(
             Ok(Transition { next })
         }
 
-        DeploymentEvent(id, T::Host(host), E::HostStarted) => Ok(Transition {
+        DeploymentEvent(rev, T::Host(host), E::HostStarted) => Ok(Transition {
             next: vec![DeploymentEvent(
-                id.clone(),
+                rev.clone(),
                 DeploymentTarget::Host(host.clone()),
                 E::HostArtifactReplicated,
             )],
         }),
 
-        DeploymentEvent(id, T::Host(host), E::HostArtifactReplicated) => Ok(Transition {
+        DeploymentEvent(rev, T::Host(host), E::HostArtifactReplicated) => Ok(Transition {
             next: vec![DeploymentEvent(
-                id.clone(),
+                rev.clone(),
                 DeploymentTarget::Host(host.clone()),
                 E::HostArtifactDeployed,
             )],
         }),
 
-        DeploymentEvent(id, T::Host(host), E::HostArtifactDeployed) => Ok(Transition {
+        DeploymentEvent(rev, T::Host(host), E::HostArtifactDeployed) => Ok(Transition {
             next: vec![DeploymentEvent(
-                id.clone(),
+                rev.clone(),
                 DeploymentTarget::Host(host.clone()),
                 event.1.finished_event(),
             )],
         }),
 
-        DeploymentEvent(id, T::Host(host), E::HostFinished) => {
+        DeploymentEvent(rev, T::Host(host), E::HostFinished) => {
             // Find the host group for the host, given the current revision...
             let host_group = db
                 .get_host_group_by_host(deployment_pipeline_id, &host)
@@ -450,14 +411,14 @@ pub async fn transition(
 
             Ok(Transition {
                 next: vec![DeploymentEvent(
-                    id.clone(),
+                    rev.clone(),
                     T::HostGroup(host_group),
                     E::HostGroupFinished,
                 )],
             })
         }
 
-        DeploymentEvent(id, T::HostGroup(hg), E::HostGroupFinished) => {
+        DeploymentEvent(rev, T::HostGroup(hg), E::HostGroupFinished) => {
             let stage_id = db
                 .get_deployment_pipeline_stage_by_host_group(hg)
                 .await?
@@ -465,14 +426,14 @@ pub async fn transition(
 
             Ok(Transition {
                 next: vec![DeploymentEvent(
-                    id.clone(),
+                    rev.clone(),
                     T::Stage(stage_id),
                     E::StageFinished,
                 )],
             })
         }
 
-        DeploymentEvent(id, T::Stage(s), E::StageFinished) => {
+        DeploymentEvent(rev, T::Stage(s), E::StageFinished) => {
             // Start the next stage in the pipeline, if there is one!
             let stage = db
                 .get_deployment_pipeline_stage(s)
@@ -485,12 +446,12 @@ pub async fn transition(
 
             let next_event = match next_stage {
                 None => DeploymentEvent(
-                    id.clone(),
+                    rev.clone(),
                     T::Pipeline(stage.0.clone()),
                     E::PipelineFinished,
                 ),
                 Some(next_stage) => {
-                    DeploymentEvent(id.clone(), T::Stage(next_stage), E::StageStarted)
+                    DeploymentEvent(rev.clone(), T::Stage(next_stage), E::StageStarted)
                 }
             };
 
@@ -502,80 +463,5 @@ pub async fn transition(
         DeploymentEvent(_, T::Pipeline(_), E::PipelineFinished) => Ok(Transition { next: vec![] }),
 
         event => Err(PipelineError::UnknownStep(event.clone())),
-    }
-}
-
-pub enum JobCompletion<T> {
-    Pending,
-    Finished(T),
-}
-
-pub async fn perform(
-    state: &AntZookeeperState,
-    deployment_pipeline_id: &str,
-    event: &DeploymentEvent,
-) -> Result<JobCompletion<()>, anyhow::Error> {
-    type T = DeploymentTarget;
-    type E = EventName;
-
-    match event {
-        DeploymentEvent(revision, T::Host(host), E::HostArtifactReplicated) => {
-            info!("Beginning replication of version {revision} to host {host}...");
-
-            let host_group_id = state
-                .db
-                .get_host_group_by_host(deployment_pipeline_id, &host)
-                .await?
-                .unwrap();
-
-            let host_group = state
-                .db
-                .get_host_group_by_id(&host_group_id)
-                .await?
-                .unwrap();
-
-            let project = state
-                .db
-                .get_project_from_deployment_pipeline(deployment_pipeline_id)
-                .await?;
-
-            replicate_artifact_step(state, &project, &revision, &host_group, &host).await?;
-
-            Ok(JobCompletion::Finished(()))
-        }
-
-        DeploymentEvent(revision, T::Host(host), E::HostArtifactDeployed) => {
-            let project = state
-                .db
-                .get_project_from_deployment_pipeline(deployment_pipeline_id)
-                .await?;
-
-            let version = state.db.get_revision_version(&revision).await?;
-
-            deploy_artifact(state, &project, &version, &host).await?;
-
-            Ok(JobCompletion::Finished(()))
-        }
-
-        DeploymentEvent(revision, T::Stage(_), E::ArtifactArchitectureRegistered(arch)) => {
-            let missing = state
-                .db
-                .missing_artifacts_for_revision_id(&revision)
-                .await?;
-
-            if missing.contains(&arch) {
-                info!("Still missing {arch:?} on {revision}, stay pending.");
-                return Ok(JobCompletion::Pending);
-            } else {
-                info!("Architecture {arch:?} has been registered on {revision}.");
-                return Ok(JobCompletion::Finished(()));
-            }
-        }
-
-        // If we didn't understand the event, then there was likely nothing to do for it.
-        e => {
-            info!("Perform default job handling, complete immediately: {e:?}");
-            Ok(JobCompletion::Finished(()))
-        }
     }
 }

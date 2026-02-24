@@ -1,7 +1,7 @@
-import { ReactNode } from "react";
 import { Host } from "./Host";
 import { RevisionBox } from "./RevisionBox";
 import { HostGroup } from "./HostGroup";
+import { Stage } from "./Stage";
 
 export type Host = {
   name: string;
@@ -21,11 +21,16 @@ export type Stage = {
   stageType: { type: "build" } | { type: "deploy"; hostGroup: HostGroup };
 };
 
+export type Revision = {
+  revision: string;
+  reachedAt: string;
+};
+
 export type Progress = Record<
   string,
   {
-    latestStartedRevision?: { createdAt: string; revision: string };
-    latestSuccessfulRevision?: { createdAt: string; revision: string };
+    startedRevisions?: Revision[];
+    finishedRevisions?: Revision[];
   }
 >;
 
@@ -87,10 +92,25 @@ export function formatDatetime(date: Date | string): string {
   const d = new Date(date);
 
   const time = `${pad(d.getHours().toString(), 2, "0")}:${pad(d.getMinutes().toString(), 2, "0")}:${pad(d.getSeconds().toString(), 2, "0")}`;
-  const dateStr = `${d.getFullYear()}-${pad(d.getMonth().toString(), 2, "0")}-${pad(d.getDate().toString(), 2, "0")}`;
+  const dateStr = `${d.getFullYear()}-${pad((d.getMonth() + 1).toString(), 2, "0")}-${pad(d.getDate().toString(), 2, "0")}`;
 
   return `${time} ${dateStr}`;
 }
+
+export const revisions = (
+  progress: Progress,
+  id: string,
+): { inProgress: Revision[]; finished: Revision | undefined } => {
+  const inProgress: Revision[] = (progress[id]?.startedRevisions ?? []).filter(
+    (r1) =>
+      !(progress[id]?.finishedRevisions ?? []).find(
+        (r2) => r1.revision === r2.revision,
+      ),
+  );
+  const finished: Revision | undefined = progress[id]?.finishedRevisions?.[0];
+
+  return { inProgress, finished };
+};
 
 export function Pipeline({ res }: PipelineProps) {
   console.log(res.project, res.progress, res.revisions);
@@ -118,64 +138,11 @@ export function Pipeline({ res }: PipelineProps) {
       <div className="flex flex-row space-x-6">
         {res.stages.map((stage, i: number) => (
           <div key={i}>
-            <div className="flex flex-col border">
-              <div id={`stage-title-${i}`} className="border-b">
-                <div
-                  className={`p-2 ${color(res.revisions, res.progress[stage.stageId]?.latestSuccessfulRevision?.revision).bg}`}
-                >
-                  <div className="text-xl flex flex-row">
-                    {stage.stageName}
-                    <div className="ml-2 text-sm self-center">
-                      (<i>type: {stage.stageType.type}</i>)
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-2 p-2">
-                <div className="flex flex-row space-x-2">
-                  {res.progress[stage.stageId]?.latestStartedRevision &&
-                  res.progress[stage.stageId]?.latestStartedRevision
-                    ?.revision !==
-                    res.progress[stage.stageId]?.latestSuccessfulRevision
-                      ?.revision ? (
-                    <span className="flex flex-row items-center">
-                      in progress:{" "}
-                      <RevisionBox
-                        revs={res.revisions}
-                        revision={
-                          res.progress[stage.stageId]?.latestStartedRevision
-                            ?.revision
-                        }
-                      />
-                    </span>
-                  ) : null}
-
-                  <span className="flex flex-row items-center space-x-1">
-                    <div>latest: </div>
-                    {res.revisions.length > 0 ? (
-                      <RevisionBox
-                        revs={res.revisions}
-                        revision={
-                          res.progress[stage.stageId]?.latestSuccessfulRevision
-                            ?.revision
-                        }
-                      />
-                    ) : (
-                      <span className="text-sm"> never</span>
-                    )}
-                  </span>
-                </div>
-
-                {stage.stageType.type === "deploy" ? (
-                  <HostGroup
-                    stage={stage as Stage & { stageType: { type: "deploy" } }}
-                    revisions={res.revisions}
-                    progress={res.progress}
-                  />
-                ) : undefined}
-              </div>
-            </div>
+            <Stage
+              revisions={res.revisions}
+              progress={res.progress}
+              stage={stage}
+            />
           </div>
         ))}
       </div>
