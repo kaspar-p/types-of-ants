@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use ant_zookeeper_db::{AntZooStorageClient, Revision};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::event_loop::transition::{
     after, is_deployment_complete, is_doable, transition, DeploymentEvent, DeploymentTarget,
@@ -235,7 +235,7 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 
     // Index 0 is newest attempt at the job
     let previous_jobs = db
-        .get_deployment_jobs(
+        .list_deployment_jobs(
             &event.0,
             &project,
             &deployment_pipeline_id,
@@ -275,8 +275,11 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     if let Some(prev) = retryable {
         info!(
             "[p={deployment_pipeline_id} v={}] Prev. job {} failed but is retryable, {}",
-            "creating retry.", event.0, prev.0
+            "creating retry and marking previous non-retryable.", event.0, prev.0
         );
+
+        // Set the previous job to non-retryable since we're about to kickoff a retry!
+        db.set_deployment_job_retryable(&prev.0, false).await?;
     }
 
     // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!

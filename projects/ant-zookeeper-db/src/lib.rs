@@ -354,35 +354,6 @@ impl AntZooStorageClient {
         Ok(())
     }
 
-    // pub async fn environments_without_secret(
-    //     &self,
-    //     secret_name: &str,
-    // ) -> Result<Vec<String>, anyhow::Error> {
-    //     let environments_without_secret: Vec<String> = self
-    //         .db
-    //         .get()
-    //         .await?
-    //         .query(
-    //             "
-    //     select distinct secret_environment
-    //     from secret
-    //     where secret_id not in (
-    //         select secret_id
-    //         from secret
-    //         where secret_name = $1 and deleted_at is null
-    //     )
-    //     order by created_at desc
-    //     ",
-    //             &[&secret_name],
-    //         )
-    //         .await?
-    //         .iter()
-    //         .map(|row| row.get("secret_environment"))
-    //         .collect();
-
-    //     return Ok(environments_without_secret);
-    // }
-
     pub async fn register_new_secret_version(
         &self,
         secret_name: &str,
@@ -503,39 +474,6 @@ impl AntZooStorageClient {
         Ok(stages)
     }
 
-    pub async fn get_deployment_pipeline_stage_by_name(
-        &self,
-        deployment_pipeline_id: &str,
-        stage_name: &str,
-    ) -> Result<Option<String>, anyhow::Error> {
-        let stage_id = self
-            .db
-            .get()
-            .await?
-            .query_opt(
-                "
-            select deployment_pipeline_stage_id
-            from deployment_pipeline_stage
-            where
-                deployment_pipeline_id = $1 and
-                stage_name = $2
-            ",
-                &[&deployment_pipeline_id, &stage_name],
-            )
-            .await
-            .with_context(|| {
-                format!(
-                    "{}: {} {}",
-                    function_name!(),
-                    deployment_pipeline_id,
-                    stage_name
-                )
-            })?
-            .map(|row| row.get("deployment_pipeline_stage_id"));
-
-        Ok(stage_id)
-    }
-
     /// Returns (pipeline_id, stage_name, stage_order, stage_type)
     pub async fn get_deployment_pipeline_stage(
         &self,
@@ -566,21 +504,6 @@ impl AntZooStorageClient {
             });
 
         Ok(stage)
-    }
-
-    pub async fn get_deployment_pipeline_build_stage(
-        &self,
-        deployment_pipeline_id: &str,
-    ) -> Result<String, anyhow::Error> {
-        self.get_deployment_pipeline_stage_by_order(&deployment_pipeline_id, 0)
-            .await?
-            .ok_or_else(|| {
-                anyhow::Error::msg(format!(
-                    "{}{}",
-                    "Could not find a build stage for pipeline ",
-                    format!("{deployment_pipeline_id}, but all pipelines should have one!")
-                ))
-            })
     }
 
     pub async fn get_deployment_pipeline_stage_by_order(
@@ -710,83 +633,6 @@ impl AntZooStorageClient {
         Ok(stage_id)
     }
 
-    pub async fn get_hosts_in_stage(&self, stage_id: &str) -> Result<Vec<String>, anyhow::Error> {
-        let rows = self
-            .db
-            .get()
-            .await?
-            .query(
-                "
-            select
-                host.host_id
-            from host
-                join host_group_host on host_group_host.host_id = host.host_id
-                join deployment_pipeline_stage on 
-                    deployment_pipeline_stage.stage_type_deploy_host_group_id
-                        = host_group_host.host_group_id
-            where
-                deployment_pipeline_stage_id = $1
-        ",
-                &[&stage_id],
-            )
-            .await?;
-
-        let hosts = rows
-            .iter()
-            .map(|row| row.get("host_id"))
-            .collect::<Vec<String>>();
-
-        Ok(hosts)
-    }
-
-    pub async fn get_deployment_history_on_host(
-        &self,
-        host_id: &str,
-    ) -> Result<Vec<(String, String, DateTime<Utc>, DateTime<Utc>, DateTime<Utc>)>, anyhow::Error>
-    {
-        let rows = self
-            .db
-            .get()
-            .await?
-            .query(
-                "
-            select
-                deployment.deployment_id,
-                revision.deployment_version,
-                revision.created_at revision_created_at,
-                deployment.created_at deployment_created_at,
-                deployment.finished_at
-            from deployment
-                join revision on deployment.revision_id
-                    = revision.revision_id
-                join deployment_pipeline_stage on deployment.deployment_pipeline_stage_id
-                    = deployment_pipeline_stage.deployment_pipeline_stage_id
-            where
-                deployment.is_finished is not null and
-                deployment_pipeline_stage.stage_type_deploy_host_group_id =
-                    (select host_group_id from host_group_host where host_id = $1)
-            order by created_at desc
-        ",
-                &[&host_id],
-            )
-            .await?;
-
-        let revisions = rows
-            .iter()
-            .map(|row| {
-                (
-                    row.get("deployment_id"),
-                    row.get("deployment_version"),
-                    row.get("revision_created_at"),
-                    row.get("deployment_created_at"),
-                    row.get("finished_at"),
-                )
-            })
-            .collect::<Vec<(String, String, DateTime<Utc>, DateTime<Utc>, DateTime<Utc>)>>();
-
-        Ok(revisions)
-    }
-
     pub async fn get_deployment(
         &self,
         revision_id: &str,
@@ -838,7 +684,8 @@ impl AntZooStorageClient {
             ",
                 &[&deployment_job_id],
             )
-            .await?;
+            .await
+            .with_context(|| format!("{}: {}", function_name!(), deployment_job_id))?;
 
         Ok(())
     }
@@ -858,7 +705,8 @@ impl AntZooStorageClient {
             ",
                 &[&deployment_job_id],
             )
-            .await?;
+            .await
+            .with_context(|| format!("{}: {}", function_name!(), deployment_job_id))?;
 
         Ok(())
     }
@@ -866,6 +714,7 @@ impl AntZooStorageClient {
     pub async fn set_deployment_job_retryable(
         &self,
         deployment_job_id: &str,
+        retryable: bool,
     ) -> Result<(), anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
@@ -875,16 +724,16 @@ impl AntZooStorageClient {
             "
             update deployment_job
             set
-                is_retryable = true,
+                is_retryable = $1,
                 updated_at = now()
             where
-                deployment_job_id = $1 and
-                is_retryable = false
+                deployment_job_id = $2
             returning deployment_job_id
             ",
-            &[&deployment_job_id],
+            &[&retryable, &deployment_job_id],
         )
-        .await?;
+        .await
+        .with_context(|| format!("{}: {} {}", function_name!(), deployment_job_id, retryable))?;
 
         tx.commit().await?;
 
@@ -919,7 +768,19 @@ impl AntZooStorageClient {
             ",
             &[&is_success, &deployment_job_id],
         )
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "{}: mark complete {} {} {} {} {} {}",
+                function_name!(),
+                deployment_job_id,
+                revision_id,
+                target_type,
+                target_id,
+                event_name,
+                is_success
+            )
+        })?;
 
         // Add successful deployment event if there was one
         if is_success {
@@ -945,6 +806,7 @@ impl AntZooStorageClient {
                     )
                 })?
                 .get("deployment_id");
+
             tx.commit().await?;
 
             return Ok(Some(deployment_id));
@@ -954,12 +816,116 @@ impl AntZooStorageClient {
         }
     }
 
-    /// Returns the jobs in this (revision, project, pipeline, target_type, target_id, event_name)
-    ///   that failed.
+    /// Find all deployment jobs that occurred after the deployment job for a given event.
+    ///
+    /// All jobs matching (revision, project, pipeline, target_type, target_id) that happened
+    /// after a job ((revision, project, pipeline, target_type, target_id, event_name) that
+    /// was successful.
+    ///
+    /// Panics if no such previous job exists.
+    ///
+    /// Returns jobs in the order they were created, so index 0 is the newest job
+    ///
+    /// Returns a vec of (job_id, is_retryable, is_success, started_at, finished_at)
+    pub async fn list_deployment_jobs_after_event(
+        &self,
+        revision_id: &str,
+        project: &str,
+        deployment_pipeline_id: &str,
+        target_type: &str,
+        target_id: &str,
+        after_event_name: &str,
+    ) -> Result<Vec<(String, bool, bool, DateTime<Utc>, DateTime<Utc>)>, anyhow::Error> {
+        let mut con = self.db.get().await?;
+        let tx = con.transaction().await?;
+
+        let starting_point: Option<DateTime<Utc>> = tx
+            .query_opt(
+                "
+            select finished_at
+            from deployment_job
+            where
+                revision_id = $1 and
+                target_type = $2 and
+                target_id = $3 and
+                event_name = $4 and
+                finished_at is not null and
+                is_success = true
+            order by created_at asc
+            limit 1
+            ",
+                &[&revision_id, &target_type, &target_id, &after_event_name],
+            )
+            .await
+            .with_context(|| {
+                format!(
+                    "{}: starting point {} {} {} {} {} {}",
+                    function_name!(),
+                    revision_id,
+                    project,
+                    deployment_pipeline_id,
+                    target_type,
+                    target_id,
+                    after_event_name
+                )
+            })?
+            .map(|r| r.get("finished_at"));
+
+        if starting_point.is_none() {
+            return Ok(vec![]);
+        }
+        let starting_point = starting_point.unwrap();
+
+        let jobs = tx
+            .query(
+                "
+            select deployment_job_id, is_retryable, is_success, started_at, finished_at
+            from deployment_job
+            where
+                revision_id = $1 and
+                target_type = $2 and
+                target_id = $3 and
+                finished_at is not null and
+                created_at >= $4
+            order by created_at asc
+            ",
+                &[&revision_id, &target_type, &target_id, &starting_point],
+            )
+            .await
+            .with_context(|| {
+                format!(
+                    "{}: idempotency {} {} {} {} {} {}",
+                    function_name!(),
+                    revision_id,
+                    project,
+                    deployment_pipeline_id,
+                    target_type,
+                    target_id,
+                    after_event_name
+                )
+            })?
+            .iter()
+            .map(|r| {
+                (
+                    r.get("deployment_job_id"),
+                    r.get("is_retryable"),
+                    r.get("is_success"),
+                    r.get("started_at"),
+                    r.get("finished_at"),
+                )
+            })
+            .collect();
+
+        tx.commit().await?;
+
+        Ok(jobs)
+    }
+
+    /// Returns the jobs in this (revision, project, pipeline, target_type, target_id, event_name).
     /// Returns jobs in the order they were created, where index 0 is the newest job
     ///
     /// Returns vec of (job_id, is_retryable, is_success)
-    pub async fn get_deployment_jobs(
+    pub async fn list_deployment_jobs(
         &self,
         revision_id: &str,
         project: &str,
@@ -974,7 +940,7 @@ impl AntZooStorageClient {
         let jobs: Vec<(String, bool, bool)> = tx
             .query(
                 "
-            select deployment_job_id, is_retryable
+            select deployment_job_id, is_retryable, is_success
             from deployment_job
             where
                 revision_id = $1 and

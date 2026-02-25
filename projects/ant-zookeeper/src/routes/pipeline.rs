@@ -91,8 +91,21 @@ pub struct PipelineDeployStage {
 pub struct RevisionProgress {
     revision: String,
     reached_at: DateTime<Utc>,
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // finished_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FailedJob {
+    job_id: String,
+    started_at: DateTime<Utc>,
+    finished_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FailedRevision {
+    revision: String,
+    failed_jobs: Vec<FailedJob>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -104,8 +117,8 @@ pub struct TargetRevisionProgress {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     finished_revisions: Vec<RevisionProgress>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    failed_revisions: Option<Vec<RevisionProgress>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    failed_revisions: Vec<FailedRevision>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -150,27 +163,39 @@ async fn revision_progress(
         )
         .await?;
 
-    // let failed_jobs = match started {
-    //     None => None,
-    //     Some(revision) => {
-    //         // let has_failed_jobs = state
-    //         //     .db
-    //         //     .get_deployment_jobs(
-    //         //         revision_id,
-    //         //         project,
-    //         //         deployment_pipeline_id,
-    //         //         target_type,
-    //         //         target_id,
-    //         //         event_name,
-    //         //     )
-    //         //     .await?
-    //         //     .iter()
-    //         //     .filter(|(_, _, is_success)| !*is_success)
-    //         //     .map(|j| j.0.as_ref())
-    //         //     .last()
-    //         //     .is_some();
-    //     }
-    // };
+    let mut failed_revisions: Vec<FailedRevision> = Vec::new();
+    for revision in &started {
+        if finished.contains(&revision) {
+            continue;
+        }
+
+        let failed_jobs: Vec<FailedJob> = state
+            .db
+            .list_deployment_jobs_after_event(
+                &revision.0.id,
+                &revision.0.project_id,
+                pipeline_id,
+                target.as_target_type(),
+                target.as_target_id(),
+                &target.started_event().to_string(),
+            )
+            .await?
+            .into_iter()
+            .filter(|(_, _, is_success, _, _)| !*is_success)
+            .map(|(job_id, _, _, started_at, finished_at)| FailedJob {
+                job_id,
+                started_at,
+                finished_at,
+            })
+            .collect();
+
+        if failed_jobs.len() > 0 {
+            failed_revisions.push(FailedRevision {
+                revision: revision.0.id.clone(),
+                failed_jobs,
+            });
+        }
+    }
 
     Ok(TargetRevisionProgress {
         started_revisions: started
@@ -187,7 +212,7 @@ async fn revision_progress(
                 reached_at: rev.1,
             })
             .collect(),
-        failed_revisions: None, // TODO
+        failed_revisions,
     })
 }
 

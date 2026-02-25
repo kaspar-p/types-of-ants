@@ -445,7 +445,7 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
         fixture
             .state
             .db
-            .set_deployment_job_retryable(&job_id)
+            .set_deployment_job_retryable(&job_id, true)
             .await
             .unwrap()
     }

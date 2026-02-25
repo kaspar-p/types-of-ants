@@ -1,6 +1,8 @@
+import { BoxTitle } from "./BoxTitle";
 import { Host } from "./Host";
-import { color, Progress, revisions, Stage } from "./Pipeline";
-import { RevisionBox } from "./RevisionBox";
+import { InProgressDeployments } from "./InProgressDeployments";
+import { LatestDeployment } from "./LatestDeployment";
+import { Progress, revisions, Stage } from "./Pipeline";
 
 type HostGroupProps = {
   stage: Stage & { stageType: { type: "deploy" } };
@@ -15,45 +17,44 @@ export function HostGroup(props: HostGroupProps) {
   );
 
   return (
-    <div className="border">
-      <div
-        className={`p-2 border-b border-b-black flex flex-row ${color(props.revisions, hgRev.finished?.revision).bg}`}
+    <div className="border rounded-lg">
+      <BoxTitle
+        revisions={props.revisions}
+        finished={hgRev.finished}
+        inProgress={hgRev.inProgress}
       >
-        {props.stage.stageType.hostGroup.name}
-        <div className="ml-2 text-sm self-center">
+        <div>{props.stage.stageType.hostGroup.name}</div>
+        <div className="text-sm self-center">
           (<i>environment: {props.stage.stageType.hostGroup.environment}</i>)
         </div>
-      </div>
-      <div className="flex flex-col space-y-2 p-2">
-        <div className="flex flex-row space-x-2">
-          {hgRev.inProgress.length > 0 ? (
-            <span className="flex flex-row items-center">
-              in progress:{" "}
-              <RevisionBox
-                revs={props.revisions}
-                revision={hgRev.inProgress[0].revision}
-              />
-            </span>
-          ) : undefined}
+      </BoxTitle>
 
-          <span className="flex flex-row items-center">
-            latest:{" "}
-            <RevisionBox
-              revs={props.revisions}
-              revision={hgRev.finished?.revision}
-            />
-          </span>
+      <div className="flex flex-col space-y-2 p-2">
+        <div className="flex flex-col space-y-2">
+          <InProgressDeployments
+            revisions={props.revisions}
+            inProgress={hgRev.inProgress}
+          />
+
+          <LatestDeployment
+            revisions={props.revisions}
+            finished={hgRev.finished}
+          />
         </div>
 
         {props.stage.stageType.hostGroup.hosts.length > 0 ? (
-          props.stage.stageType.hostGroup.hosts.map((host, i: number) => (
-            <Host
-              key={i}
-              host={host}
-              progress={props.progress}
-              revisions={props.revisions}
-            />
-          ))
+          props.stage.stageType.hostGroup.hosts.map(
+            (host, i: number, hosts) => (
+              <Host
+                key={i}
+                index={i + 1}
+                total={hosts.length}
+                host={host}
+                progress={props.progress}
+                revisions={props.revisions}
+              />
+            ),
+          )
         ) : (
           <div>No hosts!</div>
         )}

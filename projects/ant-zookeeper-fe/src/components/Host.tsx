@@ -1,11 +1,14 @@
-import {
-  color,
-  formatDatetime,
-  type Host,
-  Progress,
-  revisions,
-} from "./Pipeline";
-type HostProps = {
+import { BoxTitle } from "./BoxTitle";
+import { ClipboardCopy } from "./ClipboardCopy";
+import { DateTime } from "./DateTime";
+import { InProgressDeployments } from "./InProgressDeployments";
+import { LatestDeployment } from "./LatestDeployment";
+import { type Host, Progress, revisions } from "./Pipeline";
+import { RevisionBox } from "./RevisionBox";
+
+export type HostProps = {
+  index: number;
+  total: number;
   host: Host;
   progress: Progress;
   revisions: string[];
@@ -16,28 +19,66 @@ export function Host(props: HostProps) {
 
   return (
     <div>
-      <div className="border">
-        <div
-          className={`p-2 border-b border-b-black flex flex-row ${color(props.revisions, hostRev.finished?.revision).bg}`}
+      <div className="border rounded-lg">
+        <BoxTitle
+          revisions={props.revisions}
+          finished={hostRev.finished}
+          inProgress={hostRev.inProgress}
         >
-          <code>{props.host.name}</code>{" "}
-          <div className="ml-2 text-sm self-center">({props.host.arch}) </div>
-        </div>
-
-        {hostRev.inProgress.length > 0 && (
-          <div className="p-2 text-sm">
-            deploying {hostRev.inProgress.length} in progress:{" "}
-            {hostRev.inProgress
-              .map((r) => `${r.revision} ${r.reachedAt}`)
-              .join(", ")}
+          <span className="flex flex-row space-x-2 items-center">
+            <code>{props.host.name}</code>
+          </span>
+          <div className="text-sm self-center">
+            (<i>{props.host.arch}</i>)
           </div>
-        )}
+          <code className="border rounded-md p-1 text-black bg-white">
+            host {props.index}/{props.total}
+          </code>
+        </BoxTitle>
 
-        <div className="p-2 text-sm">
-          deployed at:{" "}
-          {hostRev.finished
-            ? formatDatetime(hostRev.finished.reachedAt)
-            : "never"}
+        <div className="p-2 flex flex-col space-y-2">
+          {hostRev.failed ? (
+            <div className="flex flex-row space-x-2 items-center">
+              <RevisionBox
+                revs={props.revisions}
+                revision={hostRev.failed.revision}
+                failed={true}
+              />
+              <div className="text-red-700">failed</div>
+              <div className="flex flex-col space-y-1">
+                {hostRev.failed?.failedJobs.map((j, i, jobs) => (
+                  <div
+                    key={i}
+                    className="flex flex-col space-x-2 items-start border rounded-md p-1"
+                  >
+                    <code>
+                      attempt {i + 1}/{jobs.length}
+                    </code>
+                    <div className="ml-4 flex flex-row items-center space-x-1">
+                      <ClipboardCopy text={j.jobId}>
+                        <code>{j.jobId}</code>
+                      </ClipboardCopy>
+                      <div className="flex flex-row items-center space-x-1">
+                        <div>finished</div>
+                        <DateTime date={j.finishedAt} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <InProgressDeployments
+              revisions={props.revisions}
+              inProgress={hostRev.inProgress}
+              verb="deploying"
+            />
+          )}
+
+          <LatestDeployment
+            revisions={props.revisions}
+            finished={hostRev.finished}
+          />
         </div>
       </div>
     </div>

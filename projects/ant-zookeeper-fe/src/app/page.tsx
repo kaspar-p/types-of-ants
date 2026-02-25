@@ -1,6 +1,5 @@
 import { Pipeline } from "@/components/Pipeline";
-import { RefreshButton } from "@/components/RefreshButton";
-import { RefreshTimer } from "@/components/RefreshTimer";
+import { RefreshCounter } from "@/components/RefreshCounter";
 
 export default async function Home() {
   const h = new Headers();
@@ -40,9 +39,7 @@ export default async function Home() {
   return (
     <div className="flex flex-col space-y-4">
       <h1>zoo.typesofants.org</h1>
-      <div className="flex flex-row space-x-4">
-        <RefreshTimer /> <RefreshButton>refresh</RefreshButton>
-      </div>
+      <RefreshCounter />
 
       {responses.map((p) => (
         <Pipeline key={p.project} res={p.res} />
