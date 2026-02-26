@@ -1,7 +1,6 @@
 use std::{
     collections::{HashSet, VecDeque},
     fmt::Display,
-    str::FromStr,
 };
 
 use ant_library::host_architecture::HostArchitecture;
@@ -10,166 +9,155 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DeploymentTarget {
-    Pipeline(String),
-    Stage(String),
-    HostGroup(String),
-    Host(String),
-}
+// #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
+// #[serde(rename_all = "camelCase")]
+// pub enum DeploymentTarget {
+//     Pipeline(String),
+//     Stage(String),
+//     HostGroup(String),
+//     Host(String),
+// }
 
-impl DeploymentTarget {
-    pub fn from_strings(target_type: &str, target_id: String) -> DeploymentTarget {
-        match target_type {
-            "pipeline" => DeploymentTarget::Pipeline(target_id),
-            "stage" => DeploymentTarget::Stage(target_id),
-            "host-group" => DeploymentTarget::HostGroup(target_id),
-            "host" => DeploymentTarget::Host(target_id),
-            _ => panic!("Unknown target type: {target_type}"),
-        }
-    }
+// impl DeploymentTarget {
+//     pub fn from_strings(target_type: &str, target_id: String) -> DeploymentTarget {
+//         match target_type {
+//             "pipeline" => DeploymentTarget::Pipeline(target_id),
+//             "stage" => DeploymentTarget::Stage(target_id),
+//             "host-group" => DeploymentTarget::HostGroup(target_id),
+//             "host" => DeploymentTarget::Host(target_id),
+//             _ => panic!("Unknown target type: {target_type}"),
+//         }
+//     }
 
-    pub fn as_target_type(&self) -> &'static str {
-        match self {
-            DeploymentTarget::Pipeline(_) => "pipeline",
-            DeploymentTarget::Stage(_) => "stage",
-            DeploymentTarget::HostGroup(_) => "host-group",
-            DeploymentTarget::Host(_) => "host",
-        }
-    }
+//     pub fn as_target_type(&self) -> &'static str {
+//         match self {
+//             DeploymentTarget::Pipeline(_) => "pipeline",
+//             DeploymentTarget::Stage(_) => "stage",
+//             DeploymentTarget::HostGroup(_) => "host-group",
+//             DeploymentTarget::Host(_) => "host",
+//         }
+//     }
 
-    pub fn as_target_id(&self) -> &str {
-        match self {
-            DeploymentTarget::Pipeline(p) => p,
-            DeploymentTarget::Stage(p) => p,
-            DeploymentTarget::HostGroup(p) => p,
-            DeploymentTarget::Host(p) => p,
-        }
-    }
+//     pub fn as_target_id(&self) -> &str {
+//         match self {
+//             DeploymentTarget::Pipeline(p) => p,
+//             DeploymentTarget::Stage(p) => p,
+//             DeploymentTarget::HostGroup(p) => p,
+//             DeploymentTarget::Host(p) => p,
+//         }
+//     }
 
-    pub fn started_event(&self) -> EventName {
-        match self {
-            DeploymentTarget::Host(_) => EventName::HostStarted,
-            DeploymentTarget::HostGroup(_) => EventName::HostGroupStarted,
-            DeploymentTarget::Stage(_) => EventName::StageStarted,
-            DeploymentTarget::Pipeline(_) => EventName::PipelineStarted,
-        }
-    }
+//     pub fn started_event(&self) -> Event {
+//         match self {
+//             DeploymentTarget::Host(_) => Event::HostStarted {
+//                 project: "".to_string(),
+//             },
+//             DeploymentTarget::HostGroup(_) => Event::HostGroupStarted,
+//             DeploymentTarget::Stage(_) => Event::StageStarted,
+//             DeploymentTarget::Pipeline(_) => Event::PipelineStarted,
+//         }
+//     }
 
-    pub fn finished_event(&self) -> EventName {
-        match self {
-            DeploymentTarget::Host(_) => EventName::HostFinished,
-            DeploymentTarget::HostGroup(_) => EventName::HostGroupFinished,
-            DeploymentTarget::Stage(_) => EventName::StageFinished,
-            DeploymentTarget::Pipeline(_) => EventName::PipelineFinished,
-        }
-    }
-}
+//     pub fn finished_event(&self) -> Event {
+//         match self {
+//             DeploymentTarget::Host(_) => Event::HostFinished,
+//             DeploymentTarget::HostGroup(_) => Event::HostGroupFinished,
+//             DeploymentTarget::Stage(_) => Event::StageFinished,
+//             DeploymentTarget::Pipeline(_) => Event::PipelineFinished,
+//         }
+//     }
+// }
 
-impl ToString for DeploymentTarget {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Pipeline(p) => p.to_string(),
-            Self::Stage(s) => s.to_string(),
-            Self::HostGroup(hg) => hg.to_string(),
-            Self::Host(host) => host.to_string(),
-        }
-    }
-}
+// impl ToString for DeploymentTarget {
+//     fn to_string(&self) -> String {
+//         match self {
+//             Self::Pipeline(p) => p.to_string(),
+//             Self::Stage(s) => s.to_string(),
+//             Self::HostGroup(hg) => hg.to_string(),
+//             Self::Host(host) => host.to_string(),
+//         }
+//     }
+// }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub enum EventName {
-    PipelineStarted,
+pub enum Event {
+    PipelineStarted {
+        pipeline_id: String,
+    },
+    PipelineFinished {
+        pipeline_id: String,
+    },
 
-    StageStarted,
-    ArtifactArchitectureRegistered(HostArchitecture),
+    StageStarted {
+        stage_id: String,
+    },
+    ArtifactRegistered {
+        stage_id: String,
+        arch: HostArchitecture,
+    },
+    StageFinished {
+        stage_id: String,
+    },
 
-    HostGroupStarted,
+    HostGroupStarted {
+        host_group_id: String,
+    },
+    HostGroupFinished {
+        host_group_id: String,
+    },
 
-    HostStarted,
-    HostArtifactReplicated,
-    HostArtifactDeployed,
-    HostFinished,
-
-    HostGroupFinished,
-    StageFinished,
-
-    PipelineFinished,
+    HostStarted {
+        host_group_id: String,
+        host: String,
+    },
+    HostArtifactReplicated {
+        host_group_id: String,
+        host: String,
+    },
+    HostArtifactDeployed {
+        host_group_id: String,
+        host: String,
+    },
+    HostFinished {
+        host_group_id: String,
+        host: String,
+    },
 }
 
-impl ToString for EventName {
+impl ToString for Event {
     fn to_string(&self) -> String {
-        match self {
-            Self::PipelineStarted => "pipeline-started".to_string(),
-            Self::StageStarted => "stage-started".to_string(),
-            Self::ArtifactArchitectureRegistered(h) => {
-                format!("artifact-architecture-registered:{}", h.as_str())
-            }
-            Self::HostGroupStarted => "host-group-started".to_string(),
-            Self::HostStarted => "host-started".to_string(),
-            Self::HostArtifactReplicated => "host-artifact-replicated".to_string(),
-            Self::HostArtifactDeployed => "host-artifact-deployed".to_string(),
-            Self::HostFinished => "host-finished".to_string(),
-            Self::HostGroupFinished => "host-group-finished".to_string(),
-            Self::StageFinished => "stage-finished".to_string(),
-            Self::PipelineFinished => "pipeline-finished".to_string(),
-        }
+        serde_json::to_string(&self)
+            .expect(&format!("Event failed to serialize to string: {self:?}"))
     }
 }
 
-impl<E> From<E> for EventName
+impl<E> From<E> for Event
 where
     E: Into<String>,
 {
     fn from(value: E) -> Self {
-        match value.into().as_str() {
-            "pipeline-started" => Self::PipelineStarted,
-            "stage-started" => Self::StageStarted,
-            "host-group-started" => Self::HostGroupStarted,
-            "host-started" => Self::HostStarted,
-            "host-artifact-replicated" => Self::HostArtifactReplicated,
-            "host-artifact-deployed" => Self::HostArtifactDeployed,
-            "host-finished" => Self::HostFinished,
-            "host-group-finished" => Self::HostGroupFinished,
-            "stage-finished" => Self::StageFinished,
-            "pipeline-finished" => Self::PipelineFinished,
-
-            v if v.starts_with("artifact-architecture-registered:") => {
-                Self::ArtifactArchitectureRegistered(
-                    HostArchitecture::from_str(
-                        v.split(":")
-                            .last()
-                            .expect(format!("Event value {v} must have : delimiter").as_str()),
-                    )
-                    .expect(
-                        format!("Event value {v} could not get host architecture parsed back out")
-                            .as_str(),
-                    ),
-                )
-            }
-
-            v => panic!("Invalid EventName: {v}"),
-        }
+        let str = value.into();
+        serde_json::from_str(&str)
+            .expect(&format!("Event failed to deserialize from string: {str}"))
     }
 }
 
-/// Represents (revision_id, target, event)
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct DeploymentEvent(pub String, pub DeploymentTarget, pub EventName);
+/// Represents (revision_id, event)
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub struct DeploymentEvent(pub String, pub Event);
 
 impl DeploymentEvent {
     pub fn for_other_revision(&self, rev: String) -> Self {
-        DeploymentEvent(rev, self.1.clone(), self.2.clone())
+        DeploymentEvent(rev, self.1.clone())
     }
 }
 
 impl Display for DeploymentEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "Deployment{{deployment_id: {}, target: {:?}, event: {:?}}}",
-            self.0, self.1, self.2
+            "Deployment{{revision: {}, event: {:?}}}",
+            self.0, self.1
         ))?;
 
         Ok(())
@@ -199,20 +187,14 @@ pub(crate) async fn is_deployment_complete(
     db: &AntZooStorageClient,
     e: &DeploymentEvent,
 ) -> Result<bool, anyhow::Error> {
-    db.get_deployment(
-        &e.0,
-        e.1.as_target_type(),
-        &e.1.as_target_id(),
-        &e.2.to_string(),
-    )
-    .await
-    .map(|r| r.is_some())
+    db.get_deployment(&e.0, &e.1.to_string())
+        .await
+        .map(|r| r.is_some())
 }
 
 /// Return all events that come AFTER the `event`, not including the input.
 pub(crate) async fn after(
     db: &AntZooStorageClient,
-    deployment_pipeline_id: &str,
     event: &DeploymentEvent,
 ) -> Result<Vec<DeploymentEvent>, PipelineError> {
     let mut after: Vec<DeploymentEvent> = Vec::new();
@@ -223,7 +205,7 @@ pub(crate) async fn after(
 
     loop {
         if let Some(event) = queue.pop_front() {
-            let t = transition(&db, deployment_pipeline_id, &event).await?;
+            let t = transition(&db, &event).await?;
 
             for next_event in t.next {
                 if !seen.contains(&next_event) {
@@ -242,19 +224,22 @@ pub(crate) async fn after(
 
 /// Determine whether a step is DOABLE, based on a few criteria:
 ///
-/// INCOMPLETE(a): the event `a` is incomplete.
 /// NEW(a): all events in `after(a)` must be incomplete.
-/// READY(a): given a frontier `f`, the steps in `after(f)` do not contain `a`.
+///     This property ensures that adding hosts to host groups does not deploy to that host.
 ///
-/// This function returns whether the event is INCOMPLETE, NEW, and READY.
+/// READY(a): given a frontier `f`, the steps in `after(f)` do not contain `a`.
+///     This property ensures that "collapsing" nodes in the graph (nodes that have multiple
+///     nodes as predecessors) do not begin too early. They must begin only if ALL of their
+///     predecessors are finished, not just the first one.
+///
+/// This function returns whether the event is NEW and READY.
 pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     db: &AntZooStorageClient,
-    deployment_pipeline_id: &str,
     frontier: T,
     event: &DeploymentEvent,
 ) -> Result<bool, PipelineError> {
     // Check for NEW
-    for e in after(db, deployment_pipeline_id, event).await? {
+    for e in after(db, event).await? {
         if is_deployment_complete(db, &e).await? {
             info!("Event {event:?} is not doable, failed NEW: event {e:?} is AFTER, but complete!");
             return Ok(false);
@@ -263,10 +248,7 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 
     // Check for READY
     for frontier_event in frontier {
-        if after(db, deployment_pipeline_id, frontier_event)
-            .await?
-            .contains(event)
-        {
+        if after(db, frontier_event).await?.contains(event) {
             info!("Event {event:?} is not doable, failed READY: event {frontier_event:?} has this event in AFTER!");
             return Ok(false);
         }
@@ -277,67 +259,68 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 
 pub async fn transition(
     db: &AntZooStorageClient,
-    deployment_pipeline_id: &str,
     event: &DeploymentEvent,
 ) -> Result<Transition, PipelineError> {
-    type T = DeploymentTarget;
-    type E = EventName;
+    type E = Event;
 
     match event {
-        DeploymentEvent(rev, T::Pipeline(p), E::PipelineStarted) => {
-            // The pipeline has begun! Start the first stage.
-
-            let build_stage_id = db
-                .get_deployment_pipeline_stage_by_order(p, 0)
+        DeploymentEvent(rev, E::PipelineStarted { pipeline_id }) => {
+            // The pipeline has begun! Start the first stages, those with no dependencies
+            let initial_stages = db
+                .list_deployment_stages_with_no_previous_adjacencies(pipeline_id)
                 .await?
-                .expect("all pipelines should have a stage 0");
+                .into_iter()
+                .map(|stage_id| DeploymentEvent(rev.clone(), E::StageStarted { stage_id }))
+                .collect();
 
             // Find the first stage of the pipeline and start that.
             Ok(Transition {
-                next: vec![DeploymentEvent(
-                    rev.clone(),
-                    T::Stage(build_stage_id),
-                    E::StageStarted,
-                )],
+                next: initial_stages,
             })
         }
 
-        DeploymentEvent(rev, T::Stage(s), E::StageStarted) => {
+        DeploymentEvent(rev, E::StageStarted { stage_id }) => {
             // A pipeline stage has begun, start the host group within it
             let stage = db
-                .get_deployment_pipeline_stage(s)
+                .get_deployment_pipeline_stage(stage_id)
                 .await?
                 .context(event.clone())
                 .context("stage should exist if event target")?;
 
-            let next_stages = match stage.3.as_str() {
+            let next_events = match stage.2.as_str() {
                 "build" => {
                     // The build stage has 3 successors, one for each architecture.
-
                     db.list_architectures()
                         .await?
                         .into_iter()
                         .map(|arch| {
                             DeploymentEvent(
                                 rev.clone(),
-                                T::Stage(s.clone()),
-                                E::ArtifactArchitectureRegistered(arch),
+                                E::ArtifactRegistered {
+                                    stage_id: stage_id.clone(),
+                                    arch,
+                                },
                             )
                         })
                         .collect()
                 }
 
                 "deploy" => {
-                    let hg = db
-                        .get_host_group_by_stage_id(s)
-                        .await?
-                        .context("deploy stages should have a host group attached")?;
+                    let hgs = db.get_host_groups_by_stage_id(stage_id).await?;
 
-                    vec![DeploymentEvent(
-                        rev.clone(),
-                        T::HostGroup(hg.id),
-                        E::HostGroupStarted,
-                    )]
+                    assert_ne!(hgs.len(), 0);
+
+                    // Deploy to all host groups in parallel.
+                    hgs.into_iter()
+                        .map(|hg| {
+                            DeploymentEvent(
+                                rev.clone(),
+                                E::HostGroupStarted {
+                                    host_group_id: hg.id,
+                                },
+                            )
+                        })
+                        .collect()
                 }
 
                 s => {
@@ -347,20 +330,24 @@ pub async fn transition(
                 }
             };
 
-            Ok(Transition { next: next_stages })
+            Ok(Transition { next: next_events })
         }
 
-        DeploymentEvent(rev, T::Stage(s), E::ArtifactArchitectureRegistered(_)) => Ok(Transition {
+        DeploymentEvent(rev, E::ArtifactRegistered { stage_id, .. }) => Ok(Transition {
             next: vec![DeploymentEvent(
                 rev.clone(),
-                T::Stage(s.clone()),
-                E::StageFinished,
+                E::StageFinished {
+                    stage_id: stage_id.clone(),
+                },
             )],
         }),
 
-        DeploymentEvent(rev, T::HostGroup(hg), E::HostGroupStarted) => {
+        DeploymentEvent(rev, E::HostGroupStarted { host_group_id }) => {
             // Start deployment to all hosts in the host group, in parallel.
-            let hg = db.get_host_group_by_id(hg).await?.context(event.clone())?;
+            let hg = db
+                .get_host_group_by_id(host_group_id)
+                .await?
+                .context(event.clone())?;
 
             let next = hg
                 .hosts
@@ -368,8 +355,10 @@ pub async fn transition(
                 .map(|host| {
                     DeploymentEvent(
                         rev.clone(),
-                        DeploymentTarget::Host(host.name),
-                        E::HostStarted,
+                        E::HostStarted {
+                            host_group_id: host_group_id.clone(),
+                            host: host.name,
+                        },
                     )
                 })
                 .collect::<Vec<DeploymentEvent>>();
@@ -377,91 +366,114 @@ pub async fn transition(
             Ok(Transition { next })
         }
 
-        DeploymentEvent(rev, T::Host(host), E::HostStarted) => Ok(Transition {
+        DeploymentEvent(
+            rev,
+            E::HostStarted {
+                host_group_id,
+                host,
+            },
+        ) => Ok(Transition {
             next: vec![DeploymentEvent(
                 rev.clone(),
-                DeploymentTarget::Host(host.clone()),
-                E::HostArtifactReplicated,
+                E::HostArtifactReplicated {
+                    host: host.clone(),
+                    host_group_id: host_group_id.clone(),
+                },
             )],
         }),
 
-        DeploymentEvent(rev, T::Host(host), E::HostArtifactReplicated) => Ok(Transition {
+        DeploymentEvent(
+            rev,
+            E::HostArtifactReplicated {
+                host_group_id,
+                host,
+            },
+        ) => Ok(Transition {
             next: vec![DeploymentEvent(
                 rev.clone(),
-                DeploymentTarget::Host(host.clone()),
-                E::HostArtifactDeployed,
+                E::HostArtifactDeployed {
+                    host_group_id: host_group_id.clone(),
+                    host: host.clone(),
+                },
             )],
         }),
 
-        DeploymentEvent(rev, T::Host(host), E::HostArtifactDeployed) => Ok(Transition {
+        DeploymentEvent(
+            rev,
+            E::HostArtifactDeployed {
+                host_group_id,
+                host,
+            },
+        ) => Ok(Transition {
             next: vec![DeploymentEvent(
                 rev.clone(),
-                DeploymentTarget::Host(host.clone()),
-                event.1.finished_event(),
+                E::HostFinished {
+                    host_group_id: host_group_id.clone(),
+                    host: host.clone(),
+                },
             )],
         }),
 
-        DeploymentEvent(rev, T::Host(host), E::HostFinished) => {
-            // Find the host group for the host, given the current revision...
-            let host_group = db
-                .get_host_group_by_host(deployment_pipeline_id, &host)
-                .await
-                .context(event.clone())?
-                .expect("hosts targeted in a pipeline can be traced back");
+        DeploymentEvent(rev, E::HostFinished { host_group_id, .. }) => Ok(Transition {
+            next: vec![DeploymentEvent(
+                rev.clone(),
+                E::HostGroupFinished {
+                    host_group_id: host_group_id.clone(),
+                },
+            )],
+        }),
 
-            Ok(Transition {
-                next: vec![DeploymentEvent(
-                    rev.clone(),
-                    T::HostGroup(host_group),
-                    E::HostGroupFinished,
-                )],
-            })
-        }
-
-        DeploymentEvent(rev, T::HostGroup(hg), E::HostGroupFinished) => {
+        DeploymentEvent(rev, E::HostGroupFinished { host_group_id }) => {
             let stage_id = db
-                .get_deployment_pipeline_stage_by_host_group(hg)
+                .get_deployment_pipeline_stage_by_host_group(host_group_id)
                 .await?
                 .context(event.clone())?;
 
             Ok(Transition {
                 next: vec![DeploymentEvent(
                     rev.clone(),
-                    T::Stage(stage_id),
-                    E::StageFinished,
+                    E::StageFinished {
+                        stage_id: stage_id.clone(),
+                    },
                 )],
             })
         }
 
-        DeploymentEvent(rev, T::Stage(s), E::StageFinished) => {
+        DeploymentEvent(rev, E::StageFinished { stage_id }) => {
             // Start the next stage in the pipeline, if there is one!
             let stage = db
-                .get_deployment_pipeline_stage(s)
+                .get_deployment_pipeline_stage(stage_id)
                 .await?
                 .context(event.clone())?;
 
-            let next_stage = db
-                .get_deployment_pipeline_stage_by_order(&stage.0, stage.2 + 1)
-                .await?;
+            let next_stages: Vec<DeploymentEvent> = db
+                .list_deployment_pipeline_stages_after(&stage_id)
+                .await?
+                .into_iter()
+                .map(|next_stage_id| {
+                    DeploymentEvent(
+                        rev.clone(),
+                        E::StageStarted {
+                            stage_id: next_stage_id,
+                        },
+                    )
+                })
+                .collect();
 
-            let next_event = match next_stage {
-                None => DeploymentEvent(
+            // Finish the pipeline if there aren't any stages left
+            let next_events = match next_stages.len() {
+                0 => vec![DeploymentEvent(
                     rev.clone(),
-                    T::Pipeline(stage.0.clone()),
-                    E::PipelineFinished,
-                ),
-                Some(next_stage) => {
-                    DeploymentEvent(rev.clone(), T::Stage(next_stage), E::StageStarted)
-                }
+                    E::PipelineFinished {
+                        pipeline_id: stage.0,
+                    },
+                )],
+                _ => next_stages,
             };
 
-            Ok(Transition {
-                next: vec![next_event],
-            })
+            Ok(Transition { next: next_events })
         }
 
-        DeploymentEvent(_, T::Pipeline(_), E::PipelineFinished) => Ok(Transition { next: vec![] }),
-
-        event => Err(PipelineError::UnknownStep(event.clone())),
+        DeploymentEvent(_, E::PipelineFinished { .. }) => Ok(Transition { next: vec![] }),
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::exists;
 use std::io::Read;
 use std::path::PathBuf;
@@ -22,6 +23,7 @@ use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
 use crate::anthill::AnthillManifest;
+use crate::event_loop::transition::Event;
 use crate::fs::{
     artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
     secret_file_path,
@@ -254,7 +256,45 @@ async fn register_artifact(
         std::fs::copy(&temp_file_path, &filepath)?;
     }
 
-    let (revision_id, is_new) = state.db.upsert_revision(&project.0, &version.0).await?;
+    let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;
+
+    if is_new {
+        info!(
+            "Revision {revision_id} is new, scheduling pipelines that build this project to start."
+        );
+        let all_pipelines = state.db.list_deployment_pipelines().await?;
+        let mut pipelines_building_project: HashSet<&String> = HashSet::new();
+        for pipeline_id in &all_pipelines {
+            let build_stages = state
+                .db
+                .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
+                .await?;
+            for stage_id in build_stages {
+                let stage = state
+                    .db
+                    .get_deployment_pipeline_stage(&stage_id)
+                    .await?
+                    .unwrap();
+                let pipeline_build_project = stage.3.expect(&format!(
+                    "build stage {stage_id} should have project attached."
+                ));
+
+                if pipeline_build_project == *project.0 {
+                    pipelines_building_project.insert(pipeline_id);
+                }
+            }
+        }
+
+        for pipeline_id in pipelines_building_project {
+            let event = Event::PipelineStarted {
+                pipeline_id: pipeline_id.clone(),
+            };
+            state
+                .db
+                .create_deployment_job(&revision_id, &event.to_string())
+                .await?;
+        }
+    }
 
     info!(
         "Registering or updating artifact for [new={}] revision [{}]",
@@ -262,7 +302,7 @@ async fn register_artifact(
     );
     let artifact_id = state
         .db
-        .get_artifact_by_revision(arch.0.as_ref(), &revision_id)
+        .get_artifact_by_revision(&revision_id, &project.0, arch.0.as_ref())
         .await?;
 
     match artifact_id {
@@ -279,7 +319,7 @@ async fn register_artifact(
             ));
             state
                 .db
-                .register_artifact(&revision_id, arch.0.as_ref(), &relative)
+                .register_artifact(&project.0, &revision_id, arch.0.as_ref(), &relative)
                 .await?;
         }
     }

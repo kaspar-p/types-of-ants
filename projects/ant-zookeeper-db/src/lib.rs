@@ -40,6 +40,7 @@ pub struct HostGroupHost {
 pub struct HostGroup {
     pub id: String,
     pub name: String,
+    pub project: String,
     pub environment: String,
     pub description: Option<String>,
     pub hosts: Vec<HostGroupHost>,
@@ -47,26 +48,12 @@ pub struct HostGroup {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct DeploymentJob {
-    pub job_id: String,
-    pub project_id: String,
-    pub deployment_pipeline_id: String,
-    pub revision: String,
-    pub target_type: String,
-    pub target_id: String,
-    pub event_name: String,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Deployment {
     pub deployment_id: String,
     pub revision_id: String,
-    pub target_type: String,
-    pub target_id: String,
-    pub event_name: String,
+    pub event: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -111,35 +98,17 @@ impl AntZooStorageClient {
         Ok(row.is_some())
     }
 
-    pub async fn get_project_from_deployment_pipeline(
-        &self,
-        deployment_pipeline_id: &str,
-    ) -> Result<String, anyhow::Error> {
-        let project_id = self
-            .db
-            .get()
-            .await?
-            .query_one(
-                "
-            select project_id
-            from deployment_pipeline
-            where
-                deployment_pipeline_id = $1
-            ",
-                &[&deployment_pipeline_id],
-            )
-            .await?
-            .get("project_id");
-
-        Ok(project_id)
-    }
-
+    /// When building a new project, the project associates itself with some revision, some VERSION.
+    ///
+    /// This is allowed if the revision is still "collecting", and has not progressed beyond the build
+    /// phase of the pipeline, but not allowed if we've started deploying this artifact.
+    ///
+    /// This is the inverse of the Version Set, which forces itself as one-final-thing onto the pipeline
+    /// to be used for its artifacts. Here we need to "collect"/"poll" until we decide to release it further
+    /// into the pipeline, closing that collection phase.
+    ///
     /// Returns (revision_id, is_new)
-    pub async fn upsert_revision(
-        &self,
-        project: &str,
-        version: &str,
-    ) -> Result<(String, bool), anyhow::Error> {
+    pub async fn upsert_revision(&self, version: &str) -> Result<(String, bool), anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
@@ -149,10 +118,9 @@ impl AntZooStorageClient {
                 select revision_id
                 from revision
                 where
-                    project_id = $1 and
-                    deployment_version = $2
+                    deployment_version = $1
             ",
-                &[&project, &version],
+                &[&version],
             )
             .await?
             .map(|r| r.get("revision_id"));
@@ -164,31 +132,15 @@ impl AntZooStorageClient {
                     .query_one(
                         "
                     insert into revision
-                        (project_id, deployment_version)
+                        (deployment_version)
                     values
-                        ($1, $2)
+                        ($1)
                     returning revision_id
                     ",
-                        &[&project, &version],
+                        &[&version],
                     )
                     .await?
                     .get("revision_id");
-
-                let pipeline_id = self
-                    .get_deployment_pipeline_by_project(project)
-                    .await?
-                    .unwrap();
-
-                tx.execute(
-                    "
-                insert into deployment
-                    (revision_id, target_type, target_id, event_name)
-                values
-                    ($1, 'pipeline', $2, 'pipeline-started')
-                ",
-                    &[&revision_id, &pipeline_id],
-                )
-                .await?;
 
                 tx.commit().await?;
 
@@ -200,25 +152,35 @@ impl AntZooStorageClient {
     /// Returns (artifact id, version, local path)
     pub async fn get_artifact_by_revision(
         &self,
-        arch: Option<&HostArchitecture>,
         revision_id: &str,
+        project: &str,
+        arch: Option<&HostArchitecture>,
     ) -> Result<Option<(String, String, PathBuf)>, anyhow::Error> {
         let con = self.db.get().await?;
 
         let exists = con
             .query_opt(
                 "
-            select artifact_id, deployment_version, local_path
+            select artifact.artifact_id, revision.deployment_version, artifact.local_path
             from artifact
-                join revision on revision.revision_id
-                    = artifact.revision_id
+                join revision on artifact.revision_id = revision.revision_id
             where
-                revision.revision_id = $1 and
-                artifact.architecture_id = $2
+                artifact.revision_id = $1 and
+                artifact.project_id = $2 and
+                artifact.architecture_id = $3
             ",
-                &[&revision_id, &arch.map(|a| a.as_str())],
+                &[&revision_id, &project, &arch.map(|a| a.as_str())],
             )
-            .await?
+            .await
+            .with_context(|| {
+                format!(
+                    "{}: {} {} {:?}",
+                    function_name!(),
+                    revision_id,
+                    project,
+                    arch
+                )
+            })?
             .map(|row| -> Result<(String, String, PathBuf), anyhow::Error> {
                 Ok((
                     row.get("artifact_id"),
@@ -233,6 +195,7 @@ impl AntZooStorageClient {
 
     pub async fn missing_artifacts_for_revision_id(
         &self,
+        project: &str,
         revision_id: &str,
     ) -> Result<Vec<HostArchitecture>, anyhow::Error> {
         let mut con = self.db.get().await?;
@@ -246,12 +209,15 @@ impl AntZooStorageClient {
             where architecture.architecture_id not in (
                 select artifact.architecture_id
                 from artifact
-                where artifact.revision_id = $1
+                where
+                    artifact.revision_id = $1 and
+                    artifact.project_id = $2
             )
             ",
-                &[&revision_id],
+                &[&revision_id, &project],
             )
-            .await?;
+            .await
+            .with_context(|| format!("{}: {} {}", function_name!(), project, revision_id))?;
 
         let architectures = rows
             .iter()
@@ -275,14 +241,16 @@ impl AntZooStorageClient {
             select revision_id
             from revision
             where
-                project_id = $1 and
-                deployment_version = $2",
-                &[&project, &version],
+                deployment_version = $1",
+                &[&version],
             )
-            .await?
+            .await
+            .with_context(|| format!("{}: {} {}", function_name!(), project, version))?
             .get("revision_id");
 
-        return Ok(self.missing_artifacts_for_revision_id(&revision).await?);
+        return Ok(self
+            .missing_artifacts_for_revision_id(&project, &revision)
+            .await?);
     }
 
     pub async fn list_architectures(&self) -> Result<Vec<HostArchitecture>, anyhow::Error> {
@@ -302,6 +270,7 @@ impl AntZooStorageClient {
 
     pub async fn register_artifact(
         &self,
+        project: &str,
         revision_id: &str,
         arch: Option<&HostArchitecture>,
         path: &Path,
@@ -314,12 +283,13 @@ impl AntZooStorageClient {
             .query_one(
                 "
             insert into artifact
-                (revision_id, architecture_id, local_path)
+                (project_id, revision_id, architecture_id, local_path)
             values
-                ($1, $2, $3)
+                ($1, $2, $3, $4)
             returning artifact_id
             ",
                 &[
+                    &project,
                     &revision_id,
                     &arch.map(|a| a.as_str()),
                     &path
@@ -328,7 +298,16 @@ impl AntZooStorageClient {
                         .expect(&format!("bad artifact path: {}", path.display())),
                 ],
             )
-            .await?
+            .await
+            .with_context(|| {
+                format!(
+                    "{}: {} {:?} {}",
+                    function_name!(),
+                    revision_id,
+                    arch,
+                    path.display()
+                )
+            })?
             .get("artifact_id");
 
         tx.commit().await?;
@@ -410,6 +389,70 @@ impl AntZooStorageClient {
         Ok(secret_id)
     }
 
+    pub async fn create_deployment_pipeline(&self, name: &str) -> Result<String, anyhow::Error> {
+        let exists = self
+            .db
+            .get()
+            .await?
+            .query_one(
+                "
+            insert into deployment_pipeline
+                (deployment_pipeline_name)
+            values
+                ($1)
+            returning deployment_pipeline_id
+            ",
+                &[&name],
+            )
+            .await?
+            .get("deployment_pipeline_id");
+
+        Ok(exists)
+    }
+
+    pub async fn list_deployment_pipelines(&self) -> Result<Vec<String>, anyhow::Error> {
+        let pipeline_ids = self
+            .db
+            .get()
+            .await?
+            .query(
+                "
+            select deployment_pipeline_id
+            from deployment_pipeline
+            ",
+                &[],
+            )
+            .await?
+            .into_iter()
+            .map(|row| row.get("deployment_pipeline_id"))
+            .collect();
+
+        Ok(pipeline_ids)
+    }
+
+    pub async fn get_deployment_pipeline_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Option<String>, anyhow::Error> {
+        let exists = self
+            .db
+            .get()
+            .await?
+            .query_opt(
+                "
+            select deployment_pipeline_id
+            from deployment_pipeline
+            where deployment_pipeline_name = $1
+            ",
+                &[&name],
+            )
+            .await?
+            .map(|r| r.get("deployment_pipeline_id"));
+
+        Ok(exists)
+    }
+
+    #[deprecated]
     pub async fn get_deployment_pipeline_by_project(
         &self,
         project: &str,
@@ -433,11 +476,11 @@ impl AntZooStorageClient {
         Ok(exists)
     }
 
-    /// Returns (stage_name, stage_id, stage_type)
-    pub async fn get_deployment_pipeline_stages(
+    /// Returns vec of (stage_name, stage_id, stage_type, stage_type_build_project_id) UNORDERED
+    pub async fn list_deployment_pipeline_stages(
         &self,
-        project: &str,
-    ) -> Result<Vec<(String, String, String)>, anyhow::Error> {
+        deployment_pipeline_id: &str,
+    ) -> Result<Vec<(String, String, String, Option<String>)>, anyhow::Error> {
         let rows = self
             .db
             .get()
@@ -447,26 +490,25 @@ impl AntZooStorageClient {
             select
                 stage_name,
                 deployment_pipeline_stage_id,
-                stage_type
+                stage_type,
+                stage_type_build_project_id
             from deployment_pipeline_stage
-                join deployment_pipeline on deployment_pipeline_stage.deployment_pipeline_id
-                    = deployment_pipeline.deployment_pipeline_id
             where
-                deployment_pipeline.project_id = $1
-            order by stage_order asc
+                deployment_pipeline_id = $1
         ",
-                &[&project],
+                &[&deployment_pipeline_id],
             )
             .await
-            .with_context(|| format!("{}: {}", function_name!(), project))?;
+            .with_context(|| format!("{}: {}", function_name!(), deployment_pipeline_id))?;
 
         let stages = rows
             .iter()
-            .map(|row| -> (String, String, String) {
+            .map(|row| {
                 (
                     row.get("stage_name"),
                     row.get("deployment_pipeline_stage_id"),
                     row.get("stage_type"),
+                    row.get("stage_type_build_project_id"),
                 )
             })
             .collect();
@@ -474,18 +516,77 @@ impl AntZooStorageClient {
         Ok(stages)
     }
 
-    /// Returns (pipeline_id, stage_name, stage_order, stage_type)
+    pub async fn list_deployment_stages_with_no_previous_adjacencies(
+        &self,
+        deployment_pipeline_id: &str,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let stage_ids = self
+            .db
+            .get()
+            .await?
+            .query(
+                "
+            select deployment_pipeline_stage_id
+            from deployment_pipeline_stage
+            where 
+                deployment_pipeline_id = $1 and
+                deployment_pipeline_stage_id not in (
+                    select to_stage_id as deployment_pipeline_stage_id
+                    from deployment_pipeline_stage_edge
+                )
+            order by stage_name
+            ",
+                &[&deployment_pipeline_id],
+            )
+            .await?
+            .into_iter()
+            .map(|row| row.get("deployment_pipeline_stage_id"))
+            .collect();
+
+        Ok(stage_ids)
+    }
+
+    /// Gets all the stages `s` that have a direct edge like (prev, s).
+    ///
+    /// If None then finds all stages with no adjacency
+    pub async fn list_deployment_pipeline_stages_after(
+        &self,
+        previous_stage_id: &str,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let after = self
+            .db
+            .get()
+            .await?
+            .query(
+                "
+            select to_stage_id
+            from deployment_pipeline_stage_edge
+            where
+                from_stage_id = $1
+            order by created_at
+            ",
+                &[&previous_stage_id],
+            )
+            .await?
+            .into_iter()
+            .map(|row| row.get("to_stage_id"))
+            .collect();
+
+        Ok(after)
+    }
+
+    /// Returns (pipeline_id, stage_name, stage_type, stage_type_build_project_id)
     pub async fn get_deployment_pipeline_stage(
         &self,
         stage_id: &str,
-    ) -> Result<Option<(String, String, i32, String)>, anyhow::Error> {
+    ) -> Result<Option<(String, String, String, Option<String>)>, anyhow::Error> {
         let stage = self
             .db
             .get()
             .await?
             .query_opt(
                 "
-            select deployment_pipeline_id, stage_name, stage_order, stage_type
+            select deployment_pipeline_id, stage_name, stage_type, stage_type_build_project_id
             from deployment_pipeline_stage
             where
                 deployment_pipeline_stage_id = $1
@@ -498,40 +599,12 @@ impl AntZooStorageClient {
                 (
                     row.get("deployment_pipeline_id"),
                     row.get("stage_name"),
-                    row.get("stage_order"),
                     row.get("stage_type"),
+                    row.get("stage_type_build_project_id"),
                 )
             });
 
         Ok(stage)
-    }
-
-    pub async fn get_deployment_pipeline_stage_by_order(
-        &self,
-        deployment_pipeline_id: &str,
-        order: i32,
-    ) -> Result<Option<String>, anyhow::Error> {
-        let stage_id = self
-            .db
-            .get()
-            .await?
-            .query_opt(
-                "
-            select deployment_pipeline_stage_id
-            from deployment_pipeline_stage
-                join deployment_pipeline on deployment_pipeline.deployment_pipeline_id
-                    = deployment_pipeline_stage.deployment_pipeline_id
-            where
-                deployment_pipeline.deployment_pipeline_id = $1 and
-                stage_order = $2
-            ",
-                &[&deployment_pipeline_id, &order],
-            )
-            .await
-            .with_context(|| format!("{}: {} {}", function_name!(), deployment_pipeline_id, order))?
-            .map(|r| r.get("deployment_pipeline_stage_id"));
-
-        Ok(stage_id)
     }
 
     pub async fn get_deployment_pipeline_stage_by_host_group(
@@ -544,10 +617,13 @@ impl AntZooStorageClient {
             .await?
             .query_opt(
                 "
-            select deployment_pipeline_stage_id
+            select deployment_pipeline_stage.deployment_pipeline_stage_id
             from deployment_pipeline_stage
+                join deployment_pipeline_stage_host_group on
+                    deployment_pipeline_stage_host_group.deployment_pipeline_stage_id
+                        = deployment_pipeline_stage.deployment_pipeline_stage_id
             where
-                stage_type_deploy_host_group_id = $1
+                host_group_id = $1
             ",
                 &[&host_group_id],
             )
@@ -562,10 +638,10 @@ impl AntZooStorageClient {
         &self,
         stage_id: &str,
     ) -> Result<(), anyhow::Error> {
-        let deleted = self
-            .db
-            .get()
-            .await?
+        let mut con = self.db.get().await?;
+        let tx = con.transaction().await?;
+
+        let deleted = tx
             .execute(
                 "
             delete from deployment_pipeline_stage
@@ -576,11 +652,36 @@ impl AntZooStorageClient {
             .await
             .with_context(|| format!("{}: {}", function_name!(), stage_id))?;
 
+        // Delete edges from adjacency list
+        tx.execute(
+            "
+        delete from deployment_pipeline_stage_edge
+        where
+            from_stage_id = $1 or to_stage_id = $1
+        ",
+            &[&stage_id],
+        )
+        .await
+        .with_context(|| format!("{}: edges {}", function_name!(), stage_id))?;
+
+        // Delete host group associations
+        tx.execute(
+            "
+        delete from deployment_pipeline_stage_host_group
+        where deployment_pipeline_stage_id = $1
+        ",
+            &[],
+        )
+        .await
+        .with_context(|| format!("{}: host groups {}", function_name!(), stage_id))?;
+
         if deleted != 1 {
             panic!(
                 "Deleted {deleted} stages '{stage_id}' but meant to just delete a single stage!"
             );
         }
+
+        tx.commit().await?;
 
         Ok(())
     }
@@ -589,13 +690,16 @@ impl AntZooStorageClient {
         &self,
         deployment_pipeline_id: &str,
         stage_name: &str,
-        host_group_id: &str,
-        ordering: i32,
+        stage_type: &str,
+        deploy_stage_host_group_ids: Option<&Vec<String>>,
+        build_stage_project_id: Option<&str>,
+        previous_stage_ids: &Vec<String>,
     ) -> Result<String, anyhow::Error> {
-        let stage_id: String = self
-            .db
-            .get()
-            .await?
+        let mut con = self.db.get().await?;
+
+        let tx = con.transaction().await?;
+
+        let stage_id: String = tx
             .query_one(
                 "
             insert into deployment_pipeline_stage
@@ -603,32 +707,71 @@ impl AntZooStorageClient {
                 deployment_pipeline_id,
                 stage_name,
                 stage_type,
-                stage_type_deploy_host_group_id,
-                stage_order
+                stage_type_build_project_id
             )
             values
-                ($1, $2, 'deploy', $3, $4)
+                ($1, $2, $3, $4)
             returning deployment_pipeline_stage_id
         ",
                 &[
                     &deployment_pipeline_id,
                     &stage_name,
-                    &host_group_id,
-                    &ordering,
+                    &stage_type,
+                    &build_stage_project_id,
                 ],
             )
             .await
             .with_context(|| {
                 format!(
-                    "{}: {} {} {} {}",
+                    "{}: {} {} {} {:?} {}",
                     function_name!(),
                     deployment_pipeline_id,
                     stage_name,
-                    host_group_id,
-                    ordering
+                    deploy_stage_host_group_ids.unwrap_or(&vec![]).join(", "),
+                    build_stage_project_id,
+                    previous_stage_ids.join(", ")
                 )
             })?
             .get("deployment_pipeline_stage_id");
+
+        // previous edges
+        for prev_stage in previous_stage_ids {
+            tx.execute(
+                "
+            insert into deployment_pipeline_stage_edge
+                (from_stage_id, to_stage_id)
+            values
+                ($1, $2)
+            ",
+                &[&prev_stage, &stage_id],
+            )
+            .await
+            .with_context(|| format!("{}: edge {} {}", function_name!(), prev_stage, stage_id))?;
+        }
+
+        // host group 1:many membership
+        for host_group_id in deploy_stage_host_group_ids.unwrap_or(&vec![]) {
+            tx.execute(
+                "
+            insert into deployment_pipeline_stage_host_group
+                (deployment_pipeline_stage_id, host_group_id)
+            values
+                ($1, $2)
+            ",
+                &[&stage_id, &host_group_id],
+            )
+            .await
+            .with_context(|| {
+                format!(
+                    "{}: host group {} {}",
+                    function_name!(),
+                    stage_id,
+                    host_group_id
+                )
+            })?;
+        }
+
+        tx.commit().await?;
 
         Ok(stage_id)
     }
@@ -636,9 +779,7 @@ impl AntZooStorageClient {
     pub async fn get_deployment(
         &self,
         revision_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
+        event: &str,
     ) -> Result<Option<String>, anyhow::Error> {
         let deployment_id = self
             .db
@@ -650,28 +791,27 @@ impl AntZooStorageClient {
             from deployment
             where
                 revision_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4
+                deployment_event = $2
             ",
-                &[&revision_id, &target_type, &target_id, &event_name],
+                &[&revision_id, &event],
             )
             .await
-            .with_context(|| {
-                format!(
-                    "{}: {} {} {} {}",
-                    function_name!(),
-                    revision_id,
-                    target_type,
-                    target_id,
-                    event_name
-                )
-            })?
+            .with_context(|| format!("{}: {} {}", function_name!(), revision_id, &event))?
             .map(|row| row.get("deployment_id"));
 
         Ok(deployment_id)
     }
+}
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentJob {
+    pub job_id: String,
+    pub revision: String,
+    pub event_document: String,
+}
+
+impl AntZooStorageClient {
     pub async fn start_deployment_job(&self, deployment_job_id: &str) -> Result<(), anyhow::Error> {
         self.db
             .get()
@@ -746,9 +886,7 @@ impl AntZooStorageClient {
         &self,
         deployment_job_id: &str,
         revision_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
+        event: &str,
         is_success: bool,
     ) -> Result<Option<String>, anyhow::Error> {
         let mut con = self.db.get().await?;
@@ -771,13 +909,11 @@ impl AntZooStorageClient {
         .await
         .with_context(|| {
             format!(
-                "{}: mark complete {} {} {} {} {} {}",
+                "{}: mark {} {} {} {}",
                 function_name!(),
                 deployment_job_id,
                 revision_id,
-                target_type,
-                target_id,
-                event_name,
+                event,
                 is_success
             )
         })?;
@@ -788,23 +924,15 @@ impl AntZooStorageClient {
                 .query_one(
                     "
             insert into deployment
-                (revision_id, target_type, target_id, event_name)
+                (revision_id, deployment_event)
             values
-                ($1, $2, $3, $4)
+                ($1, $2)
             returning deployment_id
             ",
-                    &[&revision_id, &target_type, &target_id, &event_name],
+                    &[&revision_id, &event],
                 )
                 .await
-                .with_context(|| {
-                    format!(
-                        "{}: {} {} {}",
-                        function_name!(),
-                        revision_id,
-                        target_id,
-                        event_name
-                    )
-                })?
+                .with_context(|| format!("{}: {} {}", function_name!(), revision_id, event,))?
                 .get("deployment_id");
 
             tx.commit().await?;
@@ -818,8 +946,8 @@ impl AntZooStorageClient {
 
     /// Find all deployment jobs that occurred after the deployment job for a given event.
     ///
-    /// All jobs matching (revision, project, pipeline, target_type, target_id) that happened
-    /// after a job ((revision, project, pipeline, target_type, target_id, event_name) that
+    /// All jobs matching (revision) that happened
+    /// after a job (revision, event) that
     /// was successful.
     ///
     /// Panics if no such previous job exists.
@@ -830,11 +958,7 @@ impl AntZooStorageClient {
     pub async fn list_deployment_jobs_after_event(
         &self,
         revision_id: &str,
-        project: &str,
-        deployment_pipeline_id: &str,
-        target_type: &str,
-        target_id: &str,
-        after_event_name: &str,
+        after_event: &str,
     ) -> Result<Vec<(String, bool, bool, DateTime<Utc>, DateTime<Utc>)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
@@ -846,27 +970,21 @@ impl AntZooStorageClient {
             from deployment_job
             where
                 revision_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4 and
+                deployment_event = $2 and
                 finished_at is not null and
                 is_success = true
             order by created_at asc
             limit 1
             ",
-                &[&revision_id, &target_type, &target_id, &after_event_name],
+                &[&revision_id, &after_event],
             )
             .await
             .with_context(|| {
                 format!(
-                    "{}: starting point {} {} {} {} {} {}",
+                    "{}: starting point {} {}",
                     function_name!(),
                     revision_id,
-                    project,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    after_event_name
+                    after_event
                 )
             })?
             .map(|r| r.get("finished_at"));
@@ -883,27 +1001,14 @@ impl AntZooStorageClient {
             from deployment_job
             where
                 revision_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
                 finished_at is not null and
-                created_at >= $4
+                created_at >= $2
             order by created_at asc
             ",
-                &[&revision_id, &target_type, &target_id, &starting_point],
+                &[&revision_id, &starting_point],
             )
             .await
-            .with_context(|| {
-                format!(
-                    "{}: idempotency {} {} {} {} {} {}",
-                    function_name!(),
-                    revision_id,
-                    project,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    after_event_name
-                )
-            })?
+            .with_context(|| format!("{}: r {} {}", function_name!(), revision_id, after_event))?
             .iter()
             .map(|r| {
                 (
@@ -921,18 +1026,14 @@ impl AntZooStorageClient {
         Ok(jobs)
     }
 
-    /// Returns the jobs in this (revision, project, pipeline, target_type, target_id, event_name).
+    /// Returns the jobs in the same revision created for this deployment event.
     /// Returns jobs in the order they were created, where index 0 is the newest job
     ///
     /// Returns vec of (job_id, is_retryable, is_success)
     pub async fn list_deployment_jobs(
         &self,
         revision_id: &str,
-        project: &str,
-        deployment_pipeline_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
+        event: &str,
     ) -> Result<Vec<(String, bool, bool)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
@@ -944,27 +1045,14 @@ impl AntZooStorageClient {
             from deployment_job
             where
                 revision_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4 and
+                deployment_event = $2 and
                 finished_at is not null
             order by created_at desc
             ",
-                &[&revision_id, &target_type, &target_id, &event_name],
+                &[&revision_id, &event],
             )
             .await
-            .with_context(|| {
-                format!(
-                    "{}: idempotency {} {} {} {} {} {}",
-                    function_name!(),
-                    revision_id,
-                    project,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    event_name
-                )
-            })?
+            .with_context(|| format!("{}: idem {} {}", function_name!(), revision_id, event))?
             .iter()
             .map(|r| {
                 (
@@ -982,21 +1070,16 @@ impl AntZooStorageClient {
 
     /// Creates a deployment job if it doesn't already exist.
     ///
-    /// Returns an existing job if:
-    ///  - The job exists and is unfinished for the same tuple (revision, target_type, target_id, event), or,
+    /// If there's already a job for this deployment event that's UNFINISHED, returns that instead.
     ///
     /// This means retries ARE jobs with very similar parameters!
     ///
-    /// Returns job_id
+    /// Returns (job_id, is_new)
     pub async fn create_deployment_job(
         &self,
         revision_id: &str,
-        project: &str,
-        deployment_pipeline_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
-    ) -> Result<String, anyhow::Error> {
+        event: &str,
+    ) -> Result<(String, bool), anyhow::Error> {
         let mut con = self.db.get().await?;
 
         let tx = con.transaction().await?;
@@ -1008,86 +1091,46 @@ impl AntZooStorageClient {
             from deployment_job
             where
                 revision_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4 and
+                deployment_event = $2 and
                 finished_at is null
             order by created_at desc
             limit 1
             ", // Get only the latest attempt, since retries kickoff new deployment jobs
-                &[&revision_id, &target_type, &target_id, &event_name],
+                &[&revision_id, &event],
             )
             .await
-            .with_context(|| {
-                format!(
-                    "{}: idempotency {} {} {} {} {} {}",
-                    function_name!(),
-                    revision_id,
-                    project,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    event_name
-                )
-            })?
+            .with_context(|| format!("{}: idem {} {}", function_name!(), revision_id, event))?
             .map(|r| r.get("deployment_job_id"));
 
         if let Some(unfinished_job_id) = unfinished_job_id {
-            return Ok(unfinished_job_id);
+            return Ok((unfinished_job_id, false));
         }
 
         let deployment_job_id = tx
             .query_one(
                 "
             insert into deployment_job
-                (
-                    revision_id,
-                    project_id,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    event_name
-                )
+                (revision_id, deployment_event)
             values
-                ($1, $2, $3, $4, $5, $6)
+                ($1, $2)
             returning deployment_job_id
             ",
-                &[
-                    &revision_id,
-                    &project,
-                    &deployment_pipeline_id,
-                    &target_type,
-                    &target_id,
-                    &event_name,
-                ],
+                &[&revision_id, &event],
             )
             .await
-            .with_context(|| {
-                format!(
-                    "{}: creation {} {} {} {} {} {}",
-                    function_name!(),
-                    revision_id,
-                    project,
-                    deployment_pipeline_id,
-                    target_type,
-                    target_id,
-                    event_name
-                )
-            })?
+            .with_context(|| format!("{}: creation {} {}", function_name!(), revision_id, event))?
             .get("deployment_job_id");
 
         tx.commit().await?;
 
-        Ok(deployment_job_id)
+        Ok((deployment_job_id, true))
     }
 
     fn row_to_deployment_event(row: &Row) -> Deployment {
         Deployment {
             deployment_id: row.get("deployment_id"),
             revision_id: row.get("revision_id"),
-            target_type: row.get("target_type"),
-            target_id: row.get("target_id"),
-            event_name: row.get("event_name"),
+            event: row.get("deployment_event"),
             created_at: row.get("created_at"),
         }
     }
@@ -1099,7 +1142,7 @@ impl AntZooStorageClient {
             .await?
             .query(
                 "
-            select deployment_id, revision_id, target_type, target_id, event_name, created_at
+            select deployment_id, revision_id, deployment_event, created_at
             from deployment
             ",
                 &[],
@@ -1123,12 +1166,8 @@ impl AntZooStorageClient {
                 "
             select
                 deployment_job_id,
-                project_id,
-                deployment_pipeline_id,
                 revision_id,
-                target_type,
-                target_id,
-                event_name
+                deployment_event
             from deployment_job
             where
                 started_at is null and
@@ -1141,22 +1180,16 @@ impl AntZooStorageClient {
             .iter()
             .map(|row| DeploymentJob {
                 job_id: row.get("deployment_job_id"),
-                project_id: row.get("project_id"),
-                deployment_pipeline_id: row.get("deployment_pipeline_id"),
                 revision: row.get("revision_id"),
-                target_type: row.get("target_type"),
-                target_id: row.get("target_id"),
-                event_name: row.get("event_name"),
+                event_document: row.get("deployment_event"),
             })
             .collect();
 
         Ok(jobs)
     }
 
-    /// Returns (deployment_id, revision_id, target_type, target_id, event_name, created_at)
-    pub async fn list_deployment_events_in_pipeline_revision(
+    pub async fn list_deployment_events_in_revision(
         &self,
-        project: &str,
         revision_id: &str,
     ) -> Result<Vec<Deployment>, anyhow::Error> {
         let deployment_events = self
@@ -1168,21 +1201,18 @@ impl AntZooStorageClient {
             select
                 deployment_id,
                 deployment.revision_id,
-                target_type,
-                target_id,
-                event_name,
+                deployment_event,
                 deployment.created_at
             from deployment
                 join revision on revision.revision_id = deployment.revision_id
             where
-                deployment.revision_id = $1 and
-                revision.project_id = $2
+                deployment.revision_id = $1
             order by deployment.created_at asc
             ",
-                &[&revision_id, &project],
+                &[&revision_id],
             )
             .await
-            .with_context(|| format!("{}: {} {}", function_name!(), project, revision_id))?
+            .with_context(|| format!("{}: {}", function_name!(), revision_id))?
             .iter()
             .map(|row| AntZooStorageClient::row_to_deployment_event(&row))
             .collect();
@@ -1195,7 +1225,6 @@ impl AntZooStorageClient {
 pub struct Revision {
     pub id: String,
     pub seq: i32,
-    pub project_id: String,
     pub version: String,
 }
 
@@ -1204,7 +1233,6 @@ impl AntZooStorageClient {
         Revision {
             id: row.get("revision_id"),
             seq: row.get("revision_seq"),
-            project_id: row.get("project_id"),
             version: row.get("deployment_version"),
         }
     }
@@ -1216,7 +1244,7 @@ impl AntZooStorageClient {
             .await?
             .query(
                 "
-            select revision_id, project_id, deployment_version, revision_seq
+            select revision_id, deployment_version, revision_seq
             from revision
             order by revision_seq desc
             ",
@@ -1237,7 +1265,7 @@ impl AntZooStorageClient {
             .await?
             .query_one(
                 "
-            select revision_id, project_id, deployment_version, revision_seq
+            select revision_id, deployment_version, revision_seq
             from revision
             where revision_id = $1
             ",
@@ -1261,37 +1289,30 @@ impl AntZooStorageClient {
     /// Returns vec of (Revision, deployment created at)
     pub async fn list_revisions_with_event(
         &self,
-        deployment_pipeline_id: &str,
-        target_type: &str,
-        target_id: &str,
-        event_name: &str,
+        event: &str,
     ) -> Result<Vec<(Revision, DateTime<Utc>)>, anyhow::Error> {
         let con = self.db.get().await?;
 
         let revisions = con
             .query(
                 "
-            select deployment.revision_id, r.revision_seq, r.project_id, r.deployment_version, deployment.created_at
+            select
+                deployment.revision_id,
+                r.revision_seq,
+                r.deployment_version,
+                deployment.created_at
             from deployment
                 join revision r on r.revision_id = deployment.revision_id
-                join deployment_pipeline p on p.project_id = 
-                    r.project_id
             where
-                deployment_pipeline_id = $1 and
-                target_type = $2 and
-                target_id = $3 and
-                event_name = $4
+                deployment_event = $1
             order by deployment_seq desc
             ",
-                &[
-                    &deployment_pipeline_id,
-                    &target_type,
-                    &target_id,
-                    &event_name,
-                ],
+                &[&event],
             )
             .await?
-            .iter().map(|row| (self.row_to_revision(&row), row.get("created_at"))).collect();
+            .iter()
+            .map(|row| (self.row_to_revision(&row), row.get("created_at")))
+            .collect();
 
         Ok(revisions)
     }
@@ -1299,11 +1320,11 @@ impl AntZooStorageClient {
     /// For example, finding all revisions without a "pipeline-finished" event would be finding
     /// all IN PROGRESS revisions.
     ///
-    /// Returns (Revision, pipeline_id)
+    /// Returns (Revision)
     pub async fn list_revisions_missing_event(
         &self,
-        event_name: &str,
-    ) -> Result<Vec<(Revision, String)>, anyhow::Error> {
+        event: &str,
+    ) -> Result<Vec<Revision>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
@@ -1313,27 +1334,22 @@ impl AntZooStorageClient {
             select
                 r.revision_id,
                 r.revision_seq,
-                r.project_id,
-                r.deployment_version,
-                p.deployment_pipeline_id
+                r.deployment_version
             from revision r
-                join deployment_pipeline p on p.project_id = r.project_id
             where r.revision_id not in (
                 select revision_id
                 from deployment
-                where deployment.event_name = $1
+                where
+                   deployment.deployment_event = $1
             )
             order by r.revision_seq desc;
             ",
-                &[&event_name],
+                &[&event],
             )
             .await
-            .with_context(|| format!("{}: {}", function_name!(), event_name))?;
+            .with_context(|| format!("{}: {}", function_name!(), event))?;
 
-        let deployments = rows
-            .iter()
-            .map(|row| (self.row_to_revision(row), row.get("deployment_pipeline_id")))
-            .collect();
+        let deployments = rows.iter().map(|row| self.row_to_revision(row)).collect();
 
         Ok(deployments)
     }
@@ -1408,35 +1424,45 @@ impl AntZooStorageClient {
         }
     }
 
-    pub async fn get_host_group_by_stage_id(
+    pub async fn get_host_groups_by_stage_id(
         &self,
         stage_id: &str,
-    ) -> Result<Option<HostGroup>, anyhow::Error> {
-        let host_group_name: Option<String> = self
+    ) -> Result<Vec<HostGroup>, anyhow::Error> {
+        let host_group_names: Vec<String> = self
             .db
             .get()
             .await?
-            .query_opt(
+            .query(
                 "
                 select host_group_name
                 from host_group
-                    join deployment_pipeline_stage on
-                        host_group.host_group_id
-                            = deployment_pipeline_stage.stage_type_deploy_host_group_id
-                where deployment_pipeline_stage.deployment_pipeline_stage_id = $1",
+                    join deployment_pipeline_stage_host_group on
+                        deployment_pipeline_stage_host_group.host_group_id
+                            = host_group.host_group_id
+                where
+                    deployment_pipeline_stage_host_group.deployment_pipeline_stage_id = $1",
                 &[&stage_id],
             )
             .await
             .with_context(|| format!("{}: {}", function_name!(), stage_id))?
-            .map(|r| r.get("host_group_name"));
+            .iter()
+            .map(|r| r.get("host_group_name"))
+            .collect();
 
-        match host_group_name {
-            None => Ok(None),
-            Some(host_group_name) => self.get_host_group_by_name(&host_group_name).await,
+        let mut host_groups = vec![];
+        for host_group_name in host_group_names {
+            host_groups.push(
+                self.get_host_group_by_name(&host_group_name)
+                    .await?
+                    .unwrap(),
+            );
         }
+
+        return Ok(host_groups);
     }
 
-    pub async fn get_host_group_by_host(
+    #[deprecated]
+    pub async fn get_host_group_by_host_in_pipeline(
         &self,
         deployment_pipeline_id: &str,
         host_id: &str,
@@ -1451,9 +1477,12 @@ impl AntZooStorageClient {
                 from host
                     join host_group_host on host_group_host.host_id = host.host_id
                     join host_group on host_group.host_group_id = host_group_host.host_group_id
-                    join deployment_pipeline_stage on
+                    join deployment_pipeline_stage_host_group on
                         host_group.host_group_id
-                            = deployment_pipeline_stage.stage_type_deploy_host_group_id
+                            = deployment_pipeline_stage_host_group.host_group_id
+                    join deployment_pipeline_stage on
+                        deployment_pipeline_stage_host_group.deployment_pipeline_stage_id
+                            = deployment_pipeline_stage.deployment_pipeline_stage_id
                     join deployment_pipeline on
                         deployment_pipeline.deployment_pipeline_id
                             = deployment_pipeline_stage.deployment_pipeline_id
@@ -1490,6 +1519,7 @@ impl AntZooStorageClient {
             select
                 host_group_id,
                 host_group_name,
+                project_id,
                 environment,
                 host_group_description,
                 created_at,
@@ -1543,6 +1573,7 @@ impl AntZooStorageClient {
         Ok(Some(HostGroup {
             id: host_group_row.get("host_group_id"),
             name: host_group_row.get("host_group_name"),
+            project: host_group_row.get("project_id"),
             environment: host_group_row.get("environment"),
             description: host_group_row.get("host_group_description"),
             hosts: hosts,
@@ -1551,53 +1582,10 @@ impl AntZooStorageClient {
         }))
     }
 
-    /// Find a host group (group of hosts + environment) from a starting host and project.
-    ///
-    /// The same host can be specified for multiple projects, but can only be specified a
-    /// single time within a project, so this should be unique!
-    pub async fn find_host_group_by_host_and_project(
-        &self,
-        host_id: &str,
-        project: &str,
-    ) -> Result<Option<(String, String)>, anyhow::Error> {
-        let rows = self
-            .db
-            .get()
-            .await?
-            .query(
-                "
-            select hg.host_group_id, hg.environment
-            from host_group hg
-                join host_group_host hgh on hgh.host_group_id = hg.host_group_id
-                join deployment_pipeline_stage s on s.stage_type_deploy_host_group_id
-                        = hg.host_group_id
-                join deployment_pipeline p on p.deployment_pipeline_id
-                    = s.deployment_pipeline_id
-            where
-                hgh.host_id = $1 and
-                p.project_id = $2
-            ",
-                &[&host_id, &project],
-            )
-            .await
-            .with_context(|| format!("{}: {} {}", function_name!(), host_id, project))?;
-
-        if rows.len() > 1 {
-            return Err(anyhow::Error::msg(format!(
-                "Hosts are only meant to be included in a project once, but found more than that: {:?}",
-                rows
-            )));
-        }
-        let row = rows.first();
-
-        let host_group = row.map(|row| (row.get("host_group_id"), row.get("environment")));
-
-        Ok(host_group)
-    }
-
     pub async fn create_host_group(
         &self,
-        host_group_id: &str,
+        host_group_name: &str,
+        project: &str,
         environment: &str,
     ) -> Result<String, anyhow::Error> {
         let row = self
@@ -1607,15 +1595,17 @@ impl AntZooStorageClient {
             .query_one(
                 "
             insert into host_group
-                (host_group_name, environment)
+                (host_group_name, project_id, environment)
             values
-                ($1, $2)
+                ($1, $2, $3)
             returning host_group_id
             ",
-                &[&host_group_id, &environment],
+                &[&host_group_name, &project, &environment],
             )
             .await
-            .with_context(|| format!("{}: {} {}", function_name!(), host_group_id, environment))?;
+            .with_context(|| {
+                format!("{}: {} {}", function_name!(), host_group_name, environment)
+            })?;
 
         Ok(row.get("host_group_id"))
     }

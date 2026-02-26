@@ -3,19 +3,25 @@ import { ClipboardCopy } from "./ClipboardCopy";
 import { DateTime } from "./DateTime";
 import { InProgressDeployments } from "./InProgressDeployments";
 import { LatestDeployment } from "./LatestDeployment";
-import { type Host, Progress, revisions } from "./Pipeline";
+import { type Host, HostGroup, Progress, revisions } from "./Pipeline";
 import { RevisionBox } from "./RevisionBox";
 
 export type HostProps = {
   index: number;
   total: number;
+  hostGroup: HostGroup;
   host: Host;
   progress: Progress;
   revisions: string[];
 };
 
 export function Host(props: HostProps) {
-  const hostRev = revisions(props.progress, props.host.name);
+  const hostRev = revisions(
+    props.progress,
+    `${props.hostGroup.hostGroupId}#${props.host.name}`,
+  );
+
+  console.log(hostRev);
 
   return (
     <div>

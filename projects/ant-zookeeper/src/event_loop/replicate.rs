@@ -60,7 +60,7 @@ fn source_env_variables(
     project: &str,
     version: &str,
     environment: &str,
-) -> Result<Vec<(String, String)>, anyhow::Error> {
+) -> Result<HashMap<String, String>, anyhow::Error> {
     let source_files = vec![
         envs_persist_dir(&state.root_dir).join(global_envs_file_name(&environment)),
         envs_persist_dir(&state.root_dir).join(project_envs_file_name(&project, &environment)),
@@ -97,10 +97,6 @@ fn source_env_variables(
     variables.insert("SECRETS_DIR".to_string(), escape_value("./secrets"));
     variables.insert("VERSION".to_string(), escape_value(version));
 
-    let mut variables = variables.into_iter().collect::<Vec<(String, String)>>();
-
-    variables.sort();
-
     Ok(variables)
 }
 
@@ -126,11 +122,26 @@ async fn render_docker_compose(
     }
 
     let template = mustache::compile_path(&docker_compose_path)?;
+    let variables = mustache::Data::Map(
+        source_env_variables(state, project, version, environment)?
+            .into_iter()
+            .map(|(k, v)| {
+                // The mustache engine takes a line like:
+                //  VARIABLE="my-value"
+                // and interpolated the quotes into &quot; into the docker-compose file, so remove the leading ones first.
+                (
+                    k,
+                    v.trim_end_matches("\"")
+                        .trim_start_matches("\"")
+                        .to_string(),
+                )
+            })
+            .map(|(k, v)| (k, mustache::Data::String(v)))
+            .collect(),
+    );
 
     // Create in a temp place in case something fails
-    let variables = mustache::to_data(source_env_variables(state, project, version, environment)?)?;
-
-    info!("Interpolating variables...");
+    info!("Interpolating variables {:?}", variables);
     let mut docker_compose_file = File::create(dest.join(".__docker-compose.yml"))?;
     template.render_data(&mut docker_compose_file, &variables)?;
 
@@ -139,6 +150,15 @@ async fn render_docker_compose(
         dest.join(".__docker-compose.yml"),
         dest.join("docker-compose.yml"),
     )?;
+
+    {
+        let buf = std::fs::read_to_string(dest.join("docker-compose.yml"))?;
+        info!(
+            "docker-compose content:
+{buf}
+"
+        );
+    }
 
     Ok(())
 }
@@ -169,7 +189,6 @@ async fn inject_env_file(
 
 pub async fn replicate_artifact_step(
     state: &AntZookeeperState,
-    project: &str,
     revision: &str,
     host_group: &HostGroup,
     host: &str,
@@ -178,7 +197,7 @@ pub async fn replicate_artifact_step(
 
     let (_, version, artifact_relative_path) = state
         .db
-        .get_artifact_by_revision(Some(&host_arch), &revision)
+        .get_artifact_by_revision(&revision, &host_group.project, Some(&host_arch))
         .await?
         .unwrap();
 
@@ -206,7 +225,7 @@ pub async fn replicate_artifact_step(
             inject_env_file(
                 state,
                 &unpack_dir_path,
-                project,
+                &host_group.project,
                 &version,
                 &host_group.environment,
             )
@@ -215,7 +234,7 @@ pub async fn replicate_artifact_step(
             render_docker_compose(
                 state,
                 &unpack_dir_path,
-                project,
+                &host_group.project,
                 &version,
                 &host_group.environment,
             )
@@ -240,7 +259,7 @@ pub async fn replicate_artifact_step(
 
         create_dir_all(services_persist_dir(&state.root_dir)).await?;
         let service_file_path = services_persist_dir(&state.root_dir).join(services_file_name(
-            &project,
+            &host_group.project,
             Some(&host_arch),
             &version,
         ));
@@ -268,13 +287,13 @@ pub async fn replicate_artifact_step(
 
     info!("Replicating service file to: {host}");
     ant_host_agent
-        .register_service(&project, &version, service_file)
+        .register_service(&host_group.project, &version, service_file)
         .await?;
 
     info!("Installing service file file to: {host}");
     ant_host_agent
         .install_service(ant_host_agent::routes::service::InstallServiceRequest {
-            project: project.to_string(),
+            project: host_group.project.clone(),
             version: version.to_string(),
         })
         .await?;

@@ -4,7 +4,7 @@ use crate::{
     event_loop::{
         deploy::deploy_artifact,
         replicate::replicate_artifact_step,
-        transition::{DeploymentEvent, DeploymentTarget, EventName},
+        transition::{DeploymentEvent, Event},
     },
     state::AntZookeeperState,
 };
@@ -35,21 +35,19 @@ pub enum JobCompletion<T> {
 ///         are registered.
 pub async fn perform(
     state: &AntZookeeperState,
-    deployment_pipeline_id: &str,
     event: &DeploymentEvent,
 ) -> Result<JobCompletion<()>, anyhow::Error> {
-    type T = DeploymentTarget;
-    type E = EventName;
+    type E = Event;
 
     match event {
-        DeploymentEvent(revision, T::Host(host), E::HostArtifactReplicated) => {
+        DeploymentEvent(
+            revision,
+            E::HostArtifactReplicated {
+                host_group_id,
+                host,
+            },
+        ) => {
             info!("Beginning replication of version {revision} to host {host}...");
-
-            let host_group_id = state
-                .db
-                .get_host_group_by_host(deployment_pipeline_id, &host)
-                .await?
-                .unwrap();
 
             let host_group = state
                 .db
@@ -57,33 +55,44 @@ pub async fn perform(
                 .await?
                 .unwrap();
 
-            let project = state
-                .db
-                .get_project_from_deployment_pipeline(deployment_pipeline_id)
-                .await?;
-
-            replicate_artifact_step(state, &project, &revision, &host_group, &host).await?;
+            replicate_artifact_step(state, &revision, &host_group, &host).await?;
 
             Ok(JobCompletion::Finished(()))
         }
 
-        DeploymentEvent(revision, T::Host(host), E::HostArtifactDeployed) => {
-            let project = state
+        DeploymentEvent(
+            revision,
+            E::HostArtifactDeployed {
+                host_group_id,
+                host: host_id,
+            },
+        ) => {
+            let host_group = state
                 .db
-                .get_project_from_deployment_pipeline(deployment_pipeline_id)
-                .await?;
+                .get_host_group_by_id(&host_group_id)
+                .await?
+                .unwrap();
 
             let version = state.db.get_revision(&revision).await?.version;
 
-            deploy_artifact(state, &project, &version, &host).await?;
+            deploy_artifact(state, &host_group.project, &version, &host_id).await?;
 
             Ok(JobCompletion::Finished(()))
         }
 
-        DeploymentEvent(revision, T::Stage(_), E::ArtifactArchitectureRegistered(arch)) => {
+        DeploymentEvent(revision, E::ArtifactRegistered { stage_id, arch }) => {
+            let stage = state
+                .db
+                .get_deployment_pipeline_stage(stage_id)
+                .await?
+                .unwrap();
+
+            // The project that this build stage (we assume this event was emitted by a build stage) is responsible for building.
+            let building_project_id = stage.3.unwrap();
+
             let missing = state
                 .db
-                .missing_artifacts_for_revision_id(&revision)
+                .missing_artifacts_for_revision_id(&building_project_id, &revision)
                 .await?;
 
             if missing.contains(&arch) {

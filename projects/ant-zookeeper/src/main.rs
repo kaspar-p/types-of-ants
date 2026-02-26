@@ -59,14 +59,16 @@ async fn main() -> Result<(), anyhow::Error> {
         .context("ANT_ZOOKEEPER_PORT")?
         .parse()?;
 
-    let port2 = port.clone();
     let scheduler = JobScheduler::new().await.unwrap();
     scheduler
         .add(
             Job::new_async("every 2 seconds", move |_, _| {
                 Box::pin(async move {
                     reqwest::Client::new()
-                        .post(format!("http://localhost:{}/deployment/iteration", port2))
+                        .post(format!(
+                            "http://localhost:{}/deployment/iteration",
+                            port.clone()
+                        ))
                         .send()
                         .await
                         .unwrap()
@@ -81,7 +83,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     scheduler.shutdown_on_ctrl_c();
 
-    scheduler.start().await.expect("start schedular");
+    scheduler.start().await.expect("start scheduler");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port.clone()));
     debug!(

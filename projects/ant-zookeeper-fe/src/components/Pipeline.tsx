@@ -19,7 +19,12 @@ export type HostGroup = {
 export type Stage = {
   stageId: string;
   stageName: string;
-  stageType: { type: "build" } | { type: "deploy"; hostGroup: HostGroup };
+  stageType:
+    | { type: "build" }
+    | {
+        type: "deploy";
+        hostGroups: HostGroup[];
+      };
 };
 
 export type Revision = {
@@ -49,8 +54,9 @@ export type Progress = Record<
 
 export type GetPipelineResponse = {
   pipelineId: string;
-  project: string;
-  stages: Stage[];
+  name: string;
+
+  stages: Stage[][];
 
   progress: Progress;
 
@@ -106,19 +112,18 @@ export const revisions = (
     return { inProgress: [], finished: undefined, failed: undefined };
   }
 
-  const inProgress: Revision[] = (prog.startedRevisions ?? [])
-    .filter(
-      (r1) =>
-        !(prog?.finishedRevisions ?? []).find(
-          (r2) => r1.revision === r2.revision,
-        ),
-    )
-    .filter(
-      (r1) =>
-        !(prog?.failedRevisions ?? []).find(
-          (r2) => r1.revision === r2.revision,
-        ),
-    );
+  const inProgress: Revision[] = (prog.startedRevisions ?? []).filter(
+    (r1) =>
+      !(prog?.finishedRevisions ?? []).find(
+        (r2) => r1.revision === r2.revision,
+      ),
+  );
+  // .filter(
+  //   (r1) =>
+  //     !(prog?.failedRevisions ?? []).find(
+  //       (r2) => r1.revision === r2.revision,
+  //     ),
+  // );
 
   const finished: Revision | undefined = prog?.finishedRevisions?.[0];
 
@@ -128,11 +133,16 @@ export const revisions = (
 };
 
 export function Pipeline({ res }: PipelineProps) {
-  console.log(res.project, res.progress, res.revisions);
+  console.log(res.name, res.progress, res.revisions);
 
   return (
     <div className="p-3 border rounded-2xl flex flex-col space-y-3 w-fit">
-      <h3>{res.project}</h3>
+      <h3 className="flex flex-row space-x-2">
+        <div>{res.name}</div>
+        <ClipboardCopy text={res.pipelineId}>
+          (<code className="text-sm">{res.pipelineId}</code>)
+        </ClipboardCopy>
+      </h3>
 
       <div>
         <div className="flex flex-row space-x-4 space-y-2 flex-wrap">
@@ -152,13 +162,19 @@ export function Pipeline({ res }: PipelineProps) {
       </div>
 
       <div className="flex flex-row space-x-6">
-        {res.stages.map((stage, i: number) => (
+        {res.stages.map((phase, i: number) => (
           <div key={i}>
-            <Stage
-              revisions={res.revisions}
-              progress={res.progress}
-              stage={stage}
-            />
+            <div className="flex flex-col space-y-2">
+              {phase.map((stage, i) => (
+                <div key={i}>
+                  <Stage
+                    revisions={res.revisions}
+                    progress={res.progress}
+                    stage={stage}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>

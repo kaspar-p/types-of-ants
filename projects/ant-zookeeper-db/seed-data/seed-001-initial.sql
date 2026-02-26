@@ -48,19 +48,6 @@ values
   ('nextcloud-webdav', false)
 ;
 
-insert into deployment_pipeline
-  (project_id)
-select (project_id)
-from project
-where owned = true
-;
-
-insert into deployment_pipeline_stage
-  (deployment_pipeline_id, stage_type, stage_name, stage_order)
-select deployment_pipeline_id, 'build', 'build', 0
-from deployment_pipeline
-;
-
 -- insert into project_instance
 --   (project_id, deployment_version)
 -- values

@@ -2,19 +2,17 @@ import { BoxTitle } from "./BoxTitle";
 import { Host } from "./Host";
 import { InProgressDeployments } from "./InProgressDeployments";
 import { LatestDeployment } from "./LatestDeployment";
-import { Progress, revisions, Stage } from "./Pipeline";
+import { type HostGroup, Progress, revisions, Stage } from "./Pipeline";
 
 type HostGroupProps = {
   stage: Stage & { stageType: { type: "deploy" } };
+  hostGroup: HostGroup;
   progress: Progress;
   revisions: string[];
 };
 
 export function HostGroup(props: HostGroupProps) {
-  const hgRev = revisions(
-    props.progress,
-    props.stage.stageType.hostGroup.hostGroupId,
-  );
+  const hgRev = revisions(props.progress, props.hostGroup.hostGroupId);
 
   return (
     <div className="border rounded-lg">
@@ -23,9 +21,9 @@ export function HostGroup(props: HostGroupProps) {
         finished={hgRev.finished}
         inProgress={hgRev.inProgress}
       >
-        <div>{props.stage.stageType.hostGroup.name}</div>
+        <div>{props.hostGroup.name}</div>
         <div className="text-sm self-center">
-          (<i>environment: {props.stage.stageType.hostGroup.environment}</i>)
+          (<i>environment: {props.hostGroup.environment}</i>)
         </div>
       </BoxTitle>
 
@@ -42,19 +40,18 @@ export function HostGroup(props: HostGroupProps) {
           />
         </div>
 
-        {props.stage.stageType.hostGroup.hosts.length > 0 ? (
-          props.stage.stageType.hostGroup.hosts.map(
-            (host, i: number, hosts) => (
-              <Host
-                key={i}
-                index={i + 1}
-                total={hosts.length}
-                host={host}
-                progress={props.progress}
-                revisions={props.revisions}
-              />
-            ),
-          )
+        {props.hostGroup.hosts.length > 0 ? (
+          props.hostGroup.hosts.map((host, i: number, hosts) => (
+            <Host
+              key={i}
+              index={i + 1}
+              total={hosts.length}
+              hostGroup={props.hostGroup}
+              host={host}
+              progress={props.progress}
+              revisions={props.revisions}
+            />
+          ))
         ) : (
           <div>No hosts!</div>
         )}

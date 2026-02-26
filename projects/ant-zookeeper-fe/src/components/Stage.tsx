@@ -16,7 +16,7 @@ export function Stage(props: StageProps) {
 
   return (
     <div>
-      <div className="border rounded-lg w-max">
+      <div className="border rounded-lg">
         <BoxTitle
           revisions={props.revisions}
           finished={stageRev.finished}
@@ -63,13 +63,20 @@ export function Stage(props: StageProps) {
             />
           </div>
 
-          {props.stage.stageType.type === "deploy" ? (
-            <HostGroup
-              stage={props.stage as Stage & { stageType: { type: "deploy" } }}
-              revisions={props.revisions}
-              progress={props.progress}
-            />
-          ) : undefined}
+          {props.stage.stageType.type === "deploy"
+            ? props.stage.stageType.hostGroups.map((hostGroup, i) => (
+                <div key={i}>
+                  <HostGroup
+                    stage={
+                      props.stage as Stage & { stageType: { type: "deploy" } }
+                    }
+                    hostGroup={hostGroup}
+                    revisions={props.revisions}
+                    progress={props.progress}
+                  />
+                </div>
+              ))
+            : undefined}
         </div>
       </div>
     </div>

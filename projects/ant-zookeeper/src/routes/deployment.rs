@@ -11,7 +11,7 @@ use crate::{
     event_loop::{
         drive_revisions,
         perform::{perform, JobCompletion},
-        transition::{DeploymentEvent, DeploymentTarget, PipelineError},
+        transition::{DeploymentEvent, PipelineError},
     },
     state::AntZookeeperState,
 };
@@ -24,7 +24,6 @@ async fn iterate_pipeline(
     State(state): State<AntZookeeperState>,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
     // Schedule any deployment jobs available
-    info!("Scheduling new tasks.");
     drive_revisions(&state.db, 1)
         .map_err(|e| match e {
             PipelineError::UnknownStep(p) => AntZookeeperError::InternalServerError(Some(
@@ -45,11 +44,7 @@ async fn iterate_pipeline(
     let handles = unfinished_jobs.into_iter().map(|job| {
         let state = state.clone();
         async move {
-            let event = DeploymentEvent(
-                job.revision.clone(),
-                DeploymentTarget::from_strings(&job.target_type, job.target_id.clone()),
-                job.event_name.clone().into(),
-            );
+            let event = DeploymentEvent(job.revision.clone(), job.event_document.clone().into());
 
             // Do the work.
             info!("Performing: {event:?}");
@@ -61,14 +56,12 @@ async fn iterate_pipeline(
                     let job_id = job.job_id.clone();
                     let state = state.clone();
                     async move {
-                        perform(&state, &job.deployment_pipeline_id.clone(), &event)
-                            .await
-                            .with_context(|| {
-                                format!(
+                        perform(&state, &event).await.with_context(|| {
+                            format!(
                                 "Failed to perform scheduled deployment job [{}] for event [{}]",
                                 job_id, event
                             )
-                            })
+                        })
                     }
                 })
                 .await;
@@ -98,9 +91,7 @@ async fn iterate_pipeline(
                     .complete_deployment_job(
                         &job.job_id,
                         &job.revision,
-                        &job.target_type,
-                        &job.target_id,
-                        &job.event_name,
+                        &job.event_document,
                         is_success,
                     )
                     .await?;

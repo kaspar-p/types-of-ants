@@ -6,26 +6,27 @@ export default async function Home() {
 
   h.append("Content-Type", "application/json");
 
-  const projects = [
-    "ant-looking-pretty",
-    "ant-on-the-web",
-    "ant-host-agent",
+  const pipelines = [
+    "ant-data-farm",
     "ant-gateway",
+    "ant-naming-domains",
+    "website",
+    "agent",
   ];
-  const responses: { project: string; res: any }[] = [];
+  const responses: { pipeline: string; res: any }[] = [];
 
-  for (const project of projects) {
+  for (const pipeline of pipelines) {
     const res = await fetch(
-      `http://localhost:3235/pipeline/pipeline?project=${project}`,
+      `http://localhost:3235/pipeline/pipeline?name=${pipeline}`,
       {
         next: { revalidate: 2 },
         method: "GET",
         headers: h,
       },
     ).then((x) => x.json());
-    console.log(res.project, res.events);
+    console.log(res.name, res.events);
 
-    responses.push({ project, res });
+    responses.push({ pipeline, res });
   }
 
   // const res2 = await fetch("http://localhost:3235/deployment/iteration", {
@@ -42,7 +43,7 @@ export default async function Home() {
       <RefreshCounter />
 
       {responses.map((p) => (
-        <Pipeline key={p.project} res={p.res} />
+        <Pipeline key={p.pipeline} res={p.res} />
       ))}
     </div>
   );

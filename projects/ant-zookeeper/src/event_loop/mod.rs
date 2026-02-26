@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use ant_zookeeper_db::{AntZooStorageClient, Revision};
 use tracing::info;
 
 use crate::event_loop::transition::{
-    after, is_deployment_complete, is_doable, transition, DeploymentEvent, DeploymentTarget,
-    EventName, PipelineError,
+    after, is_deployment_complete, is_doable, transition, DeploymentEvent, Event, PipelineError,
 };
 
 mod deploy;
@@ -17,32 +16,10 @@ pub async fn drive_revisions(
     db: &AntZooStorageClient,
     _iterations: i32,
 ) -> Result<(), PipelineError> {
-    let revisions = {
-        let mut grouped_revisions: HashMap<String, Vec<Revision>> = HashMap::new();
-        for revision in db.list_revisions().await? {
-            let pipeline = db
-                .get_deployment_pipeline_by_project(&revision.project_id)
-                .await?
-                .unwrap();
+    let revisions = db.list_revisions().await?;
 
-            match grouped_revisions.get_mut(&pipeline) {
-                None => {
-                    grouped_revisions.insert(pipeline, vec![revision]);
-                }
-                Some(revs) => {
-                    revs.push(revision);
-                }
-            }
-        }
-        grouped_revisions
-    };
-
-    for (deployment_pipeline_id, pipeline_revisions) in revisions {
-        info!(
-            "[p={deployment_pipeline_id}] Driving pipeline {} revisions.",
-            pipeline_revisions.len()
-        );
-        drive_pipeline(db, &deployment_pipeline_id, pipeline_revisions).await?;
+    for deployment_pipeline_id in db.list_deployment_pipelines().await? {
+        drive_pipeline(db, &deployment_pipeline_id, &revisions).await?;
     }
 
     Ok(())
@@ -58,9 +35,16 @@ async fn revision_frontier(
 ) -> Result<Vec<DeploymentEvent>, PipelineError> {
     let event = DeploymentEvent(
         revision.to_string(),
-        DeploymentTarget::Pipeline(deployment_pipeline_id.to_string()),
-        EventName::PipelineStarted,
+        Event::PipelineStarted {
+            pipeline_id: deployment_pipeline_id.to_string(),
+        },
     );
+
+    // If the pipeline hasn't even started yet, there is no frontier. This allows "speculative"
+    // calling of this function for (pipeline, revision) combos that don't (or may never) exist.
+    if !is_deployment_complete(db, &event).await? {
+        return Ok(vec![]);
+    }
 
     let mut frontier: Vec<DeploymentEvent> = Vec::new();
 
@@ -71,7 +55,7 @@ async fn revision_frontier(
 
     loop {
         if let Some(event) = queue.pop_front() {
-            for next_event in transition(&db, deployment_pipeline_id, &event).await?.next {
+            for next_event in transition(&db, &event).await?.next {
                 if is_deployment_complete(db, &next_event).await? {
                     if !seen.contains(&next_event) {
                         queue.push_back(next_event.clone());
@@ -119,12 +103,6 @@ async fn frontier(
         frontiers
     };
 
-    info!(
-        "Frontiers Pre-Filtering ({}) {:?}",
-        frontiers.len(),
-        frontiers
-    );
-
     let mut filtered_frontiers: Vec<DeploymentEvent> = vec![];
 
     // If any events from AFTER(a) were completed by newer revisions, then a should be removed from the
@@ -136,7 +114,7 @@ async fn frontier(
         for event_a in frontier_a {
             let mut on_frontier = true;
 
-            let after_events = after(db, deployment_pipeline_id, &event_a).await?;
+            let after_events = after(db, &event_a).await?;
             for after_event_a in after_events {
                 for rev_b in pipeline_revisions {
                     if rev_a.seq >= rev_b.seq {
@@ -167,19 +145,13 @@ async fn frontier(
         filtered_frontiers.append(&mut new_frontier_a);
     }
 
-    info!(
-        "Frontiers Post-Filtering {} {:?}",
-        filtered_frontiers.len(),
-        filtered_frontiers
-    );
-
     Ok(filtered_frontiers)
 }
 
 async fn drive_pipeline(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
-    revisions: Vec<Revision>,
+    revisions: &Vec<Revision>,
 ) -> Result<(), PipelineError> {
     let mut frontier = frontier(&db, &deployment_pipeline_id, &revisions).await?;
 
@@ -195,7 +167,7 @@ async fn drive_pipeline(
             // The deployment may already have been completed by another thread, we want to handle that
             // gracefully since the frontier we have is just in-memory.
             if is_deployment_complete(db, event).await? {
-                let mut trans = transition(db, deployment_pipeline_id, &event).await?;
+                let mut trans = transition(db, &event).await?;
                 info!("[p={deployment_pipeline_id} v={}] Event {event:?} is already finished, progressing pipeline with {} new events...", event.0, trans.next.len());
                 new_frontier.append(&mut trans.next);
             }
@@ -221,7 +193,7 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     frontier: T,
     event: &DeploymentEvent,
 ) -> Result<(), PipelineError> {
-    if !is_doable(&db, deployment_pipeline_id, frontier, &event).await? {
+    if !is_doable(&db, frontier, &event).await? {
         info!(
             "[p={deployment_pipeline_id} v={}] Event {event:?} is not doable.",
             event.0
@@ -229,20 +201,9 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
         return Ok(());
     }
 
-    let project = db
-        .get_project_from_deployment_pipeline(deployment_pipeline_id)
-        .await?;
-
     // Index 0 is newest attempt at the job
     let previous_jobs = db
-        .list_deployment_jobs(
-            &event.0,
-            &project,
-            &deployment_pipeline_id,
-            &event.1.as_target_type(),
-            &event.1.as_target_id(),
-            &event.2.to_string(),
-        )
+        .list_deployment_jobs(&event.0, event.1.to_string().as_str())
         .await?;
 
     let successful = previous_jobs.iter().find(|(_, _, is_success)| *is_success);
@@ -283,21 +244,16 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     }
 
     // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!
-    let job_id = db
-        .create_deployment_job(
-            &event.0,
-            &project,
-            &deployment_pipeline_id,
-            &event.1.as_target_type(),
-            &event.1.as_target_id(),
-            &event.2.to_string(),
-        )
+    let (job_id, is_new) = db
+        .create_deployment_job(&event.0, &event.1.to_string())
         .await?;
 
-    info!(
-        "[p={deployment_pipeline_id} v={}] Scheduled job {job_id} for event {event:?}",
-        event.0
-    );
+    if is_new {
+        info!(
+            "[p={deployment_pipeline_id} v={}] Scheduled job {job_id} for event {event:?}",
+            event.0
+        );
+    }
 
     return Ok(());
 }

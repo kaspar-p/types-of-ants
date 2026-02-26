@@ -4,16 +4,19 @@ use std::{
     path::PathBuf,
 };
 
-use ant_zookeeper::routes::pipeline::{
-    AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse, PutPipelineRequest,
-    PutPipelineStage,
+use ant_zookeeper::{
+    event_loop::transition::Event as E,
+    routes::pipeline::{
+        AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
+        PutPipelineRequest, PutPipelineStage,
+    },
 };
 use http::StatusCode;
 use stdext::function_name;
 use tokio::test;
 use tracing_test::traced_test;
 
-use crate::fixture;
+use crate::fixture::{self, Fixture};
 
 fn digest(path: &PathBuf) -> String {
     sha256::try_digest(path).unwrap()
@@ -201,6 +204,7 @@ async fn service_artifact_includes_env_file() {
         let host_group_id = {
             let req = CreateHostGroupRequest {
                 name: "hg".to_string(),
+                project: "ant-host-agent".to_string(),
                 environment: "beta".to_string(),
             };
 
@@ -237,11 +241,11 @@ async fn service_artifact_includes_env_file() {
         // Create beta stage
         {
             let req = PutPipelineRequest {
-                project: "ant-host-agent".to_string(),
-                stages: vec![PutPipelineStage {
+                name: "agents".to_string(),
+                stages: vec![vec![PutPipelineStage {
                     name: "beta-deployment".to_string(),
-                    host_group_id: host_group_id.clone(),
-                }],
+                    host_group_ids: vec![host_group_id.clone()],
+                }]],
             };
 
             let res = fixture
@@ -361,18 +365,10 @@ async fn service_artifact_includes_env_file() {
 
         let revisions = fixture.state.db.list_revisions().await.unwrap();
         let rev = &revisions[0];
-        assert_eq!(rev.project_id, "ant-host-agent");
         assert_eq!(revisions.len(), 1);
         let revision_id = rev.id.clone();
 
-        let get_events = || async {
-            fixture
-                .state
-                .db
-                .list_deployment_events_in_pipeline_revision("ant-host-agent", &revision_id)
-                .await
-                .unwrap()
-        };
+        let get_events = || async { crate::deployment::get_events(&fixture, &revision_id).await };
 
         for _ in 0..4 {
             let res = fixture.client.post("/deployment/iteration").send().await;
@@ -380,22 +376,16 @@ async fn service_artifact_includes_env_file() {
         }
 
         let e = get_events().await;
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert!(e[2]
-            .event_name
-            .starts_with("artifact-architecture-registered:"));
-        assert!(e[3]
-            .event_name
-            .starts_with("artifact-architecture-registered:"));
-        assert!(e[4]
-            .event_name
-            .starts_with("artifact-architecture-registered:"));
-        assert_eq!(e[5].event_name, "stage-finished");
-        assert_eq!(e[6].event_name, "stage-started");
-        assert_eq!(e[7].event_name, "host-group-started");
-        assert_eq!(e[8].event_name, "host-started");
-        assert_eq!(e[9].event_name, "host-artifact-replicated");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[4].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[5].1, E::StageFinished { .. }));
+        assert!(matches!(e[6].1, E::StageStarted { .. }));
+        assert!(matches!(e[7].1, E::HostGroupStarted { .. }));
+        assert!(matches!(e[8].1, E::HostStarted { .. }));
+        assert!(matches!(e[9].1, E::HostArtifactReplicated { .. }));
         assert_eq!(e.len(), 10);
 
         // FINALLY, assert that the replication of the artifact on the host contains a .env file containing the "beta" fields
@@ -413,5 +403,241 @@ async fn service_artifact_includes_env_file() {
         assert!(env_file_content.contains("PERSIST_DIR=\"/home/ant/persist/ant-host-agent\""));
         assert!(env_file_content.contains("ANT_HOST_AGENT_PORT=\"3232\""));
         assert!(env_file_content.contains("ANT_FS_HOST_PORTS=\"[{\\\"tls\\\":false,\\\"url\\\":\\\"antworker002.hosts.typesofants.org:3237\\\"}]\""));
+    }
+}
+
+#[test]
+#[traced_test]
+async fn service_artifact_docker_compose_includes_variables() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("tls_cert.secret"),
+            secret_root.join("prod").join("tls_cert.secret"),
+            secret_root.join("beta").join("tls_key.secret"),
+            secret_root.join("prod").join("tls_key.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
+
+    // REPLICATE
+    {
+        // Create host group
+        let host_group_id = {
+            let req = CreateHostGroupRequest {
+                name: "hg".to_string(),
+                project: "ant-gateway".to_string(),
+                environment: "beta".to_string(),
+            };
+
+            let res = fixture
+                .client
+                .post("/pipeline/host-group/host-group")
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+
+            let body: CreateHostGroupResponse = res.json().await;
+            body.id
+        };
+
+        // Add 001 (aarch64) to hg
+        {
+            let req = AddHostToHostGroupRequest {
+                host_group_id: host_group_id.clone(),
+                host_id: "antworker002.hosts.typesofants.org".to_string(),
+            };
+            let res = fixture
+                .client
+                .post("/pipeline/host-group/host")
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+
+        // Create beta stage
+        {
+            let req = PutPipelineRequest {
+                name: "proxy".to_string(),
+                stages: vec![vec![PutPipelineStage {
+                    name: "beta-deployment".to_string(),
+                    host_group_ids: vec![host_group_id.clone()],
+                }]],
+            };
+
+            let res = fixture
+                .client
+                .post("/pipeline/pipeline")
+                .json(&req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+
+        // REGISTER
+        let archive = {
+            let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
+                .join("tests")
+                .join("integration")
+                .join("test-archives")
+                .join("ant-gateway-v1.tar.gz");
+            let input_digest = digest(&archive);
+
+            let req = reqwest::multipart::Form::new()
+                .file("file", &archive)
+                .await
+                .unwrap();
+
+            let res = fixture
+                .client
+                .post("/service/artifact")
+                .header("X-Ant-Project", "ant-gateway")
+                .header("X-Ant-Version", "v1")
+                .header("X-Ant-Architecture", "aarch64")
+                .multipart(req)
+                .send()
+                .await;
+
+            assert_eq!(res.status(), StatusCode::OK);
+
+            let output_path = fixture
+                .state
+                .root_dir
+                .join("artifacts-db")
+                .join("ant-gateway.aarch64.v1.bld");
+
+            assert_eq!(
+                (output_path.clone(), exists(output_path.clone()).unwrap()),
+                (output_path.clone(), true)
+            );
+
+            let output_digest = digest(&output_path);
+
+            assert_eq!(input_digest, output_digest);
+
+            // Iterate pipeline once
+            {
+                let res = fixture.client.post("/deployment/iteration").send().await;
+                assert_eq!(res.status(), StatusCode::OK);
+            }
+
+            archive
+        };
+
+        // register other arches
+        {
+            let res = fixture
+                .client
+                .post("/service/artifact")
+                .header("X-Ant-Project", "ant-gateway")
+                .header("X-Ant-Version", "v1")
+                .header("X-Ant-Architecture", "x86")
+                .multipart(
+                    reqwest::multipart::Form::new()
+                        .file("file", &archive)
+                        .await
+                        .unwrap(),
+                )
+                .send()
+                .await;
+            assert_eq!(res.status(), StatusCode::OK);
+
+            // Iterate pipeline once
+            {
+                let res = fixture.client.post("/deployment/iteration").send().await;
+                assert_eq!(res.status(), StatusCode::OK);
+            }
+        }
+
+        {
+            let res = fixture
+                .client
+                .post("/service/artifact")
+                .header("X-Ant-Project", "ant-gateway")
+                .header("X-Ant-Version", "v1")
+                .header("X-Ant-Architecture", "raspbian")
+                .multipart(
+                    reqwest::multipart::Form::new()
+                        .file("file", &archive)
+                        .await
+                        .unwrap(),
+                )
+                .send()
+                .await;
+            assert_eq!(res.status(), StatusCode::OK);
+
+            // Iterate pipeline once
+            {
+                let res = fixture.client.post("/deployment/iteration").send().await;
+                assert_eq!(res.status(), StatusCode::OK);
+            }
+        }
+
+        // Iterate pipeline once
+        {
+            let res = fixture.client.post("/deployment/iteration").send().await;
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+
+        let revisions = fixture.state.db.list_revisions().await.unwrap();
+        let rev = &revisions[0];
+        assert_eq!(revisions.len(), 1);
+        let revision_id = rev.id.clone();
+
+        let get_events = || async { crate::deployment::get_events(&fixture, &revision_id).await };
+
+        for _ in 0..4 {
+            let res = fixture.client.post("/deployment/iteration").send().await;
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+
+        let e = get_events().await;
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[4].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[5].1, E::StageFinished { .. }));
+        assert!(matches!(e[6].1, E::StageStarted { .. }));
+        assert!(matches!(e[7].1, E::HostGroupStarted { .. }));
+        assert!(matches!(e[8].1, E::HostStarted { .. }));
+        assert!(matches!(e[9].1, E::HostArtifactReplicated { .. }));
+        assert_eq!(e.len(), 10);
+
+        // FINALLY, assert that the replication of the artifact on the host contains a .env file containing the "beta" fields
+        let dir = fixture
+            .ant_host_agent_state
+            .install_root_dir
+            .join("ant-gateway")
+            .join("v1");
+
+        assert!(std::fs::exists(dir.join("ant-gateway.service")).unwrap());
+        assert!(std::fs::exists(dir.join("secrets").join("tls_cert.secret")).unwrap());
+        assert!(std::fs::exists(dir.join("secrets").join("tls_key.secret")).unwrap());
+        assert!(std::fs::exists(dir.join("docker-compose.yml")).unwrap());
+        let compose_yml_content = std::fs::read_to_string(dir.join("docker-compose.yml")).unwrap();
+        assert!(compose_yml_content.contains("- ant-gateway:latest")); // tags
+        assert!(compose_yml_content.contains("- ant-gateway:v1")); // tags
+        assert!(compose_yml_content.contains("VERSION: \"v1\"")); // environment
+        assert!(compose_yml_content.contains("ANT_GATEWAY_FQDN: \"test.typesofants.org\"")); // environment
+
+        assert!(std::fs::exists(dir.join(".env")).unwrap());
+        let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
+        assert!(env_file_content.contains("TYPESOFANTS_ENV=\"beta\""));
+        assert!(env_file_content.contains("PERSIST_DIR=\"/home/ant/persist/ant-gateway\""));
+        assert!(env_file_content.contains("ANT_GATEWAY_FQDN=\"test.typesofants.org\""));
+        assert!(env_file_content.contains("VERSION=\"v1\""));
     }
 }

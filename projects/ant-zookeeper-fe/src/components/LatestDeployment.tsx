@@ -10,7 +10,7 @@ export function LatestDeployment(props: {
     <span className="flex flex-row space-x-1 items-center">
       <RevisionBox revs={props.revisions} revision={props.finished?.revision} />
       <div className="flex flex-row space-x-1 items-center">
-        <div>latest</div>
+        <div>{props.finished ? "latest finished" : "no latest"}</div>
         {props.finished ? (
           <DateTime date={props.finished.reachedAt} />
         ) : undefined}

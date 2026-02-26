@@ -4,14 +4,18 @@ use std::{
     path::PathBuf,
 };
 
-use ant_zookeeper::routes::{
-    pipeline::{
-        AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
-        PutPipelineRequest, PutPipelineStage,
+use ant_library::host_architecture::HostArchitecture;
+use ant_zookeeper::{
+    event_loop::transition::{DeploymentEvent, Event as E},
+    routes::{
+        pipeline::{
+            AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
+            PutPipelineRequest, PutPipelineStage,
+        },
+        service::{ProjectEnvironmentVariable, PutProjectEnvironmentRequest},
     },
-    service::{ProjectEnvironmentVariable, PutProjectEnvironmentRequest},
 };
-use ant_zookeeper_db::{Deployment, DeploymentJob};
+use ant_zookeeper_db::DeploymentJob;
 use http::StatusCode;
 use reqwest::multipart::Form;
 use stdext::function_name;
@@ -20,16 +24,21 @@ use tracing_test::traced_test;
 
 use crate::fixture::Fixture;
 
-async fn get_events(fixture: &Fixture, project: &str, revision_id: &str) -> Vec<Deployment> {
-    fixture
+pub async fn get_events(fixture: &Fixture, revision_id: &str) -> Vec<DeploymentEvent> {
+    let raw_events = fixture
         .state
         .db
-        .list_deployment_events_in_pipeline_revision(project, &revision_id)
+        .list_deployment_events_in_revision(&revision_id)
         .await
-        .unwrap()
+        .unwrap();
+
+    raw_events
+        .into_iter()
+        .map(|e| DeploymentEvent(e.revision_id, e.event.into()))
+        .collect()
 }
 
-async fn get_unfinished_jobs(fixture: &Fixture) -> Vec<DeploymentJob> {
+pub async fn get_unfinished_jobs(fixture: &Fixture) -> Vec<DeploymentJob> {
     fixture
         .state
         .db
@@ -57,6 +66,7 @@ async fn beta_stage_setup(fixture: &Fixture) {
     let host_group_id = {
         let req = CreateHostGroupRequest {
             name: "ant-host-agent/beta".to_string(),
+            project: "ant-host-agent".to_string(),
             environment: "beta".to_string(),
         };
 
@@ -93,11 +103,11 @@ async fn beta_stage_setup(fixture: &Fixture) {
     // Create beta stage deploying to ant-host-agent/beta in pipeline
     {
         let req = PutPipelineRequest {
-            project: "ant-host-agent".to_string(),
-            stages: vec![PutPipelineStage {
+            name: "website".to_string(),
+            stages: vec![vec![PutPipelineStage {
                 name: "beta-deployment".to_string(),
-                host_group_id: host_group_id.clone(),
-            }],
+                host_group_ids: vec![host_group_id.clone()],
+            }]],
         };
 
         let res = fixture
@@ -160,38 +170,23 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
 
     let revisions = fixture.state.db.list_revisions().await.unwrap();
     let rev = &revisions[0];
-    assert_eq!(rev.project_id, "ant-host-agent");
     assert!(revisions.len() >= 1);
     let revision_id = rev.id.clone();
 
-    let get_events = || async {
-        fixture
-            .state
-            .db
-            .list_deployment_events_in_pipeline_revision("ant-host-agent", &revision_id)
-            .await
-            .unwrap()
-    };
-
-    let get_unfinished_jobs = || async {
-        fixture
-            .state
-            .db
-            .list_unfinished_deployment_jobs()
-            .await
-            .unwrap()
-    };
+    let get_events = || async { get_events(&fixture, &revision_id).await };
+    let get_unfinished_jobs = || async { get_unfinished_jobs(&fixture).await };
 
     {
+        let res = fixture.client.post("/deployment/iteration").send().await;
+        assert_eq!(res.status(), StatusCode::OK);
+
         let jobs = get_unfinished_jobs().await;
         assert_eq!(jobs.len(), 0);
 
         let e = get_events().await;
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        if e.len() == 5 {
-            assert_eq!(e, vec![]);
-        }
+        assert_eq!(e.len(), 2);
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
     }
 
     // Iterate pipeline once
@@ -201,9 +196,15 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
         let e = get_events().await;
         assert_eq!(e.len(), 3);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(
+            e[2].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::Aarch64,
+                ..
+            }
+        ));
     }
 
     // Iterate pipeline once
@@ -217,9 +218,15 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
         assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
         let e = get_events().await;
         assert_eq!(e.len(), 3);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(
+            e[2].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::Aarch64,
+                ..
+            }
+        ));
     }
 
     // Register the x86 artifact
@@ -252,10 +259,16 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
         assert_eq!(get_unfinished_jobs().await.len(), 1); // only ArmV7 remaining
         let e = get_events().await;
         assert_eq!(e.len(), 4);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(
+            e[3].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::X86_64,
+                ..
+            }
+        ));
     }
 
     // Register the (FINAL) Raspian artifact
@@ -288,11 +301,17 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         let e = get_events().await;
         assert_eq!(e.len(), 5);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(
+            e[4].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::ArmV7,
+                ..
+            }
+        ));
     }
 
     revision_id
@@ -306,7 +325,7 @@ async fn deployment_deployment_returns_200_happy_path() {
     beta_stage_setup(&fixture).await;
     let revision_id = artifact_build_setup(&fixture, None).await;
     let get_unfinished_jobs = || get_unfinished_jobs(&fixture);
-    let get_events = || get_events(&fixture, "ant-host-agent", &revision_id);
+    let get_events = || get_events(&fixture, &revision_id);
 
     // Iterate pipeline 5 times, before requiring a deployment (fails locally, no systemd on MacOS)
     {
@@ -318,16 +337,16 @@ async fn deployment_deployment_returns_200_happy_path() {
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         let e = get_events().await;
         assert_eq!(e.len(), 10);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e[5].event_name, "stage-finished");
-        assert_eq!(e[6].event_name, "stage-started");
-        assert_eq!(e[7].event_name, "host-group-started");
-        assert_eq!(e[8].event_name, "host-started");
-        assert_eq!(e[9].event_name, "host-artifact-replicated");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[4].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[5].1, E::StageFinished { .. }));
+        assert!(matches!(e[6].1, E::StageStarted { .. }));
+        assert!(matches!(e[7].1, E::HostGroupStarted { .. }));
+        assert!(matches!(e[8].1, E::HostStarted { .. }));
+        assert!(matches!(e[9].1, E::HostArtifactReplicated { .. }));
     }
 }
 
@@ -352,47 +371,59 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
 
     let v1_revision_id = artifact_build_setup(&fixture, Some("v1")).await;
     let get_unfinished_jobs = || get_unfinished_jobs(&fixture);
-    let get_events_v1 = || get_events(&fixture, "ant-host-agent", &v1_revision_id);
+    let get_events_v1 = || get_events(&fixture, &v1_revision_id);
 
-    let (pipeline_id, build_stage_id) = {
+    let build_stage_id = {
         let e = get_events_v1().await;
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         assert_eq!(e.len(), 5);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(
+            e[2].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::Aarch64,
+                ..
+            }
+        ));
+        assert!(matches!(
+            e[3].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::X86_64,
+                ..
+            }
+        ));
+        assert!(matches!(
+            e[4].1,
+            E::ArtifactRegistered {
+                arch: HostArchitecture::ArmV7,
+                ..
+            }
+        ));
 
-        (e[0].target_id.clone(), e[4].target_id.clone())
+        let build_stage_id = match &e[4].1 {
+            E::ArtifactRegistered { stage_id, .. } => stage_id.clone(),
+            _ => panic!("not the right event"),
+        };
+
+        build_stage_id
     };
 
     // == PAUSE REVISION 1 HERE, MAKE SURE THE NEXT STEP FAILS ==
     let job_id = {
-        let job_id = fixture
+        let event = E::StageFinished {
+            stage_id: build_stage_id.clone(),
+        };
+        let (job_id, _) = fixture
             .state
             .db
-            .create_deployment_job(
-                &v1_revision_id,
-                "ant-host-agent",
-                &pipeline_id,
-                "stage",
-                &build_stage_id,
-                "stage-finished",
-            )
+            .create_deployment_job(&v1_revision_id, &event.to_string())
             .await
             .unwrap();
         fixture
             .state
             .db
-            .complete_deployment_job(
-                &job_id,
-                &v1_revision_id,
-                "stage",
-                &build_stage_id,
-                "stage-finished",
-                false,
-            )
+            .complete_deployment_job(&job_id, &v1_revision_id, &event.to_string(), false)
             .await
             .unwrap();
 
@@ -407,18 +438,18 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
             let e = get_events_v1().await;
             assert_eq!(get_unfinished_jobs().await.len(), 0);
             assert_eq!(e.len(), 5);
-            assert_eq!(e[0].event_name, "pipeline-started");
-            assert_eq!(e[1].event_name, "stage-started");
-            assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-            assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
-            assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
+            assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+            assert!(matches!(e[1].1, E::StageStarted { .. }));
+            assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+            assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+            assert!(matches!(e[4].1, E::ArtifactRegistered { .. }));
         }
 
         job_id
     };
 
     let v2_revision_id = artifact_build_setup(&fixture, Some("v2")).await;
-    let get_events_v2 = || get_events(&fixture, "ant-host-agent", &v2_revision_id);
+    let get_events_v2 = || get_events(&fixture, &v2_revision_id);
 
     // Iterate pipeline twice to "surpass" the revision 1
     {
@@ -430,13 +461,13 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
         let e = get_events_v2().await;
         assert_eq!(get_unfinished_jobs().await.len(), 0);
         assert_eq!(e.len(), 7);
-        assert_eq!(e[0].event_name, "pipeline-started");
-        assert_eq!(e[1].event_name, "stage-started");
-        assert_eq!(e[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e[4].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e[5].event_name, "stage-finished");
-        assert_eq!(e[6].event_name, "stage-started");
+        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e[1].1, E::StageStarted { .. }));
+        assert!(matches!(e[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[4].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e[5].1, E::StageFinished { .. }));
+        assert!(matches!(e[6].1, E::StageStarted { .. }));
     }
 
     // UNPAUSE REVISION 1: by marking the failed deployment job as "retryable", so it will schedule a task
@@ -462,23 +493,23 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
         // v1 hasn't moved
         let e1 = get_events_v1().await;
         assert_eq!(e1.len(), 5);
-        assert_eq!(e1[0].event_name, "pipeline-started");
-        assert_eq!(e1[1].event_name, "stage-started");
-        assert_eq!(e1[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e1[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e1[4].event_name, "artifact-architecture-registered:armv7");
+        assert!(matches!(e1[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e1[1].1, E::StageStarted { .. }));
+        assert!(matches!(e1[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e1[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e1[4].1, E::ArtifactRegistered { .. }));
 
         // v2 has kept going
         let e2 = get_events_v2().await;
         assert_eq!(e2.len(), 9);
-        assert_eq!(e2[0].event_name, "pipeline-started");
-        assert_eq!(e2[1].event_name, "stage-started");
-        assert_eq!(e2[2].event_name, "artifact-architecture-registered:aarch64");
-        assert_eq!(e2[3].event_name, "artifact-architecture-registered:x86_64");
-        assert_eq!(e2[4].event_name, "artifact-architecture-registered:armv7");
-        assert_eq!(e2[5].event_name, "stage-finished");
-        assert_eq!(e2[6].event_name, "stage-started");
-        assert_eq!(e2[7].event_name, "host-group-started");
-        assert_eq!(e2[8].event_name, "host-started");
+        assert!(matches!(e2[0].1, E::PipelineStarted { .. }));
+        assert!(matches!(e2[1].1, E::StageStarted { .. }));
+        assert!(matches!(e2[2].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e2[3].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e2[4].1, E::ArtifactRegistered { .. }));
+        assert!(matches!(e2[5].1, E::StageFinished { .. }));
+        assert!(matches!(e2[6].1, E::StageStarted { .. }));
+        assert!(matches!(e2[7].1, E::HostGroupStarted { .. }));
+        assert!(matches!(e2[8].1, E::HostStarted { .. }));
     }
 }

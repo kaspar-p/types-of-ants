@@ -169,11 +169,12 @@ impl Fixture {
         {
             create_dir_all(root_dir.join("envs")).await.unwrap();
 
-            let mut ant_host_agent_env =
-                File::create(root_dir.join("envs").join("ant-host-agent.beta.build.cfg"))
-                    .await
-                    .unwrap();
-            ant_host_agent_env
+            {
+                let mut ant_host_agent_env =
+                    File::create(root_dir.join("envs").join("ant-host-agent.beta.build.cfg"))
+                        .await
+                        .unwrap();
+                ant_host_agent_env
                 .write_all(
                     format!(
                         "ANT_FS_HOST_PORTS={}\n",
@@ -184,18 +185,31 @@ impl Fixture {
                 .await
                 .unwrap();
 
-            ant_host_agent_env
-                .write_all("ANT_HOST_AGENT_PORT=3232\n".as_bytes())
-                .await
-                .unwrap();
+                ant_host_agent_env
+                    .write_all("ANT_HOST_AGENT_PORT=3232\n".as_bytes())
+                    .await
+                    .unwrap();
+            }
+            {
+                let mut ant_gateway_env =
+                    File::create(root_dir.join("envs").join("ant-gateway.beta.build.cfg"))
+                        .await
+                        .unwrap();
 
-            let mut beta_env = File::create(root_dir.join("envs").join("beta.build.cfg"))
-                .await
-                .unwrap();
-            beta_env
-                .write_all("TYPESOFANTS_ENV=beta\n".as_bytes())
-                .await
-                .unwrap();
+                ant_gateway_env
+                    .write_all("ANT_GATEWAY_FQDN=\"test.typesofants.org\"\n".as_bytes())
+                    .await
+                    .unwrap();
+            }
+            {
+                let mut beta_env = File::create(root_dir.join("envs").join("beta.build.cfg"))
+                    .await
+                    .unwrap();
+                beta_env
+                    .write_all("TYPESOFANTS_ENV=beta\n".as_bytes())
+                    .await
+                    .unwrap();
+            }
         }
 
         let state = AntZookeeperState {
