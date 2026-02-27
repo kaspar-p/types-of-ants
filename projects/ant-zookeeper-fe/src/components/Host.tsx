@@ -4,6 +4,7 @@ import { DateTime } from "./DateTime";
 import { InProgressDeployments } from "./InProgressDeployments";
 import { LatestDeployment } from "./LatestDeployment";
 import { type Host, HostGroup, Progress, revisions } from "./Pipeline";
+import { RetryJobButton } from "./RetryJobButton";
 import { RevisionBox } from "./RevisionBox";
 
 export type HostProps = {
@@ -50,7 +51,10 @@ export function Host(props: HostProps) {
                 revision={hostRev.failed.revision}
                 failed={true}
               />
-              <div className="text-red-700">failed</div>
+              <div className="flex flex-col justify-start">
+                <div className="text-red-700">failed</div>
+                <RetryJobButton jobId={hostRev.failed.failedJobs[0].jobId} />
+              </div>
               <div className="flex flex-col space-y-1">
                 {hostRev.failed?.failedJobs.map((j, i, jobs) => (
                   <div

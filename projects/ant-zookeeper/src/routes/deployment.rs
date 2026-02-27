@@ -1,6 +1,7 @@
 use anyhow::Context;
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use axum_extra::routing::RouterExt;
+use chrono::{DateTime, Utc};
 use futures::{future::join_all, TryFutureExt};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -112,6 +113,60 @@ async fn iterate_pipeline(
     Ok((StatusCode::OK, Json(IteratePipelineResponse {})))
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetryJobRequest {
+    pub job_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetryJobResponse {
+    pub retried_at: DateTime<Utc>,
+}
+
+async fn retry_job(
+    State(state): State<AntZookeeperState>,
+    Json(req): Json<RetryJobRequest>,
+) -> Result<impl IntoResponse, AntZookeeperError> {
+    match state.db.get_deployment_job(&req.job_id).await? {
+        None => {
+            return Err(AntZookeeperError::ResourceNotFound(req.job_id));
+        }
+        Some((_, is_success, is_retryable, updated_at, _, _)) => {
+            if is_success {
+                return Err(AntZookeeperError::ValidationError(format!(
+                    "Job {} has already been completed and cannot be retried.",
+                    req.job_id
+                )));
+            }
+
+            if is_retryable {
+                return Ok((
+                    StatusCode::OK,
+                    Json(RetryJobResponse {
+                        retried_at: updated_at,
+                    }),
+                ));
+            }
+        }
+    }
+
+    let updated_at = state
+        .db
+        .set_deployment_job_retryable(&req.job_id, true)
+        .await?;
+
+    return Ok((
+        StatusCode::OK,
+        Json(RetryJobResponse {
+            retried_at: updated_at,
+        }),
+    ));
+}
+
 pub fn make_routes() -> Router<AntZookeeperState> {
-    Router::new().route_with_tsr("/iteration", post(iterate_pipeline))
+    Router::new()
+        .route_with_tsr("/iteration", post(iterate_pipeline))
+        .route_with_tsr("/retry", post(retry_job))
 }

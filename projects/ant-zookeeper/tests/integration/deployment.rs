@@ -8,6 +8,7 @@ use ant_library::host_architecture::HostArchitecture;
 use ant_zookeeper::{
     event_loop::transition::{DeploymentEvent, Event as E},
     routes::{
+        deployment::RetryJobRequest,
         pipeline::{
             AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
             PutPipelineRequest, PutPipelineStage,
@@ -23,6 +24,25 @@ use tokio::test;
 use tracing_test::traced_test;
 
 use crate::fixture::Fixture;
+
+#[test]
+#[traced_test]
+async fn deployment_retry_returns_400_if_no_such_job() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    {
+        let req = RetryJobRequest {
+            job_id: "some job".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/deployment/retry")
+            .json(&req)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST)
+    }
+}
 
 pub async fn get_events(fixture: &Fixture, revision_id: &str) -> Vec<DeploymentEvent> {
     let raw_events = fixture
@@ -417,7 +437,7 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
         let (job_id, _) = fixture
             .state
             .db
-            .create_deployment_job(&v1_revision_id, &event.to_string())
+            .create_deployment_job_idempotently(&v1_revision_id, &event.to_string())
             .await
             .unwrap();
         fixture
@@ -478,7 +498,7 @@ async fn deployment_deployment_returns_200_and_filters_revisions_if_newer_have_s
             .db
             .set_deployment_job_retryable(&job_id, true)
             .await
-            .unwrap()
+            .unwrap();
     }
 
     // Iterate pipeline

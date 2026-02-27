@@ -245,7 +245,7 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 
     // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!
     let (job_id, is_new) = db
-        .create_deployment_job(&event.0, &event.1.to_string())
+        .create_deployment_job_idempotently(&event.0, &event.1.to_string())
         .await?;
 
     if is_new {

@@ -851,33 +851,81 @@ impl AntZooStorageClient {
         Ok(())
     }
 
+    /// Returns (created_at, is_successful, is_retryable, updated_at, started_at, finished_at)
+    pub async fn get_deployment_job(
+        &self,
+        deployment_job_id: &str,
+    ) -> Result<
+        Option<(
+            DateTime<Utc>,
+            bool,
+            bool,
+            DateTime<Utc>,
+            Option<DateTime<Utc>>,
+            Option<DateTime<Utc>>,
+        )>,
+        anyhow::Error,
+    > {
+        let mut con = self.db.get().await?;
+        let tx = con.transaction().await?;
+
+        let job = tx
+            .query_opt(
+                "
+            select created_at, updated_at, is_success, is_retryable, started_at, finished_at
+            from deployment_job
+            where
+                deployment_job_id = $1
+            ",
+                &[&deployment_job_id],
+            )
+            .await
+            .with_context(|| format!("{}: {}", function_name!(), deployment_job_id))?
+            .map(|row| {
+                (
+                    row.get("created_at"),
+                    row.get("is_success"),
+                    row.get("is_retryable"),
+                    row.get("updated_at"),
+                    row.get("started_at"),
+                    row.get("finished_at"),
+                )
+            });
+
+        tx.commit().await?;
+
+        Ok(job)
+    }
+
     pub async fn set_deployment_job_retryable(
         &self,
         deployment_job_id: &str,
         retryable: bool,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<DateTime<Utc>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
         // Mark deployment job is_retryable
-        tx.query_one(
-            "
+        let updated_at = tx
+            .query_one(
+                "
             update deployment_job
             set
                 is_retryable = $1,
                 updated_at = now()
             where
                 deployment_job_id = $2
-            returning deployment_job_id
+            returning updated_at
             ",
-            &[&retryable, &deployment_job_id],
-        )
-        .await
-        .with_context(|| format!("{}: {} {}", function_name!(), deployment_job_id, retryable))?;
+                &[&retryable, &deployment_job_id],
+            )
+            .await
+            .with_context(|| format!("{}: {} {}", function_name!(), deployment_job_id, retryable))?
+            .get("updated_at");
 
         tx.commit().await?;
 
-        Ok(())
+        Ok(updated_at)
     }
 
     /// Returns Some(created Deployment ID) if the job was successful, None if it wasn't,
@@ -1075,7 +1123,7 @@ impl AntZooStorageClient {
     /// This means retries ARE jobs with very similar parameters!
     ///
     /// Returns (job_id, is_new)
-    pub async fn create_deployment_job(
+    pub async fn create_deployment_job_idempotently(
         &self,
         revision_id: &str,
         event: &str,

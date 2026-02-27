@@ -23,7 +23,7 @@ use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
 use crate::anthill::AnthillManifest;
-use crate::event_loop::transition::Event;
+use crate::event_loop::transition::{is_deployment_complete, DeploymentEvent, Event};
 use crate::fs::{
     artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
     secret_file_path,
@@ -258,41 +258,50 @@ async fn register_artifact(
 
     let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;
 
-    if is_new {
-        info!(
-            "Revision {revision_id} is new, scheduling pipelines that build this project to start."
-        );
+    {
+        info!("Scheduling pipelines that build this project to start.");
         let all_pipelines = state.db.list_deployment_pipelines().await?;
-        let mut pipelines_building_project: HashSet<&String> = HashSet::new();
-        for pipeline_id in &all_pipelines {
-            let build_stages = state
-                .db
-                .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
-                .await?;
-            for stage_id in build_stages {
-                let stage = state
+        let pipelines_building_project = {
+            let mut pipelines_building_project: HashSet<&String> = HashSet::new();
+            for pipeline_id in &all_pipelines {
+                let build_stages = state
                     .db
-                    .get_deployment_pipeline_stage(&stage_id)
-                    .await?
-                    .unwrap();
-                let pipeline_build_project = stage.3.expect(&format!(
-                    "build stage {stage_id} should have project attached."
-                ));
+                    .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
+                    .await?;
+                for stage_id in build_stages {
+                    let stage = state
+                        .db
+                        .get_deployment_pipeline_stage(&stage_id)
+                        .await?
+                        .unwrap();
+                    let pipeline_build_project = stage.3.expect(&format!(
+                        "build stage {stage_id} should have project attached."
+                    ));
 
-                if pipeline_build_project == *project.0 {
-                    pipelines_building_project.insert(pipeline_id);
+                    if pipeline_build_project == *project.0 {
+                        pipelines_building_project.insert(pipeline_id);
+                    }
                 }
             }
-        }
+            pipelines_building_project
+        };
 
         for pipeline_id in pipelines_building_project {
-            let event = Event::PipelineStarted {
-                pipeline_id: pipeline_id.clone(),
-            };
-            state
-                .db
-                .create_deployment_job(&revision_id, &event.to_string())
-                .await?;
+            let event = DeploymentEvent(
+                revision_id.clone(),
+                Event::PipelineStarted {
+                    pipeline_id: pipeline_id.clone(),
+                },
+            );
+            if !is_deployment_complete(&state.db, &event).await? {
+                info!("Kick-starting pipeline [{}]...", pipeline_id);
+                state
+                    .db
+                    .create_deployment_job_idempotently(&revision_id, &event.1.to_string())
+                    .await?;
+            } else {
+                info!("Skipping stating pipeline [{pipeline_id}], it's already started...");
+            }
         }
     }
 
