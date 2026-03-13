@@ -5,7 +5,8 @@ Description=The typesofants frontend!
 Type=simple
 EnvironmentFile={{INSTALL_DIR}}/.env
 Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
-Environment=PORT=3240 # This should come from ANT_LOOKING_PRETTY_PORT but not sure how to do that...
+# This should come from ANT_LOOKING_PRETTY_PORT but not sure how to do that...
+Environment=PORT=3240
 ExecStart=/home/ant/.nvm/versions/node/current {{INSTALL_DIR}}/server.js
 WorkingDirectory={{INSTALL_DIR}}
 Restart=always
