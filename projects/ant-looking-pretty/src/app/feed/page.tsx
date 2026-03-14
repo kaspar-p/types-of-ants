@@ -7,7 +7,7 @@ import Link from "next/link";
 import { RefreshButton } from "./RefreshButton";
 import { Suspense } from "react";
 
-function formatDate(createdUtcMilliseconds: string): string {
+export function formatDate(millis: string): string {
   const months = [
     "Jan",
     "Feb",
@@ -22,9 +22,17 @@ function formatDate(createdUtcMilliseconds: string): string {
     "Nov",
     "Dec",
   ];
-  const d = new Date(createdUtcMilliseconds);
+  const d = new Date(millis);
 
   const date = `${months[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+
+  return date;
+}
+
+function formatDatetime(createdUtcMilliseconds: string): string {
+  const date = formatDate(createdUtcMilliseconds);
+
+  const d = new Date(createdUtcMilliseconds);
   const minutes =
     d.getMinutes().toString().length === 1
       ? "0" + d.getMinutes().toString()
@@ -43,7 +51,7 @@ function AntPost({ ant }: AntPostProps) {
         <Link href={`/im/${ant.createdByUsername}`}>
           @{ant.createdByUsername}
         </Link>{" "}
-        <small className="pl-1">{formatDate(ant.createdAt)}</small>
+        <small className="pl-1">{formatDatetime(ant.createdAt)}</small>
       </div>
       <div className="pl-4">{ant.antName}</div>
     </div>

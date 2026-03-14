@@ -60,6 +60,8 @@ export async function Header() {
               </>
             )}
 
+            <Button path="/blog">blog</Button>
+
             {user.loggedIn && <LogoutButton>logout</LogoutButton>}
           </div>
 
