@@ -56,11 +56,11 @@ export type GetPipelineResponse = {
   pipelineId: string;
   name: string;
 
-  stages: Stage[][];
+  stages?: Stage[][];
 
   progress: Progress;
 
-  revisions: string[];
+  revisions?: string[];
 };
 
 export type PipelineProps = {
@@ -146,7 +146,7 @@ export function Pipeline({ res }: PipelineProps) {
 
       <div>
         <div className="flex flex-row space-x-4 space-y-2 flex-wrap">
-          {res.revisions.map((revision, i, revs) => (
+          {res.revisions?.map((revision, i, revs) => (
             <div key={revision}>
               <ClipboardCopy text={revision}>
                 <div className="flex flex-row border rounded-md p-1 space-x-1">
@@ -162,13 +162,13 @@ export function Pipeline({ res }: PipelineProps) {
       </div>
 
       <div className="flex flex-row space-x-6">
-        {res.stages.map((phase, i: number) => (
+        {res.stages?.map((phase, i: number) => (
           <div key={i}>
             <div className="flex flex-col space-y-2">
               {phase.map((stage, i) => (
                 <div key={i}>
                   <Stage
-                    revisions={res.revisions}
+                    revisions={res.revisions ?? []}
                     progress={res.progress}
                     stage={stage}
                   />

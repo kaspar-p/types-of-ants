@@ -1,5 +1,5 @@
 use axum::Router;
-use http::{header, HeaderValue, Method};
+use http::{header, Method};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tower_http::{

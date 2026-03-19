@@ -18,7 +18,7 @@ pub async fn drive_revisions(
 ) -> Result<(), PipelineError> {
     let revisions = db.list_revisions().await?;
 
-    for deployment_pipeline_id in db.list_deployment_pipelines().await? {
+    for (deployment_pipeline_id, _) in db.list_deployment_pipelines().await? {
         drive_pipeline(db, &deployment_pipeline_id, &revisions).await?;
     }
 

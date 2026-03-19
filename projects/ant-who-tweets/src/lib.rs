@@ -1,5 +1,6 @@
 use ant_data_farm::{ants::Ant, ants::Tweeted, tweets::ScheduledTweet, AntDataFarmClient};
 use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use rand::seq::IteratorRandom;
 use tracing::info;
@@ -183,7 +184,8 @@ pub fn get_config() -> Result<Config, anyhow::Error> {
 
     let config = Config {
         twitter: TwitterCredentials {
-            handle: dotenv::var("TWITTER_API_ACCOUNT_HANDLE")?,
+            handle: dotenv::var("ANT_WHO_TWEETS_HANDLE")
+                .with_context(|| format!("Missing ANT_WHO_TWEETS_HANDLE"))?,
             consumer_key: ant_library::secret::load_secret("twitter_consumer_key")?,
             consumer_secret: ant_library::secret::load_secret("twitter_consumer_secret")?,
             access_token: ant_library::secret::load_secret("twitter_access_token")?,
@@ -193,8 +195,11 @@ pub fn get_config() -> Result<Config, anyhow::Error> {
             database_name: ant_library::secret::load_secret("ant_data_farm_db")?,
             database_user: ant_library::secret::load_secret("ant_data_farm_user")?,
             database_password: ant_library::secret::load_secret("ant_data_farm_password")?,
-            host: dotenv::var("ANT_DATA_FARM_HOST")?,
-            port: dotenv::var("ANT_DATA_FARM_PORT")?.parse::<u16>()?,
+            host: dotenv::var("ANT_DATA_FARM_HOST")
+                .with_context(|| format!("Missing ANT_DATA_FARM_HOST"))?,
+            port: dotenv::var("ANT_DATA_FARM_PORT")
+                .with_context(|| format!("Missing ANT_DATA_FARM_PORT"))?
+                .parse::<u16>()?,
             migration_dirs: vec![],
         },
     };

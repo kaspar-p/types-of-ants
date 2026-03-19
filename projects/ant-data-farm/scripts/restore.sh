@@ -2,6 +2,18 @@
 
 set -euo pipefail
 
+if (( $# < 2 )); then
+  echo "$0: <deployment environment> <backup filepath>
+=== DANGER ===
+  Entirely overwrites and wipes the target database based on a local SQL file!
+
+Arguments:
+  <deployment environment>: either 'dev', 'beta', or 'prod'
+  <backup filepath>: The path to the SQL pg_dump file that was output from the ./backup.sh script  
+"
+  exit 1
+fi
+
 deploy_env="$1"
 backup_filepath="$2"
 

@@ -263,7 +263,7 @@ async fn register_artifact(
         let all_pipelines = state.db.list_deployment_pipelines().await?;
         let pipelines_building_project = {
             let mut pipelines_building_project: HashSet<&String> = HashSet::new();
-            for pipeline_id in &all_pipelines {
+            for (pipeline_id, _) in &all_pipelines {
                 let build_stages = state
                     .db
                     .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
@@ -405,8 +405,8 @@ async fn put_project_environment(
 
 pub fn make_routes() -> Router<AntZookeeperState> {
     Router::new()
-        .route("/service", post(register_service))
-        .route("/env", post(put_project_environment))
+        .route_with_tsr("/service", post(register_service))
+        .route_with_tsr("/env", post(put_project_environment))
         .route_with_tsr(
             "/artifact",
             post(register_artifact).layer(

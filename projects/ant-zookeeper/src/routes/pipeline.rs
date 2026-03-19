@@ -743,6 +743,31 @@ async fn remove_host_from_host_group(
     ))
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListPipelinesResponse {
+    pipeline_names: Vec<String>,
+}
+
+async fn list_pipelines(
+    State(state): State<AntZookeeperState>,
+) -> Result<(StatusCode, Json<ListPipelinesResponse>), AntZookeeperError> {
+    let pipelines = state
+        .db
+        .list_deployment_pipelines()
+        .await?
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect();
+
+    Ok((
+        StatusCode::OK,
+        Json(ListPipelinesResponse {
+            pipeline_names: pipelines,
+        }),
+    ))
+}
+
 pub fn make_routes() -> Router<AntZookeeperState> {
     Router::new()
         .route_with_tsr(
@@ -754,4 +779,5 @@ pub fn make_routes() -> Router<AntZookeeperState> {
             post(add_host_to_host_group).delete(remove_host_from_host_group),
         )
         .route_with_tsr("/pipeline", get(get_pipeline).post(put_pipeline))
+        .route_with_tsr("/pipelines", get(list_pipelines))
 }

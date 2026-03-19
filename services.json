@@ -21,6 +21,7 @@
   },
   "hosts": {
     "antworker000.hosts.typesofants.org": {
+      "INACTIVE": true,
       "architecture": "raspbian",
       "services": [
         {
@@ -29,15 +30,18 @@
         },
         {
           "env": "prod",
-          "service": "ant-data-farm"
+          "service": "ant-data-farm",
+          "inactive-replaced-by": "antworker006.hosts.typesofants.org"
         },
         {
           "env": "prod",
-          "service": "ant-who-tweets"
+          "service": "ant-who-tweets",
+          "inactive-replaced-by": "antworker005.hosts.typesofants.org"
         },
         {
           "env": "prod",
-          "service": "ant-backing-it-up-db"
+          "service": "ant-backing-it-up-db",
+          "inactive-replaced-by": "antworker003.hosts.typesofants.org"
         }
       ]
     },
@@ -143,6 +147,10 @@
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-who-tweets"
         }
       ]
     },
@@ -152,6 +160,10 @@
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-data-farm"
         }
       ]
     },

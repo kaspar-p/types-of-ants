@@ -11,10 +11,10 @@ function error() {
 
 function usage() {
   error "Usage: anthost [-hn] <host-or-num>
-  host-or-num:    antworker000.hosts.typesofants.org, antworker000, 000
+  host-or-num:    antworkerXYZ.hosts.typesofants.org, antworkerXYZ, XYZ
 
   -h: Display this help text.
-  -n: Display only the trailing number, e.g. 000.
+  -n: Display only the trailing number, e.g. 999.
 "
 }
 
@@ -23,9 +23,9 @@ function parse_full() {
   local host="$1"
   if [[ -z "$host" ]]; then
     error "[ERROR] Need hostname argument! For example:
-      - antworker000.hosts.typesofants.org
-      - antworker000
-      - 000"
+      - antworkerXYZ.hosts.typesofants.org
+      - antworkerXYZ
+      - XYZ"
   elif [[ ${#host} -gt 12 ]]; then
     # Then this format is "antworkerxyz.hosts.typesofants.org"
     host="$host"

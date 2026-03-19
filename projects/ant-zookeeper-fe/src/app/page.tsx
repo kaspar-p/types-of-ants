@@ -2,17 +2,16 @@ import { Pipeline } from "@/components/Pipeline";
 import { RefreshCounter } from "@/components/RefreshCounter";
 
 export default async function Home() {
-  const h = new Headers();
+  const h1 = new Headers();
+  h1.append("Content-Type", "application/json");
 
-  h.append("Content-Type", "application/json");
+  const res = await fetch("http://localhost:3235/pipeline/pipelines");
+  const body: { pipelineNames: string[] } = await res.json();
 
-  const pipelines = [
-    "ant-data-farm",
-    "ant-gateway",
-    "ant-naming-domains",
-    "website",
-    "agent",
-  ];
+  const h2 = new Headers();
+  h2.append("Content-Type", "application/json");
+
+  const pipelines: string[] = body.pipelineNames;
   const responses: { pipeline: string; res: any }[] = [];
 
   for (const pipeline of pipelines) {
@@ -21,7 +20,7 @@ export default async function Home() {
       {
         next: { revalidate: 2 },
         method: "GET",
-        headers: h,
+        headers: h2,
       },
     ).then((x) => x.json());
     console.log(res.name, res.events);

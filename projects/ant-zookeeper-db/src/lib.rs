@@ -410,24 +410,30 @@ impl AntZooStorageClient {
         Ok(exists)
     }
 
-    pub async fn list_deployment_pipelines(&self) -> Result<Vec<String>, anyhow::Error> {
-        let pipeline_ids = self
+    /// Returns vec of (pipeline_id, pipeline_name)
+    pub async fn list_deployment_pipelines(&self) -> Result<Vec<(String, String)>, anyhow::Error> {
+        let pipelines = self
             .db
             .get()
             .await?
             .query(
                 "
-            select deployment_pipeline_id
+            select deployment_pipeline_id, deployment_pipeline_name
             from deployment_pipeline
             ",
                 &[],
             )
             .await?
             .into_iter()
-            .map(|row| row.get("deployment_pipeline_id"))
+            .map(|row| {
+                (
+                    row.get("deployment_pipeline_id"),
+                    row.get("deployment_pipeline_name"),
+                )
+            })
             .collect();
 
-        Ok(pipeline_ids)
+        Ok(pipelines)
     }
 
     pub async fn get_deployment_pipeline_by_name(

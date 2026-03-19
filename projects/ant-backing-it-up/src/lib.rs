@@ -153,7 +153,7 @@ async fn post_backup(
 
     info!(
         "Writing {} bytes to zip archive: {}",
-        sql_plaintext.len(),
+        humansize::format_size(sql_plaintext.len(), humansize::DECIMAL),
         local_zip_path.display()
     );
     zip.start_file(

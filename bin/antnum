@@ -9,9 +9,9 @@ function error() {
 
 function usage() {
   error "Usage: $0 [-h] <host-or-num>
-  Prints the ant worker number at the end of the identifier, e.g. 000
+  Prints the ant worker number at the end of the identifier, e.g. 999
   
-  host-or-num:    antworker000.hosts.typesofants.org, antworker000, 000
+  host-or-num:    antworker999.hosts.typesofants.org, antworker999, 999
 
   -h: Display this help text.
 "
@@ -22,9 +22,9 @@ function parse_short() {
 
   if [[ -z "$host" ]]; then
     error "[ERROR] Need hostname argument! For example:
-      - antworker000.hosts.typesofants.org
-      - antworker000
-      - 000"
+      - antworker999.hosts.typesofants.org
+      - antworker999
+      - 999"
   elif [[ ${#host} -gt 12 ]]; then
     # Then this format is "antworkerxyz.hosts.typesofants.org"
     local arr_host=("${host//.hosts.typesofants.org/}")
