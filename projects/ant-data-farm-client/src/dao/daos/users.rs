@@ -1,6 +1,6 @@
 pub use super::lib::Id as UserId;
 use crate::dao::dao_trait::DaoTrait;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 use futures::future;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio_postgres::Row;
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -39,10 +38,8 @@ pub struct User {
     pub role_name: String,
 }
 
-async fn construct_emails_for_user(db: &Arc<Mutex<Database>>, user_id: &UserId) -> Vec<String> {
-    db.lock()
-        .await
-        .get()
+async fn construct_emails_for_user(pool: &Arc<ConnectionPool>, user_id: &UserId) -> Vec<String> {
+    pool.get()
         .await
         .unwrap()
         .query(
@@ -57,12 +54,10 @@ async fn construct_emails_for_user(db: &Arc<Mutex<Database>>, user_id: &UserId) 
 }
 
 async fn construct_phone_numbers_for_user(
-    db: &Arc<Mutex<Database>>,
+    pool: &Arc<ConnectionPool>,
     user_id: &UserId,
 ) -> Vec<String> {
-    db.lock()
-        .await
-        .get()
+    pool.get()
         .await
         .unwrap()
         .query(
@@ -77,7 +72,7 @@ async fn construct_phone_numbers_for_user(
 }
 
 pub struct UsersDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 fn row_to_user(user_row: &Row, emails: Vec<String>, phone_numbers: Vec<String>) -> User {
@@ -94,15 +89,13 @@ fn row_to_user(user_row: &Row, emails: Vec<String>, phone_numbers: Vec<String>) 
 
 #[async_trait::async_trait]
 impl DaoTrait<UsersDao, User> for UsersDao {
-    async fn new(db: Arc<Mutex<Database>>) -> Result<UsersDao, anyhow::Error> {
-        Ok(UsersDao { database: db })
+    async fn new(pool: Arc<ConnectionPool>) -> Result<UsersDao, anyhow::Error> {
+        Ok(UsersDao { pool })
     }
 
     async fn get_one_by_id(&self, user_id: &UserId) -> Result<Option<User>, anyhow::Error> {
         let binding = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -125,7 +118,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
 
         let row = binding.first().map(|row: &Row| async move {
             let user_id: UserId = row.get("user_id");
-            let in_db = self.database.clone();
+            let in_db = self.pool.clone();
             let emails = construct_emails_for_user(&in_db, &user_id).await;
             let phone_numbers = construct_phone_numbers_for_user(&in_db, &user_id).await;
             row_to_user(row, emails, phone_numbers)
@@ -139,9 +132,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
 
     async fn get_all(&self) -> Result<Vec<User>, anyhow::Error> {
         let rows = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -156,7 +147,7 @@ impl DaoTrait<UsersDao, User> for UsersDao {
 
         Ok(future::join_all(rows.iter().map(|row| async move {
             let user_id: UserId = row.get("user_id");
-            let in_db = self.database.clone();
+            let in_db = self.pool.clone();
             let emails = construct_emails_for_user(&in_db, &user_id).await;
             let phone_numbers = construct_phone_numbers_for_user(&in_db, &user_id).await;
 
@@ -232,8 +223,7 @@ impl UsersDao {
     ) -> Result<User, anyhow::Error> {
         info!("Creating user '{}'", username);
 
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
         let password_hash = make_password_hash(&password)?;
@@ -287,9 +277,7 @@ impl UsersDao {
         user_id: &UserId,
         role_name: &str,
     ) -> Result<(), anyhow::Error> {
-        self.database
-            .lock()
-            .await
+        self.pool
             .get()
             .await?
             .query_one(
@@ -313,8 +301,7 @@ impl UsersDao {
         user_id: &UserId,
         new_password: &str,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        let con = db.get().await?;
+        let con = self.pool.get().await?;
         let password_hash = make_password_hash(&new_password)?;
 
         con.query_one(
@@ -340,9 +327,7 @@ impl UsersDao {
         phone_number: &str,
     ) -> Result<(), anyhow::Error> {
         let res_affected = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .execute(
@@ -369,8 +354,7 @@ impl UsersDao {
         user_id: &UserId,
         new_username: &str,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
         let affected = tx
@@ -400,8 +384,7 @@ impl UsersDao {
         user_id: &UserId,
         email: &str,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
         let res_affected = tx

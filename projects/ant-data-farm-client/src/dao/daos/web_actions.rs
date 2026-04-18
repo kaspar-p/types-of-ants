@@ -1,12 +1,11 @@
 use crate::users::UserId;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 pub struct WebActionsDao {
-    database: Arc<Mutex<Database>>,
+    database: Arc<ConnectionPool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +49,7 @@ impl Display for WebTargetType {
 }
 
 impl WebActionsDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> Result<WebActionsDao, anyhow::Error> {
+    pub async fn new(db: Arc<ConnectionPool>) -> Result<WebActionsDao, anyhow::Error> {
         Ok(WebActionsDao { database: db })
     }
 
@@ -63,8 +62,6 @@ impl WebActionsDao {
         target: &str,
     ) -> Result<(), anyhow::Error> {
         self.database
-            .lock()
-            .await
             .get()
             .await?
             .execute(

@@ -1,11 +1,10 @@
 pub use super::lib::Id as HostId;
 use crate::dao::dao_trait::DaoTrait;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,7 +18,7 @@ pub struct Host {
 }
 
 pub struct HostsDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 fn row_to_host(row: &Row) -> Host {
@@ -36,9 +35,7 @@ fn row_to_host(row: &Row) -> Host {
 impl HostsDao {
     pub async fn get_one_by_hostname(&self, hostname: &str) -> Result<Option<Host>, anyhow::Error> {
         Ok(self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -57,14 +54,14 @@ impl HostsDao {
 
 #[async_trait]
 impl DaoTrait<HostsDao, Host> for HostsDao {
-    async fn new(db: Arc<Mutex<Database>>) -> Result<HostsDao, anyhow::Error> {
-        Ok(HostsDao { database: db })
+    async fn new(pool: Arc<ConnectionPool>) -> Result<HostsDao, anyhow::Error> {
+        Ok(HostsDao { pool })
     }
 
     async fn get_all(&self) -> Result<Vec<Host>> {
-        Ok(self.database
-                .lock()
-                .await.get().await?
+        Ok(self.pool
+                
+                .get().await?
                 .query("select host_id, host_label, host_location, host_hostname, host_type, host_os from host;", &[])
                 .await?
                 .iter()
@@ -74,9 +71,7 @@ impl DaoTrait<HostsDao, Host> for HostsDao {
 
     async fn get_one_by_id(&self, host_id: &HostId) -> Result<Option<Host>> {
         Ok(self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(

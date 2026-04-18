@@ -1,14 +1,13 @@
 pub use super::lib::Id as UserId;
 use crate::users::verify_password_hash;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use chrono::Duration;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::{debug, info};
 use uuid::Uuid;
 
 pub struct VerificationsDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 pub enum VerificationResult {
@@ -23,8 +22,8 @@ pub enum VerificationResult {
 }
 
 impl VerificationsDao {
-    pub fn new(db: Arc<Mutex<Database>>) -> Self {
-        VerificationsDao { database: db }
+    pub fn new(pool: Arc<ConnectionPool>) -> Self {
+        VerificationsDao { pool }
     }
 
     pub async fn is_phone_number_verified(
@@ -33,9 +32,7 @@ impl VerificationsDao {
         phone_number: &str,
     ) -> Result<bool, anyhow::Error> {
         let verifications = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -63,9 +60,7 @@ impl VerificationsDao {
         email: &str,
     ) -> Result<bool, anyhow::Error> {
         let verifications = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -95,8 +90,7 @@ impl VerificationsDao {
         method: &str,
         identifier: &str,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
         let rows = t
@@ -163,8 +157,7 @@ impl VerificationsDao {
         expiration: Duration,
         otp: &str,
     ) -> Result<Uuid, anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
         let verification_id: Uuid = t
@@ -233,9 +226,7 @@ impl VerificationsDao {
         verification_attempt_id: &Uuid,
         send_id: &str,
     ) -> Result<(), anyhow::Error> {
-        self.database
-            .lock()
-            .await
+        self.pool
             .get()
             .await?
             .execute(
@@ -256,8 +247,7 @@ impl VerificationsDao {
         identifier: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
         let verification = t

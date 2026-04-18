@@ -1,12 +1,11 @@
 use crate::dao::daos::lib::Id;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[async_trait]
 pub trait DaoTrait<K, T> {
-    async fn new(db: Arc<Mutex<Database>>) -> anyhow::Result<K, anyhow::Error>;
+    async fn new(db: Arc<ConnectionPool>) -> anyhow::Result<K, anyhow::Error>;
 
     // Read
     async fn get_all(&self) -> anyhow::Result<Vec<T>>;

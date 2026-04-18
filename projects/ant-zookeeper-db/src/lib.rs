@@ -4,7 +4,7 @@ use std::{
 };
 use stdext::function_name;
 
-use ant_library::db::{Database, DatabaseConfig, TypesOfAntsDatabase, database_connection};
+use ant_library::db::{ConnectionPool, DatabaseConfig, TypesOfAntsDatabase, database_connection};
 use anyhow::Context;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -15,7 +15,7 @@ use tokio_postgres::Row;
 
 #[derive(Clone)]
 pub struct AntZooStorageClient {
-    db: Database,
+    db: ConnectionPool,
 }
 
 #[async_trait]

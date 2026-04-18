@@ -35,9 +35,9 @@ fn make_connection_string(
     format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
 }
 
-pub type Database = Pool<PostgresConnectionManager<NoTls>>;
+pub type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
 
-pub async fn database_connection(config: &DatabaseConfig) -> Result<Database, anyhow::Error> {
+pub async fn database_connection(config: &DatabaseConfig) -> Result<ConnectionPool, anyhow::Error> {
     let connection_string = make_connection_string(
         &config.database_user,
         &config.database_password,
@@ -57,7 +57,7 @@ pub async fn database_connection(config: &DatabaseConfig) -> Result<Database, an
         )
     );
     let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)?;
-    let db: Database = Pool::builder().build(manager).await?;
+    let db: ConnectionPool = Pool::builder().build(manager).await?;
 
     for migration_dir in &config.migration_dirs {
         let con = db.get().await?;

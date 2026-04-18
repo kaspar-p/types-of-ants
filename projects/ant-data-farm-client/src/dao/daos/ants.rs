@@ -1,12 +1,11 @@
 pub use super::lib::Id as AntId;
 use super::users::UserId;
 use crate::{releases::Release, users::User};
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
-use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -63,7 +62,7 @@ impl Ord for Ant {
 }
 
 pub struct AntsDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 fn row_to_ant(row: &Row) -> Ant {
@@ -112,16 +111,14 @@ fn row_to_ant(row: &Row) -> Ant {
 }
 
 impl AntsDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> Result<AntsDao, anyhow::Error> {
-        Ok(AntsDao { database: db })
+    pub async fn new(db: Arc<ConnectionPool>) -> Result<AntsDao, anyhow::Error> {
+        Ok(AntsDao { pool: db })
     }
 
     // Read
     pub async fn get_all(&self) -> anyhow::Result<Vec<Ant>> {
         let rows = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -158,9 +155,7 @@ impl AntsDao {
 
     pub async fn get_all_with_user_context(&self, user: &User) -> anyhow::Result<Vec<Ant>> {
         let rows = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -200,9 +195,7 @@ impl AntsDao {
 
     pub async fn get_one_by_id(&self, ant_id: &AntId) -> Result<Option<Ant>> {
         let rows = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(
@@ -245,8 +238,7 @@ impl AntsDao {
         user: &UserId,
         ant: &AntId,
     ) -> Result<Option<DateTime<Utc>>> {
-        let db = self.database.lock().await;
-        let con = db.get().await?;
+        let con = self.pool.get().await?;
 
         let favorite_row = con
             .query_opt(
@@ -265,8 +257,7 @@ impl AntsDao {
     }
 
     pub async fn favorite_ant(&self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
         let favorited_at: DateTime<Utc> = tx
@@ -289,8 +280,7 @@ impl AntsDao {
     }
 
     pub async fn unfavorite_ant(&self, user: &UserId, ant: &AntId) -> Result<()> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
         let rows = tx
@@ -318,9 +308,7 @@ impl AntsDao {
 
     pub async fn is_ant_declined(&self, ant: &AntId) -> Result<bool> {
         let ant_row = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query_opt(
@@ -338,9 +326,7 @@ impl AntsDao {
     // Assumes the ant is not already declined!
     pub async fn decline_ant(&self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
         let declined_at: DateTime<Utc> = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query_one(
@@ -362,9 +348,7 @@ impl AntsDao {
         let time = chrono::offset::Utc::now();
 
         let _ = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .execute(
@@ -388,9 +372,7 @@ impl AntsDao {
 
     pub async fn get_num_released(&self) -> Result<i64> {
         let count = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query_one("select count(ant_id) as cnt from ant_release", &[])
@@ -427,9 +409,7 @@ impl AntsDao {
             favorited_at: None,
         };
 
-        self.database
-            .lock()
-            .await
+        self.pool
             .get()
             .await?
             .execute(

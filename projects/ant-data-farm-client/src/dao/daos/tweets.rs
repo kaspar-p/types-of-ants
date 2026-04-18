@@ -3,10 +3,9 @@ use std::sync::Arc;
 use super::lib::Id;
 use crate::ants::AntId;
 use crate::users::UserId;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use tokio_postgres::Row;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,7 +25,7 @@ pub struct TweetAnt {
 }
 
 pub struct TweetsDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 fn row_to_scheduled_tweet(row: &Row, user_name: String, ants: Vec<TweetAnt>) -> ScheduledTweet {
@@ -48,16 +47,15 @@ fn row_to_tweet_ant(row: Row) -> TweetAnt {
 }
 
 impl TweetsDao {
-    pub fn new(db: Arc<Mutex<Database>>) -> Self {
-        TweetsDao { database: db }
+    pub fn new(pool: Arc<ConnectionPool>) -> Self {
+        TweetsDao { pool }
     }
 
     pub async fn mark_scheduled_tweet_tweeted(
         &self,
         scheduled_tweet: Id,
     ) -> Result<(), anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
         t.execute(
@@ -79,8 +77,7 @@ impl TweetsDao {
     }
 
     pub async fn get_next_scheduled_tweet(&self) -> Result<Option<ScheduledTweet>, anyhow::Error> {
-        let db = self.database.lock().await;
-        let con = db.get().await?;
+        let con = self.pool.get().await?;
 
         // The interval needs to be subtracted by a day, so that the tweeter at midnight will see the tweet
         // of "today" as being valid. So placing the data at noon always and subtracting a day works.

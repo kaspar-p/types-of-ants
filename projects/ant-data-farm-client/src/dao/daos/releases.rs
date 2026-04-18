@@ -1,14 +1,13 @@
 use crate::{ants::AntId, users::UserId};
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
-use tokio::sync::Mutex;
 use tokio_postgres::Row;
 use uuid::Uuid;
 
 pub struct ReleasesDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -53,15 +52,13 @@ fn row_to_release(row: &Row) -> Release {
 }
 
 impl ReleasesDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> ReleasesDao {
-        ReleasesDao { database: db }
+    pub async fn new(db: Arc<ConnectionPool>) -> ReleasesDao {
+        ReleasesDao { pool: db }
     }
 
     pub async fn get_release(&self, release_number: i32) -> Result<Option<Release>, anyhow::Error> {
         let row = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query_opt(
@@ -83,8 +80,7 @@ impl ReleasesDao {
         label: String,
         ants: Vec<AntReleaseRequest>,
     ) -> Result<i32, anyhow::Error> {
-        let db = self.database.lock().await;
-        let mut con = db.get().await?;
+        let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
         let release_number: i32 = tx
@@ -130,9 +126,7 @@ impl ReleasesDao {
 
     pub async fn get_latest_release(&self) -> Result<Option<Release>, anyhow::Error> {
         let release = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query_opt(

@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
 use crate::users::{make_password_hash, verify_password_hash, UserId};
-use ant_library::db::Database;
-use tokio::sync::Mutex;
+use ant_library::db::ConnectionPool;
 use tracing::{info, warn};
 
 pub struct ApiTokensDao {
-    database: Arc<Mutex<Database>>,
+    pool: Arc<ConnectionPool>,
 }
 
 impl ApiTokensDao {
-    pub async fn new(db: Arc<Mutex<Database>>) -> Result<Self, anyhow::Error> {
-        Ok(Self { database: db })
+    pub async fn new(pool: Arc<ConnectionPool>) -> Result<Self, anyhow::Error> {
+        Ok(Self { pool })
     }
 
     pub async fn register_api_token(
@@ -21,9 +20,7 @@ impl ApiTokensDao {
     ) -> Result<(), anyhow::Error> {
         let token_hash = make_password_hash(api_token)?;
 
-        self.database
-            .lock()
-            .await
+        self.pool
             .get()
             .await?
             .execute(
@@ -46,9 +43,7 @@ impl ApiTokensDao {
         api_token: &str,
     ) -> Result<Option<UserId>, anyhow::Error> {
         let users = self
-            .database
-            .lock()
-            .await
+            .pool
             .get()
             .await?
             .query(

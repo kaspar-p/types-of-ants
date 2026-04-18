@@ -15,12 +15,11 @@ use crate::dao::daos::{
     verifications::VerificationsDao, web_actions::WebActionsDao,
 };
 use ant_library::db::database_connection;
-use ant_library::db::Database;
+use ant_library::db::ConnectionPool;
 use ant_library::db::DatabaseConfig;
 use ant_library::db::TypesOfAntsDatabase;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::info;
 
 pub struct AntDataFarmClient {
@@ -43,17 +42,17 @@ impl TypesOfAntsDatabase for AntDataFarmClient {
         let pool = database_connection(&config).await?;
 
         info!("Initializing data access layer...");
-        let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(pool));
+        let pool: Arc<ConnectionPool> = Arc::new(pool);
 
         Ok(AntDataFarmClient {
-            ants: AntsDao::new(database.clone()).await?,
-            api_tokens: ApiTokensDao::new(database.clone()).await?,
-            releases: ReleasesDao::new(database.clone()).await,
-            tweets: TweetsDao::new(database.clone()),
-            users: UsersDao::new(database.clone()).await?,
-            verifications: VerificationsDao::new(database.clone()),
-            hosts: HostsDao::new(database.clone()).await?,
-            web_actions: WebActionsDao::new(database.clone()).await?,
+            ants: AntsDao::new(pool.clone()).await?,
+            api_tokens: ApiTokensDao::new(pool.clone()).await?,
+            releases: ReleasesDao::new(pool.clone()).await,
+            tweets: TweetsDao::new(pool.clone()),
+            users: UsersDao::new(pool.clone()).await?,
+            verifications: VerificationsDao::new(pool.clone()),
+            hosts: HostsDao::new(pool.clone()).await?,
+            web_actions: WebActionsDao::new(pool.clone()).await?,
         })
     }
 }
