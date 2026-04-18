@@ -94,9 +94,11 @@ where
         }
     };
 
-    if let Ok(body) = std::str::from_utf8(&bytes) {
+    if bytes.len() > 1000 {
+        tracing::debug!("{} body = {{large}}", direction)
+    } else if let Ok(body) = std::str::from_utf8(&bytes) {
         if redact {
-            tracing::debug!("{} body = {{REDACTED}}", direction)
+            tracing::debug!("{} body = {{redacted}}", direction)
         } else {
             tracing::debug!("{} body = {:?}", direction, body)
         };

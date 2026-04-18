@@ -36,9 +36,9 @@ ubuntu-22 (192.168.2.95) at 82:de:6c:c4:68:a9 on en0 ifscope [ethernet]
 
 ### Change the hostname
 
-Go to <http://192.168.2.1> > My Devices > Ethernet, and select the current
-device. Change the hostname of the new device to `antworker<num>` in the web
-terminal, if not already done so.
+Go to <http://mynetworksettings.com> and select the device. Change the hostname
+of the new device to `antworker<num>` in the web terminal, if not already done
+so.
 
 ### Reserve the local dynamic IP
 

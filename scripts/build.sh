@@ -118,7 +118,10 @@ for arch in "${arches[@]}"; do
   cp -R "${build_dir}/${build_mode}/." "${tmp_build_dir}/"
 
   # Copy the systemd service template into the build directory
-  cp "${project_src}/${project}.service" "${tmp_build_dir}/"
+  systemd_service_file="${project_src}/${project}.service"
+  if [[ -f "$systemd_service_file" ]]; then
+    cp "$systemd_service_file" "${tmp_build_dir}/"
+  fi
 
   # Copy the anthill.json manifest into the build directory
   cp "${project_src}/anthill.json" "${tmp_build_dir}/"
