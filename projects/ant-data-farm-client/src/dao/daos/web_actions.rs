@@ -55,7 +55,7 @@ impl WebActionsDao {
     }
 
     pub async fn new_action(
-        &mut self,
+        &self,
         actor_token: Uuid,
         actor_id: &UserId,
         action: &WebAction,

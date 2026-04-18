@@ -33,12 +33,7 @@ async fn grant_token(
 ) -> Result<impl IntoResponse, AntOnTheWebError> {
     authenticate_admin(&auth, &dao).await?;
 
-    let user = dao
-        .users
-        .read()
-        .await
-        .get_one_by_user_name(&req.username)
-        .await?;
+    let user = dao.users.get_one_by_user_name(&req.username).await?;
     if user.is_none() {
         return Ok(StatusCode::NOT_FOUND.into_response());
     }
@@ -49,8 +44,6 @@ async fn grant_token(
     let token = dist.sample_string(&mut rng, 32);
 
     dao.api_tokens
-        .write()
-        .await
         .register_api_token(&user.user_id, &token)
         .await?;
 

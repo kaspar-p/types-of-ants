@@ -86,8 +86,6 @@ pub async fn telemetry_cookie_middleware(
             tokio::spawn(async move {
                 info!("Writing telemetry action for page visit to: {uri}");
                 dao.web_actions
-                    .write()
-                    .await
                     .new_action(
                         telemetry.token,
                         &u.clone().user_id,

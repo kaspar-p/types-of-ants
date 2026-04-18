@@ -24,17 +24,19 @@ async fn host(
     Path(host_identifier): Path<String>,
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, HostsError> {
-    let hosts = dao.hosts.read().await;
-
     info!("Trying parse as UUID and ID: {}", host_identifier);
     if let Ok(host_id) = Uuid::parse_str(host_identifier.as_str()) {
-        if let Some(host) = hosts.get_one_by_id(&HostId(host_id)).await? {
+        if let Some(host) = dao.hosts.get_one_by_id(&HostId(host_id)).await? {
             return Ok((StatusCode::OK, Json(GetHostResponse { host })).into_response());
         }
     }
 
     info!("Trying as hostname: {}", host_identifier);
-    if let Some(host) = hosts.get_one_by_hostname(host_identifier.as_str()).await? {
+    if let Some(host) = dao
+        .hosts
+        .get_one_by_hostname(host_identifier.as_str())
+        .await?
+    {
         return Ok((StatusCode::OK, Json(GetHostResponse { host })).into_response());
     }
 
@@ -53,8 +55,7 @@ pub struct GetHostsResponse {
 async fn all_hosts(
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<impl IntoResponse, HostsError> {
-    let hosts = dao.hosts.read().await;
-    let all_hosts = hosts.get_all().await?;
+    let all_hosts = dao.hosts.get_all().await?;
     Ok((
         StatusCode::OK,
         Json(GetHostsResponse { hosts: all_hosts }).into_response(),

@@ -78,7 +78,7 @@ impl ReleasesDao {
     }
 
     pub async fn make_release(
-        &mut self,
+        &self,
         user_id: &UserId,
         label: String,
         ants: Vec<AntReleaseRequest>,

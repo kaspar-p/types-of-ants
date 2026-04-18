@@ -33,13 +33,12 @@ pub async fn user_is_two_factor_verified(
     dao: &AntDataFarmClient,
     user: &User,
 ) -> Result<VerificationStatus, anyhow::Error> {
-    let verifications = dao.verifications.read().await;
-
     let mut verified: Vec<VerificationMethod> = vec![];
     let mut not_verified: Vec<VerificationMethod> = vec![];
 
     for phone_number in &user.phone_numbers {
-        if !verifications
+        if !dao
+            .verifications
             .is_phone_number_verified(&user.user_id, &phone_number)
             .await?
         {
@@ -50,7 +49,8 @@ pub async fn user_is_two_factor_verified(
     }
 
     for email in &user.emails {
-        if !verifications
+        if !dao
+            .verifications
             .is_email_verified(&user.user_id, &email)
             .await?
         {
@@ -75,14 +75,14 @@ async fn send_email_verification_code(
     user_id: &UserId,
     email: &str,
 ) -> Result<(), AntOnTheWebError> {
-    let mut write_verifications = dao.verifications.write().await;
     let dist = rand::distr::Alphanumeric;
 
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
     let otp_hash = make_password_hash(&otp)?;
 
     info!("Starting email verification for {user_id} on {email} with {otp}");
-    let verification = write_verifications
+    let verification = dao
+        .verifications
         .start_email_verification(&user_id, &email, Duration::minutes(5), &otp_hash)
         .await?;
 
@@ -107,7 +107,7 @@ with love,
             EmailError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
         })?;
 
-    write_verifications
+    dao.verifications
         .update_verification_with_send_id(&verification, &send_id)
         .await?;
 
@@ -124,8 +124,6 @@ pub async fn resend_email_verification_code(
     email: &str,
 ) -> Result<(), AntOnTheWebError> {
     dao.verifications
-        .write()
-        .await
         .cancel_outstanding_email_verifications(email)
         .await?;
 
@@ -145,10 +143,9 @@ pub async fn receive_email_verification_code(
     email: &str,
     otp_attempt: &str,
 ) -> Result<VerificationReceipt, anyhow::Error> {
-    let mut write_verifications = dao.verifications.write().await;
-
     info!("Attempting to verify 2fa attempt");
-    let verified = write_verifications
+    let verified = dao
+        .verifications
         .attempt_email_verification(&email, &otp_attempt)
         .await?;
 
@@ -161,7 +158,7 @@ pub async fn receive_email_verification_code(
         VerificationResult::Failed { attempts } => {
             if attempts >= 5 {
                 info!("Too many attempts, cancelling verifications");
-                write_verifications
+                dao.verifications
                     .cancel_outstanding_email_verifications(&email)
                     .await?;
             }
@@ -180,14 +177,14 @@ async fn send_phone_verification_code(
     user_id: &UserId,
     phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {
-    let mut write_verifications = dao.verifications.write().await;
     let dist = rand::distr::Alphanumeric;
 
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
     let otp_hash = make_password_hash(&otp)?;
 
     info!("Starting phone number verification for {user_id} on {phone_number} with {otp}");
-    let verification = write_verifications
+    let verification = dao
+        .verifications
         .start_phone_number_verification(&user_id, &phone_number, Duration::minutes(5), &otp_hash)
         .await?;
 
@@ -204,7 +201,7 @@ async fn send_phone_verification_code(
             SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
         })?;
 
-    write_verifications
+    dao.verifications
         .update_verification_with_send_id(&verification, &send_id)
         .await?;
 
@@ -221,8 +218,6 @@ pub async fn resend_phone_verification_code(
     phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {
     dao.verifications
-        .write()
-        .await
         .cancel_outstanding_phone_number_verifications(phone_number)
         .await?;
 
@@ -247,10 +242,9 @@ pub async fn receive_phone_verification_code(
     phone_number: &str,
     otp_attempt: &str,
 ) -> Result<VerificationReceipt, anyhow::Error> {
-    let mut write_verifications = dao.verifications.write().await;
-
     info!("Attempting to verify 2fa attempt");
-    let verified = write_verifications
+    let verified = dao
+        .verifications
         .attempt_phone_number_verification(&phone_number, &otp_attempt)
         .await?;
 
@@ -263,7 +257,7 @@ pub async fn receive_phone_verification_code(
         VerificationResult::Failed { attempts } => {
             if attempts >= 5 {
                 info!("Too many attempts, cancelling verifications");
-                write_verifications
+                dao.verifications
                     .cancel_outstanding_phone_number_verifications(&phone_number)
                     .await?;
             }

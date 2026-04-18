@@ -73,8 +73,7 @@ async fn post_tweet(
 async fn choose_scheduled_ants(
     client: &AntDataFarmClient,
 ) -> Result<Option<ScheduledTweet>, anyhow::Error> {
-    let read_tweets = client.tweets.read().await;
-    match read_tweets.get_next_scheduled_tweet().await? {
+    match client.tweets.get_next_scheduled_tweet().await? {
         None => {
             return Ok(None);
         }
@@ -95,8 +94,8 @@ async fn choose_scheduled_ants(
 
 /// From the entire list of released ants, choose one randomly
 async fn choose_random_ant(client: &AntDataFarmClient) -> Result<Ant, anyhow::Error> {
-    let read_ants = client.ants.read().await;
-    let ants = read_ants
+    let ants = client
+        .ants
         .get_all_released()
         .await?
         .into_iter()
@@ -141,14 +140,12 @@ pub async fn cron_tweet(config: Config) -> Result<Vec<twitter_v2::Tweet>, anyhow
 
         for ant in tweet.ants_to_tweet.iter() {
             info!("Saving ant content '{}' as tweeted...", ant.ant_content);
-            client.ants.write().await.add_ant_tweet(&ant.ant_id).await?;
+            client.ants.add_ant_tweet(&ant.ant_id).await?;
         }
 
         info!("Marking {} as tweeted...", tweet.scheduled_tweet_id);
         client
             .tweets
-            .write()
-            .await
             .mark_scheduled_tweet_tweeted(tweet.scheduled_tweet_id)
             .await?;
 
@@ -161,12 +158,7 @@ pub async fn cron_tweet(config: Config) -> Result<Vec<twitter_v2::Tweet>, anyhow
         let tweets = post_tweet(config.twitter, random_ant.ant_name, vec![]).await;
 
         info!("Saving result to DB...");
-        client
-            .ants
-            .write()
-            .await
-            .add_ant_tweet(&random_ant.ant_id)
-            .await?;
+        client.ants.add_ant_tweet(&random_ant.ant_id).await?;
         info!("Cron tasks done, exiting...");
         return Ok(tweets);
     }

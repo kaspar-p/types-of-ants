@@ -225,7 +225,7 @@ impl UsersDao {
     /// Create a user in the database, the user_name, phone_number, or email should not already be taken
     /// or else the transaction will fail.
     pub async fn create_user(
-        &mut self,
+        &self,
         username: String,
         password: String,
         role: String,
@@ -283,7 +283,7 @@ impl UsersDao {
     }
 
     pub async fn change_user_role(
-        &mut self,
+        &self,
         user_id: &UserId,
         role_name: &str,
     ) -> Result<(), anyhow::Error> {
@@ -309,7 +309,7 @@ impl UsersDao {
     }
 
     pub async fn overwrite_user_password(
-        &mut self,
+        &self,
         user_id: &UserId,
         new_password: &str,
     ) -> Result<(), anyhow::Error> {
@@ -335,7 +335,7 @@ impl UsersDao {
     }
 
     pub async fn add_phone_number_to_user(
-        &mut self,
+        &self,
         user_id: &UserId,
         phone_number: &str,
     ) -> Result<(), anyhow::Error> {
@@ -365,7 +365,7 @@ impl UsersDao {
     }
 
     pub async fn change_username(
-        &mut self,
+        &self,
         user_id: &UserId,
         new_username: &str,
     ) -> Result<(), anyhow::Error> {
@@ -396,7 +396,7 @@ impl UsersDao {
     }
 
     pub async fn add_email_to_user(
-        &mut self,
+        &self,
         user_id: &UserId,
         email: &str,
     ) -> Result<(), anyhow::Error> {

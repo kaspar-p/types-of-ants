@@ -26,8 +26,7 @@ async fn more_than_500_ants() {
     .await
     .expect("Connected!");
 
-    let ants = dao.ants.read().await;
-    let all_ants = ants.get_all_released().await.unwrap();
+    let all_ants = dao.ants.get_all_released().await.unwrap();
     assert!(all_ants.len() >= 500);
 }
 
@@ -49,9 +48,7 @@ async fn user_gets_created() {
     .await
     .expect("Connected!");
 
-    let mut users = dao.users.write().await;
-
-    users
+    dao.users
         .create_user(
             "integ-user".to_string(),
             "integ-user-password".to_string(),
@@ -60,7 +57,8 @@ async fn user_gets_created() {
         .await
         .unwrap();
 
-    let user_by_name = users
+    let user_by_name = dao
+        .users
         .get_one_by_user_name("integ-user")
         .await
         .unwrap()
@@ -87,13 +85,7 @@ async fn see_scheduled_tweets(_logging: &()) {
     .await
     .expect("Connected!");
 
-    let scheduled = dao
-        .tweets
-        .read()
-        .await
-        .get_next_scheduled_tweet()
-        .await
-        .unwrap();
+    let scheduled = dao.tweets.get_next_scheduled_tweet().await.unwrap();
 
     assert!(scheduled.is_some() || scheduled.is_none());
 }
@@ -117,14 +109,10 @@ async fn add_tweeted(_logging: &()) {
     .await
     .expect("Connected!");
 
-    let ant_id = {
-        let ants = dao.ants.read().await;
-        ants.get_all().await.unwrap().last().unwrap().ant_id
-    };
+    let ant_id = { dao.ants.get_all().await.unwrap().last().unwrap().ant_id };
 
     {
-        let mut write_ants = dao.ants.write().await;
-        let ant = write_ants.add_ant_tweet(&ant_id).await.unwrap();
+        let ant = dao.ants.add_ant_tweet(&ant_id).await.unwrap();
         println!("{ant:#?}");
         match &ant.tweeted {
             Tweeted::NotTweeted => panic!("Ant should have tweeted!"),
@@ -134,8 +122,7 @@ async fn add_tweeted(_logging: &()) {
         }
     }
 
-    let ants = dao.ants.read().await;
-    let found_ant = ants.get_one_by_id(&ant_id).await.unwrap();
+    let found_ant = dao.ants.get_one_by_id(&ant_id).await.unwrap();
     match found_ant {
         None => panic!("Failed to get ant again!"),
         Some(found_ant) => match &found_ant.tweeted {

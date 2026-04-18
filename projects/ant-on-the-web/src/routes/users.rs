@@ -57,9 +57,7 @@ async fn subscribe_email(
     };
 
     {
-        let users = dao.users.read().await;
-
-        if let Some(u) = users.get_one_by_email(&canonical_email).await? {
+        if let Some(u) = dao.users.get_one_by_email(&canonical_email).await? {
             if u != user {
                 return Err(AntOnTheWebError::ConflictError {
                     msg: "Already subscribed!",
@@ -74,8 +72,7 @@ async fn subscribe_email(
         });
     }
 
-    let mut user_write = dao.users.write().await;
-    user_write
+    dao.users
         .add_email_to_user(&user.user_id, &canonical_email)
         .await?;
 
@@ -110,8 +107,7 @@ async fn get_user_by_name(
     }
     info!("Granted access to {}", user.user_id);
 
-    let users = dao.users.read().await;
-    let user = users.get_one_by_user_name(&user_name).await?.unwrap();
+    let user = dao.users.get_one_by_user_name(&user_name).await?.unwrap();
     return Ok(AntOnTheWebResponse::GetUserResponse(GetUserResponse {
         user,
     }));
@@ -135,9 +131,7 @@ async fn change_username(
         )));
     }
 
-    let mut users_write = dao.users.write().await;
-
-    let other = users_write.get_one_by_user_name(&req.username).await?;
+    let other = dao.users.get_one_by_user_name(&req.username).await?;
 
     match other {
         Some(other) => {
@@ -152,7 +146,7 @@ async fn change_username(
             }
         }
         None => {
-            users_write
+            dao.users
                 .change_username(&user.user_id, &req.username)
                 .await?;
 
@@ -215,23 +209,22 @@ async fn login(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     // AuthN: This is the starting entry point for AuthN, so we don't need any auth claims here
 
-    let users = dao.users.read().await;
     let user: Result<Option<User>, ValidationMessage> = match login_request.method {
         LoginMethod::Email(email) => match canonicalize_email(email.as_str()) {
             Err(e) => {
                 info!("Field method.email invalid: {}", e);
                 Err(ValidationMessage::invalid("method.email"))
             }
-            Ok(email) => Ok(users.get_one_by_email(&email).await?),
+            Ok(email) => Ok(dao.users.get_one_by_email(&email).await?),
         },
         LoginMethod::Phone(phone) => match canonicalize_phone_number(&phone) {
             Err(e) => {
                 info!("Field method.phone invalid: {}", e);
                 Err(ValidationMessage::invalid("method.phone"))
             }
-            Ok(phone) => Ok(users.get_one_by_phone_number(&phone).await?),
+            Ok(phone) => Ok(dao.users.get_one_by_phone_number(&phone).await?),
         },
-        LoginMethod::Username(username) => Ok(users.get_one_by_user_name(&username).await?),
+        LoginMethod::Username(username) => Ok(dao.users.get_one_by_user_name(&username).await?),
     };
 
     let user = match user {
@@ -357,8 +350,6 @@ async fn two_factor_verification_attempt(
                             &canonical, &user.username
                         );
                         dao.users
-                            .write()
-                            .await
                             .add_phone_number_to_user(&user.user_id, &canonical)
                             .await?;
                     } else {
@@ -372,8 +363,6 @@ async fn two_factor_verification_attempt(
                     if !user.emails.contains(&canonical) {
                         info!("Adding email {} to user {}", &canonical, &user.username);
                         dao.users
-                            .write()
-                            .await
                             .add_email_to_user(&user.user_id, &canonical)
                             .await?;
                     } else {
@@ -458,8 +447,6 @@ async fn add_phone_number(
     let already_added = {
         let by_phone_number = dao
             .users
-            .read()
-            .await
             .get_one_by_phone_number(&canonical_phone_number)
             .await?;
 
@@ -551,12 +538,7 @@ async fn add_email(
     let user = authenticate_or_weak_matching_method(&auth, &dao, &method, user).await?;
 
     let already_added = {
-        let by_email = dao
-            .users
-            .read()
-            .await
-            .get_one_by_email(&canonical_email)
-            .await?;
+        let by_email = dao.users.get_one_by_email(&canonical_email).await?;
 
         match by_email {
             None => false,
@@ -614,9 +596,7 @@ async fn password_reset_code(
         )))
     })?;
 
-    let users = dao.users.read().await;
-
-    let user = users.get_one_by_user_name(&req.username).await?;
+    let user = dao.users.get_one_by_user_name(&req.username).await?;
     match user {
         Some(u) if u.phone_numbers.contains(&phone_number) => {
             let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
@@ -762,8 +742,6 @@ async fn password(
             let user = authenticate(&auth, &dao).await?;
 
             dao.users
-                .write()
-                .await
                 .overwrite_user_password(&user.user_id, &req.password1)
                 .await?;
 
@@ -781,8 +759,6 @@ async fn password(
             let user_id = claims.sub;
 
             dao.users
-                .write()
-                .await
                 .overwrite_user_password(&user_id, &req.password1)
                 .await?;
 
@@ -874,9 +850,9 @@ async fn signup_request(
 
     {
         info!("Checking if user already exists...");
-        let read_users = dao.users.read().await;
 
-        let by_username = read_users
+        let by_username = dao
+            .users
             .get_one_by_user_name(&signup_request.username)
             .await?
             .is_some();
@@ -891,8 +867,8 @@ async fn signup_request(
     let user = {
         // Make user
         info!("User does not exist, creating...");
-        let mut write_users = dao.users.write().await;
-        let user = write_users
+        let user = dao
+            .users
             .create_user(
                 signup_request.username,
                 signup_request.password,

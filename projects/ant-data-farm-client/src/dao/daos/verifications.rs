@@ -91,7 +91,7 @@ impl VerificationsDao {
     /// Phone numbers are unique, so they only belong to a single user.
     /// This might be done when they click "resend".
     async fn cancel_outstanding_verifications(
-        &mut self,
+        &self,
         method: &str,
         identifier: &str,
     ) -> Result<(), anyhow::Error> {
@@ -132,7 +132,7 @@ impl VerificationsDao {
     /// Phone numbers are unique, so they only belong to a single user.
     /// This might be done when they click "resend".
     pub async fn cancel_outstanding_phone_number_verifications(
-        &mut self,
+        &self,
         phone_number: &str,
     ) -> Result<(), anyhow::Error> {
         self.cancel_outstanding_verifications("phone", phone_number)
@@ -143,7 +143,7 @@ impl VerificationsDao {
     /// Emails are unique, so they only belong to a single user.
     /// This might be done when they click "resend".
     pub async fn cancel_outstanding_email_verifications(
-        &mut self,
+        &self,
         email: &str,
     ) -> Result<(), anyhow::Error> {
         self.cancel_outstanding_verifications("email", email).await
@@ -156,7 +156,7 @@ impl VerificationsDao {
     ///
     /// Returns the Verification ID.
     async fn start_verification(
-        &mut self,
+        &self,
         user_id: &UserId,
         method: &str,
         identifier: &str,
@@ -199,7 +199,7 @@ impl VerificationsDao {
     ///
     /// Returns the Verification ID.
     pub async fn start_phone_number_verification(
-        &mut self,
+        &self,
         user_id: &UserId,
         phone_number: &str,
         expiration: Duration,
@@ -216,7 +216,7 @@ impl VerificationsDao {
     ///
     /// Returns the Verification ID.
     pub async fn start_email_verification(
-        &mut self,
+        &self,
         user_id: &UserId,
         email: &str,
         expiration: Duration,
@@ -229,7 +229,7 @@ impl VerificationsDao {
     /// For a verification request, once the request is sent and there is some unique ID to associate
     /// that came from the SMS/Email provider, save that into the DB.
     pub async fn update_verification_with_send_id(
-        &mut self,
+        &self,
         verification_attempt_id: &Uuid,
         send_id: &str,
     ) -> Result<(), anyhow::Error> {
@@ -251,7 +251,7 @@ impl VerificationsDao {
     }
 
     async fn attempt_verification(
-        &mut self,
+        &self,
         method: &str,
         identifier: &str,
         attempt: &str,
@@ -347,7 +347,7 @@ impl VerificationsDao {
     /// If the attempt does not match, returns `false` and the application should ask the user to retry.
     /// Also returns false if there was no verification that matched for those details, or might be expired.
     pub async fn attempt_phone_number_verification(
-        &mut self,
+        &self,
         phone_number: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
@@ -364,7 +364,7 @@ impl VerificationsDao {
     /// If the attempt does not match, returns `false` and the application should ask the user to retry.
     /// Also returns false if there was no verification that matched for those details, or might be expired.
     pub async fn attempt_email_verification(
-        &mut self,
+        &self,
         email: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {

@@ -30,8 +30,6 @@ async fn new_web_action(
     let user = optional_authenticate(auth.as_ref(), &dao).await?;
 
     dao.web_actions
-        .write()
-        .await
         .new_action(
             tracking.token,
             &user.user_id,

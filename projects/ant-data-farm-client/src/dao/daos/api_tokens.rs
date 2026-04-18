@@ -15,7 +15,7 @@ impl ApiTokensDao {
     }
 
     pub async fn register_api_token(
-        &mut self,
+        &self,
         user_id: &UserId,
         api_token: &str,
     ) -> Result<(), anyhow::Error> {

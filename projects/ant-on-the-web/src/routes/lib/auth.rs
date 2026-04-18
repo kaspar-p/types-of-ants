@@ -82,9 +82,9 @@ async fn try_api_token_authentication(
     let username: &str = split[0];
     let token: &str = split[1];
 
-    let api_tokens = state.dao.api_tokens.read().await;
-
-    let user = api_tokens
+    let user = state
+        .dao
+        .api_tokens
         .verify_token_user(username, token)
         .await
         .map_err(|e| {
@@ -206,8 +206,7 @@ pub async fn authenticate_weak(
 ) -> Result<User, AntOnTheWebError> {
     info!("Attempting weak authentication.");
     let user = {
-        let users = dao.users.read().await;
-        let user = users.get_one_by_id(&auth.sub).await?;
+        let user = dao.users.get_one_by_id(&auth.sub).await?;
         user
     };
 
@@ -332,13 +331,11 @@ pub async fn optional_authenticate(
     dao: &Arc<AntDataFarmClient>,
 ) -> Result<User, AntOnTheWebError> {
     match optional_strict_authenticate(auth, dao).await? {
-        None => {
-            let users = dao.users.read().await;
-            Ok(users
-                .get_one_by_user_name("nobody")
-                .await?
-                .expect("nobody user exists"))
-        }
+        None => Ok(dao
+            .users
+            .get_one_by_user_name("nobody")
+            .await?
+            .expect("nobody user exists")),
         Some(user) => Ok(user),
     }
 }

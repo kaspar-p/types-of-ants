@@ -20,18 +20,18 @@ use ant_library::db::DatabaseConfig;
 use ant_library::db::TypesOfAntsDatabase;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tracing::info;
 
 pub struct AntDataFarmClient {
-    pub ants: RwLock<AntsDao>,
-    pub releases: RwLock<ReleasesDao>,
-    pub users: RwLock<UsersDao>,
-    pub api_tokens: RwLock<ApiTokensDao>,
-    pub verifications: RwLock<VerificationsDao>,
-    pub tweets: RwLock<TweetsDao>,
-    pub hosts: RwLock<HostsDao>,
-    pub web_actions: RwLock<WebActionsDao>,
+    pub ants: AntsDao,
+    pub releases: ReleasesDao,
+    pub users: UsersDao,
+    pub api_tokens: ApiTokensDao,
+    pub verifications: VerificationsDao,
+    pub tweets: TweetsDao,
+    pub hosts: HostsDao,
+    pub web_actions: WebActionsDao,
     // pub deployments: DeploymentsDao,
     // pub metrics: MetricsDao,
     // pub tests: TestsDao,
@@ -46,14 +46,14 @@ impl TypesOfAntsDatabase for AntDataFarmClient {
         let database: Arc<Mutex<Database>> = Arc::new(Mutex::new(pool));
 
         Ok(AntDataFarmClient {
-            ants: RwLock::new(AntsDao::new(database.clone()).await?),
-            api_tokens: RwLock::new(ApiTokensDao::new(database.clone()).await?),
-            releases: RwLock::new(ReleasesDao::new(database.clone()).await),
-            tweets: RwLock::new(TweetsDao::new(database.clone())),
-            users: RwLock::new(UsersDao::new(database.clone()).await?),
-            verifications: RwLock::new(VerificationsDao::new(database.clone())),
-            hosts: RwLock::new(HostsDao::new(database.clone()).await?),
-            web_actions: RwLock::new(WebActionsDao::new(database.clone()).await?),
+            ants: AntsDao::new(database.clone()).await?,
+            api_tokens: ApiTokensDao::new(database.clone()).await?,
+            releases: ReleasesDao::new(database.clone()).await,
+            tweets: TweetsDao::new(database.clone()),
+            users: UsersDao::new(database.clone()).await?,
+            verifications: VerificationsDao::new(database.clone()),
+            hosts: HostsDao::new(database.clone()).await?,
+            web_actions: WebActionsDao::new(database.clone()).await?,
         })
     }
 }

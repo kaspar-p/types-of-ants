@@ -30,7 +30,7 @@ async fn connection_resetting_works_fine() {
         .await
         .expect("Connected!");
 
-        let ants = dao.ants.read().await.get_all().await.unwrap();
+        let ants = dao.ants.get_all().await.unwrap();
         assert!(ants.len() > 0);
 
         // Moving this out of the scope kills the underlying container!
@@ -49,7 +49,7 @@ async fn connection_resetting_works_fine() {
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         assert_eq!(port, 13654);
 
-        let ants = dao.ants.read().await.get_all().await.unwrap();
+        let ants = dao.ants.get_all().await.unwrap();
         assert!(ants.len() > 0);
     }
 }

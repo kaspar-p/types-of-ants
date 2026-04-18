@@ -31,7 +31,7 @@ pub struct AllAntsResponse {
 async fn all_ants(
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await.get_all().await?;
+    let ants = dao.ants.get_all().await?;
     Ok(AntOnTheWebResponse::AllAntsResponse(AllAntsResponse {
         ants,
     }))
@@ -53,9 +53,8 @@ async fn unreleased_ants(
     State(InnerApiState { dao, .. }): ApiState,
     query: Query<Pagination>,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await;
-
-    let mut unreleased_ants = ants
+    let mut unreleased_ants = dao
+        .ants
         .get_all()
         .await?
         .into_iter()
@@ -96,9 +95,8 @@ async fn declined_ants(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<DeclinedAntsRequest>,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await;
-
-    let declined_ants = ants
+    let declined_ants = dao
+        .ants
         .get_all()
         .await?
         .into_iter()
@@ -149,11 +147,9 @@ async fn released_ants(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = optional_strict_authenticate(auth.as_ref(), &dao).await?;
 
-    let ants = dao.ants.read().await;
-
     let released_ants = match &user {
-        None => ants.get_all().await?,
-        Some(u) => ants.get_all_with_user_context(&u).await?,
+        None => dao.ants.get_all().await?,
+        Some(u) => dao.ants.get_all_with_user_context(&u).await?,
     }
     .into_iter()
     .filter_map(|ant| match ant.status {
@@ -195,8 +191,6 @@ async fn latest_release(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let latest_release = dao
         .releases
-        .read()
-        .await
         .get_latest_release()
         .await?
         .ok_or(AntOnTheWebError::NoSuchResource)?;
@@ -224,8 +218,8 @@ async fn get_release(
     State(InnerApiState { dao, .. }): ApiState,
     Json(req): Json<GetReleaseRequest>,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let releases = dao.releases.read().await;
-    let release = releases
+    let release = dao
+        .releases
         .get_release(req.release)
         .await?
         .ok_or(AntOnTheWebError::NoSuchResource)?;
@@ -268,7 +262,6 @@ async fn create_release(
             ));
         }
 
-        let ants = dao.ants.read().await;
         for ant_req in &req.ants {
             if req
                 .ants
@@ -283,7 +276,7 @@ async fn create_release(
                 ));
             }
 
-            let ant = ants.get_one_by_id(&ant_req.ant_id).await?;
+            let ant = dao.ants.get_one_by_id(&ant_req.ant_id).await?;
             match ant {
                 None => {
                     validations.push(ValidationMessage::new(
@@ -315,9 +308,8 @@ async fn create_release(
         }
     }
 
-    let mut releases = dao.releases.write().await;
-
-    let release = releases
+    let release = dao
+        .releases
         .make_release(&user.user_id, req.label, req.ants)
         .await?;
 
@@ -334,8 +326,7 @@ pub struct TotalResponse {
 async fn total(
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await;
-    let total = ants.get_num_released().await?;
+    let total = dao.ants.get_num_released().await?;
 
     Ok(AntOnTheWebResponse::TotalResponse(TotalResponse { total }))
 }
@@ -351,11 +342,9 @@ pub struct LatestAntsResponse {
 async fn latest_ants(
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
-    let ants = dao.ants.read().await;
-    let releases = dao.releases.read().await;
-
-    let all_ants: Vec<Ant> = ants.get_all().await?;
-    let latest_release = releases
+    let all_ants: Vec<Ant> = dao.ants.get_all().await?;
+    let latest_release = dao
+        .releases
         .get_latest_release()
         .await?
         .ok_or(AntOnTheWebError::NoSuchResource)?;
@@ -419,9 +408,8 @@ async fn make_suggestion(
         }
     }
 
-    let mut ants = dao.ants.write().await;
-
-    let ant = ants
+    let ant = dao
+        .ants
         .add_unreleased_ant(suggestion.suggestion_content, user.user_id, user.username)
         .await?;
 
@@ -449,9 +437,7 @@ async fn decline_ant(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate_admin(&auth, &dao).await?;
 
-    let mut ants = dao.ants.write().await;
-
-    let declined_at = match ants.get_one_by_id(&req.ant_id).await? {
+    let declined_at = match dao.ants.get_one_by_id(&req.ant_id).await? {
         None => {
             return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("ant_id", "No such ant."),
@@ -465,7 +451,7 @@ async fn decline_ant(
                 ValidationMessage::new("ant_id", format!("Ant already released.")),
             ))),
             AntStatus::Unreleased => {
-                let declined_at = ants.decline_ant(&user.user_id, &ant.ant_id).await?;
+                let declined_at = dao.ants.decline_ant(&user.user_id, &ant.ant_id).await?;
 
                 Ok(declined_at)
             }
@@ -496,19 +482,17 @@ async fn favorite_ant(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
 
-    let mut ants = dao.ants.write().await;
-
-    if ants.get_one_by_id(&req.ant_id).await?.is_none() {
+    if dao.ants.get_one_by_id(&req.ant_id).await?.is_none() {
         return Err(AntOnTheWebError::ValidationError(ValidationError::one(
             ValidationMessage::new("antId", "No such ant."),
         )));
     }
 
-    let favorited_at: DateTime<Utc> = match ants.is_favorite_ant(&user.user_id, &req.ant_id).await?
-    {
-        Some(time) => time,
-        None => ants.favorite_ant(&user.user_id, &req.ant_id).await?,
-    };
+    let favorited_at: DateTime<Utc> =
+        match dao.ants.is_favorite_ant(&user.user_id, &req.ant_id).await? {
+            Some(time) => time,
+            None => dao.ants.favorite_ant(&user.user_id, &req.ant_id).await?,
+        };
 
     Ok(AntOnTheWebResponse::FavoriteAntResponse(
         FavoriteAntResponse { favorited_at },
@@ -528,20 +512,19 @@ async fn unfavorite_ant(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
 
-    let mut ants = dao.ants.write().await;
-
-    if ants.get_one_by_id(&req.ant_id).await?.is_none() {
+    if dao.ants.get_one_by_id(&req.ant_id).await?.is_none() {
         return Err(AntOnTheWebError::ValidationError(ValidationError::one(
             ValidationMessage::new("antId", "No such ant."),
         )));
     }
 
-    if ants
+    if dao
+        .ants
         .is_favorite_ant(&user.user_id, &req.ant_id)
         .await?
         .is_some()
     {
-        ants.unfavorite_ant(&user.user_id, &req.ant_id).await?;
+        dao.ants.unfavorite_ant(&user.user_id, &req.ant_id).await?;
     };
 
     Ok(AntOnTheWebResponse::UnfavoriteAntResponse)

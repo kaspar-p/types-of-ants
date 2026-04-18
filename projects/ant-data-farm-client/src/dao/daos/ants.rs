@@ -264,7 +264,7 @@ impl AntsDao {
         return Ok(favorite_row.map(|r| r.get("favorited_at")));
     }
 
-    pub async fn favorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
+    pub async fn favorite_ant(&self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
         let db = self.database.lock().await;
         let mut con = db.get().await?;
         let tx = con.transaction().await?;
@@ -288,7 +288,7 @@ impl AntsDao {
         Ok(favorited_at)
     }
 
-    pub async fn unfavorite_ant(&mut self, user: &UserId, ant: &AntId) -> Result<()> {
+    pub async fn unfavorite_ant(&self, user: &UserId, ant: &AntId) -> Result<()> {
         let db = self.database.lock().await;
         let mut con = db.get().await?;
         let tx = con.transaction().await?;
@@ -336,7 +336,7 @@ impl AntsDao {
     }
 
     // Assumes the ant is not already declined!
-    pub async fn decline_ant(&mut self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
+    pub async fn decline_ant(&self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
         let declined_at: DateTime<Utc> = self
             .database
             .lock()
@@ -358,7 +358,7 @@ impl AntsDao {
         Ok(declined_at)
     }
 
-    pub async fn add_ant_tweet(&mut self, ant: &AntId) -> Result<Ant> {
+    pub async fn add_ant_tweet(&self, ant: &AntId) -> Result<Ant> {
         let time = chrono::offset::Utc::now();
 
         let _ = self
@@ -410,7 +410,7 @@ impl AntsDao {
     }
 
     pub async fn add_unreleased_ant(
-        &mut self,
+        &self,
         ant_suggestion_content: String,
         user_id: UserId,
         username: String,

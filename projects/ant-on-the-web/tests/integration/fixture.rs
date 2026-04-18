@@ -301,8 +301,6 @@ pub async fn test_router_admin_auth(opts: FixtureOptions) -> (TestFixture, Strin
         .state
         .dao
         .users
-        .write()
-        .await
         .change_user_role(&user.user_id, "admin")
         .await
         .unwrap();

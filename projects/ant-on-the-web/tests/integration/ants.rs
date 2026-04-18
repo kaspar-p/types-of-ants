@@ -35,9 +35,9 @@ async fn ants_total_matches_ants_released() {
     let total: TotalResponse = total_res.json().await;
 
     assert!(ants.ants.len() <= 1000); // page size
-    assert!(ants.ants.len() <= total.total);
+    assert!(ants.ants.len() as i64 <= total.total);
 
-    let mut running_total = ants.ants.len();
+    let mut running_total = ants.ants.len() as i64;
     let mut has_next_page = true;
     let mut next_page = 1;
     while has_next_page {
@@ -49,7 +49,7 @@ async fn ants_total_matches_ants_released() {
         assert_eq!(ants_res.status(), StatusCode::OK);
         let ants: ReleasedAntsResponse = ants_res.json().await;
 
-        running_total += ants.ants.len();
+        running_total += ants.ants.len() as i64;
         if ants.has_next_page {
             next_page += 1;
         } else {
