@@ -329,13 +329,13 @@ async fn create_release(
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TotalResponse {
-    pub total: usize,
+    pub total: i64,
 }
 async fn total(
     State(InnerApiState { dao, .. }): ApiState,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let ants = dao.ants.read().await;
-    let total = ants.get_all_released().await?.len();
+    let total = ants.get_num_released().await?;
 
     Ok(AntOnTheWebResponse::TotalResponse(TotalResponse { total }))
 }

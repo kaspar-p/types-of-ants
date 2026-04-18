@@ -386,15 +386,26 @@ impl AntsDao {
         Ok(ant)
     }
 
+    pub async fn get_num_released(&self) -> Result<i64> {
+        let count = self
+            .database
+            .lock()
+            .await
+            .get()
+            .await?
+            .query_one("select count(ant_id) as cnt from ant_release", &[])
+            .await?
+            .get("cnt");
+
+        Ok(count)
+    }
+
     pub async fn get_all_released(&self) -> Result<Vec<Ant>> {
         Ok(self
             .get_all()
             .await?
             .into_iter()
-            .filter(|ant| match ant.status {
-                AntStatus::Released(_) => true,
-                _ => false,
-            })
+            .filter(|ant| matches!(ant.status, AntStatus::Released(_)))
             .collect::<Vec<Ant>>())
     }
 
