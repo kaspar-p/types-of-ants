@@ -1,0 +1,12 @@
+[Unit]
+Description=The typesofants monitoring frontend!
+
+[Service]
+Type=simple
+ExecStart=/snap/bin/docker-compose --project-directory={{INSTALL_DIR}} up --no-build --force-recreate ant-monitor-fe
+EnvironmentFile={{INSTALL_DIR}}/.env
+WorkingDirectory={{INSTALL_DIR}}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

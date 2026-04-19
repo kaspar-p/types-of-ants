@@ -99,6 +99,23 @@ services:
       - tls_cert
       - tls_key
 
+  ant-monitor-fe:
+    image: ant-monitor-fe:{{VERSION}}
+    container_name: ant-monitor-fe
+    build:
+      context: ./projects/ant-monitor-fe
+      dockerfile: Dockerfile
+      tags:
+        - ant-monitor-fe:latest
+        - ant-monitor-fe:{{VERSION}}
+    restart: always
+    environment:
+      VERSION: "{{VERSION}}"
+    ports:
+      - "{{ANT_MONITOR_FE_PORT}}:3000"
+    volumes:
+      - "{{PERSIST_DIR}}/grafana_storage:/var/lib/grafana"
+
   # ant-renewing-certificates:
   #   image: ant-renewing-certificates:{{VERSION}}
   #   container_name: ant-renewing-certificates

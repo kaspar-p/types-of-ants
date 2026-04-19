@@ -1,4 +1,4 @@
 {
   "project": "ant-worker-metrics-exporter",
-  "project_type": "Makefile"
+  "project_type": "makefile"
 }
