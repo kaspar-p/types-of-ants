@@ -1,4 +1,5 @@
 use ant_library::headers::{XAntProjectHeader, XAntVersionHeader};
+use anyhow::Context;
 use flate2::read::GzDecoder;
 use humansize::DECIMAL;
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
@@ -174,26 +175,37 @@ async fn install_service(
     std::fs::create_dir_all(&dst)?;
 
     info!("Unpacking installation to: {}", dst.display());
-    deployment.unpack(&dst)?;
+    deployment
+        .unpack(&dst)
+        .context("attempted to unpack malformed tarfile")?;
 
     let template_variables = mustache::MapBuilder::new()
-        .insert_str("INSTALL_DIR", dst.to_str().unwrap())
+        .insert_str(
+            "INSTALL_DIR",
+            dst.to_str().expect("destination was not string"),
+        )
         .build();
 
     let unit_file_path = dst.join(unit_name(&req.project));
-    let unit_file_template = mustache::compile_path(&unit_file_path)?;
+    if std::fs::exists(&unit_file_path)? {
+        info!("Rendering systemd template: {}", unit_file_path.display());
+        let unit_file_template =
+            mustache::compile_path(&unit_file_path).context("mustache compilation")?;
 
-    info!("Rewriting unit file with data: {:?}", template_variables);
-    unit_file_template.render_data(
-        &mut std::fs::File::create(&unit_file_path)?,
-        &template_variables,
-    )?;
+        info!("Rewriting unit file with data: {:?}", template_variables);
+        unit_file_template.render_data(
+            &mut std::fs::File::create(&unit_file_path)?,
+            &template_variables,
+        )?;
+    }
 
     let docker_img_path = dst.join("docker-image.tar");
-    if std::fs::exists(&docker_img_path)? {
+    if std::fs::exists(&docker_img_path).context("docker img exists failed")? {
         info!("Loading docker image...");
 
-        let docker_img_file = File::open(docker_img_path).await.unwrap();
+        let docker_img_file = File::open(docker_img_path)
+            .await
+            .expect("opening docker img failed");
         let docker_img_bytes = codec::FramedRead::new(docker_img_file, codec::BytesCodec::new())
             .map(|r| r.unwrap().freeze());
 
