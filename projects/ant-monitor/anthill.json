@@ -1,4 +1,4 @@
 {
   "project": "ant-monitor",
-  "project_type": "makefile"
+  "build": "makefile"
 }

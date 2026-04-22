@@ -22,7 +22,7 @@ structure is:
   // The project type dictates the type and output of the build system used.
   // See further for each project type, what it assumes about the project,
   // and how they are deployed.
-  "project_type": "rust-binary" | "docker-compose" | "custom"
+  "build": "rust-binary" | "docker-compose" | "custom"
 }
 ```
 

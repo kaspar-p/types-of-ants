@@ -11,7 +11,6 @@ use tracing::debug;
 
 use crate::state::AntZookeeperState;
 
-mod anthill;
 pub mod client;
 pub mod dns;
 pub mod err;

@@ -1,6 +1,6 @@
 {
   "project": "ant-fs",
-  "project_type": "makefile",
+  "build": "makefile",
   "secrets": [
     "ant_fs_users"
   ]

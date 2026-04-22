@@ -1,4 +1,4 @@
 {
   "project": "ant-monitor-fe",
-  "project_type": "docker"
+  "build": "docker"
 }

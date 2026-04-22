@@ -5,6 +5,7 @@ use std::{
 };
 
 use ant_host_agent::client::AntHostAgentClientConfig;
+use ant_library::anthill::{get_manifest_from_file, AnthillManifest};
 use ant_zookeeper_db::HostGroup;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -17,7 +18,6 @@ use tokio::{
 use tracing::info;
 
 use crate::{
-    anthill::{get_manifest_from_file, AnthillManifest},
     fs::{
         artifact_persist_dir, envs_persist_dir, global_envs_file_name, project_envs_file_name,
         secret_file_name, secret_file_path, services_file_name, services_persist_dir,

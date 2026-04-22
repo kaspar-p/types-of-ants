@@ -1,5 +1,5 @@
 {
   "project": "ant-zookeeper",
-  "project_type": "makefile",
+  "build": "makefile",
   "secrets": []
 }

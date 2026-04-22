@@ -4,7 +4,10 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
-use ant_library::headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader};
+use ant_library::{
+    anthill::AnthillManifest,
+    headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
+};
 use axum::debug_handler;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
@@ -22,7 +25,6 @@ use tempfile::tempdir_in;
 use tokio::fs::create_dir_all;
 use tracing::{info, warn};
 
-use crate::anthill::AnthillManifest;
 use crate::event_loop::transition::{is_deployment_complete, DeploymentEvent, Event};
 use crate::fs::{
     artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,

@@ -1,5 +1,5 @@
 {
   "project": "ant-host-agent",
-  "project_type": "makefile",
+  "build": "makefile",
   "secrets": []
 }

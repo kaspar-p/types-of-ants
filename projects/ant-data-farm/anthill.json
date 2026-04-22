@@ -1,6 +1,6 @@
 {
   "project": "ant-data-farm",
-  "project_type": "docker",
+  "build": "docker",
   "secrets": [
     "ant_data_farm_db",
     "ant_data_farm_user",

@@ -1,5 +1,5 @@
 {
   "project": "ant-just-checking-in",
-  "project_type": "makefile",
+  "build": "makefile",
   "secrets": []
 }

@@ -1,6 +1,6 @@
 {
   "project": "ant-who-tweets",
-  "project_type": "makefile",
+  "build": "makefile",
   "secrets": [
     "twitter_consumer_key",
     "twitter_consumer_secret",

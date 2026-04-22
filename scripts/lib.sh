@@ -92,9 +92,9 @@ function get_project_config() {
   cat "$repository_root/projects/$project/anthill.json"
 }
 
-function get_project_type() {
+function get_build() {
   local project="$1"
-  get_project_config "$project" | jq -r '.project_type'
+  get_project_config "$project" | jq -r '.build'
 }
 
 function get_project_secrets() {
@@ -104,7 +104,7 @@ function get_project_secrets() {
 
 function is_project_docker() {
   local project="$1"
-  test "$(get_project_type "$project")" == "docker"
+  test "$(get_build "$project")" == "docker"
 }
 
 function get_docker_platform() {

@@ -1,4 +1,4 @@
 {
   "project": "ant-looking-pretty",
-  "project_type": "makefile"
+  "build": "makefile"
 }

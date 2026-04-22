@@ -1,5 +1,5 @@
 {
   "project": "ant-zookeeper-db",
-  "project_type": "docker",
+  "build": "docker",
   "secrets": []
 }
