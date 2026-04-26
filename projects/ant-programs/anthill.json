@@ -1,7 +1,7 @@
 {
   "project": "ant-programs",
   "build": "makefile",
-  "deployment_options": {
+  "deployment": {
     "versioned": false
   }
 }

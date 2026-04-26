@@ -16,12 +16,31 @@ pub struct DeploymentOptions {
     pub versioned: Option<bool>,
 }
 
-pub fn get_manifest_from_file(path: &Path) -> Result<AnthillManifest, anyhow::Error> {
-    let mut manifest_buf = String::new();
-    File::open(path)?.read_to_string(&mut manifest_buf)?;
+impl Default for DeploymentOptions {
+    fn default() -> Self {
+        Self {
+            versioned: Some(true),
+        }
+    }
+}
 
-    debug!("manifest: {}", manifest_buf);
-    let manifest: AnthillManifest = serde_json::from_str(&manifest_buf)?;
+#[derive(thiserror::Error, Debug)]
+pub enum AnthillManifestError {
+    #[error("failed to read anthill manifest")]
+    Io(#[from] std::io::Error),
 
-    Ok(manifest)
+    #[error("malformed anthill manifest")]
+    Shape(#[from] serde_json::Error),
+}
+
+impl AnthillManifest {
+    pub fn from_file(path: &Path) -> Result<Self, AnthillManifestError> {
+        let mut manifest_buf = String::new();
+        File::open(path)?.read_to_string(&mut manifest_buf)?;
+
+        debug!("manifest: {}", manifest_buf);
+        let manifest: AnthillManifest = serde_json::from_str(&manifest_buf)?;
+
+        Ok(manifest)
+    }
 }

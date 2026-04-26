@@ -1,0 +1,7 @@
+{
+  "project": "ant-host-agent",
+  "build": "makefile",
+  "deployment": {
+    "versioned": false
+  }
+}

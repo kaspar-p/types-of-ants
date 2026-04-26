@@ -5,7 +5,7 @@ use std::{
 };
 
 use ant_host_agent::client::AntHostAgentClientConfig;
-use ant_library::anthill::{get_manifest_from_file, AnthillManifest};
+use ant_library::anthill::AnthillManifest;
 use ant_zookeeper_db::HostGroup;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -31,7 +31,7 @@ async fn inject_secrets(
     environment: &str,
 ) -> Result<(), anyhow::Error> {
     info!("Injecting secrets...");
-    let manifest: AnthillManifest = get_manifest_from_file(&dest.join("anthill.json"))?;
+    let manifest = AnthillManifest::from_file(&dest.join("anthill.json"))?;
 
     let project_secrets_dir = dest.join("secrets");
     create_dir_all(&project_secrets_dir).await?;

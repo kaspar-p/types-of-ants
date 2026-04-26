@@ -1,0 +1,13 @@
+[Unit]
+Description=The typesofants host agent!
+
+[Service]
+Type=simple
+EnvironmentFile=/home/ant/service/ant-host-agent/463-2025-10-19-15-56-964cffa/.env
+Environment=TYPESOFANTS_SECRET_DIR=/home/ant/service/ant-host-agent/463-2025-10-19-15-56-964cffa/secrets
+ExecStart=/home/ant/service/ant-host-agent/463-2025-10-19-15-56-964cffa/ant-host-agent
+WorkingDirectory=/home/ant/service/ant-host-agent/463-2025-10-19-15-56-964cffa
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

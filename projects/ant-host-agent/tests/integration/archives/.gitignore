@@ -1,0 +1,5 @@
+!*.secret
+!*.env
+
+!tmp/.gitkeep
+tmp/*

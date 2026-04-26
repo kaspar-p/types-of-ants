@@ -5,9 +5,13 @@ use std::{
 
 use ant_host_agent::{make_routes, routes::secret::PutSecretRequest, state::AntHostAgentState};
 use ant_library_test::axum_test_client::TestClient;
+use flate2::{write::GzEncoder, Compression};
 use hyper::StatusCode;
+use tempfile::NamedTempFile;
 
 pub struct TestFixture {
+    archive_root_dir: PathBuf,
+
     pub test_root_dir: PathBuf,
     pub client: TestClient,
 }
@@ -19,19 +23,14 @@ impl Drop for TestFixture {
 }
 
 impl TestFixture {
-    pub async fn new(name: &str, use_ephemeral_archive_dir: Option<bool>) -> Self {
+    pub async fn new(name: &str) -> Self {
         let test_root_dir = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
             .join("test-fs")
             .join(name);
         let _ = remove_dir_all(test_root_dir.clone());
 
-        let archive_root_dir = match use_ephemeral_archive_dir {
-            Some(true) => test_root_dir.join("fs"),
-            Some(false) | None => PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-                .join("tests")
-                .join("integration")
-                .join("archives"),
-        };
+        let archive_root_dir = test_root_dir.join("fs");
+
         create_dir_all(&archive_root_dir).unwrap();
 
         let test_secrets_dir = test_root_dir.join("secrets");
@@ -71,6 +70,34 @@ impl TestFixture {
         TestFixture {
             client,
             test_root_dir,
+            archive_root_dir,
         }
+    }
+
+    /// Create a tarfile from a test directory in the "archives/" directory
+    pub fn make_tarfile_fixture(&self, tar_dir_name: &str) -> NamedTempFile {
+        std::fs::create_dir_all(self.archive_root_dir.join("tmp")).unwrap();
+        let dst = NamedTempFile::new_in(self.archive_root_dir.join("tmp")).unwrap();
+
+        let enc_dst = GzEncoder::new(&dst, Compression::best());
+
+        {
+            let mut tarfile = tar::Builder::new(enc_dst);
+
+            tarfile
+                .append_dir_all(
+                    ".",
+                    PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
+                        .join("tests")
+                        .join("integration")
+                        .join("archives")
+                        .join(tar_dir_name),
+                )
+                .unwrap();
+
+            tarfile.finish().unwrap();
+        }
+
+        dst
     }
 }

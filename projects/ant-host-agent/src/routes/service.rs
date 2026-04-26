@@ -1,8 +1,12 @@
-use ant_library::headers::{XAntProjectHeader, XAntVersionHeader};
+use ant_library::{
+    anthill::{AnthillManifest, AnthillManifestError},
+    headers::{XAntProjectHeader, XAntVersionHeader},
+};
 use anyhow::Context;
 use flate2::read::GzDecoder;
 use humansize::DECIMAL;
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
+use tempfile::TempDir;
 use tokio_util::codec;
 
 use axum::{
@@ -145,6 +149,13 @@ fn install_location_path(install_root: &PathBuf, project: &str, version: &str) -
     install_root.join(project).join(version)
 }
 
+fn temp_dir(state: &AntHostAgentState) -> Result<TempDir, anyhow::Error> {
+    let global_temp_dir = state.archive_root_dir.join("tmp");
+    std::fs::create_dir_all(&global_temp_dir)?;
+
+    Ok(tempfile::tempdir_in(global_temp_dir)?)
+}
+
 async fn install_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<InstallServiceRequest>,
@@ -152,7 +163,7 @@ async fn install_service(
     let file_name = deployment_file_name(&req.project, &req.version);
     let file_path = state.archive_root_dir.join(file_name);
     info!(
-        "Installing {} version {} from {}...",
+        "Installing [{}] version [{}] from [{}]...",
         req.project,
         req.version,
         file_path.display()
@@ -169,15 +180,35 @@ async fn install_service(
         _ => AntHostAgentError::InternalServerError(Some(e.into())),
     })?;
 
-    let mut deployment = tar::Archive::new(GzDecoder::new(file));
+    let dst = {
+        let tmp_dst = temp_dir(&state)?;
 
-    let dst = install_location_path(&state.install_root_dir, &req.project, &req.version);
-    std::fs::create_dir_all(&dst)?;
+        let mut deployment = tar::Archive::new(GzDecoder::new(file));
+        info!("Unpacking installation to: {}", tmp_dst.path().display());
+        deployment
+            .unpack(&tmp_dst)
+            .context("attempted to unpack malformed tarfile")?;
 
-    info!("Unpacking installation to: {}", dst.display());
-    deployment
-        .unpack(&dst)
-        .context("attempted to unpack malformed tarfile")?;
+        let manifest = match AnthillManifest::from_file(&tmp_dst.path().join("anthill.json")) {
+            Ok(manifest) => Ok(Some(manifest)),
+            Err(AnthillManifestError::Io(e)) if matches!(e.kind(), ErrorKind::NotFound) => Ok(None),
+            Err(e) => Err(e),
+        }?;
+
+        let versioned = manifest
+            .and_then(|m| m.deployment)
+            .and_then(|d| d.versioned)
+            .unwrap_or(true);
+
+        let version = if versioned { &req.version } else { "service" };
+        let dst = install_location_path(&state.install_root_dir, &req.project, &version);
+
+        info!("Copying installation to: {}", dst.display());
+        std::fs::create_dir_all(&dst)?;
+        dircpy::copy_dir(&tmp_dst, &dst).context("move deployment to final location")?;
+
+        dst
+    };
 
     let template_variables = mustache::MapBuilder::new()
         .insert_str(
