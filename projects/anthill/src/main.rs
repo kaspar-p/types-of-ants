@@ -1,10 +1,30 @@
-use anthill::{build_artifacts, get_root};
 use anyhow::Result;
+use clap::Parser;
 
-#[tokio::main]
+mod build;
+
+#[derive(clap::Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(clap::Subcommand)]
+enum Commands {
+    Build(build::BuildCmd),
+}
+
+#[tokio::main(flavor = "local")]
 async fn main() -> Result<()> {
-    let root = get_root()?;
-    dbg!(&root);
-    build_artifacts(&root).await;
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Build(cmd)) => {
+            build::build(cmd).await;
+        }
+        None => {}
+    }
+
     Ok(())
 }

@@ -1,0 +1,4 @@
+{
+  "project": "ant-worker-node-metrics-exporter",
+  "build": "makefile"
+}

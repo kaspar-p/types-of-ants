@@ -11,12 +11,15 @@ source "$(git rev-parse --show-toplevel)/scripts/lib.sh"
 set -euo pipefail
 
 function usage() {
-  echo "USAGE: $0 <project-name> [arch]
+  echo "USAGE: $0 [project-name] [arch]
     project-name: 'ant-gateway', 'ant-data-farm', ...
     arch: 'arm', 'x86', or 'raspbian'. Defaults to all.
 " >> /dev/stderr
   exit 1
 }
+
+cargo run -p anthill --quiet -- build "${@}"
+exit 0
 
 set +u
 project="$1"

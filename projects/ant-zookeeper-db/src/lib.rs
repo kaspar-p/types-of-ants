@@ -122,7 +122,8 @@ impl AntZooStorageClient {
             ",
                 &[&version],
             )
-            .await?
+            .await
+            .with_context(|| format!("select {}: {}", function_name!(), version))?
             .map(|r| r.get("revision_id"));
 
         match revision_id {
@@ -135,11 +136,13 @@ impl AntZooStorageClient {
                         (deployment_version)
                     values
                         ($1)
+                    on conflict do nothing
                     returning revision_id
                     ",
                         &[&version],
                     )
-                    .await?
+                    .await
+                    .with_context(|| format!("insert {}: {}", function_name!(), version))?
                     .get("revision_id");
 
                 tx.commit().await?;

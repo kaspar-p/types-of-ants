@@ -25,8 +25,8 @@ values
   ('antworker005.hosts.typesofants.org', 'aarch64'),
   ('antworker006.hosts.typesofants.org', 'aarch64'),
   ('antworker007.hosts.typesofants.org', 'aarch64'),
-  ('ant.hisbaan.com', 'x86_64'),
-  ('ant.flower.beer', 'x86_64')
+  ('hisbaan01.hosts.typesofants.org', 'x86_64'),
+  ('greg01.hosts.typesofants.org', 'x86_64')
 ;
 
 insert into project
@@ -41,10 +41,11 @@ values
   ('ant-host-agent', true),
   ('ant-naming-domains', true),
   ('ant-who-tweets', true),
-  ('ant-worker-metrics-exporter', true),
+  ('ant-worker-node-metrics-exporter', true),
   ('ant-gateway', true),
   ('ant-zookeeper-db', true),
   ('ant-zookeeper', true),
+  ('ant-monitor', true),
   ('nextcloud-webdav', false)
 ;
 

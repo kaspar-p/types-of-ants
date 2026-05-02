@@ -1,4 +1,4 @@
-PROJECT = ant-worker-metrics-exporter
+PROJECT = ant-worker-node-metrics-exporter
 
 NODE_EXPORTER_VERSION=1.10.2
 

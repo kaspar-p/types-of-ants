@@ -5,7 +5,7 @@ Description=The typesofants per-host metrics exporter!
 Type=simple
 EnvironmentFile={{INSTALL_DIR}}/.env
 Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
-ExecStart={{INSTALL_DIR}}/node_exporter
+ExecStart={{INSTALL_DIR}}/node_exporter --web.listen-address=":{{ANT_WORKER_NODE_METRICS_EXPORTER_PORT}}" --collector.systemd
 WorkingDirectory={{INSTALL_DIR}}
 Restart=always
 

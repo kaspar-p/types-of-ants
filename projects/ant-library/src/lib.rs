@@ -17,6 +17,7 @@ pub mod headers;
 pub mod host_architecture;
 pub mod manifest_file;
 pub mod secret;
+pub mod services;
 
 /// The standard ping that all typesofants web servers should use.
 pub async fn api_ping() -> (StatusCode, String) {

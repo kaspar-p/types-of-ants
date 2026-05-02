@@ -21,7 +21,8 @@
   },
   "hosts": {
     "antworker000.hosts.typesofants.org": {
-      "INACTIVE": true,
+      "inactive": true,
+      "auto_deployable": true,
       "architecture": "raspbian",
       "services": [
         {
@@ -46,11 +47,16 @@
       ]
     },
     "antworker001.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
@@ -75,11 +81,16 @@
       ]
     },
     "antworker002.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
-          "env": "beta",
+          "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "beta",
+          "service": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "beta",
@@ -116,11 +127,16 @@
       ]
     },
     "antworker003.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
@@ -129,11 +145,16 @@
       ]
     },
     "antworker004.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
@@ -142,6 +163,7 @@
       ]
     },
     "antworker005.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
@@ -150,16 +172,29 @@
         },
         {
           "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
+        },
+        {
+          "env": "prod",
           "service": "ant-who-tweets"
+        },
+        {
+          "env": "prod",
+          "service": "ant-monitor"
         }
       ]
     },
     "antworker006.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
@@ -168,15 +203,21 @@
       ]
     },
     "antworker007.hosts.typesofants.org": {
+      "auto_deployable": true,
       "architecture": "arm",
       "services": [
         {
           "env": "prod",
           "service": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "service": "ant-worker-node-metrics-exporter"
         }
       ]
     },
     "hisbaan01.hosts.typesofants.org": {
+      "auto_deployable": false,
       "architecture": "x86",
       "services": [
         {
@@ -186,6 +227,7 @@
       ]
     },
     "greg01.hosts.typesofants.org": {
+      "auto_deployable": false,
       "architecture": "x86",
       "services": [
         {

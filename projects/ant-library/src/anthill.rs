@@ -6,9 +6,18 @@ use tracing::debug;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnthillManifest {
     // pub project: String,
-    // pub build: String,
+    pub build: AnthillBuild,
     pub deployment: Option<DeploymentOptions>,
     pub secrets: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum AnthillBuild {
+    #[serde(rename = "makefile")]
+    Makefile,
+
+    #[serde(rename = "docker")]
+    Docker,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

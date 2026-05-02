@@ -1,5 +1,8 @@
+use std::path::Path;
+
+use ant_library::host_architecture::HostArchitecture;
 use http::Method;
-use reqwest::Client;
+use reqwest::{multipart::Form, Client};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -31,13 +34,8 @@ impl AntZookeeperClient {
         }
     }
 
-    async fn send<Req: Serialize, Res: for<'a> Deserialize<'a>>(
-        &self,
-        method: Method,
-        path: &'static str,
-        req: Req,
-    ) -> Result<Res, anyhow::Error> {
-        let endpoint = format!(
+    fn endpoint(&self, path: &str) -> String {
+        format!(
             "http{}://{}{}",
             match self.config.tls {
                 true => "s",
@@ -45,18 +43,22 @@ impl AntZookeeperClient {
             },
             self.config.endpoint,
             path
-        );
+        )
+    }
 
+    async fn send<Req: Serialize, Res: for<'a> Deserialize<'a>>(
+        &self,
+        method: Method,
+        path: &'static str,
+        req: Req,
+    ) -> Result<Res, anyhow::Error> {
         let res = self
             .client
-            .request(method.clone(), &endpoint)
+            .request(method.clone(), &self.endpoint(path))
             .json(&req)
             .send()
             .await?
             .error_for_status();
-        // .error_for_status()?
-        // .json::<Res>()
-        // .await;
 
         match res {
             Ok(res) => {
@@ -64,7 +66,12 @@ impl AntZookeeperClient {
                 return Ok(body);
             }
             Err(err) => {
-                error!("Error sending {} {}: {}", method.as_str(), endpoint, err);
+                error!(
+                    "Error sending {} {}: {}",
+                    method.as_str(),
+                    self.endpoint(path),
+                    err
+                );
                 return Err(err.into());
             }
         }
@@ -114,5 +121,36 @@ impl AntZookeeperClient {
         req: PutPipelineRequest,
     ) -> Result<PutPipelineResponse, anyhow::Error> {
         self.send(Method::POST, "/pipeline/pipeline", req).await
+    }
+
+    pub async fn register_artifact(
+        &self,
+        project: &str,
+        arch: &HostArchitecture,
+        version: &str,
+        file_path: &Path,
+    ) -> Result<(), anyhow::Error> {
+        let req = Form::new().file("file", file_path).await.unwrap();
+
+        let path = "/service/artifact";
+
+        let res = self
+            .client
+            .request(Method::POST, self.endpoint(path))
+            .header("x-ant-project", project)
+            .header("x-ant-architecture", arch.as_str())
+            .header("x-ant-version", version)
+            .multipart(req)
+            .send()
+            .await?
+            .error_for_status();
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                error!("Error sending POST {}: {}", self.endpoint(path), err);
+                return Err(err.into());
+            }
+        }
     }
 }
