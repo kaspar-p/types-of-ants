@@ -2,9 +2,6 @@ PROJECT = ant-worker-node-metrics-exporter
 
 NODE_EXPORTER_VERSION=1.10.2
 
-PROMETHEUS_OS ?= $(shell uname)
-PROMETHEUS_ARCH ?= $(shell uname -m)
-
 ifeq ($(PROMETHEUS_OS),)
     $(error PROMETHEUS_OS is not set. Please define it.)
 endif

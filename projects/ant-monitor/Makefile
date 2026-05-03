@@ -2,9 +2,6 @@ PROJECT = ant-monitor
 
 PROMETHEUS_VERSION=3.11.2
 
-PROMETHEUS_OS ?= $(shell uname)
-PROMETHEUS_ARCH ?= $(shell uname -m)
-
 ifeq ($(PROMETHEUS_OS),)
     $(error PROMETHEUS_OS is not set. Please define it.)
 endif
