@@ -989,31 +989,42 @@ impl AntZooStorageClient {
                 is_success
             )
         })?;
+        tx.commit().await?;
 
         // Add successful deployment event if there was one
         if is_success {
-            let deployment_id = tx
-                .query_one(
-                    "
+            let deployment_id = self.create_deployment(revision_id, event).await?;
+            return Ok(Some(deployment_id));
+        } else {
+            return Ok(None);
+        }
+    }
+
+    /// If there's no job to schedule, just emit the deployment log to mark this complete and keep going
+    pub async fn create_deployment(
+        &self,
+        revision_id: &str,
+        event: &str,
+    ) -> Result<String, anyhow::Error> {
+        let deployment_id = self
+            .db
+            .get()
+            .await?
+            .query_one(
+                "
             insert into deployment
                 (revision_id, deployment_event)
             values
                 ($1, $2)
             returning deployment_id
             ",
-                    &[&revision_id, &event],
-                )
-                .await
-                .with_context(|| format!("{}: {} {}", function_name!(), revision_id, event,))?
-                .get("deployment_id");
+                &[&revision_id, &event],
+            )
+            .await
+            .with_context(|| format!("{}: {} {}", function_name!(), revision_id, event,))?
+            .get("deployment_id");
 
-            tx.commit().await?;
-
-            return Ok(Some(deployment_id));
-        } else {
-            tx.commit().await?;
-            return Ok(None);
-        }
+        Ok(deployment_id)
     }
 
     /// Find all deployment jobs that occurred after the deployment job for a given event.
@@ -1342,9 +1353,12 @@ impl AntZooStorageClient {
                 "
             select revision_id, activated_at
             from revision
+            where
+                project_id = $1
             order by revision_seq desc
+            limit 1
             ",
-                &[],
+                &[&project],
             )
             .await
             .context(format!("{}: {}", function_name!(), project))?

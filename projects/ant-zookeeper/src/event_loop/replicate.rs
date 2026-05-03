@@ -151,15 +151,6 @@ async fn render_docker_compose(
         dest.join("docker-compose.yml"),
     )?;
 
-    {
-        let buf = std::fs::read_to_string(dest.join("docker-compose.yml"))?;
-        info!(
-            "docker-compose content:
-{buf}
-"
-        );
-    }
-
     Ok(())
 }
 

@@ -4,7 +4,7 @@ use ant_zookeeper_db::{AntZooStorageClient, Revision};
 use tracing::info;
 
 use crate::event_loop::transition::{
-    after, is_deployment_complete, is_doable, transition, DeploymentEvent, Event, PipelineError,
+    after, is_deployment_complete, is_doable, transition, DeploymentEvent, Event, Node,
 };
 
 mod deploy;
@@ -15,7 +15,7 @@ pub mod transition;
 pub async fn drive_revisions(
     db: &AntZooStorageClient,
     _iterations: i32,
-) -> Result<(), PipelineError> {
+) -> Result<(), anyhow::Error> {
     let revisions = db.list_revisions().await?;
 
     for (deployment_pipeline_id, _) in db.list_deployment_pipelines().await? {
@@ -32,7 +32,7 @@ async fn revision_frontier(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
     revision: &str,
-) -> Result<Vec<DeploymentEvent>, PipelineError> {
+) -> Result<Vec<DeploymentEvent>, anyhow::Error> {
     let event = DeploymentEvent(
         revision.to_string(),
         Event::PipelineStarted {
@@ -91,7 +91,7 @@ async fn frontier(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
     pipeline_revisions: &Vec<Revision>,
-) -> Result<Vec<DeploymentEvent>, PipelineError> {
+) -> Result<HashSet<DeploymentEvent>, anyhow::Error> {
     let frontiers = {
         let mut frontiers: Vec<(&Revision, Vec<DeploymentEvent>)> = vec![]; // (revision_id, events)
         for revision in pipeline_revisions {
@@ -103,7 +103,7 @@ async fn frontier(
         frontiers
     };
 
-    let mut filtered_frontiers: Vec<DeploymentEvent> = vec![];
+    let mut filtered_frontiers: HashSet<DeploymentEvent> = HashSet::new();
 
     // If any events from AFTER(a) were completed by newer revisions, then a should be removed from the
     // frontier, it's been surpassed.
@@ -142,7 +142,9 @@ async fn frontier(
             }
         }
 
-        filtered_frontiers.append(&mut new_frontier_a);
+        for node in new_frontier_a {
+            filtered_frontiers.insert(node);
+        }
     }
 
     Ok(filtered_frontiers)
@@ -152,27 +154,24 @@ async fn drive_pipeline(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
     revisions: &Vec<Revision>,
-) -> Result<(), PipelineError> {
+) -> Result<(), anyhow::Error> {
     let mut frontier = frontier(&db, &deployment_pipeline_id, &revisions).await?;
 
     loop {
-        let mut new_frontier = Vec::new();
+        let mut new_frontier = HashSet::new();
 
         for event in &frontier {
-            info!(
-                "[p={deployment_pipeline_id} v={}] Driving frontier event: {event:?}",
-                event.0
-            );
+            let node = transition(db, &event).await?;
 
             // The deployment may already have been completed by another thread, we want to handle that
             // gracefully since the frontier we have is just in-memory.
             if is_deployment_complete(db, event).await? {
-                let mut trans = transition(db, &event).await?;
-                info!("[p={deployment_pipeline_id} v={}] Event {event:?} is already finished, progressing pipeline with {} new events...", event.0, trans.next.len());
-                new_frontier.append(&mut trans.next);
+                for next in node.next {
+                    new_frontier.insert(next);
+                }
+            } else {
+                drive_iteration(db, deployment_pipeline_id, frontier.iter(), &node, &event).await?;
             }
-
-            drive_iteration(db, deployment_pipeline_id, frontier.iter(), &event).await?;
         }
 
         if new_frontier.len() == 0 {
@@ -191,69 +190,70 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     db: &AntZooStorageClient,
     deployment_pipeline_id: &str,
     frontier: T,
+    node: &Node,
     event: &DeploymentEvent,
-) -> Result<(), PipelineError> {
+) -> Result<(), anyhow::Error> {
     if !is_doable(&db, frontier, &event).await? {
-        info!(
-            "[p={deployment_pipeline_id} v={}] Event {event:?} is not doable.",
-            event.0
-        );
         return Ok(());
     }
 
-    // Index 0 is newest attempt at the job
-    let previous_jobs = db
-        .list_deployment_jobs(&event.0, event.1.to_string().as_str())
-        .await?;
+    match node.perform {
+        None => {
+            // Nothing to perform, register the success by emitting the deployment logs and continue
+            info!(
+                "[p={deployment_pipeline_id}, v={}] Deployment completed with no work: {}",
+                event.0,
+                event.1.to_string()
+            );
+            db.create_deployment(&event.0, &event.1.to_string()).await?;
+            return Ok(());
+        }
+        Some(_) => {
+            // Index 0 is newest attempt at the job
+            let previous_jobs = db
+                .list_deployment_jobs(&event.0, event.1.to_string().as_str())
+                .await?;
 
-    let successful = previous_jobs.iter().find(|(_, _, is_success)| *is_success);
-    if let Some(successful) = successful {
-        panic!(
+            let successful = previous_jobs.iter().find(|(_, _, is_success)| *is_success);
+            if let Some(successful) = successful {
+                panic!(
             "[p={deployment_pipeline_id} v={}] Previous job {} succeeded, this shouldn't {}",
             "happen!", event.0, successful.0
         );
-    }
+            }
 
-    let retryable = previous_jobs
-        .iter()
-        .find(|(_, is_retryable, is_success)| !*is_success && *is_retryable);
-
-    if previous_jobs.len() > 0 && retryable.is_none() {
-        info!(
-            "[p={deployment_pipeline_id} v={}] All {} prev. jobs [{}] failed + aren't {}",
-            "retryable...",
-            event.0,
-            previous_jobs.len(),
-            previous_jobs
+            let retryable = previous_jobs
                 .iter()
-                .map(|j| j.0.as_ref())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-        return Ok(());
+                .find(|(_, is_retryable, is_success)| !*is_success && *is_retryable);
+
+            if previous_jobs.len() > 0 && retryable.is_none() {
+                // All previous jobs failed and aren't retryable, skip!
+                return Ok(());
+            }
+
+            if let Some(prev) = retryable {
+                info!(
+                    "[p={deployment_pipeline_id} v={}] Prev. job {} failed but is retryable, {}",
+                    "creating retry and marking previous non-retryable.", event.0, prev.0
+                );
+
+                // Set the previous job to non-retryable since we're about to kickoff a retry!
+                db.set_deployment_job_retryable(&prev.0, false).await?;
+            }
+
+            // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!
+            let (job_id, is_new) = db
+                .create_deployment_job_idempotently(&event.0, &event.1.to_string())
+                .await?;
+
+            if is_new {
+                info!(
+                    "[p={deployment_pipeline_id} v={}] Scheduled job {job_id} for event {event:?}",
+                    event.0
+                );
+            }
+
+            return Ok(());
+        }
     }
-
-    if let Some(prev) = retryable {
-        info!(
-            "[p={deployment_pipeline_id} v={}] Prev. job {} failed but is retryable, {}",
-            "creating retry and marking previous non-retryable.", event.0, prev.0
-        );
-
-        // Set the previous job to non-retryable since we're about to kickoff a retry!
-        db.set_deployment_job_retryable(&prev.0, false).await?;
-    }
-
-    // Schedule the deployment job to actually happen. A different process/thread/api is always looking for jobs to perform!
-    let (job_id, is_new) = db
-        .create_deployment_job_idempotently(&event.0, &event.1.to_string())
-        .await?;
-
-    if is_new {
-        info!(
-            "[p={deployment_pipeline_id} v={}] Scheduled job {job_id} for event {event:?}",
-            event.0
-        );
-    }
-
-    return Ok(());
 }

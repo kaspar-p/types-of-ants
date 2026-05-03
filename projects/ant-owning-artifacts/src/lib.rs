@@ -50,7 +50,7 @@ pub async fn start_server(port: Option<u16>) -> anyhow::Result<(), anyhow::Error
         ))
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .layer(ant_library::http_log_layer())
                 .layer(cors),
         )
         .fallback(|| async { ant_library::api_fallback(&["GET /ping", "/api"]) });

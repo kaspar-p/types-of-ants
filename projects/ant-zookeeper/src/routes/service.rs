@@ -508,7 +508,7 @@ async fn upsert_revision(
                 info!("Kick-starting pipeline [{}]...", pipeline_id);
                 state
                     .db
-                    .create_deployment_job_idempotently(&revision_id, &event.1.to_string())
+                    .create_deployment(&revision_id, &event.1.to_string())
                     .await?;
             }
 

@@ -215,22 +215,7 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
         let res = fixture.client.post("/deployment/iteration").send().await;
         assert_eq!(res.status(), StatusCode::OK);
 
-        let jobs = get_unfinished_jobs().await;
-        assert_eq!(jobs.len(), 0);
-
         let e = get_events().await;
-        assert_eq!(e.len(), 2);
-        assert!(matches!(e[0].1, E::PipelineStarted { .. }));
-        assert!(matches!(e[1].1, E::StageStarted { .. }));
-    }
-
-    // Iterate pipeline once
-    {
-        let res = fixture.client.post("/deployment/iteration").send().await;
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(get_unfinished_jobs().await.len(), 2); // aarch64 already done above.
-        let e = get_events().await;
-        assert_eq!(e.len(), 3);
         assert!(matches!(e[0].1, E::PipelineStarted { .. }));
         assert!(matches!(e[1].1, E::StageStarted { .. }));
         assert!(matches!(
@@ -240,6 +225,10 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
                 ..
             }
         ));
+        assert_eq!(e.len(), 3);
+
+        let jobs = get_unfinished_jobs().await;
+        assert_eq!(jobs.len(), 2); // aarch64 already done above.
     }
 
     // Iterate pipeline once

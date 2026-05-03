@@ -6,8 +6,16 @@ use std::{
 use ant_library::host_architecture::HostArchitecture;
 use ant_zookeeper_db::AntZooStorageClient;
 use anyhow::Context;
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+
+use crate::{
+    event_loop::perform::{
+        artifact_registered, host_artifact_deployed, host_artifact_replicated, stage_finished,
+        JobCompletion,
+    },
+    state::AntZookeeperState,
+};
 
 // #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
 // #[serde(rename_all = "camelCase")]
@@ -164,23 +172,31 @@ impl Display for DeploymentEvent {
     }
 }
 
-pub enum PipelineError {
-    UnknownStep(DeploymentEvent),
-    DatabaseError(anyhow::Error),
-}
+pub struct Node {
+    /// Given an event, this is the function that would run to actually process that event.
+    /// For example, if the event is "deploy to host" then actually performs the remote-RPCs to do
+    /// the deployment.
+    ///
+    /// If not included, the event is "synthetic" and does nothing but continue to the `next` set.
+    /// Events like "stage is starting" are this way, and just serve to progress the pipeline.
+    pub perform: Option<
+        fn(
+            &AntZookeeperState,
+            DeploymentEvent,
+        ) -> BoxFuture<'static, Result<JobCompletion<()>, anyhow::Error>>,
+    >,
 
-impl<E> From<E> for PipelineError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(value: E) -> Self {
-        PipelineError::DatabaseError(value.into())
-    }
-}
-
-pub struct Transition {
+    /// Given this event, these are the next events.
+    ///     There might be none (if this event is the "pipeline is finished" event)
+    ///     There might be a single one (if this event is "deployed" and now we test)
+    ///     There might be many (if this event is "start deploying stage" and there are many hosts to deploy to)
+    ///
+    /// In the case of fan-out, the target next events are only actually processed when ALL of their
+    /// predecessors are finished.
+    ///
+    /// That is, "stage is finished" will not complete until all hosts in that stage are finished, too, even if
+    /// the first host finishes much earlier and includes "stage is finished" in its `next` set.
     pub next: Vec<DeploymentEvent>,
-    // pub previous: DeploymentEvent,
 }
 
 pub(crate) async fn is_deployment_complete(
@@ -196,7 +212,7 @@ pub(crate) async fn is_deployment_complete(
 pub(crate) async fn after(
     db: &AntZooStorageClient,
     event: &DeploymentEvent,
-) -> Result<Vec<DeploymentEvent>, PipelineError> {
+) -> Result<Vec<DeploymentEvent>, anyhow::Error> {
     let mut after: Vec<DeploymentEvent> = Vec::new();
     let mut seen: HashSet<DeploymentEvent> = HashSet::new();
     let mut queue: VecDeque<DeploymentEvent> = VecDeque::new();
@@ -237,11 +253,11 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     db: &AntZooStorageClient,
     frontier: T,
     event: &DeploymentEvent,
-) -> Result<bool, PipelineError> {
+) -> Result<bool, anyhow::Error> {
     // Check for NEW
     for e in after(db, event).await? {
         if is_deployment_complete(db, &e).await? {
-            info!("Event {event:?} is not doable, failed NEW: event {e:?} is AFTER, but complete!");
+            // Event is not doable, failed NEW, e is AFTER, but complete!
             return Ok(false);
         }
     }
@@ -249,7 +265,7 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
     // Check for READY
     for frontier_event in frontier {
         if after(db, frontier_event).await?.contains(event) {
-            info!("Event {event:?} is not doable, failed READY: event {frontier_event:?} has this event in AFTER!");
+            // Event is not doable, failed READY: frontier_event has this event in AFTER!
             return Ok(false);
         }
     }
@@ -260,7 +276,7 @@ pub async fn is_doable<'a, T: Iterator<Item = &'a DeploymentEvent>>(
 pub async fn transition(
     db: &AntZooStorageClient,
     event: &DeploymentEvent,
-) -> Result<Transition, PipelineError> {
+) -> Result<Node, anyhow::Error> {
     type E = Event;
 
     match event {
@@ -274,8 +290,9 @@ pub async fn transition(
                 .collect();
 
             // Find the first stage of the pipeline and start that.
-            Ok(Transition {
+            Ok(Node {
                 next: initial_stages,
+                perform: None,
             })
         }
 
@@ -323,23 +340,23 @@ pub async fn transition(
                         .collect()
                 }
 
-                s => {
-                    return Err(PipelineError::DatabaseError(anyhow::Error::msg(format!(
-                        "Unknown stage type: {s}"
-                    ))))
-                }
+                s => return Err(anyhow::Error::msg(format!("Unknown stage type: {s}"))),
             };
 
-            Ok(Transition { next: next_events })
+            Ok(Node {
+                next: next_events,
+                perform: None,
+            })
         }
 
-        DeploymentEvent(rev, E::ArtifactRegistered { stage_id, .. }) => Ok(Transition {
+        DeploymentEvent(rev, E::ArtifactRegistered { stage_id, .. }) => Ok(Node {
             next: vec![DeploymentEvent(
                 rev.clone(),
                 E::StageFinished {
                     stage_id: stage_id.clone(),
                 },
             )],
+            perform: Some(|s, e| Box::pin(artifact_registered(s.clone(), e.clone()))),
         }),
 
         DeploymentEvent(rev, E::HostGroupStarted { host_group_id }) => {
@@ -363,7 +380,10 @@ pub async fn transition(
                 })
                 .collect::<Vec<DeploymentEvent>>();
 
-            Ok(Transition { next })
+            Ok(Node {
+                next,
+                perform: None,
+            })
         }
 
         DeploymentEvent(
@@ -372,7 +392,7 @@ pub async fn transition(
                 host_group_id,
                 host,
             },
-        ) => Ok(Transition {
+        ) => Ok(Node {
             next: vec![DeploymentEvent(
                 rev.clone(),
                 E::HostArtifactReplicated {
@@ -380,6 +400,7 @@ pub async fn transition(
                     host_group_id: host_group_id.clone(),
                 },
             )],
+            perform: None,
         }),
 
         DeploymentEvent(
@@ -388,7 +409,7 @@ pub async fn transition(
                 host_group_id,
                 host,
             },
-        ) => Ok(Transition {
+        ) => Ok(Node {
             next: vec![DeploymentEvent(
                 rev.clone(),
                 E::HostArtifactDeployed {
@@ -396,6 +417,7 @@ pub async fn transition(
                     host: host.clone(),
                 },
             )],
+            perform: Some(|s, e| Box::pin(host_artifact_replicated(s.clone(), e.clone()))),
         }),
 
         DeploymentEvent(
@@ -404,7 +426,7 @@ pub async fn transition(
                 host_group_id,
                 host,
             },
-        ) => Ok(Transition {
+        ) => Ok(Node {
             next: vec![DeploymentEvent(
                 rev.clone(),
                 E::HostFinished {
@@ -412,15 +434,17 @@ pub async fn transition(
                     host: host.clone(),
                 },
             )],
+            perform: Some(|s, e| Box::pin(host_artifact_deployed(s.clone(), e.clone()))),
         }),
 
-        DeploymentEvent(rev, E::HostFinished { host_group_id, .. }) => Ok(Transition {
+        DeploymentEvent(rev, E::HostFinished { host_group_id, .. }) => Ok(Node {
             next: vec![DeploymentEvent(
                 rev.clone(),
                 E::HostGroupFinished {
                     host_group_id: host_group_id.clone(),
                 },
             )],
+            perform: None,
         }),
 
         DeploymentEvent(rev, E::HostGroupFinished { host_group_id }) => {
@@ -429,13 +453,14 @@ pub async fn transition(
                 .await?
                 .context(event.clone())?;
 
-            Ok(Transition {
+            Ok(Node {
                 next: vec![DeploymentEvent(
                     rev.clone(),
                     E::StageFinished {
                         stage_id: stage_id.clone(),
                     },
                 )],
+                perform: None,
             })
         }
 
@@ -471,9 +496,15 @@ pub async fn transition(
                 _ => next_stages,
             };
 
-            Ok(Transition { next: next_events })
+            Ok(Node {
+                next: next_events,
+                perform: Some(|s, e| Box::pin(stage_finished(s.clone(), e.clone()))),
+            })
         }
 
-        DeploymentEvent(_, E::PipelineFinished { .. }) => Ok(Transition { next: vec![] }),
+        DeploymentEvent(_, E::PipelineFinished { .. }) => Ok(Node {
+            next: vec![],
+            perform: None,
+        }),
     }
 }

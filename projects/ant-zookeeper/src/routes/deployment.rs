@@ -2,17 +2,17 @@ use anyhow::Context;
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
-use futures::{future::join_all, TryFutureExt};
+use futures::future::join_all;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::{error, info, info_span, Instrument};
 
 use crate::{
     err::AntZookeeperError,
     event_loop::{
         drive_revisions,
-        perform::{perform, JobCompletion},
-        transition::{DeploymentEvent, PipelineError},
+        perform::JobCompletion,
+        transition::{self, DeploymentEvent},
     },
     state::AntZookeeperState,
 };
@@ -26,15 +26,8 @@ async fn iterate_pipeline(
 ) -> Result<impl IntoResponse, AntZookeeperError> {
     // Schedule any deployment jobs available
     drive_revisions(&state.db, 1)
-        .map_err(|e| match e {
-            PipelineError::UnknownStep(p) => AntZookeeperError::InternalServerError(Some(
-                anyhow::Error::msg(format!("Unknown deployment event: {p}")),
-            )),
-            PipelineError::DatabaseError(e) => AntZookeeperError::InternalServerError(Some(
-                e.context("Pipeline orchestration failure"),
-            )),
-        })
-        .await?;
+        .await
+        .with_context(|| "Pipeline orchestration failure")?;
 
     let unfinished_jobs = state.db.list_unfinished_deployment_jobs().await?;
 
@@ -47,46 +40,68 @@ async fn iterate_pipeline(
         async move {
             let event = DeploymentEvent(job.revision.clone(), job.event_document.clone().into());
 
-            // Do the work.
-            info!("Performing: {event:?}");
+            let perform_fn = transition::transition(&state.db, &event).await?.perform;
 
-            state.db.start_deployment_job(&job.job_id).await?;
+            let is_success = match perform_fn {
+                None => {
+                    error!(
+                        "Deployment job rev={} event={} has no perform, but ignoring...",
+                        event.0,
+                        event.1.to_string()
+                    );
 
-            let work: Result<Result<JobCompletion<()>, anyhow::Error>, tokio::task::JoinError> =
-                tokio::spawn({
-                    let job_id = job.job_id.clone();
-                    let state = state.clone();
-                    async move {
-                        perform(&state, &event).await.with_context(|| {
-                            format!(
-                                "Failed to perform scheduled deployment job [{}] for event [{}]",
-                                job_id, event
-                            )
-                        })
-                    }
-                })
-                .await;
-
-            let is_success: Option<bool> = match &work {
-                Ok(Ok(JobCompletion::Pending)) => None,
-                Ok(Ok(JobCompletion::Finished(_))) => Some(true),
-                Ok(Err(e)) => {
-                    error!("Handler Error: {:?}", e);
-                    Some(false)
+                    // Just marking it complete, shouldn't have happened though
+                    Some(true)
                 }
-                Err(e) => {
-                    error!("Orchestration Error: {:?}", e);
-                    Some(false)
+
+                Some(perform_fn) => {
+                    // Do the work.
+
+                    state.db.start_deployment_job(&job.job_id).await?;
+
+                    let work: Result<
+                        Result<JobCompletion<()>, anyhow::Error>,
+                        tokio::task::JoinError,
+                    > = tokio::spawn({
+                        let job_id = job.job_id.clone();
+                        let state = state.clone();
+                        let event2 = event.clone();
+                        let event3 = event.clone();
+                        let span = info_span!("job", job_id = job_id);
+                        async move {
+                            perform_fn(&state, event2).await.with_context(|| {
+                                format!(
+                                "Failed to perform scheduled deployment job [{}] for event [{}]",
+                                job_id, event3
+                            )
+                            })
+                        }
+                        .instrument(span)
+                    })
+                    .await;
+
+                    let is_success: Option<bool> = match &work {
+                        Ok(Ok(JobCompletion::Pending)) => None,
+                        Ok(Ok(JobCompletion::Finished(_))) => {
+                            info!("Completed [{}] for {event}", job.job_id);
+                            Some(true)
+                        }
+                        Ok(Err(e)) => {
+                            error!("Handler Error: {:?}", e);
+                            Some(false)
+                        }
+                        Err(e) => {
+                            error!("Orchestration Error: {:?}", e);
+                            Some(false)
+                        }
+                    };
+
+                    is_success
                 }
             };
 
             // If the job finished, set its status and finished_at timestamp.
             if let Some(is_success) = is_success {
-                info!(
-                    "Job {} complete, success={}",
-                    job.job_id.clone(),
-                    is_success
-                );
                 state
                     .db
                     .complete_deployment_job(

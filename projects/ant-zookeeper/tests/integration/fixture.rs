@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::remove_dir_all, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use ant_host_agent::{
     client::{AntHostAgentClient, AntHostAgentClientConfig, AntHostAgentClientFactory},
@@ -98,7 +98,7 @@ pub struct Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        // let _ = remove_dir_all(&self.state.root_dir);
+        let _ = std::fs::remove_dir_all(&self.state.root_dir);
     }
 }
 

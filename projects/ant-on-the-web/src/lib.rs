@@ -12,7 +12,6 @@ use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::{AllowOrigin, CorsLayer},
     services::ServeDir,
-    trace::TraceLayer,
 };
 use tracing::debug;
 
@@ -130,7 +129,7 @@ pub fn make_routes(
         .fallback_service(ServeDir::new(state.static_dir.clone()))
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .layer(ant_library::http_log_layer())
                 .layer(cors)
                 .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
                 .layer(GovernorLayer { config: throttling })

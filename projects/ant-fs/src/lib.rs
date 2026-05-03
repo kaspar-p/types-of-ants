@@ -19,8 +19,7 @@ use std::{
 };
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{
-    catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer,
-    services::ServeDir, trace::TraceLayer,
+    catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer, services::ServeDir,
 };
 use tracing::{debug, error, info};
 
@@ -128,7 +127,7 @@ pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
         .with_state(root)
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .layer(ant_library::http_log_layer())
                 .layer(cors)
                 .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
                 .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(

@@ -11,7 +11,7 @@ use http::{header, Method, StatusCode};
 use postgresql_commands::{pg_dump::PgDumpBuilder, traits::CommandToString, CommandBuilder};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, trace::TraceLayer};
+use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 use tracing::{debug, error, info, warn};
 use zip::write::SimpleFileOptions;
 
@@ -224,7 +224,7 @@ pub fn make_routes(s: AntBackingItUpState) -> Result<Router, anyhow::Error> {
         .with_state(s)
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .layer(ant_library::http_log_layer())
                 .layer(cors)
                 .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
                 .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(

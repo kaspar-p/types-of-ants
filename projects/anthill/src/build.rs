@@ -5,7 +5,7 @@ use ant_library::{
     host_architecture::HostArchitecture,
     services::Services,
 };
-use ant_zookeeper::client::AntZookeeperClientConfig;
+use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRevisionRequest};
 use anyhow::Context;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};
@@ -42,6 +42,18 @@ pub async fn build(cmd: BuildCmd) {
         serde_json::de::from_reader(std::fs::File::open(find_up("services.json")).unwrap())
             .unwrap();
 
+    let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
+        tls: false,
+        endpoint: "localhost:3235".to_string(),
+    });
+
+    let revision = client
+        .upsert_revision(UpsertRevisionRequest {
+            project: cmd.project.clone(),
+        })
+        .await
+        .unwrap();
+
     let arches: HashSet<HostArchitecture> = services
         .hosts
         .iter()
@@ -51,12 +63,15 @@ pub async fn build(cmd: BuildCmd) {
 
     let mut handles = Vec::new();
     for arch in arches {
+        let revision: String = revision.revision.clone();
         let cmd2 = cmd.clone();
         let proj = cmd2.project.clone();
         let handle = tokio::task::spawn_blocking(|| async move {
-            build_arch(cmd2, &arch)
-                .await
-                .context(format!("building {} {}", proj, arch.as_str()))
+            build_arch(cmd2, &arch, &revision).await.context(format!(
+                "building {} {}",
+                proj,
+                arch.as_str()
+            ))
         });
         handles.push(handle);
     }
@@ -102,7 +117,11 @@ fn format_datetime(t: git2::Time) -> String {
     )
 }
 
-async fn build_arch<'a>(cmd: BuildCmd, arch: &'a HostArchitecture) -> Result<(), anyhow::Error> {
+async fn build_arch<'a>(
+    cmd: BuildCmd,
+    arch: &'a HostArchitecture,
+    revision: &'a str,
+) -> Result<(), anyhow::Error> {
     println!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
 
     let (deployment_file_path, version) = build_artifact(&cmd, &arch).await?;
@@ -113,9 +132,14 @@ async fn build_arch<'a>(cmd: BuildCmd, arch: &'a HostArchitecture) -> Result<(),
         tls: false,
         endpoint: "localhost:3235".to_string(),
     });
-
     client
-        .register_artifact(&cmd.project, &arch, &version, &deployment_file_path)
+        .register_artifact(
+            &revision,
+            &cmd.project,
+            &arch,
+            &version,
+            &deployment_file_path,
+        )
         .await?;
 
     println!("... artifact registered.");

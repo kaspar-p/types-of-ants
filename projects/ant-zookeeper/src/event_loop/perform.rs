@@ -23,46 +23,42 @@ pub enum JobCompletion<T> {
     Finished(T),
 }
 
-/// Runs inside the worker thread, actually performs the work of a task. This could be:
-///   1. Running the actual work, e.g. taking an artifact and repackaging it for a host, replicating it to a
-///         host, etc.
-///   2. Completing instantly. Most jobs like "stage-finished" have no real work attached for now.
-///         But in the future, attaching "time blockers" where stages only start from 9am - 5pm would be
-///         very easy, so they are good hooks.
-///   3. Checking some external database or state and returning its status. Since the pipeline often cannot
-///         MAKE work happen, the scheduled job can often just be relied upon to periodically check a status.
-///         The build steps do this for registering architectures, they just wait until all known architectures
-///         are registered.
-pub async fn perform(
-    state: &AntZookeeperState,
-    event: &DeploymentEvent,
+pub(crate) async fn host_artifact_replicated(
+    state: AntZookeeperState,
+    event: DeploymentEvent,
 ) -> Result<JobCompletion<()>, anyhow::Error> {
-    type E = Event;
-
     match event {
         DeploymentEvent(
             revision,
-            E::HostArtifactReplicated {
+            Event::HostArtifactReplicated {
                 host_group_id,
                 host,
             },
         ) => {
             info!("Beginning replication of version {revision} to host {host}...");
-
             let host_group = state
                 .db
                 .get_host_group_by_id(&host_group_id)
                 .await?
                 .unwrap();
 
-            replicate_artifact_step(state, &revision, &host_group, &host).await?;
+            replicate_artifact_step(&state, &revision, &host_group, &host).await?;
 
             Ok(JobCompletion::Finished(()))
         }
 
+        e => panic!("wrong event: {e}"),
+    }
+}
+
+pub(crate) async fn host_artifact_deployed(
+    state: AntZookeeperState,
+    event: DeploymentEvent,
+) -> Result<JobCompletion<()>, anyhow::Error> {
+    match event {
         DeploymentEvent(
             revision,
-            E::HostArtifactDeployed {
+            Event::HostArtifactDeployed {
                 host_group_id,
                 host: host_id,
             },
@@ -77,16 +73,24 @@ pub async fn perform(
 
             let (_, version, _) = state
                 .db
-                .get_artifact_by_revision(revision, &host_group.project, Some(&host.1))
+                .get_artifact_by_revision(&revision, &host_group.project, Some(&host.1))
                 .await?
                 .unwrap();
 
-            deploy_artifact(state, &host_group.project, &version, &host_id).await?;
+            deploy_artifact(&state, &host_group.project, &version, &host_id).await?;
 
             Ok(JobCompletion::Finished(()))
         }
+        e => panic!("wrong event: {e}"),
+    }
+}
 
-        DeploymentEvent(revision, E::ArtifactRegistered { arch, .. }) => {
+pub(crate) async fn artifact_registered(
+    state: AntZookeeperState,
+    event: DeploymentEvent,
+) -> Result<JobCompletion<()>, anyhow::Error> {
+    match event {
+        DeploymentEvent(revision, Event::ArtifactRegistered { arch, .. }) => {
             let missing = state
                 .db
                 .missing_architectures_for_revision(&revision)
@@ -100,11 +104,19 @@ pub async fn perform(
                 return Ok(JobCompletion::Finished(()));
             }
         }
+        e => panic!("wrong event: {e}"),
+    }
+}
 
-        DeploymentEvent(revision, E::StageFinished { stage_id }) => {
+pub(crate) async fn stage_finished(
+    state: AntZookeeperState,
+    event: DeploymentEvent,
+) -> Result<JobCompletion<()>, anyhow::Error> {
+    match event {
+        DeploymentEvent(revision, Event::StageFinished { stage_id }) => {
             let stage = state
                 .db
-                .get_deployment_pipeline_stage(stage_id)
+                .get_deployment_pipeline_stage(&stage_id)
                 .await?
                 .unwrap();
 
@@ -127,11 +139,31 @@ pub async fn perform(
                 _ => return Ok(JobCompletion::Finished(())),
             }
         }
-
-        // If we didn't understand the event, then there was likely nothing to do for it.
-        e => {
-            info!("Perform default job handling, complete immediately: {e:?}");
-            Ok(JobCompletion::Finished(()))
-        }
+        e => panic!("wrong event: {e}"),
     }
 }
+
+// / Runs inside the worker thread, actually performs the work of a task. This could be:
+// /   1. Running the actual work, e.g. taking an artifact and repackaging it for a host, replicating it to a
+// /         host, etc.
+// /   2. Completing instantly. Most jobs like "stage-finished" have no real work attached for now.
+// /         But in the future, attaching "time blockers" where stages only start from 9am - 5pm would be
+// /         very easy, so they are good hooks.
+// /   3. Checking some external database or state and returning its status. Since the pipeline often cannot
+// /         MAKE work happen, the scheduled job can often just be relied upon to periodically check a status.
+// /         The build steps do this for registering architectures, they just wait until all known architectures
+// /         are registered.
+// pub async fn perform(
+//     state: &AntZookeeperState,
+//     event: &DeploymentEvent,
+// ) -> Result<JobCompletion<()>, anyhow::Error> {
+//     type E = Event;
+
+//     match event {
+//         // If we didn't understand the event, then there was likely nothing to do for it.
+//         e => {
+//             info!("Perform default job handling, complete immediately: {e:?}");
+//             Ok(JobCompletion::Finished(()))
+//         }
+//     }
+// }

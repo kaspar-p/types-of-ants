@@ -6,10 +6,14 @@ use reqwest::{multipart::Form, Client};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::routes::pipeline::{
-    AddHostToHostGroupRequest, AddHostToHostGroupResponse, CreateHostGroupRequest,
-    CreateHostGroupResponse, GetHostGroupRequest, GetHostGroupResponse, GetPipelineRequest,
-    GetPipelineResponse, PutPipelineRequest, PutPipelineResponse, RemoveHostFromHostGroupRequest,
+use crate::routes::{
+    pipeline::{
+        AddHostToHostGroupRequest, AddHostToHostGroupResponse, CreateHostGroupRequest,
+        CreateHostGroupResponse, GetHostGroupRequest, GetHostGroupResponse, GetPipelineRequest,
+        GetPipelineResponse, PutPipelineRequest, PutPipelineResponse,
+        RemoveHostFromHostGroupRequest,
+    },
+    service::{UpsertRevisionRequest, UpsertRevisionResponse},
 };
 
 pub struct AntZookeeperClient {
@@ -123,8 +127,16 @@ impl AntZookeeperClient {
         self.send(Method::POST, "/pipeline/pipeline", req).await
     }
 
+    pub async fn upsert_revision(
+        &self,
+        req: UpsertRevisionRequest,
+    ) -> Result<UpsertRevisionResponse, anyhow::Error> {
+        self.send(Method::POST, "/service/revision", req).await
+    }
+
     pub async fn register_artifact(
         &self,
+        revision: &str,
         project: &str,
         arch: &HostArchitecture,
         version: &str,
@@ -137,6 +149,7 @@ impl AntZookeeperClient {
         let res = self
             .client
             .request(Method::POST, self.endpoint(path))
+            .header("x-ant-revision", revision)
             .header("x-ant-project", project)
             .header("x-ant-architecture", arch.as_str())
             .header("x-ant-version", version)

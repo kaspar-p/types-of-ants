@@ -51,8 +51,8 @@ pub fn set_global_logs(project: &str) -> () {
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
-        .with_file(true)
-        .with_line_number(true)
+        .with_file(false)
+        .with_line_number(false)
         .with_env_filter(
             EnvFilter::try_from_env("RUST_LOG")
                 .unwrap()
@@ -77,10 +77,29 @@ pub fn set_global_logs(project: &str) -> () {
     debug!("Logs initialized...");
 }
 
+#[derive(Clone)]
+pub struct SkipOnRequest;
+
+impl<B> tower_http::trace::OnRequest<B> for SkipOnRequest {
+    fn on_request(&mut self, _: &http::Request<B>, _: &tracing::Span) {}
+}
+
+pub fn http_log_layer() -> tower_http::trace::TraceLayer<
+    tower_http::classify::SharedClassifier<tower_http::classify::ServerErrorsAsFailures>,
+    tower_http::trace::DefaultMakeSpan,
+    SkipOnRequest,
+> {
+    tower_http::trace::TraceLayer::new_for_http()
+        .make_span_with(tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO))
+        .on_request(SkipOnRequest)
+        .on_response(tower_http::trace::DefaultOnResponse::new().level(tracing::Level::INFO))
+}
+
 async fn buffer_and_print<B>(
     direction: &str,
     body: B,
     redact: bool,
+    ignore: bool,
 ) -> Result<Bytes, (StatusCode, String)>
 where
     B: axum::body::HttpBody<Data = Bytes>,
@@ -96,14 +115,10 @@ where
         }
     };
 
-    if bytes.len() > 1000 {
-        tracing::debug!("{} body = {{large}}", direction)
-    } else if let Ok(body) = std::str::from_utf8(&bytes) {
-        if redact {
-            tracing::debug!("{} body = {{redacted}}", direction)
-        } else {
+    if !ignore && !redact && bytes.len() > 0 && bytes.len() < 1024 {
+        if let Ok(body) = std::str::from_utf8(&bytes) {
             tracing::debug!("{} body = {:?}", direction, body)
-        };
+        }
     }
 
     Ok(bytes)
@@ -120,13 +135,15 @@ pub async fn middleware_print_request_response(
         || req.uri().path().contains("/login")
         || req.uri().path().contains("/verification-attempt");
 
+    let ignore = req.uri().path().contains("/deployment/iteration");
+
     let (parts, body) = req.into_parts();
-    let bytes = buffer_and_print("request", body, redact).await?;
+    let bytes = buffer_and_print("request", body, redact, ignore).await?;
     let request = Request::from_parts(parts, Body::from(bytes));
     let res = next.run(request).await;
 
     let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body, redact).await?;
+    let bytes = buffer_and_print("response", body, redact, ignore).await?;
     let response = Response::from_parts(parts, Body::from(bytes));
 
     Ok(response)
