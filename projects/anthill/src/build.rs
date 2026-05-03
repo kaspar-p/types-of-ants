@@ -193,6 +193,10 @@ async fn build_artifact<'a>(
     {
         let exit = tokio::process::Command::new("make")
             .args(["-C", project_src.to_str().unwrap()])
+            .args([
+                "-e",
+                &format!("BUILD_OUTPUT_DIR=build/release/{}", arch.as_str()),
+            ])
             .args(["-e", &format!("RUST_TARGET={}", arch.rust_target())])
             .args(["-e", &format!("PROMETHEUS_OS={}", arch.prometheus_os())])
             .args(["-e", &format!("PROMETHEUS_ARCH={}", arch.prometheus_arch())])

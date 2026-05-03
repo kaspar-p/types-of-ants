@@ -10,29 +10,44 @@ ifeq ($(PROMETHEUS_ARCH),)
     $(error PROMETHEUS_ARCH is not set. Please define it.)
 endif
 
+ifeq ($(BUILD_OUTPUT_DIR),)
+    $(error PROMETHEUS_ARCH is not set. Please define it.)
+endif
+
+TARDIR=prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)
+TARFILE=$(TARDIR).tar.gz
+
 -include ../../Makefile.common
 
 all: release
 
-release: build/release/prometheus
+release: $(BUILD_OUTPUT_DIR)/prometheus
 	@echo "built" >> /dev/stderr
 
 clean:
 	rm -rf build
 
-build/.tmp:
-	mkdir -p build/.tmp
+$(BUILD_OUTPUT_DIR):
+	@mkdir -p $@
 
-build/.tmp/prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz: build/.tmp
+build/.cache/:
+	@mkdir -p $@
+
+build/.packaging/:
+	@mkdir -p $@
+
+build/.packaging/$(TARDIR)/: build/.cache/$(TARFILE) | build/.packaging/
+	@tar -xvz -f build/.cache/$(TARFILE) -C build/.packaging/
+
+build/.cache/$(TARFILE): | build/.cache
 # For example: https://github.com/prometheus/prometheus/releases/download/v3.11.2/prometheus-3.11.2.darwin-arm64.tar.gz
-	@cd build/.tmp && \
-	wget https://github.com/prometheus/prometheus/releases/download/v$(PROMETHEUS_VERSION)/prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz \
-		-o prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz
+	@cd build/.cache && \
+	wget -N https://github.com/prometheus/prometheus/releases/download/v$(PROMETHEUS_VERSION)/$(TARFILE)
 
-build/%/prometheus: build/.tmp build/.tmp/prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz
-	@cd build/.tmp && tar -xvz -f prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz.1
-	@mkdir -p build/release
-	@cp build/.tmp/prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)/prometheus build/release/prometheus
-	@cp prometheus.yml build/release/prometheus.yml
+$(BUILD_OUTPUT_DIR)/prometheus: $(BUILD_OUTPUT_DIR)/prometheus.yml | $(BUILD_OUTPUT_DIR) build/.packaging/$(TARDIR)
+	@cp build/.packaging/$(TARDIR)/prometheus $(BUILD_OUTPUT_DIR)/prometheus
 
-.PHONY: all clean
+$(BUILD_OUTPUT_DIR)/prometheus.yml: prometheus.yml | $(BUILD_OUTPUT_DIR)
+	@cp prometheus.yml $(BUILD_OUTPUT_DIR)/prometheus.yml
+
+.PHONY: all clean release
