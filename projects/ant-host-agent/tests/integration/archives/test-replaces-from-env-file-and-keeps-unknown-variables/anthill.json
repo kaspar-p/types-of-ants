@@ -1,0 +1,4 @@
+{
+  "project": "ant-host-agent",
+  "build": "makefile"
+}

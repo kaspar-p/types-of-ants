@@ -1,0 +1,13 @@
+[Unit]
+Description=The typesofants host agent!
+
+[Service]
+Type=simple
+EnvironmentFile={{INSTALL_DIR}}/.env
+Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
+ExecStart={{INSTALL_DIR}}/ant-host-agent --fake-data-directory {{PERSIST_DIR}}/fs --env {{TYPESOFANTS_ENV}} --fake-serve-at-port {{FAKE_ANT_HOST_AGENT_PORT}}
+WorkingDirectory={{INSTALL_DIR}}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

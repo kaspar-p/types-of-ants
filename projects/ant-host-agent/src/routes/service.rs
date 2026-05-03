@@ -4,6 +4,7 @@ use ant_library::{
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
+use handlebars::Handlebars;
 use humansize::DECIMAL;
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use tempfile::TempDir;
@@ -210,24 +211,44 @@ async fn install_service(
         dst
     };
 
-    let template_variables = mustache::MapBuilder::new()
-        .insert_str(
-            "INSTALL_DIR",
-            dst.to_str().expect("destination was not string"),
-        )
-        .build();
-
     let unit_file_path = dst.join(unit_name(&req.project));
     if std::fs::exists(&unit_file_path)? {
-        info!("Rendering systemd template: {}", unit_file_path.display());
-        let unit_file_template =
-            mustache::compile_path(&unit_file_path).context("mustache compilation")?;
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(true);
 
-        info!("Rewriting unit file with data: {:?}", template_variables);
-        unit_file_template.render_data(
-            &mut std::fs::File::create(&unit_file_path)?,
-            &template_variables,
-        )?;
+        handlebars
+            .register_template_file("systemd", &unit_file_path)
+            .context("handlebars compilation")?;
+
+        let mut variables = ant_library::env::env_vars_to_map(&dst.join(".env"))?;
+        variables.insert(
+            "INSTALL_DIR".to_string(),
+            dst.to_str()
+                .expect("destination was not string")
+                .to_string(),
+        );
+
+        info!("Rendering systemd template: {}", unit_file_path.display());
+        let content = handlebars
+            .render("systemd", &variables)
+            .map_err(|e| match e.reason() {
+                handlebars::RenderErrorReason::MissingVariable(Some(var)) => {
+                    return AntHostAgentError::validation_msg(&format!(
+                        "Unknown template variable replacement attempt of [{var}] in file: {}",
+                        unit_name(&req.project)
+                    ));
+                }
+                r => {
+                    error!("Failed to render template: {r}");
+                    return AntHostAgentError::validation_msg(&format!(
+                        "Failed to replace template: {}",
+                        unit_name(&req.project)
+                    ));
+                }
+            })?;
+
+        info!("Rewriting unit file with data...");
+        std::fs::write(unit_file_path, content)?;
     }
 
     let docker_img_path = dst.join("docker-image.tar");

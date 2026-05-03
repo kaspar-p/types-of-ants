@@ -33,5 +33,6 @@ build/%/prometheus: build/.tmp build/.tmp/prometheus-$(PROMETHEUS_VERSION).$(PRO
 	@cd build/.tmp && tar -xvz -f prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH).tar.gz.1
 	@mkdir -p build/release
 	@cp build/.tmp/prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)/prometheus build/release/prometheus
+	@cp prometheus.yml build/release/prometheus.yml
 
 .PHONY: all clean

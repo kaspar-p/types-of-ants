@@ -34,7 +34,11 @@ async fn inject_secrets(
     let manifest = AnthillManifest::from_file(&dest.join("anthill.json"))?;
 
     let project_secrets_dir = dest.join("secrets");
-    create_dir_all(&project_secrets_dir).await?;
+
+    // Only make secrets directory if they have any
+    if !manifest.secrets.as_deref().unwrap_or_default().is_empty() {
+        create_dir_all(&project_secrets_dir).await?;
+    }
 
     for secret in manifest.secrets.unwrap_or_default() {
         let src_file = secret_file_path(&state.root_dir, environment, &secret);
@@ -50,11 +54,6 @@ async fn inject_secrets(
     Ok(())
 }
 
-fn escape_value(val: &str) -> String {
-    let val = val.replace("\"", "\\\"");
-    format!("\"{}\"", val)
-}
-
 fn source_env_variables(
     state: &AntZookeeperState,
     project: &str,
@@ -68,34 +67,22 @@ fn source_env_variables(
 
     let mut variables = HashMap::<String, String>::new();
     for path in source_files {
-        let entries = match dotenvy::from_path_iter(&path) {
-            Err(dotenvy::Error::Io(io_err))
-                if matches!(io_err.kind(), std::io::ErrorKind::NotFound) =>
-            {
-                Ok(vec![])
-            }
-
-            Err(e) => Err(e).context(format!("reading env: {}", path.display())),
-            Ok(f) => Ok(f
-                .into_iter()
-                .filter_map(|e| match e {
-                    Err(_) => None,
-                    Ok(t) => Some(t),
-                })
-                .collect::<Vec<(String, String)>>()),
-        }?;
-
-        for (k, v) in entries {
-            variables.insert(k, escape_value(&v));
-        }
+        let v = ant_library::env::env_vars_to_map(&path)?;
+        variables.extend(v.into_iter());
     }
 
     variables.insert(
         "PERSIST_DIR".to_string(),
-        escape_value(&format!("/home/ant/persist/{project}")),
+        ant_library::env::escape_env_variable(&format!("/home/ant/persist/{project}")),
     );
-    variables.insert("SECRETS_DIR".to_string(), escape_value("./secrets"));
-    variables.insert("VERSION".to_string(), escape_value(version));
+    variables.insert(
+        "SECRETS_DIR".to_string(),
+        ant_library::env::escape_env_variable("./secrets"),
+    );
+    variables.insert(
+        "VERSION".to_string(),
+        ant_library::env::escape_env_variable(version),
+    );
 
     Ok(variables)
 }
