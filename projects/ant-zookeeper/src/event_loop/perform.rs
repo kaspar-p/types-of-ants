@@ -73,26 +73,23 @@ pub async fn perform(
                 .await?
                 .unwrap();
 
-            let version = state.db.get_revision(&revision).await?.version;
+            let host = state.db.get_host(&host_id).await?.unwrap();
+
+            let (_, version, _) = state
+                .db
+                .get_artifact_by_revision(revision, &host_group.project, Some(&host.1))
+                .await?
+                .unwrap();
 
             deploy_artifact(state, &host_group.project, &version, &host_id).await?;
 
             Ok(JobCompletion::Finished(()))
         }
 
-        DeploymentEvent(revision, E::ArtifactRegistered { stage_id, arch }) => {
-            let stage = state
-                .db
-                .get_deployment_pipeline_stage(stage_id)
-                .await?
-                .unwrap();
-
-            // The project that this build stage (we assume this event was emitted by a build stage) is responsible for building.
-            let building_project_id = stage.3.unwrap();
-
+        DeploymentEvent(revision, E::ArtifactRegistered { arch, .. }) => {
             let missing = state
                 .db
-                .missing_artifacts_for_revision_id(&building_project_id, &revision)
+                .missing_architectures_for_revision(&revision)
                 .await?;
 
             if missing.contains(&arch) {
@@ -101,6 +98,33 @@ pub async fn perform(
             } else {
                 info!("Architecture {arch:?} has been registered on {revision}.");
                 return Ok(JobCompletion::Finished(()));
+            }
+        }
+
+        DeploymentEvent(revision, E::StageFinished { stage_id }) => {
+            let stage = state
+                .db
+                .get_deployment_pipeline_stage(stage_id)
+                .await?
+                .unwrap();
+
+            match stage.2.as_str() {
+                // Build stages aren't done even if their underlying artifact-registrations are done
+                // because there may be version mismatches. So we are Pending until not only we have
+                // all the host architectures we need (x86, ...), but also that each of those are the same version.
+                //
+                // All of that criteria is the "activated" state of the revision, so we just check that.
+                "build" => {
+                    let revision = state.db.get_revision(&revision).await?.unwrap();
+                    if revision.activated_at.is_some() {
+                        return Ok(JobCompletion::Finished(()));
+                    } else {
+                        return Ok(JobCompletion::Pending);
+                    }
+                }
+
+                // Deployment stages are done immediately, nothing to do.
+                _ => return Ok(JobCompletion::Finished(())),
             }
         }
 

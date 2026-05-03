@@ -1,0 +1,142 @@
+services:
+  ant-data-farm:
+    image: ant-data-farm:{{VERSION}}
+    container_name: ant-data-farm
+    build:
+      context: ./projects/ant-data-farm
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "{{ANT_DATA_FARM_PORT}}:5432" # Map a types-of-ants port 7000 to the postgres default port 5432
+    environment:
+      VERSION: "{{VERSION}}"
+      POSTGRES_DB_FILE: /run/secrets/ant_data_farm_db
+      POSTGRES_USER_FILE: /run/secrets/ant_data_farm_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_data_farm_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - "{{PERSIST_DIR}}/database-files/:/var/lib/postgresql/data"
+    secrets:
+      - ant_data_farm_db
+      - ant_data_farm_user
+      - ant_data_farm_password
+
+  ant-backing-it-up-db:
+    image: ant-backing-it-up-db:{{VERSION}}
+    container_name: ant-backing-it-up-db
+    build:
+      context: ./projects/ant-backing-it-up-db
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "{{ANT_BACKING_IT_UP_DB_PORT}}:5432"
+    environment:
+      VERSION: "{{VERSION}}"
+      POSTGRES_DB_FILE: /run/secrets/ant_backing_it_up_db_db
+      POSTGRES_USER_FILE: /run/secrets/ant_backing_it_up_db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_backing_it_up_db_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - "{{PERSIST_DIR}}/database-files/:/var/lib/postgresql/data"
+    secrets:
+      - ant_backing_it_up_db_db
+      - ant_backing_it_up_db_user
+      - ant_backing_it_up_db_password
+
+  ant-zookeeper-db:
+    image: ant-zookeeper-db:{{VERSION}}
+    container_name: ant-zookeeper-db
+    build:
+      context: ./projects/ant-zookeeper-db
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "{{ANT_ZOOKEEPER_DB_PORT}}:5432"
+    environment:
+      VERSION: "{{VERSION}}"
+      POSTGRES_DB_FILE: /run/secrets/ant_zookeeper_db_db
+      POSTGRES_USER_FILE: /run/secrets/ant_zookeeper_db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_zookeeper_db_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - "{{PERSIST_DIR}}/database-files/:/var/lib/postgresql/data"
+    secrets:
+      - ant_zookeeper_db_db
+      - ant_zookeeper_db_user
+      - ant_zookeeper_db_password
+
+  ant-gateway:
+    image: ant-gateway:{{VERSION}}
+    container_name: ant-gateway
+    build:
+      context: ./projects/ant-gateway
+      dockerfile: Dockerfile
+      tags:
+        - ant-gateway:latest
+        - ant-gateway:{{VERSION}}
+    restart: always
+    environment:
+      VERSION: "{{VERSION}}"
+      ANT_GATEWAY_FQDN: "{{ANT_GATEWAY_FQDN}}"
+      ANT_LOOKING_PRETTY_HOST: "{{ANT_LOOKING_PRETTY_HOST}}"
+      ANT_LOOKING_PRETTY_PORT: "{{ANT_LOOKING_PRETTY_PORT}}"
+      ANT_ON_THE_WEB_HOST: "{{ANT_ON_THE_WEB_HOST}}"
+      ANT_ON_THE_WEB_PORT: "{{ANT_ON_THE_WEB_PORT}}"
+    ports:
+      - "80:80"
+      - "443:443"
+    secrets:
+      - tls_cert
+      - tls_key
+
+  ant-naming-domains:
+    image: ant-naming-domains:{{VERSION}}
+    platform: linux/arm64
+    container_name: ant-naming-domains
+    build:
+      context: ./projects/ant-naming-domains
+      dockerfile: Dockerfile
+    environment:
+      VERSION: "{{VERSION}}"
+      ANT_NAMING_DOMAINS_FQDN: "{{ANT_NAMING_DOMAINS_FQDN}}"
+      PUID: 1001
+      PGID: 1001
+      TZ: Etc/UTC
+      FILE__CLOUDFLARE_API_TOKEN: /run/secrets/cloudflare_api_token
+    volumes:
+      - ./config:/config
+    restart: always
+    secrets:
+      - cloudflare_api_token
+
+secrets:
+  ant_fs_users.secret:
+    file: "{{SECRETS_DIR}}/ant_fs_users.secret"
+
+  ant_zookeeper_db_db:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_db.secret"
+  ant_zookeeper_db_user:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_user.secret"
+  ant_zookeeper_db_password:
+    file: "{{SECRETS_DIR}}/ant_zookeeper_db_password.secret"
+
+  ant_backing_it_up_db_db:
+    file: "{{SECRETS_DIR}}/ant_backing_it_up_db_db.secret"
+  ant_backing_it_up_db_user:
+    file: "{{SECRETS_DIR}}/ant_backing_it_up_db_user.secret"
+  ant_backing_it_up_db_password:
+    file: "{{SECRETS_DIR}}/ant_backing_it_up_db_password.secret"
+
+  ant_data_farm_db:
+    file: "{{SECRETS_DIR}}/ant_data_farm_db.secret"
+  ant_data_farm_user:
+    file: "{{SECRETS_DIR}}/ant_data_farm_user.secret"
+  ant_data_farm_password:
+    file: "{{SECRETS_DIR}}/ant_data_farm_password.secret"
+
+  tls_cert:
+    file: "{{SECRETS_DIR}}/tls_cert.secret"
+  tls_key:
+    file: "{{SECRETS_DIR}}/tls_key.secret"
+  cloudflare_api_token:
+    file: "{{SECRETS_DIR}}/cloudflare.secret"

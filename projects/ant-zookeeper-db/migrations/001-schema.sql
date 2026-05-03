@@ -48,23 +48,33 @@ create table host (
 create table revision (
   revision_id text primary key default ('rev-' || random_string(10)),
 
-  deployment_version text unique not null, -- The version.
+  project_id text not null, -- The project building into this revision.
+  
+  activated_at timestamp with time zone, -- Present if the revision is ACTIVATED (all required artifacts registered)
 
   revision_seq serial not null, -- The sequence number, in order. Logical clock to order revisions.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
-  deleted_at timestamp with time zone
+  deleted_at timestamp with time zone,
+
+  foreign key (project_id) references project(project_id)
 );
 
 create table artifact (
   artifact_id text primary key default ('a-' || random_string(10)),
 
-  project_id text not null, -- The project that was built into this revision.
   revision_id text not null, -- The revision of this project.
+  project_id text not null, -- The project that was built into this revision.
+  -- The version associated with this build of the project.
+  -- This is different from revision_id, because revision_id is a single identifier ACROSS build client
+  -- invocations, whereas build_version is unique to each build client run. This is done so that
+  -- the client can't have 
   architecture_id text, -- The architecture this project was built for. If NULL, is platform-agnostic.
-
-  unique (project_id, revision_id, architecture_id), -- Cannot have multiple of the same project and version within a revision
+  -- Cannot have multiple of the same project and version within a revision
+  unique (revision_id, project_id, architecture_id),
+  
+  build_version text not null,
 
   local_path text not null, -- The local filesystem path to the artifact, where it was saved.
 

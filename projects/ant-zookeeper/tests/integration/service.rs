@@ -1,14 +1,17 @@
 use std::{
     fs::{create_dir_all, exists, File},
     io::Write,
-    path::PathBuf,
+    path::Path,
 };
 
 use ant_zookeeper::{
     event_loop::transition::Event as E,
-    routes::pipeline::{
-        AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
-        PutPipelineRequest, PutPipelineStage,
+    routes::{
+        pipeline::{
+            AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
+            PutPipelineRequest, PutPipelineStage,
+        },
+        service::{UpsertRevisionRequest, UpsertRevisionResponse},
     },
 };
 use http::StatusCode;
@@ -18,13 +21,13 @@ use tracing_test::traced_test;
 
 use crate::fixture::{self, Fixture};
 
-fn digest(path: &PathBuf) -> String {
+fn digest(path: &Path) -> String {
     sha256::try_digest(path).unwrap()
 }
 
 #[test]
 #[traced_test]
-async fn service_artifact_returns_400_if_no_headers() {
+async fn service_artifact_returns_400_if_bad_revision_header() {
     let fixture = fixture::Fixture::new(function_name!()).await;
 
     {
@@ -32,7 +35,48 @@ async fn service_artifact_returns_400_if_no_headers() {
         let res = fixture
             .client
             .post("/service/artifact")
-            // .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Revision", "not-a-real-rev")
+            .header("X-Ant-Project", "ant-gateway")
+            .header("X-Ant-Version", "v1")
+            .header("X-Ant-Architecture", "aarch64")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+}
+
+#[test]
+#[traced_test]
+async fn service_artifact_returns_400_if_no_headers() {
+    let fixture = fixture::Fixture::new(function_name!()).await;
+
+    // Create revision
+    let revision = {
+        let req = UpsertRevisionRequest {
+            project: "ant-gateway".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    {
+        let req = reqwest::multipart::Form::new();
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            // .header("X-Ant-Revision", &revision)
+            .header("X-Ant-Project", "ant-gateway")
             .header("X-Ant-Version", "v1")
             .header("X-Ant-Architecture", "aarch64")
             .multipart(req)
@@ -47,7 +91,8 @@ async fn service_artifact_returns_400_if_no_headers() {
         let res = fixture
             .client
             .post("/service/artifact")
-            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Revision", &revision)
+            .header("X-Ant-Project", "ant-gateway")
             // .header("X-Ant-Version", "v1")
             .header("X-Ant-Architecture", "aarch64")
             .multipart(req)
@@ -62,7 +107,8 @@ async fn service_artifact_returns_400_if_no_headers() {
         let res = fixture
             .client
             .post("/service/artifact")
-            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Revision", &revision)
+            .header("X-Ant-Project", "ant-gateway")
             .header("X-Ant-Version", "v1")
             // .header("X-Ant-Architecture", "aarch64")
             .multipart(req)
@@ -78,7 +124,8 @@ async fn service_artifact_returns_400_if_no_headers() {
         let res = fixture
             .client
             .post("/service/artifact")
-            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Revision", &revision)
+            .header("X-Ant-Project", "ant-gateway")
             .header("X-Ant-Version", "v1")
             .header("X-Ant-Architecture", "something-else")
             .multipart(req)
@@ -94,14 +141,10 @@ async fn service_artifact_returns_400_if_no_headers() {
 async fn service_artifact_returns_400_if_asking_for_unknown_secrets() {
     let fixture = fixture::Fixture::new(function_name!()).await;
 
-    let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("tests")
-        .join("integration")
-        .join("test-archives")
-        .join("ant-gateway-v1.tar.gz");
+    let archive = fixture.make_tarfile_fixture("ant-gateway-v1");
 
     let req = reqwest::multipart::Form::new()
-        .file("file", archive)
+        .file("file", archive.path())
         .await
         .unwrap();
 
@@ -139,21 +182,36 @@ async fn service_artifact_returns_200_happy_path() {
         }
     }
 
-    let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("tests")
-        .join("integration")
-        .join("test-archives")
-        .join("ant-gateway-v1.tar.gz");
-    let input_digest = digest(&archive);
+    // Create revision
+    let revision = {
+        let req = UpsertRevisionRequest {
+            project: "ant-gateway".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    let archive = fixture.make_tarfile_fixture("ant-gateway-v1");
+    let input_digest = digest(&archive.path());
 
     let req = reqwest::multipart::Form::new()
-        .file("file", archive)
+        .file("file", archive.path())
         .await
         .unwrap();
 
     let res = fixture
         .client
         .post("/service/artifact")
+        .header("X-Ant-Revision", &revision)
         .header("X-Ant-Project", "ant-gateway")
         .header("X-Ant-Version", "v1")
         .header("X-Ant-Architecture", "aarch64")
@@ -259,22 +317,37 @@ async fn service_artifact_includes_env_file() {
         }
 
         // REGISTER
-        let archive = {
-            let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-                .join("tests")
-                .join("integration")
-                .join("test-archives")
-                .join("ant-host-agent-and-proj1-v1.tar.gz");
-            let input_digest = digest(&archive);
+        let (archive, revision) = {
+            // Create revision
+            let revision = {
+                let req = UpsertRevisionRequest {
+                    project: "ant-host-agent".to_string(),
+                };
+                let res = fixture
+                    .client
+                    .post("/service/revision")
+                    .json(&req)
+                    .send()
+                    .await;
+
+                assert_eq!(res.status(), StatusCode::OK);
+                let body: UpsertRevisionResponse = res.json().await;
+
+                body.revision
+            };
+
+            let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+            let input_digest = digest(&archive.path());
 
             let req = reqwest::multipart::Form::new()
-                .file("file", &archive)
+                .file("file", &archive.path())
                 .await
                 .unwrap();
 
             let res = fixture
                 .client
                 .post("/service/artifact")
+                .header("X-Ant-Revision", &revision)
                 .header("X-Ant-Project", "ant-host-agent")
                 .header("X-Ant-Version", "v1")
                 .header("X-Ant-Architecture", "aarch64")
@@ -305,7 +378,7 @@ async fn service_artifact_includes_env_file() {
                 assert_eq!(res.status(), StatusCode::OK);
             }
 
-            archive
+            (archive, revision)
         };
 
         // register other arches
@@ -313,12 +386,13 @@ async fn service_artifact_includes_env_file() {
             let res = fixture
                 .client
                 .post("/service/artifact")
+                .header("X-Ant-Revision", &revision)
                 .header("X-Ant-Project", "ant-host-agent")
                 .header("X-Ant-Version", "v1")
                 .header("X-Ant-Architecture", "x86")
                 .multipart(
                     reqwest::multipart::Form::new()
-                        .file("file", &archive)
+                        .file("file", &archive.path())
                         .await
                         .unwrap(),
                 )
@@ -337,12 +411,13 @@ async fn service_artifact_includes_env_file() {
             let res = fixture
                 .client
                 .post("/service/artifact")
+                .header("X-Ant-Revision", &revision)
                 .header("X-Ant-Project", "ant-host-agent")
                 .header("X-Ant-Version", "v1")
                 .header("X-Ant-Architecture", "raspbian")
                 .multipart(
                     reqwest::multipart::Form::new()
-                        .file("file", &archive)
+                        .file("file", &archive.path())
                         .await
                         .unwrap(),
                 )
@@ -487,30 +562,48 @@ async fn service_artifact_docker_compose_includes_variables() {
         }
 
         // REGISTER
-        let archive = {
-            let archive = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
-                .join("tests")
-                .join("integration")
-                .join("test-archives")
-                .join("ant-gateway-v1.tar.gz");
-            let input_digest = digest(&archive);
+        let (archive, revision) = {
+            // create revision
+            let revision = {
+                let req = UpsertRevisionRequest {
+                    project: "ant-gateway".to_string(),
+                };
+                let res = fixture
+                    .client
+                    .post("/service/revision")
+                    .json(&req)
+                    .send()
+                    .await;
 
-            let req = reqwest::multipart::Form::new()
-                .file("file", &archive)
-                .await
-                .unwrap();
+                assert_eq!(res.status(), StatusCode::OK);
+                let body: UpsertRevisionResponse = res.json().await;
 
-            let res = fixture
-                .client
-                .post("/service/artifact")
-                .header("X-Ant-Project", "ant-gateway")
-                .header("X-Ant-Version", "v1")
-                .header("X-Ant-Architecture", "aarch64")
-                .multipart(req)
-                .send()
-                .await;
+                body.revision
+            };
 
-            assert_eq!(res.status(), StatusCode::OK);
+            let archive = fixture.make_tarfile_fixture("ant-gateway-v1");
+            let input_digest = digest(archive.path());
+
+            // register artifact
+            {
+                let req = reqwest::multipart::Form::new()
+                    .file("file", archive.path())
+                    .await
+                    .unwrap();
+
+                let res = fixture
+                    .client
+                    .post("/service/artifact")
+                    .header("X-Ant-Revision", &revision)
+                    .header("X-Ant-Project", "ant-gateway")
+                    .header("X-Ant-Architecture", "aarch64")
+                    .header("X-Ant-Version", "v1")
+                    .multipart(req)
+                    .send()
+                    .await;
+
+                assert_eq!(res.status(), StatusCode::OK);
+            }
 
             let output_path = fixture
                 .state
@@ -533,7 +626,7 @@ async fn service_artifact_docker_compose_includes_variables() {
                 assert_eq!(res.status(), StatusCode::OK);
             }
 
-            archive
+            (archive, revision)
         };
 
         // register other arches
@@ -541,12 +634,13 @@ async fn service_artifact_docker_compose_includes_variables() {
             let res = fixture
                 .client
                 .post("/service/artifact")
+                .header("X-Ant-Revision", &revision)
                 .header("X-Ant-Project", "ant-gateway")
                 .header("X-Ant-Version", "v1")
                 .header("X-Ant-Architecture", "x86")
                 .multipart(
                     reqwest::multipart::Form::new()
-                        .file("file", &archive)
+                        .file("file", archive.path())
                         .await
                         .unwrap(),
                 )
@@ -565,12 +659,13 @@ async fn service_artifact_docker_compose_includes_variables() {
             let res = fixture
                 .client
                 .post("/service/artifact")
+                .header("X-Ant-Revision", &revision)
                 .header("X-Ant-Project", "ant-gateway")
                 .header("X-Ant-Version", "v1")
                 .header("X-Ant-Architecture", "raspbian")
                 .multipart(
                     reqwest::multipart::Form::new()
-                        .file("file", &archive)
+                        .file("file", archive.path())
                         .await
                         .unwrap(),
                 )
@@ -640,4 +735,371 @@ async fn service_artifact_docker_compose_includes_variables() {
         assert!(env_file_content.contains("ANT_GATEWAY_FQDN=\"test.typesofants.org\""));
         assert!(env_file_content.contains("VERSION=\"v1\""));
     }
+}
+
+#[test]
+#[traced_test]
+async fn service_revision_returns_200_with_same_if_architectures_unfinished() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("jwt.secret"),
+            secret_root.join("prod").join("jwt.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
+
+    // Create revision
+    let revision1 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+
+    // register artifact (aarch64)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "aarch64")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // ask for new revision for same project
+    let revision2 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    assert_eq!(revision1, revision2);
+
+    // register artifact (x86)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "x86")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    let revision3 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    assert_eq!(revision1, revision3);
+
+    // register artifact (armv7)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "armv7")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // but now, all architectures are satisfied and same version, and we move on to next revision
+    let revision4 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    assert_ne!(revision4, revision1);
+}
+
+#[test]
+#[traced_test]
+async fn service_revision_returns_200_with_same_if_version_differs() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    // register secrets
+    {
+        let secret_root = fixture.state.root_dir.join("secrets-db");
+        let paths = vec![
+            secret_root.join("beta").join("jwt.secret"),
+            secret_root.join("prod").join("jwt.secret"),
+        ];
+        for p in paths {
+            create_dir_all(p.parent().unwrap()).unwrap();
+            let mut file = File::create(p).unwrap();
+            file.write_all("secret value".as_bytes()).unwrap();
+        }
+    }
+
+    // Create revision
+    let revision1 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+
+    // register artifact (aarch64 v1)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "aarch64")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // register artifact (aarch64 v2)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "aarch64")
+            .header("X-Ant-Version", "v2")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // register artifact (x86 v1)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "x86")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // register artifact (armv7 v1)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "armv7")
+            .header("X-Ant-Version", "v1")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    let revision2 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    assert_eq!(revision2, revision1);
+
+    // register new artifact (x86 v2)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "x86")
+            .header("X-Ant-Version", "v2")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // register new artifact (armv7 v2)
+    {
+        let req = reqwest::multipart::Form::new()
+            .file("file", archive.path())
+            .await
+            .unwrap();
+
+        let res = fixture
+            .client
+            .post("/service/artifact")
+            .header("X-Ant-Revision", &revision1)
+            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Architecture", "armv7")
+            .header("X-Ant-Version", "v2")
+            .multipart(req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    let revision3 = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
+
+    assert_ne!(revision3, revision2);
+    assert_ne!(revision3, revision1);
 }

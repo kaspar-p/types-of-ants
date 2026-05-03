@@ -1,0 +1,8 @@
+{
+  "project": "ant-gateway",
+  "build": "docker",
+  "secrets": [
+    "tls_cert",
+    "tls_key"
+  ]
+}

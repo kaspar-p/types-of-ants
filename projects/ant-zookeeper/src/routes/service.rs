@@ -4,6 +4,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
+use ant_library::headers::XAntRevisionHeader;
 use ant_library::{
     anthill::AnthillManifest,
     headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
@@ -120,15 +121,35 @@ WantedBy=multi-user.target
 #[debug_handler]
 async fn register_artifact(
     State(state): State<AntZookeeperState>,
+    TypedHeader(revision): TypedHeader<XAntRevisionHeader>,
     TypedHeader(project): TypedHeader<XAntProjectHeader>,
     TypedHeader(arch): TypedHeader<XAntArchitectureHeader>,
     TypedHeader(version): TypedHeader<XAntVersionHeader>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
-    if !state.db.get_project(&project.0).await? {
-        info!("Registering project [{}] for the first time...", project.0);
-        let is_owned = true; // Building our own images means an owned project!
-        state.db.register_project(&project.0, is_owned).await?;
+    // VALIDATIONS
+    {
+        if !state.db.get_project(&project.0).await? {
+            info!("Registering project [{}] for the first time...", project.0);
+            let is_owned = true; // Building our own images means an owned project!
+            state.db.register_project(&project.0, is_owned).await?;
+        }
+
+        let revision = state.db.get_revision(&revision.0).await?;
+        match revision {
+            None => {
+                return Err(AntZookeeperError::ResourceNotFound(
+                    "No such revision.".to_string(),
+                ));
+            }
+            Some(revision) => {
+                if revision.activated_at.is_some() {
+                    return Err(AntZookeeperError::validation_msg(
+                        "Revision has already been activated and is immutable, so cannot be updated.",
+                    ));
+                }
+            }
+        }
     }
 
     let global_tmp_dir = state.root_dir.join("tmp");
@@ -258,93 +279,124 @@ async fn register_artifact(
         std::fs::copy(&temp_file_path, &filepath)?;
     }
 
-    let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;
+    // let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;
 
-    {
-        info!("Scheduling pipelines that build this project to start.");
-        let all_pipelines = state.db.list_deployment_pipelines().await?;
-        let pipelines_building_project = {
-            let mut pipelines_building_project: HashSet<&String> = HashSet::new();
-            for (pipeline_id, _) in &all_pipelines {
-                let build_stages = state
-                    .db
-                    .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
-                    .await?;
-                for stage_id in build_stages {
-                    let stage = state
-                        .db
-                        .get_deployment_pipeline_stage(&stage_id)
-                        .await?
-                        .unwrap();
-                    let pipeline_build_project = stage.3.expect(&format!(
-                        "build stage {stage_id} should have project attached."
-                    ));
+    // {
+    //     info!("Scheduling pipelines that build this project to start.");
+    //     let all_pipelines = state.db.list_deployment_pipelines().await?;
+    //     let pipelines_building_project = {
+    //         let mut pipelines_building_project: HashSet<&String> = HashSet::new();
+    //         for (pipeline_id, _) in &all_pipelines {
+    //             let build_stages = state
+    //                 .db
+    //                 .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
+    //                 .await?;
+    //             for stage_id in build_stages {
+    //                 let stage = state
+    //                     .db
+    //                     .get_deployment_pipeline_stage(&stage_id)
+    //                     .await?
+    //                     .unwrap();
+    //                 let pipeline_build_project = stage.3.expect(&format!(
+    //                     "build stage {stage_id} should have project attached."
+    //                 ));
 
-                    if pipeline_build_project == *project.0 {
-                        pipelines_building_project.insert(pipeline_id);
-                    }
-                }
-            }
-            pipelines_building_project
-        };
+    //                 if pipeline_build_project == *project.0 {
+    //                     pipelines_building_project.insert(pipeline_id);
+    //                 }
+    //             }
+    //         }
+    //         pipelines_building_project
+    //     };
 
-        for pipeline_id in pipelines_building_project {
-            let event = DeploymentEvent(
-                revision_id.clone(),
-                Event::PipelineStarted {
-                    pipeline_id: pipeline_id.clone(),
-                },
-            );
-            if !is_deployment_complete(&state.db, &event).await? {
-                info!("Kick-starting pipeline [{}]...", pipeline_id);
-                state
-                    .db
-                    .create_deployment_job_idempotently(&revision_id, &event.1.to_string())
-                    .await?;
-            } else {
-                info!("Skipping stating pipeline [{pipeline_id}], it's already started...");
-            }
-        }
-    }
+    //     for pipeline_id in pipelines_building_project {
+    //         let event = DeploymentEvent(
+    //             revision_id.clone(),
+    //             Event::PipelineStarted {
+    //                 pipeline_id: pipeline_id.clone(),
+    //             },
+    //         );
+    //         if !is_deployment_complete(&state.db, &event).await? {
+    //             info!("Kick-starting pipeline [{}]...", pipeline_id);
+    //             state
+    //                 .db
+    //                 .create_deployment_job_idempotently(&revision_id, &event.1.to_string())
+    //                 .await?;
+    //         } else {
+    //             info!("Skipping stating pipeline [{pipeline_id}], it's already started...");
+    //         }
+    //     }
+    // }
 
-    info!(
-        "Registering or updating artifact for [new={}] revision [{}]",
-        is_new, revision_id
-    );
+    // Register new artifact
+    info!("Registering or updating artifact...");
     let artifact_id = state
         .db
-        .get_artifact_by_revision(&revision_id, &project.0, arch.0.as_ref())
+        .get_artifact_by_revision(&revision.0, &project.0, arch.0.as_ref())
         .await?;
+    let relative_path = filepath.strip_prefix(&dir).expect(&format!(
+        "[{}] was not parent of [{}]",
+        dir.display(),
+        filepath.display()
+    ));
 
     match artifact_id {
-        Some((artifact_id, _, _)) => {
+        Some((artifact_id, _, previous_relative_path)) => {
+            if previous_relative_path != relative_path {
+                let path = dir.join(previous_relative_path);
+                info!("Deleting old artifact: {}", path.display());
+                tokio::fs::remove_file(&path).await?;
+            }
+
             info!("Updating existing artifact");
-            state.db.update_artifact(&artifact_id).await?;
+            state
+                .db
+                .update_artifact(&artifact_id, &version.0, &relative_path)
+                .await?;
         }
         None => {
             info!("Registering new artifact");
-            let relative = filepath.strip_prefix(&dir).expect(&format!(
-                "[{}] was not parent of [{}]",
-                dir.display(),
-                filepath.display()
-            ));
             state
                 .db
-                .register_artifact(&project.0, &revision_id, arch.0.as_ref(), &relative)
+                .register_artifact(
+                    &revision.0,
+                    &project.0,
+                    arch.0.as_ref(),
+                    &version.0,
+                    &relative_path,
+                )
                 .await?;
         }
     }
 
-    info!("Determining pipeline promotions...");
-    // if all architectures are done for a given (project, version), then we are done with the 'build' stage in a pipeline.
-    let missing_architectures = state
-        .db
-        .missing_artifacts_for_project_version(&project.0, &version.0)
-        .await?;
-    if missing_architectures.is_empty() {
-        info!("All architectures for a project have been built, build stage fulfilled.");
-    } else {
-        info!("Still missing architectures: {missing_architectures:?}");
+    // Determine if the revision (with this new artifact) is now activated/immutable
+    {
+        let artifacts = state.db.list_artifacts_for_revision_id(&revision.0).await?;
+
+        let missing_architectures = state
+            .db
+            .missing_architectures_for_revision(&revision.0)
+            .await?;
+        let all_architectures_present = missing_architectures.is_empty();
+
+        let versions = artifacts
+            .iter()
+            .map(|(_, _, _, version)| version)
+            .collect::<HashSet<_>>();
+        let all_on_same_version = versions.len() == 1;
+
+        let should_revision_activate = all_on_same_version && all_architectures_present;
+        if should_revision_activate {
+            info!("Activating revision: {}", &revision.0);
+            // This signals the pipeline to continue!
+            state.db.activate_revision(&revision.0).await?;
+        } else {
+            info!(
+                "Revision not active: {} versions registered, {} architectures missing",
+                versions.len(),
+                missing_architectures.len()
+            );
+        }
     }
 
     Ok((StatusCode::OK, "Version registered"))
@@ -405,8 +457,76 @@ async fn put_project_environment(
 //     Ok((StatusCode::OK, Json(GetProjectEnvironmentResponse{variables})))
 // }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertRevisionRequest {
+    pub project: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertRevisionResponse {
+    pub revision: String,
+}
+async fn upsert_revision(
+    State(state): State<AntZookeeperState>,
+    Json(req): Json<UpsertRevisionRequest>,
+) -> Result<impl IntoResponse, AntZookeeperError> {
+    if !state.db.get_project(&req.project).await? {
+        return Err(AntZookeeperError::ResourceNotFound(
+            "No such project".to_string(),
+        ));
+    }
+
+    let revision = state.db.get_latest_revision(&req.project).await?;
+
+    let revision_id = match revision {
+        Some((revision_id, None)) => {
+            // If there is an "un-activated" revision (not all architectures built on the same version, etc.), return it.
+            revision_id
+        }
+
+        Some((_, Some(_))) | None => {
+            // If this is the first revision for the project ever, make a new one and return it (trivial case)
+            let revision_id = state.db.create_revision(&req.project).await?;
+            info!("Latest revision activated or non-existent, created new revision: {revision_id}");
+
+            // New revisions are the kick-starter for pipelines that build this project!
+            let pipelines_building_project = state
+                .db
+                .list_deployment_pipelines_building_project(&req.project)
+                .await?;
+            for pipeline_id in pipelines_building_project {
+                let event = DeploymentEvent(
+                    revision_id.clone(),
+                    Event::PipelineStarted {
+                        pipeline_id: pipeline_id.clone(),
+                    },
+                );
+                assert!(!is_deployment_complete(&state.db, &event).await?);
+
+                info!("Kick-starting pipeline [{}]...", pipeline_id);
+                state
+                    .db
+                    .create_deployment_job_idempotently(&revision_id, &event.1.to_string())
+                    .await?;
+            }
+
+            revision_id
+        }
+    };
+
+    return Ok((
+        StatusCode::OK,
+        Json(UpsertRevisionResponse {
+            revision: revision_id,
+        }),
+    ));
+}
+
 pub fn make_routes() -> Router<AntZookeeperState> {
     Router::new()
+        .route_with_tsr("/revision", post(upsert_revision))
         .route_with_tsr("/service", post(register_service))
         .route_with_tsr("/env", post(put_project_environment))
         .route_with_tsr(

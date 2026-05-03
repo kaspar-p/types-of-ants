@@ -14,7 +14,9 @@ use ant_zookeeper::{
 use ant_zookeeper_db::AntZooStorageClient;
 use async_trait::async_trait;
 use chrono::Utc;
+use flate2::{write::GzEncoder, Compression};
 use rsa::rand_core::OsRng;
+use tempfile::NamedTempFile;
 use tokio::{
     fs::{create_dir_all, File},
     io::AsyncWriteExt,
@@ -236,5 +238,31 @@ impl Fixture {
             ant_host_agent_state,
             _guard,
         }
+    }
+
+    /// Create a tarfile from a test directory in the "archives/" directory
+    pub fn make_tarfile_fixture(&self, tar_dir_name: &str) -> NamedTempFile {
+        let dst = NamedTempFile::new().unwrap();
+
+        let enc_dst = GzEncoder::new(&dst, Compression::fast());
+
+        {
+            let mut tarfile = tar::Builder::new(enc_dst);
+
+            tarfile
+                .append_dir_all(
+                    ".",
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("tests")
+                        .join("integration")
+                        .join("test-archives")
+                        .join(tar_dir_name),
+                )
+                .unwrap();
+
+            tarfile.finish().unwrap();
+        }
+
+        dst
     }
 }

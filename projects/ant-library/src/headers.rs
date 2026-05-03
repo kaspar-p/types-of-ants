@@ -66,6 +66,37 @@ impl Header for XAntVersionHeader {
     }
 }
 
+static X_ANT_REVISION_HEADER: HeaderName = http::HeaderName::from_static("x-ant-revision");
+pub struct XAntRevisionHeader(pub String);
+
+impl Header for XAntRevisionHeader {
+    fn name() -> &'static http::HeaderName {
+        &X_ANT_REVISION_HEADER
+    }
+
+    fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i http::HeaderValue>,
+    {
+        let value = values
+            .next()
+            .ok_or_else(axum_extra::headers::Error::invalid)?;
+
+        let value = value
+            .to_str()
+            .map_err(|_| axum_extra::headers::Error::invalid())?
+            .to_string();
+
+        Ok(Self(value))
+    }
+
+    fn encode<E: Extend<http::HeaderValue>>(&self, values: &mut E) {
+        let value = HeaderValue::from_str(&self.0).expect("invalid header value stored");
+        values.extend(std::iter::once(value));
+    }
+}
+
 static X_ANT_ARCHITECTURE_HEADER: HeaderName = http::HeaderName::from_static("x-ant-architecture");
 pub struct XAntArchitectureHeader(pub Option<HostArchitecture>);
 

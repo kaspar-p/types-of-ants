@@ -1,7 +1,6 @@
 use std::{
     fs::{create_dir_all, File},
     io::Write,
-    path::PathBuf,
 };
 
 use ant_library::host_architecture::HostArchitecture;
@@ -13,7 +12,10 @@ use ant_zookeeper::{
             AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
             PutPipelineRequest, PutPipelineStage,
         },
-        service::{ProjectEnvironmentVariable, PutProjectEnvironmentRequest},
+        service::{
+            ProjectEnvironmentVariable, PutProjectEnvironmentRequest, UpsertRevisionRequest,
+            UpsertRevisionResponse,
+        },
     },
 };
 use ant_zookeeper_db::DeploymentJob;
@@ -160,18 +162,31 @@ async fn beta_stage_setup(fixture: &Fixture) {
 async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> String {
     let version = version.unwrap_or("v1");
 
+    let revision = {
+        let req = UpsertRevisionRequest {
+            project: "ant-host-agent".to_string(),
+        };
+        let res = fixture
+            .client
+            .post("/service/revision")
+            .json(&req)
+            .send()
+            .await;
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: UpsertRevisionResponse = res.json().await;
+
+        body.revision
+    };
     // Register artifact for ant-host-agent on arm architecture
     {
-        let archive = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("tests")
-            .join("integration")
-            .join("test-archives")
-            .join("ant-host-agent-and-proj1-v1.tar.gz");
-        let req = Form::new().file("file", archive).await.unwrap();
+        let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+        let req = Form::new().file("file", archive.path()).await.unwrap();
 
         let res = fixture
             .client
             .post("/service/artifact")
+            .header("x-ant-revision", &revision)
             .header("x-ant-project", "ant-host-agent")
             .header("x-ant-architecture", "arm")
             .header("x-ant-version", version)
@@ -251,16 +266,13 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
 
     // Register the x86 artifact
     {
-        let archive = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("tests")
-            .join("integration")
-            .join("test-archives")
-            .join("ant-host-agent-and-proj1-v1.tar.gz");
-        let req = Form::new().file("file", archive).await.unwrap();
+        let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+        let req = Form::new().file("file", archive.path()).await.unwrap();
 
         let res = fixture
             .client
             .post("/service/artifact")
+            .header("x-ant-revision", &revision)
             .header("x-ant-project", "ant-host-agent")
             .header("x-ant-architecture", "x86")
             .header("x-ant-version", version)
@@ -293,16 +305,13 @@ async fn artifact_build_setup(fixture: &Fixture, version: Option<&str>) -> Strin
 
     // Register the (FINAL) Raspian artifact
     {
-        let archive = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("tests")
-            .join("integration")
-            .join("test-archives")
-            .join("ant-host-agent-and-proj1-v1.tar.gz");
-        let req = Form::new().file("file", archive).await.unwrap();
+        let archive = fixture.make_tarfile_fixture("ant-host-agent-and-proj1-v1");
+        let req = Form::new().file("file", archive.path()).await.unwrap();
 
         let res = fixture
             .client
             .post("/service/artifact")
+            .header("x-ant-revision", &revision)
             .header("x-ant-project", "ant-host-agent")
             .header("x-ant-architecture", "raspbian")
             .header("x-ant-version", version)

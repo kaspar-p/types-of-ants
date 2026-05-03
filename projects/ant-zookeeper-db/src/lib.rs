@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -98,58 +99,26 @@ impl AntZooStorageClient {
         Ok(row.is_some())
     }
 
-    /// When building a new project, the project associates itself with some revision, some VERSION.
-    ///
-    /// This is allowed if the revision is still "collecting", and has not progressed beyond the build
-    /// phase of the pipeline, but not allowed if we've started deploying this artifact.
-    ///
-    /// This is the inverse of the Version Set, which forces itself as one-final-thing onto the pipeline
-    /// to be used for its artifacts. Here we need to "collect"/"poll" until we decide to release it further
-    /// into the pipeline, closing that collection phase.
-    ///
-    /// Returns (revision_id, is_new)
-    pub async fn upsert_revision(&self, version: &str) -> Result<(String, bool), anyhow::Error> {
-        let mut con = self.db.get().await?;
-        let tx = con.transaction().await?;
+    /// Returns revision_id
+    pub async fn create_revision(&self, project: &str) -> Result<String, anyhow::Error> {
+        let con = self.db.get().await?;
 
-        let revision_id: Option<String> = tx
-            .query_opt(
+        let revision_id: String = con
+            .query_one(
                 "
-                select revision_id
-                from revision
-                where
-                    deployment_version = $1
-            ",
-                &[&version],
-            )
-            .await
-            .with_context(|| format!("select {}: {}", function_name!(), version))?
-            .map(|r| r.get("revision_id"));
-
-        match revision_id {
-            Some(id) => return Ok((id, false)),
-            None => {
-                let revision_id: String = tx
-                    .query_one(
-                        "
                     insert into revision
-                        (deployment_version)
+                        (project_id)
                     values
                         ($1)
-                    on conflict do nothing
                     returning revision_id
                     ",
-                        &[&version],
-                    )
-                    .await
-                    .with_context(|| format!("insert {}: {}", function_name!(), version))?
-                    .get("revision_id");
+                &[&project],
+            )
+            .await
+            .with_context(|| format!("{}: {}", function_name!(), project))?
+            .get("revision_id");
 
-                tx.commit().await?;
-
-                return Ok((revision_id, true));
-            }
-        }
+        Ok(revision_id)
     }
 
     /// Returns (artifact id, version, local path)
@@ -161,10 +130,10 @@ impl AntZooStorageClient {
     ) -> Result<Option<(String, String, PathBuf)>, anyhow::Error> {
         let con = self.db.get().await?;
 
-        let exists = con
+        let artifact = con
             .query_opt(
                 "
-            select artifact.artifact_id, revision.deployment_version, artifact.local_path
+            select artifact.artifact_id, artifact.build_version, artifact.local_path
             from artifact
                 join revision on artifact.revision_id = revision.revision_id
             where
@@ -181,79 +150,75 @@ impl AntZooStorageClient {
                     function_name!(),
                     revision_id,
                     project,
-                    arch
+                    arch,
                 )
             })?
-            .map(|row| -> Result<(String, String, PathBuf), anyhow::Error> {
+            .map(|row| -> Result<_, anyhow::Error> {
                 Ok((
                     row.get("artifact_id"),
-                    row.get("deployment_version"),
+                    row.get("build_version"),
                     PathBuf::from_str(row.get("local_path"))?,
                 ))
             })
             .transpose()?;
 
-        Ok(exists)
+        Ok(artifact)
     }
 
-    pub async fn missing_artifacts_for_revision_id(
+    /// Returns vec of (artifact_id, project, architecture, version)
+    pub async fn list_artifacts_for_revision_id(
         &self,
-        project: &str,
         revision_id: &str,
-    ) -> Result<Vec<HostArchitecture>, anyhow::Error> {
+    ) -> Result<Vec<(String, String, HostArchitecture, String)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
         let rows = tx
             .query(
                 "
-            select architecture.architecture_id
-            from architecture
-            where architecture.architecture_id not in (
-                select artifact.architecture_id
-                from artifact
-                where
-                    artifact.revision_id = $1 and
-                    artifact.project_id = $2
-            )
+            select artifact_id, project_id, architecture_id, build_version
+            from artifact
+            where
+                artifact.revision_id = $1
             ",
-                &[&revision_id, &project],
+                &[&revision_id],
             )
             .await
-            .with_context(|| format!("{}: {} {}", function_name!(), project, revision_id))?;
+            .with_context(|| format!("{}: {}", function_name!(), revision_id))?;
 
-        let architectures = rows
-            .iter()
-            .map(|row| HostArchitecture::from_str(row.get("architecture_id")))
-            .collect::<Result<Vec<HostArchitecture>, anyhow::Error>>()?;
+        let artifacts = rows
+            .into_iter()
+            .map(|row| -> Result<_, anyhow::Error> {
+                Ok((
+                    row.get("artifact_id"),
+                    row.get("project_id"),
+                    HostArchitecture::from_str(row.get("architecture_id"))?,
+                    row.get("build_version"),
+                ))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(architectures)
+        Ok(artifacts)
     }
 
-    pub async fn missing_artifacts_for_project_version(
+    pub async fn missing_architectures_for_revision(
         &self,
-        project: &str,
-        version: &str,
+        revision_id: &str,
     ) -> Result<Vec<HostArchitecture>, anyhow::Error> {
-        let mut con = self.db.get().await?;
-        let tx = con.transaction().await?;
+        let architectures = self.list_architectures().await?;
+        let artifacts = self.list_artifacts_for_revision_id(&revision_id).await?;
 
-        let revision: String = tx
-            .query_one(
-                "
-            select revision_id
-            from revision
-            where
-                deployment_version = $1",
-                &[&version],
-            )
-            .await
-            .with_context(|| format!("{}: {} {}", function_name!(), project, version))?
-            .get("revision_id");
+        let missing_architectures = architectures
+            .into_iter()
+            .filter(|arch| {
+                artifacts
+                    .iter()
+                    .find(|(_, _, artifact_arch, _)| arch == artifact_arch)
+                    .is_none()
+            })
+            .collect::<Vec<_>>();
 
-        return Ok(self
-            .missing_artifacts_for_revision_id(&project, &revision)
-            .await?);
+        Ok(missing_architectures)
     }
 
     pub async fn list_architectures(&self) -> Result<Vec<HostArchitecture>, anyhow::Error> {
@@ -273,9 +238,10 @@ impl AntZooStorageClient {
 
     pub async fn register_artifact(
         &self,
-        project: &str,
         revision_id: &str,
+        project: &str,
         arch: Option<&HostArchitecture>,
+        version: &str,
         path: &Path,
     ) -> Result<String, anyhow::Error> {
         let mut con = self.db.get().await?;
@@ -286,15 +252,16 @@ impl AntZooStorageClient {
             .query_one(
                 "
             insert into artifact
-                (project_id, revision_id, architecture_id, local_path)
+                (revision_id, project_id, architecture_id, build_version, local_path)
             values
-                ($1, $2, $3, $4)
+                ($1, $2, $3, $4, $5)
             returning artifact_id
             ",
                 &[
-                    &project,
                     &revision_id,
+                    &project,
                     &arch.map(|a| a.as_str()),
+                    &version,
                     &path
                         .as_os_str()
                         .to_str()
@@ -304,10 +271,12 @@ impl AntZooStorageClient {
             .await
             .with_context(|| {
                 format!(
-                    "{}: {} {:?} {}",
+                    "{}: {} {} {:?} {} {}",
                     function_name!(),
                     revision_id,
+                    project,
                     arch,
+                    version,
                     path.display()
                 )
             })?
@@ -318,18 +287,32 @@ impl AntZooStorageClient {
         Ok(artifact_id)
     }
 
-    pub async fn update_artifact(&self, artifact_id: &str) -> Result<(), anyhow::Error> {
+    pub async fn update_artifact(
+        &self,
+        artifact_id: &str,
+        version: &str,
+        path: &Path,
+    ) -> Result<(), anyhow::Error> {
         let con = self.db.get().await?;
 
         con.execute(
             "
             update artifact
             set
+                build_version = $2,
+                local_path = $3,
                 updated_at = now()
             where
                 artifact_id = $1
             ",
-            &[&artifact_id],
+            &[
+                &artifact_id,
+                &version,
+                &path
+                    .as_os_str()
+                    .to_str()
+                    .expect(&format!("bad artifact path: {}", path.display())),
+            ],
         )
         .await?;
 
@@ -437,6 +420,38 @@ impl AntZooStorageClient {
             .collect();
 
         Ok(pipelines)
+    }
+
+    pub async fn list_deployment_pipelines_building_project(
+        &self,
+        project: &str,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let mut pipelines_building_project: HashSet<&String> = HashSet::new();
+
+        let pipelines = self.list_deployment_pipelines().await?;
+        for (pipeline_id, _) in &pipelines {
+            let build_stages = self
+                .list_deployment_stages_with_no_previous_adjacencies(&pipeline_id)
+                .await?;
+            for stage_id in build_stages {
+                let stage = self
+                    .get_deployment_pipeline_stage(&stage_id)
+                    .await?
+                    .unwrap();
+                let pipeline_build_project = stage.3.expect(&format!(
+                    "build stage {stage_id} should have project attached."
+                ));
+
+                if pipeline_build_project == *project {
+                    pipelines_building_project.insert(&pipeline_id);
+                }
+            }
+        }
+
+        Ok(pipelines_building_project
+            .into_iter()
+            .map(|s| s.clone())
+            .collect())
     }
 
     pub async fn get_deployment_pipeline_by_name(
@@ -1282,7 +1297,7 @@ impl AntZooStorageClient {
 pub struct Revision {
     pub id: String,
     pub seq: i32,
-    pub version: String,
+    pub activated_at: Option<DateTime<Utc>>,
 }
 
 impl AntZooStorageClient {
@@ -1290,7 +1305,7 @@ impl AntZooStorageClient {
         Revision {
             id: row.get("revision_id"),
             seq: row.get("revision_seq"),
-            version: row.get("deployment_version"),
+            activated_at: row.get("activated_at"),
         }
     }
 
@@ -1301,7 +1316,7 @@ impl AntZooStorageClient {
             .await?
             .query(
                 "
-            select revision_id, deployment_version, revision_seq
+            select revision_id, revision_seq, activated_at
             from revision
             order by revision_seq desc
             ",
@@ -1315,14 +1330,37 @@ impl AntZooStorageClient {
         Ok(deployment_events)
     }
 
-    pub async fn get_revision(&self, revision_id: &str) -> Result<Revision, anyhow::Error> {
+    pub async fn get_latest_revision(
+        &self,
+        project: &str,
+    ) -> Result<Option<(String, Option<DateTime<Utc>>)>, anyhow::Error> {
         let row = self
             .db
             .get()
             .await?
-            .query_one(
+            .query_opt(
                 "
-            select revision_id, deployment_version, revision_seq
+            select revision_id, activated_at
+            from revision
+            order by revision_seq desc
+            ",
+                &[],
+            )
+            .await
+            .context(format!("{}: {}", function_name!(), project))?
+            .map(|r| (r.get("revision_id"), r.get("activated_at")));
+
+        Ok(row)
+    }
+
+    pub async fn get_revision(&self, revision_id: &str) -> Result<Option<Revision>, anyhow::Error> {
+        let row = self
+            .db
+            .get()
+            .await?
+            .query_opt(
+                "
+            select revision_id, activated_at, revision_seq
             from revision
             where revision_id = $1
             ",
@@ -1331,7 +1369,28 @@ impl AntZooStorageClient {
             .await
             .context(format!("{}: {}", function_name!(), revision_id))?;
 
-        Ok(self.row_to_revision(&row))
+        Ok(row.map(|row| self.row_to_revision(&row)))
+    }
+
+    /// Once we've determined that all required artifacts for a revision are registered, mark it activated
+    /// and it is now immutable.
+    pub async fn activate_revision(&self, revision_id: &str) -> Result<(), anyhow::Error> {
+        let con = self.db.get().await?;
+
+        con.execute(
+            "
+            update revision
+            set
+                activated_at = now(),
+                updated_at = now()
+            where
+                revision_id = $1
+            ",
+            &[&revision_id],
+        )
+        .await?;
+
+        Ok(())
     }
 
     /// Returns revisions that have the given event on that target.
@@ -1356,7 +1415,7 @@ impl AntZooStorageClient {
             select
                 deployment.revision_id,
                 r.revision_seq,
-                r.deployment_version,
+                r.activated_at,
                 deployment.created_at
             from deployment
                 join revision r on r.revision_id = deployment.revision_id
@@ -1391,7 +1450,7 @@ impl AntZooStorageClient {
             select
                 r.revision_id,
                 r.revision_seq,
-                r.deployment_version
+                r.activated_at
             from revision r
             where r.revision_id not in (
                 select revision_id
