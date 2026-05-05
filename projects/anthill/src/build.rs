@@ -41,6 +41,7 @@ pub async fn build(cmd: BuildCmd) {
     let services: Services =
         serde_json::de::from_reader(std::fs::File::open(find_up("services.json")).unwrap())
             .unwrap();
+    services.validate().expect("malformed services.json");
 
     let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
         tls: false,
@@ -185,8 +186,9 @@ async fn build_artifact<'a>(
     }
 
     let build_dir = project_src.join("build");
-    std::fs::remove_dir_all(build_dir.join("release")).context("removing build dir")?;
-    tokio::fs::create_dir_all(build_dir.join("release"))
+    let build_output_dir = build_dir.join("release").join(arch.as_str());
+    std::fs::remove_dir_all(build_output_dir.join("release")).context("removing build dir")?;
+    tokio::fs::create_dir_all(build_output_dir.join("release"))
         .await
         .context("creating build dir")?;
 
@@ -195,7 +197,10 @@ async fn build_artifact<'a>(
             .args(["-C", project_src.to_str().unwrap()])
             .args([
                 "-e",
-                &format!("BUILD_OUTPUT_DIR=build/release/{}", arch.as_str()),
+                &format!(
+                    "BUILD_OUTPUT_DIR={}",
+                    build_output_dir.as_os_str().to_str().unwrap()
+                ),
             ])
             .args(["-e", &format!("RUST_TARGET={}", arch.rust_target())])
             .args(["-e", &format!("PROMETHEUS_OS={}", arch.prometheus_os())])
@@ -222,9 +227,9 @@ async fn build_artifact<'a>(
 
         let tmp_packaging_dir =
             tempfile::tempdir_in(&tmp_build_dir).context("creating packaging dir")?;
-        dircpy::copy_dir(build_dir.join("release"), &tmp_packaging_dir.path()).context(format!(
+        dircpy::copy_dir(&build_output_dir, &tmp_packaging_dir.path()).context(format!(
             "copying build output from {} to {}",
-            build_dir.join("release").display(),
+            build_output_dir.display(),
             tmp_packaging_dir.path().display()
         ))?;
         tmp_packaging_dir

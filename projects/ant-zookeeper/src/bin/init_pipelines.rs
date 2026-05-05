@@ -30,20 +30,21 @@ async fn main() -> Result<(), anyhow::Error> {
     let services: Services =
         serde_json::de::from_reader(std::fs::File::open(find_up("services.json")).unwrap())
             .unwrap();
+    services.validate().expect("malformed services.json");
 
     let client = AntZookeeperClient::new(AntZookeeperClientConfig {
         tls: false,
         endpoint: "localhost:3235".to_string(),
     });
 
-    for service in services.list_service_ids() {
-        let hosts = services.list_hosts_in_service(service);
+    for service_id in services.list_service_ids() {
+        let hosts = services.list_hosts_with_service(&service_id);
 
         let beta_hg_id = if hosts.iter().any(|(_, s)| matches!(s.env, ServiceEnv::Beta)) {
             let hg = client
                 .create_host_group(CreateHostGroupRequest {
-                    name: format!("{service}/beta"),
-                    project: service.to_string(),
+                    name: format!("{service_id}/beta"),
+                    project: service_id.to_string(),
                     environment: "beta".to_string(),
                 })
                 .await?;
@@ -65,8 +66,8 @@ async fn main() -> Result<(), anyhow::Error> {
         let prod_hg_id = if hosts.iter().any(|(_, s)| matches!(s.env, ServiceEnv::Prod)) {
             let hg = client
                 .create_host_group(CreateHostGroupRequest {
-                    name: format!("{service}/prod"),
-                    project: service.to_string(),
+                    name: format!("{service_id}/prod"),
+                    project: service_id.to_string(),
                     environment: "prod".to_string(),
                 })
                 .await?;
@@ -96,7 +97,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
         client
             .put_pipeline(PutPipelineRequest {
-                name: service.to_string(),
+                name: service_id.to_string(),
                 stages: vec![beta_stage, prod_stage]
                     .into_iter()
                     .filter_map(|s| s)
@@ -105,7 +106,7 @@ async fn main() -> Result<(), anyhow::Error> {
             })
             .await?;
 
-        println!("Done: {service}")
+        println!("Done: {service_id}")
     }
 
     // pipeline_ant_data_farm(&client).await?;

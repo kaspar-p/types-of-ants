@@ -27,21 +27,21 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-data-farm",
+          "project": "ant-data-farm",
           "inactive-replaced-by": "antworker006.hosts.typesofants.org"
         },
         {
           "env": "prod",
-          "service": "ant-who-tweets",
+          "project": "ant-who-tweets",
           "inactive-replaced-by": "antworker005.hosts.typesofants.org"
         },
         {
           "env": "prod",
-          "service": "ant-backing-it-up-db",
+          "project": "ant-backing-it-up-db",
           "inactive-replaced-by": "antworker003.hosts.typesofants.org"
         }
       ]
@@ -52,31 +52,31 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
-          "service": "ant-backing-it-up"
+          "project": "ant-backing-it-up"
         },
         {
           "env": "prod",
-          "service": "ant-gateway"
+          "project": "ant-gateway"
         },
         {
           "env": "prod",
-          "service": "ant-looking-pretty"
+          "project": "ant-looking-pretty"
         },
         {
           "env": "prod",
-          "service": "ant-on-the-web"
+          "project": "ant-on-the-web"
         },
         {
           "env": "prod",
-          "service": "ant-naming-domains"
+          "project": "ant-naming-domains"
         }
       ]
     },
@@ -86,43 +86,43 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "beta",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "beta",
-          "service": "ant-backing-it-up-db"
+          "project": "ant-backing-it-up-db"
         },
         {
           "env": "beta",
-          "service": "ant-backing-it-up"
+          "project": "ant-backing-it-up"
         },
         {
           "env": "beta",
-          "service": "ant-looking-pretty"
+          "project": "ant-looking-pretty"
         },
         {
           "env": "beta",
-          "service": "ant-on-the-web"
+          "project": "ant-on-the-web"
         },
         {
           "env": "beta",
-          "service": "ant-data-farm"
+          "project": "ant-data-farm"
         },
         {
           "env": "beta",
-          "service": "ant-gateway"
+          "project": "ant-gateway"
         },
         {
           "env": "beta",
-          "service": "ant-naming-domains"
+          "project": "ant-naming-domains"
         },
         {
           "env": "beta",
-          "service": "ant-fs"
+          "project": "ant-fs"
         }
       ]
     },
@@ -132,15 +132,15 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
-          "service": "ant-backing-it-up-db"
+          "project": "ant-backing-it-up-db"
         }
       ]
     },
@@ -150,15 +150,15 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
-          "service": "ant-fs"
+          "project": "ant-fs"
         }
       ]
     },
@@ -168,19 +168,19 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
-          "service": "ant-who-tweets"
+          "project": "ant-who-tweets"
         },
         {
           "env": "prod",
-          "service": "ant-monitor"
+          "project": "ant-monitor"
         }
       ]
     },
@@ -190,15 +190,15 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         },
         {
           "env": "prod",
-          "service": "ant-data-farm"
+          "project": "ant-data-farm"
         }
       ]
     },
@@ -208,11 +208,11 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-host-agent"
+          "project": "ant-host-agent"
         },
         {
           "env": "prod",
-          "service": "ant-worker-node-metrics-exporter"
+          "project": "ant-worker-node-metrics-exporter"
         }
       ]
     },
@@ -222,7 +222,7 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-fs"
+          "project": "ant-fs"
         }
       ]
     },
@@ -232,7 +232,7 @@
       "services": [
         {
           "env": "prod",
-          "service": "ant-fs"
+          "project": "ant-fs"
         }
       ]
     }
