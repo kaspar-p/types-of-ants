@@ -1,5 +1,6 @@
+use anyhow::Context;
 use rstest::fixture;
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 use testcontainers::{
     core::client::docker_client_instance, ContainerRequest, GenericImage, ImageExt,
 };
@@ -20,18 +21,20 @@ pub struct TestFixture {
 
 #[must_use]
 pub async fn test_fixture(tag: &str, override_port: Option<u16>) -> TestFixture {
-    let cwd: String = dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!");
-    println!("{}", cwd);
+    let cwd = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!"));
+    println!("{}", cwd.display());
+
+    which::which("docker").context("docker must be installed!").unwrap();
 
     // Build the test images in the repository
     let output = Command::new("docker")
         .arg("build")
         .arg("--file")
-        .arg(&format!("{cwd}/../ant-data-farm/Dockerfile"))
+        .arg(cwd.join("..").join("ant-data-farm").join("Dockerfile"))
         .arg("--force-rm")
         .arg("--tag")
         .arg(format!("ant-data-farm-test:{}", tag))
-        .arg(&format!("{cwd}/../ant-data-farm"))
+        .arg(cwd.join("..").join("ant-data-farm"))
         .output()
         .expect("Building the ant-data-farm docker image worked!");
     debug!("Built docker image!");

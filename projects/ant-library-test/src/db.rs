@@ -5,8 +5,14 @@ use postgresql_embedded::PostgreSQL;
 use ant_library::db::DatabaseConfig;
 
 pub async fn test_database_config(project: &str) -> (PostgreSQL, DatabaseConfig) {
+    let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+
+    let pg_tmp_dir = root.join("build").join("pgtmp");
+    std::fs::create_dir_all(&pg_tmp_dir).unwrap();
+
     let mut pg = PostgreSQL::new(postgresql_embedded::Settings {
         temporary: true,
+        installation_dir: pg_tmp_dir,
         ..Default::default()
     });
     pg.setup().await.unwrap();
