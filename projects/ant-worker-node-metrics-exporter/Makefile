@@ -17,7 +17,7 @@ endif
 TARDIR=node_exporter-$(NODE_EXPORTER_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)
 TARFILE=$(TARDIR).tar.gz
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 all: release
 
@@ -26,9 +26,6 @@ release: $(BUILD_OUTPUT_DIR)/node_exporter
 
 clean:
 	rm -rf build
-
-$(BUILD_OUTPUT_DIR):
-	@mkdir -p $@
 
 build/.cache/:
 	@mkdir -p $@

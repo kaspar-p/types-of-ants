@@ -1,11 +1,13 @@
 PROJECT = ant-zookeeper-db
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 all: release
 
-release:
-	mkdir -p build/release
+release: | $(BUILD_OUTPUT_DIR)
+
+$(BUILD_OUTPUT_DIR):
+	@mkdir -p $@
 
 clean:
 	rm -rf build

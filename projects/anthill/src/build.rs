@@ -187,8 +187,16 @@ async fn build_artifact<'a>(
 
     let build_dir = project_src.join("build");
     let build_output_dir = build_dir.join("release").join(arch.as_str());
-    std::fs::remove_dir_all(build_output_dir.join("release")).context("removing build dir")?;
-    tokio::fs::create_dir_all(build_output_dir.join("release"))
+    match std::fs::remove_dir_all(&build_output_dir) {
+        Ok(_) => Ok(()),
+        Err(e) if matches!(e.kind(), std::io::ErrorKind::NotFound) => Ok(()),
+        Err(e) => Err(e),
+    }
+    .context(format!(
+        "removing build dir: {}",
+        build_output_dir.display()
+    ))?;
+    tokio::fs::create_dir_all(&build_output_dir)
         .await
         .context("creating build dir")?;
 

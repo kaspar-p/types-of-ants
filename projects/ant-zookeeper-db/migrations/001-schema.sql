@@ -61,6 +61,8 @@ create table revision (
   foreign key (project_id) references project(project_id)
 );
 
+-- A build artifact produced by a project. Architecture-specific but environment-agnostic, should be
+-- deployable to beta/prod/other envs.
 create table artifact (
   artifact_id text primary key default ('a-' || random_string(10)),
 

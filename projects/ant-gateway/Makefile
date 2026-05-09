@@ -1,11 +1,10 @@
 PROJECT = ant-gateway
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 all: release
 
-release:
-	@mkdir -p build/release
+release: | $(BUILD_OUTPUT_DIR)
 
 clean:
 	rm -rf build

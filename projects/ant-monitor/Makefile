@@ -17,7 +17,7 @@ endif
 TARDIR=prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)
 TARFILE=$(TARDIR).tar.gz
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 all: release
 

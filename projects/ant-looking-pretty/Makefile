@@ -1,6 +1,6 @@
 PROJECT = ant-looking-pretty
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 # Default to debug builds
 all: debug
@@ -11,14 +11,13 @@ debug: out
 release: BUILD_MODE = release
 release: out
 
-out:
-	mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
+out: | $(BUILD_OUTPUT_DIR)
 	@npm ci --silent >> /dev/stderr
 	@npm run build
 # 	@sed -i '' 's/process\.env\.PORT/process\.env\.ANT_LOOKING_PRETTY_PORT/' .next/standalone/server.js
-	@cp -r .next/standalone/ $(BUILD_DIR)/$(BUILD_MODE)/.
-	@cp -r public $(BUILD_DIR)/$(BUILD_MODE)/
-	@cp -r .next/static $(BUILD_DIR)/$(BUILD_MODE)/.next
+	@cp -r .next/standalone/ $(BUILD_OUTPUT_DIR)/.
+	@cp -r public $(BUILD_OUTPUT_DIR)/
+	@cp -r .next/static $(BUILD_OUTPUT_DIR)/.next
 
 clean:
 	@npm run clean && rm -rf build

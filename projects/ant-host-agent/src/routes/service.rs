@@ -1,6 +1,6 @@
 use ant_library::{
     anthill::{AnthillManifest, AnthillManifestError},
-    headers::{XAntProjectHeader, XAntVersionHeader},
+    headers::{XAntProjectHeader, XAntServiceIdHeader, XAntVersionHeader},
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
@@ -28,28 +28,31 @@ use std::default::Default;
 
 use crate::{err::AntHostAgentError, state::AntHostAgentState};
 
-fn unit_name(project: &str) -> String {
-    format!("{project}.service")
+fn unit_name(service_id: &str) -> String {
+    format!("{service_id}.service")
 }
 
-fn unit_file_path(project: &str, version: &str) -> String {
+fn unit_file_path(service_id: &str, version: &str) -> String {
     format!(
         "/home/ant/service/{}/{}/{}",
-        project,
+        service_id,
         version,
-        unit_name(project)
+        unit_name(service_id)
     )
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct EnableServiceRequest {
-    pub project: String,
+    #[deprecated(note = "Prefer service_id")]
+    pub project: Option<String>,
+    pub service_id: Option<String>,
+
     pub version: String,
 }
 
-async fn enable_unit(manager: &ManagerProxy<'_>, project: &str, version: &str) {
+async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str) {
     info!("Enabling service...");
-    let unit_file_path = unit_file_path(project, version);
+    let unit_file_path = unit_file_path(service_id, version);
     let enable = manager
         .enable_unit_files(vec![unit_file_path.clone()], false, true)
         .await;
@@ -72,23 +75,27 @@ async fn enable_unit(manager: &ManagerProxy<'_>, project: &str, version: &str) {
 /// A route to enable a systemd service. This is _fast_, and can be used to switch between versions quickly.
 ///
 /// It requires that a service be _installed_ first on the host, done with the "POST /service-installation" endpoint.
-async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoResponse {
+async fn enable_service(
+    Json(req): Json<EnableServiceRequest>,
+) -> Result<impl IntoResponse, AntHostAgentError> {
     let conn = zbus::Connection::system().await.expect("system connection");
     let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
         .await
-        .expect("manager init");
+        .context("manager init")?;
 
-    let unit_name = unit_name(&req.project);
+    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
 
-    enable_unit(&manager, &req.project, &req.version).await;
+    let unit_name = unit_name(&service_id);
 
-    manager.reload().await.expect("reload");
+    enable_unit(&manager, &service_id, &req.version).await;
+
+    manager.reload().await.context("daemon reload")?;
 
     info!("Starting service...");
     manager
         .reload_or_restart_unit(unit_name.clone(), "replace".to_string())
         .await
-        .expect("systemd reload");
+        .context("systemd reload")?;
 
     let mut queued = true;
     while queued {
@@ -96,7 +103,7 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
         queued = manager
             .list_jobs()
             .await
-            .unwrap()
+            .context("list docker jobs")?
             .iter()
             .any(|(_, some_unit_name, _, _, _, _)| *some_unit_name == unit_name);
 
@@ -108,7 +115,7 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
         let units = manager
             .list_units_by_names(vec![unit_name.clone()])
             .await
-            .unwrap();
+            .context("list units")?;
         let unit = units.first().unwrap();
         let (_, _, loaded_state, active_state, _, _, _, _, _, _) = unit;
 
@@ -117,23 +124,29 @@ async fn enable_service(Json(req): Json<EnableServiceRequest>) -> impl IntoRespo
             ("loaded", "activating") => true,
             ("loaded", "active") => false,
             (_, "failed") => {
-                return (StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start.");
+                return Ok((StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start."));
             }
             (loaded_state, active_state) => {
-                panic!("Unrecognized state, loaded: {loaded_state}, active: {active_state}");
+                return Err(AntHostAgentError::InternalServerError(Some(
+                    anyhow::Error::msg(format!(
+                        "Unrecognized state, loaded: {loaded_state}, active: {active_state}"
+                    )),
+                )));
             }
         };
 
         sleep(Duration::from_millis(500)).await;
     }
 
-    (StatusCode::OK, "Service enabled.")
+    Ok((StatusCode::OK, "Service enabled."))
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct InstallServiceRequest {
     /// The name of the project, e.g. "ant-data-farm".
-    pub project: String,
+    #[deprecated(note = "Prefer service_id")]
+    pub project: Option<String>,
+    pub service_id: Option<String>,
 
     /// The unique version ID of the software, corresponds to a path on the host. Reinstalling the same
     /// version multiple times is still fine, but there may be files in the 'cwd' that the process doesn't
@@ -141,13 +154,13 @@ pub struct InstallServiceRequest {
     pub version: String,
 }
 
-fn deployment_file_name(project: &str, version: &str) -> String {
-    format!("deployment.{project}.{version}.tar.gz")
+fn deployment_file_name(service_id: &str, version: &str) -> String {
+    format!("deployment.{service_id}.{version}.tar.gz")
 }
 
 /// The directory where all installable files for the project will live
-fn install_location_path(install_root: &PathBuf, project: &str, version: &str) -> PathBuf {
-    install_root.join(project).join(version)
+fn install_location_path(install_root: &PathBuf, service_id: &str, version: &str) -> PathBuf {
+    install_root.join(service_id).join(version)
 }
 
 fn temp_dir(state: &AntHostAgentState) -> Result<TempDir, anyhow::Error> {
@@ -161,11 +174,13 @@ async fn install_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<InstallServiceRequest>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
-    let file_name = deployment_file_name(&req.project, &req.version);
+    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
+
+    let file_name = deployment_file_name(&service_id, &req.version);
     let file_path = state.archive_root_dir.join(file_name);
     info!(
         "Installing [{}] version [{}] from [{}]...",
-        req.project,
+        service_id,
         req.version,
         file_path.display()
     );
@@ -174,7 +189,7 @@ async fn install_service(
         ErrorKind::NotFound => AntHostAgentError::validation_msg(
             format!(
                 "No deployment tarball found for: {} version {}",
-                req.project, req.version
+                service_id, req.version
             )
             .as_str(),
         ),
@@ -202,7 +217,7 @@ async fn install_service(
             .unwrap_or(true);
 
         let version = if versioned { &req.version } else { "service" };
-        let dst = install_location_path(&state.install_root_dir, &req.project, &version);
+        let dst = install_location_path(&state.install_root_dir, &service_id, &version);
 
         info!("Copying installation to: {}", dst.display());
         std::fs::create_dir_all(&dst)?;
@@ -211,7 +226,7 @@ async fn install_service(
         dst
     };
 
-    let unit_file_path = dst.join(unit_name(&req.project));
+    let unit_file_path = dst.join(unit_name(&service_id));
     if std::fs::exists(&unit_file_path)? {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(true);
@@ -235,14 +250,14 @@ async fn install_service(
                 handlebars::RenderErrorReason::MissingVariable(Some(var)) => {
                     return AntHostAgentError::validation_msg(&format!(
                         "Unknown template variable replacement attempt of [{var}] in file: {}",
-                        unit_name(&req.project)
+                        unit_name(&service_id)
                     ));
                 }
                 r => {
                     error!("Failed to render template: {r}");
                     return AntHostAgentError::validation_msg(&format!(
                         "Failed to replace template: {}",
-                        unit_name(&req.project)
+                        unit_name(&service_id)
                     ));
                 }
             })?;
@@ -321,16 +336,23 @@ async fn disable_unit(manager: &ManagerProxy<'_>, unit_name: &String) {
 
 #[derive(Deserialize, Serialize)]
 pub struct DisableServiceRequest {
-    project: String,
+    #[deprecated(note = "Prefer service_id")]
+    project: Option<String>,
+    /// backwards compat optional.
+    service_id: Option<String>,
 }
 
-async fn disable_service(Json(req): Json<DisableServiceRequest>) -> impl IntoResponse {
+async fn disable_service(
+    Json(req): Json<DisableServiceRequest>,
+) -> Result<impl IntoResponse, AntHostAgentError> {
+    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
+
     let conn = zbus::Connection::system().await.expect("system connection");
     let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
         .await
         .expect("manager init");
 
-    let unit_name = unit_name(&req.project);
+    let unit_name = unit_name(&service_id);
 
     disable_unit(&manager, &unit_name).await;
     manager
@@ -340,18 +362,35 @@ async fn disable_service(Json(req): Json<DisableServiceRequest>) -> impl IntoRes
 
     manager.reload().await.expect("reload");
 
-    (StatusCode::OK, "Service disabled.")
+    Ok((StatusCode::OK, "Service disabled."))
+}
+
+fn compute_service_id<'a>(
+    project_header: Option<&'a str>,
+    service_id_header: Option<&'a str>,
+) -> Result<&'a str, AntHostAgentError> {
+    let service_id = service_id_header
+        .as_ref()
+        .or(project_header.as_ref())
+        .ok_or(AntHostAgentError::validation_msg(
+            "One of X-Ant-Project or X-Ant-Service-Id must be specified",
+        ))?;
+
+    Ok(service_id)
 }
 
 async fn register_service(
     State(state): State<AntHostAgentState>,
     TypedHeader(project): TypedHeader<XAntProjectHeader>,
+    TypedHeader(service_id): TypedHeader<XAntServiceIdHeader>,
     TypedHeader(version): TypedHeader<XAntVersionHeader>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
+    let service_id = compute_service_id(project.0.as_deref(), service_id.0.as_deref())?;
+
     let path = state
         .archive_root_dir
-        .join(deployment_file_name(&project.0, &version.0));
+        .join(deployment_file_name(&service_id, &version.0));
     let mut file = File::create(&path).await?;
 
     let mut field = multipart

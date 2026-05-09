@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
-use ant_library::headers::XAntRevisionHeader;
+use ant_library::headers::{XAntRevisionHeader, XAntServiceIdHeader};
 use ant_library::{
     anthill::AnthillManifest,
     headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
@@ -117,6 +117,20 @@ WantedBy=multi-user.target
 ")
 }
 
+fn compute_service_id<'a>(
+    project_header: Option<&'a str>,
+    service_id_header: Option<&'a str>,
+) -> Result<&'a str, AntZookeeperError> {
+    let service_id = service_id_header
+        .as_ref()
+        .or(project_header.as_ref())
+        .ok_or(AntZookeeperError::validation_msg(
+            "One of X-Ant-Project or X-Ant-Service-Id must be specified",
+        ))?;
+
+    Ok(service_id)
+}
+
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
 #[debug_handler]
 async fn register_artifact(
@@ -127,12 +141,16 @@ async fn register_artifact(
     TypedHeader(version): TypedHeader<XAntVersionHeader>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
+    let project_id: &String = project.0.as_ref().ok_or(AntZookeeperError::validation_msg(
+        "The X-Ant-Project header must be specified.",
+    ))?;
+
     // VALIDATIONS
     {
-        if !state.db.get_project(&project.0).await? {
-            info!("Registering project [{}] for the first time...", project.0);
+        if !state.db.get_project(&project_id).await? {
+            info!("Registering project [{}] for the first time...", project_id);
             let is_owned = true; // Building our own images means an owned project!
-            state.db.register_project(&project.0, is_owned).await?;
+            state.db.register_project(&project_id, is_owned).await?;
         }
 
         let revision = state.db.get_revision(&revision.0).await?;
@@ -250,7 +268,7 @@ async fn register_artifact(
                 }
             }
 
-            if file_name == format!("{}.service", project.0).as_str() {
+            if file_name == format!("{}.service", &project_id).as_str() {
                 service_file_found = true;
             }
         }
@@ -265,7 +283,7 @@ async fn register_artifact(
             return Err(AntZookeeperError::validation_msg(
                 format!(
                     "Service file '{}.service' must be included in deployment tarball.",
-                    project.0
+                    &project_id
                 )
                 .as_str(),
             ));
@@ -273,7 +291,7 @@ async fn register_artifact(
     }
 
     // Write the file to final location
-    let filepath = dir.join(artifact_file_name(&project.0, arch.0.as_ref(), &version.0));
+    let filepath = dir.join(artifact_file_name(&project_id, arch.0.as_ref(), &version.0));
     {
         info!("Writing tarball to [{}]", filepath.display());
         std::fs::copy(&temp_file_path, &filepath)?;
@@ -332,7 +350,7 @@ async fn register_artifact(
     info!("Registering or updating artifact...");
     let artifact_id = state
         .db
-        .get_artifact_by_revision(&revision.0, &project.0, arch.0.as_ref())
+        .get_artifact_by_revision(&revision.0, &project_id, arch.0.as_ref())
         .await?;
     let relative_path = filepath.strip_prefix(&dir).expect(&format!(
         "[{}] was not parent of [{}]",
@@ -360,7 +378,7 @@ async fn register_artifact(
                 .db
                 .register_artifact(
                     &revision.0,
-                    &project.0,
+                    &project_id,
                     arch.0.as_ref(),
                     &version.0,
                     &relative_path,

@@ -1,6 +1,6 @@
 PROJECT = ant-programs
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 # Default to debug builds
 all: debug

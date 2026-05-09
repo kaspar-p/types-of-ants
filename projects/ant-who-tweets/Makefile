@@ -1,16 +1,16 @@
 PROJECT = ant-who-tweets
 
--include ../../Makefile.common
+-include ../../Common.mk
 
 # Default to debug builds
 all: debug
 
 debug: BUILD_MODE = debug
-debug: binary
+debug: $(BUILD_OUTPUT_DIR)/$(PROJECT)
 
 release: BUILD_MODE = release
 release: RUST_FLAGS += --release
-release: binary
+release: $(BUILD_OUTPUT_DIR)/$(PROJECT)
 
 clean:
 	rm -rf build
@@ -18,10 +18,9 @@ clean:
 run: debug
 	cd $(BUILD_DIR)/debug/ && ./$(PROJECT)
 
-binary:
+$(BUILD_OUTPUT_DIR)/$(PROJECT): | $(BUILD_OUTPUT_DIR)
 	@echo "BUILDING BINARY" >> /dev/stderr
 	@cross build --target=$(RUST_TARGET) $(RUST_FLAGS) -p $(PROJECT)
-	@mkdir -p $(BUILD_DIR)/$(BUILD_MODE)
-	@cp ../../target/$(RUST_TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_DIR)/$(BUILD_MODE)/$(PROJECT)
+	@cp ../../target/$(RUST_TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_OUTPUT_DIR)
 
-.PHONY: all debug release clean run binary
+.PHONY: all debug release clean run

@@ -4,8 +4,11 @@ use crate::host_architecture::HostArchitecture;
 use axum_extra::headers::Header;
 use http::{HeaderName, HeaderValue};
 
+#[deprecated]
 static X_ANT_PROJECT_HEADER: HeaderName = http::HeaderName::from_static("x-ant-project");
-pub struct XAntProjectHeader(pub String);
+
+#[deprecated]
+pub struct XAntProjectHeader(pub Option<String>);
 
 impl Header for XAntProjectHeader {
     fn name() -> &'static http::HeaderName {
@@ -17,21 +20,62 @@ impl Header for XAntProjectHeader {
         Self: Sized,
         I: Iterator<Item = &'i http::HeaderValue>,
     {
-        let value = values
-            .next()
-            .ok_or_else(axum_extra::headers::Error::invalid)?;
+        let value = values.next();
 
-        let value = value
-            .to_str()
-            .map_err(|_| axum_extra::headers::Error::invalid())?
-            .to_string();
+        let val = match value {
+            Some(v) => Some(
+                v.to_str()
+                    .map_err(|_| axum_extra::headers::Error::invalid())?
+                    .to_string(),
+            ),
+            None => None,
+        };
 
-        Ok(Self(value))
+        Ok(Self(val))
     }
 
     fn encode<E: Extend<http::HeaderValue>>(&self, values: &mut E) {
-        let value = HeaderValue::from_str(&self.0).expect("invalid header value stored");
-        values.extend(std::iter::once(value));
+        if let Some(value) = &self.0 {
+            let value =
+                HeaderValue::from_str(&value.as_str()).expect("invalid header value stored");
+            values.extend(std::iter::once(value));
+        }
+    }
+}
+
+static X_ANT_SERVICE_ID_HEADER: HeaderName = http::HeaderName::from_static("x-ant-service-id");
+pub struct XAntServiceIdHeader(pub Option<String>);
+
+impl Header for XAntServiceIdHeader {
+    fn name() -> &'static http::HeaderName {
+        &X_ANT_SERVICE_ID_HEADER
+    }
+
+    fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i http::HeaderValue>,
+    {
+        let value = values.next();
+
+        let val = match value {
+            Some(v) => Some(
+                v.to_str()
+                    .map_err(|_| axum_extra::headers::Error::invalid())?
+                    .to_string(),
+            ),
+            None => None,
+        };
+
+        Ok(Self(val))
+    }
+
+    fn encode<E: Extend<http::HeaderValue>>(&self, values: &mut E) {
+        if let Some(value) = &self.0 {
+            let value =
+                HeaderValue::from_str(&value.as_str()).expect("invalid header value stored");
+            values.extend(std::iter::once(value));
+        }
     }
 }
 
