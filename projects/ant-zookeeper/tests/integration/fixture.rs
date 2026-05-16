@@ -98,7 +98,7 @@ pub struct Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.state.root_dir);
+        // let _ = std::fs::remove_dir_all(&self.state.root_dir);
     }
 }
 
@@ -202,6 +202,32 @@ impl Fixture {
                     .write_all("ANT_GATEWAY_FQDN=\"test.typesofants.org\"\n".as_bytes())
                     .await
                     .unwrap();
+
+                let d = serde_json::json!({
+                    "some": "data"
+                });
+                let d = serde_json::Value::String(serde_json::to_string(&d).unwrap());
+                ant_gateway_env
+                    .write_all(
+                        format!(
+                            "ANT_GATEWAY_JSON_DATA={}\n",
+                            serde_json::to_string(&d).unwrap()
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+
+                // When calling function_name!() in a test to get a unique directory, the async-test
+                // wrapper makes a closure, so the name is something silly like:
+                //  "integration::service::service_artifact_docker_compose_includes_variables::{{closure}}"
+                // which Handlebars, when placing INSTALL_DIR and PERSIST_DIR variables into the systemd template file, sees as a bad substitution!
+                //
+                // We resolve this just by providing it, even though it's silly...
+                ant_gateway_env
+                    .write_all("closure=\"{{closure}}\"\n".as_bytes())
+                    .await
+                    .unwrap();
             }
             {
                 let mut beta_env = File::create(root_dir.join("envs").join("beta.build.cfg"))
@@ -209,6 +235,17 @@ impl Fixture {
                     .unwrap();
                 beta_env
                     .write_all("TYPESOFANTS_ENV=beta\n".as_bytes())
+                    .await
+                    .unwrap();
+
+                // When calling function_name!() in a test to get a unique directory, the async-test
+                // wrapper makes a closure, so the name is something silly like:
+                //  "integration::service::service_artifact_docker_compose_includes_variables::{{closure}}"
+                // which Handlebars, when placing INSTALL_DIR and PERSIST_DIR variables into the systemd template file, sees as a bad substitution!
+                //
+                // We resolve this just by providing it, even though it's silly...
+                beta_env
+                    .write_all("closure={{closure}}\n".as_bytes())
                     .await
                     .unwrap();
             }

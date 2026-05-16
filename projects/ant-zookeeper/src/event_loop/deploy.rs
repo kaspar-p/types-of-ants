@@ -20,7 +20,8 @@ pub async fn deploy_artifact(
 
     ant_host_agent
         .enable_service(ant_host_agent::routes::service::EnableServiceRequest {
-            project: project.to_string(),
+            service_id: Some(project.to_string()),
+            project: Some(project.to_string()),
             version: version.to_string(),
         })
         .await?;

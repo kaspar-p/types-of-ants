@@ -221,7 +221,8 @@ async fn install_service(
 
         info!("Copying installation to: {}", dst.display());
         std::fs::create_dir_all(&dst)?;
-        dircpy::copy_dir(&tmp_dst, &dst).context("move deployment to final location")?;
+        dircpy::copy_dir_advanced(&tmp_dst, &dst, true, true, true, vec![], vec![])
+            .context("move deployment to final location")?;
 
         dst
     };
@@ -236,6 +237,7 @@ async fn install_service(
             .context("handlebars compilation")?;
 
         let mut variables = ant_library::env::env_vars_to_map(&dst.join(".env"))?;
+
         variables.insert(
             "INSTALL_DIR".to_string(),
             dst.to_str()
@@ -248,6 +250,7 @@ async fn install_service(
             .render("systemd", &variables)
             .map_err(|e| match e.reason() {
                 handlebars::RenderErrorReason::MissingVariable(Some(var)) => {
+                    debug!("Replacement variables: {:#?}", variables);
                     return AntHostAgentError::validation_msg(&format!(
                         "Unknown template variable replacement attempt of [{var}] in file: {}",
                         unit_name(&service_id)

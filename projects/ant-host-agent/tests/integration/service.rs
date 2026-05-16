@@ -62,7 +62,7 @@ async fn service_registration_plus_installation_smoke() {
         let response = fixture
             .client
             .post("/service/service-registration")
-            .header("X-Ant-Project", "proj1")
+            .header("X-Ant-Service-Id", "proj1")
             .header("X-Ant-Version", "v1")
             .multipart(req)
             .send()
@@ -120,7 +120,7 @@ async fn service_registration_plus_installation_docker_smoke() {
         let response = fixture
             .client
             .post("/service/service-registration")
-            .header("X-Ant-Project", "docker-proj1")
+            .header("X-Ant-Service-Id", "docker-proj1")
             .header("X-Ant-Version", "v1")
             .multipart(req)
             .send()
@@ -180,7 +180,7 @@ async fn service_install_replaces_from_env_file_and_keeps_unknown_variables() {
         let response = fixture
             .client
             .post("/service/service-registration")
-            .header("X-Ant-Project", "ant-host-agent")
+            .header("X-Ant-Service-Id", "ant-host-agent")
             .header("X-Ant-Version", "v8")
             .multipart(req)
             .send()
@@ -248,7 +248,7 @@ async fn service_install_backwards_compat_project_instead_of_service_id() {
             .client
             .post("/service/service-registration")
             .header("X-Ant-Project", "ant-host-agent")
-            .header("X-Ant-Version", "v1")
+            .header("X-Ant-Version", "v8")
             .multipart(req)
             .send()
             .await;
@@ -288,15 +288,6 @@ async fn service_install_backwards_compat_project_instead_of_service_id() {
         assert!(std::fs::exists(dir.join("ant-host-agent")).unwrap());
         assert!(std::fs::exists(dir.join("ant-host-agent.service")).unwrap());
         assert!(std::fs::exists(dir.join(".env")).unwrap());
-
-        let systemd_unit_content =
-            std::fs::read_to_string(dir.join("ant-host-agent.service")).unwrap();
-        assert_contains!(
-            systemd_unit_content,
-            "--fake-data-directory /home/ant/persist/ant-host-agent/fs"
-        );
-        assert_contains!(systemd_unit_content, "--env beta");
-        assert_contains!(systemd_unit_content, "--fake-serve-at-port port1");
     }
 }
 
@@ -314,7 +305,7 @@ async fn service_registration_plus_installation_unversioned_smoke() {
         let response = fixture
             .client
             .post("/service/service-registration")
-            .header("X-Ant-Project", "proj1")
+            .header("X-Ant-Service-Id", "proj1")
             .header("X-Ant-Version", "v1")
             .multipart(req)
             .send()

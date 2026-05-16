@@ -730,10 +730,11 @@ async fn service_artifact_docker_compose_includes_variables() {
 
         assert!(std::fs::exists(dir.join(".env")).unwrap());
         let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
-        assert!(env_file_content.contains("TYPESOFANTS_ENV=\"beta\""));
-        assert!(env_file_content.contains("PERSIST_DIR=\"/home/ant/persist/ant-gateway\""));
-        assert!(env_file_content.contains("ANT_GATEWAY_FQDN=\"test.typesofants.org\""));
-        assert!(env_file_content.contains("VERSION=\"v1\""));
+        assert!(env_file_content.contains(r#"ANT_GATEWAY_JSON_DATA="{\"some\":\"data\"}""#));
+        assert!(env_file_content.contains(r#"TYPESOFANTS_ENV="beta""#));
+        assert!(env_file_content.contains(r#"PERSIST_DIR="/home/ant/persist/ant-gateway""#));
+        assert!(env_file_content.contains(r#"ANT_GATEWAY_FQDN="test.typesofants.org""#));
+        assert!(env_file_content.contains(r#"VERSION="v1""#));
     }
 }
 
