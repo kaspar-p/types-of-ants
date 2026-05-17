@@ -20,6 +20,7 @@ services:
       - ant_data_farm_db
       - ant_data_farm_user
       - ant_data_farm_password
+      - ant_db_monitoring_password
 
   # ant-backing-it-up:
   #   image: typesofants/ant-backing-it-up:arm64-latest
@@ -52,6 +53,7 @@ services:
       - ant_backing_it_up_db_db
       - ant_backing_it_up_db_user
       - ant_backing_it_up_db_password
+      - ant_db_monitoring_password
 
   ant-zookeeper-db:
     image: ant-zookeeper-db:{{VERSION}}
@@ -74,6 +76,7 @@ services:
       - ant_zookeeper_db_db
       - ant_zookeeper_db_user
       - ant_zookeeper_db_password
+      - ant_db_monitoring_password
 
   ant-gateway:
     image: ant-gateway:{{VERSION}}
@@ -167,6 +170,9 @@ services:
 secrets:
   ant_fs_users.secret:
     file: "{{SECRETS_DIR}}/ant_fs_users.secret"
+
+  ant_db_monitoring_password:
+    file: "{{SECRETS_DIR}}/ant_db_monitoring_password.secret"
 
   ant_zookeeper_db_db:
     file: "{{SECRETS_DIR}}/ant_zookeeper_db_db.secret"
