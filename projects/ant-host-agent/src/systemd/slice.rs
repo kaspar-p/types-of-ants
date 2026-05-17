@@ -3,7 +3,10 @@ use tokio::io::AsyncWriteExt;
 use tracing::{error, info, instrument, warn};
 use zbus_systemd::zbus;
 
-use crate::{state::AntHostAgentState, systemd::restart_unit};
+use crate::{
+    state::AntHostAgentState,
+    systemd::{restart_unit, SLICE_NAME},
+};
 
 fn slice_content() -> &'static str {
     "[Unit]
@@ -28,14 +31,11 @@ pub async fn ensure_slice(state: AntHostAgentState) -> Result<(), anyhow::Error>
 
     // Attempt to find slice
     let units = manager
-        .list_units_by_patterns(
-            vec!["active".to_string()],
-            vec!["typesofants.slice".to_string()],
-        )
+        .list_units_by_patterns(vec!["active".to_string()], vec![SLICE_NAME.to_string()])
         .await
         .context("list slices")?;
-    if units.iter().find(|u| u.0 == "typesofants.slice").is_some() {
-        info!("Found existing typesofants.slice");
+    if units.iter().find(|u| u.0 == SLICE_NAME).is_some() {
+        info!("Found existing slice {SLICE_NAME}");
         return Ok(());
     }
 
@@ -46,7 +46,7 @@ pub async fn ensure_slice(state: AntHostAgentState) -> Result<(), anyhow::Error>
         .await
         .context("creating slices dir")?;
 
-    let slices_path = slices_dir.join("typesofants.slice");
+    let slices_path = slices_dir.join(SLICE_NAME);
 
     let mut slices_file = tokio::fs::File::create(&slices_path)
         .await
@@ -55,7 +55,7 @@ pub async fn ensure_slice(state: AntHostAgentState) -> Result<(), anyhow::Error>
     slices_file
         .write_all(slice_content().as_bytes())
         .await
-        .context("write typesofants.slice content")?;
+        .context("write slice content")?;
 
     // Enable new slice file
 
@@ -80,9 +80,9 @@ pub async fn ensure_slice(state: AntHostAgentState) -> Result<(), anyhow::Error>
         }
     }
 
-    restart_unit(&manager, "typesofants.slice").await??;
+    restart_unit(&manager, SLICE_NAME).await??;
 
-    info!("Ensured typesofants.slice loaded.");
+    info!("Ensured {SLICE_NAME} loaded.");
 
     Ok(())
 }

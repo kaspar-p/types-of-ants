@@ -8,7 +8,10 @@ use zbus_systemd::{
     zbus,
 };
 
-use crate::state::{AntHostAgentState, HostService};
+use crate::{
+    state::{AntHostAgentState, HostService},
+    systemd::SLICE_NAME,
+};
 
 /// On startup, scan for all ACTIVE systemd units with the following requirements:
 /// - Must be included in Slice=typesofants.slice
@@ -102,7 +105,7 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
         };
 
         match service_proxy.slice().await {
-            Ok(s) if s == "typesofants.service" => {
+            Ok(s) if s == SLICE_NAME => {
                 let service_id = unit_name.strip_suffix(".service").unwrap();
                 info!("Found typesofants service: {service_id}");
                 state.services.lock().await.insert(
@@ -114,7 +117,7 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
                 );
             }
             r => {
-                debug!("Skipping {unit_name} due to not included in typesofants.slice: {r:?}");
+                debug!("Skipping {unit_name} due to not included in {SLICE_NAME}: {r:?}");
                 continue;
             }
         }

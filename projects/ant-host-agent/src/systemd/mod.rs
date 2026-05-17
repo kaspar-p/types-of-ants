@@ -8,6 +8,8 @@ use zbus_systemd::systemd1::ManagerProxy;
 pub mod scan;
 pub mod slice;
 
+pub const SLICE_NAME: &'static str = "typesofants.slice";
+
 #[derive(Debug, thiserror::Error)]
 pub enum SystemdUnitError {
     #[error("unit failed to start")]
