@@ -728,6 +728,9 @@ async fn service_artifact_docker_compose_includes_variables() {
         assert!(compose_yml_content.contains("VERSION: \"v1\"")); // environment
         assert!(compose_yml_content.contains("ANT_GATEWAY_FQDN: \"test.typesofants.org\"")); // environment
 
+        let systemd_content = std::fs::read_to_string(dir.join("ant-gateway.service")).unwrap();
+        assert!(systemd_content.contains(r#"--listen-at-fake-port=":test.typesofants.org""#));
+
         assert!(std::fs::exists(dir.join(".env")).unwrap());
         let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
         assert!(env_file_content.contains(r#"ANT_GATEWAY_JSON_DATA="{\"some\":\"data\"}""#));

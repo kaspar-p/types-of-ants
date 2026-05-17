@@ -56,6 +56,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -87,6 +91,10 @@
         {
           "env": "prod",
           "project": "ant-host-agent"
+        },
+        {
+          "env": "beta",
+          "project": "ant-measuring-the-database"
         },
         {
           "env": "beta",
@@ -136,6 +144,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -154,6 +166,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -169,6 +185,10 @@
         {
           "env": "prod",
           "project": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "project": "ant-measuring-the-database"
         },
         {
           "env": "prod",
@@ -194,6 +214,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -209,6 +233,10 @@
         {
           "env": "prod",
           "project": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "project": "ant-measuring-the-database"
         },
         {
           "env": "prod",

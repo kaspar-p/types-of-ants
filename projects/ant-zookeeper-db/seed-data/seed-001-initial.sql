@@ -42,6 +42,7 @@ values
   ('ant-naming-domains', true),
   ('ant-who-tweets', true),
   ('ant-worker-node-metrics-exporter', true),
+  ('ant-measuring-the-database', true),
   ('ant-gateway', true),
   ('ant-zookeeper-db', true),
   ('ant-zookeeper', true),

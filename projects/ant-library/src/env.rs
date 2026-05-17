@@ -2,14 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::Context;
 
-pub fn escape_env_variable(val: &str) -> String {
-    let val = val.replace("\"", "\\\"");
-    format!("\"{}\"", val)
-}
-
 /// Reads the environment variables from a .env file into a HashMap.
-/// All values in the hashmap are PRE-ESCAPED, like "{\"data\":2}" so that they can be directly injected
-/// into another env-file.
 pub fn env_vars_to_map(path: &Path) -> Result<HashMap<String, String>, anyhow::Error> {
     let mut variables = HashMap::<String, String>::new();
     let entries = match dotenvy::from_path_iter(&path) {
@@ -30,7 +23,7 @@ pub fn env_vars_to_map(path: &Path) -> Result<HashMap<String, String>, anyhow::E
     }?;
 
     for (k, v) in entries {
-        variables.insert(k, escape_env_variable(&v));
+        variables.insert(k, v);
     }
 
     Ok(variables)

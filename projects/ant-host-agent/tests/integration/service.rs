@@ -229,7 +229,7 @@ async fn service_install_replaces_from_env_file_and_keeps_unknown_variables() {
             "--fake-data-directory /home/ant/persist/ant-host-agent/fs"
         );
         assert_contains!(systemd_unit_content, "--env beta");
-        assert_contains!(systemd_unit_content, "--fake-serve-at-port port1");
+        assert_contains!(systemd_unit_content, "--fake-serve-at-port=\":port1\"");
     }
 }
 

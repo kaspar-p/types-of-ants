@@ -87,15 +87,29 @@ async fn bootstrap<'a>(
     files.sort_by_key(|dir| dir.path());
 
     for file in files {
-        debug!(
-            "Bootstrapping SQL in {}",
-            file.path().canonicalize().unwrap().to_str().unwrap()
-        );
-        let ddl = read_to_string(file.path()).expect("failed to read SQL file.");
-        db_con
-            .batch_execute(&ddl)
-            .await
-            .expect("Failed to execute SQL file.");
+        debug!("Bootstrapping with: {}", file.path().display());
+
+        match file
+            .path()
+            .extension()
+            .expect("file had no extension")
+            .to_str()
+            .unwrap()
+        {
+            "sql" => {
+                let ddl = read_to_string(file.path()).expect("failed to read SQL file.");
+                db_con
+                    .batch_execute(&ddl)
+                    .await
+                    .expect("Failed to execute SQL file.");
+            }
+            "sh" => {
+                std::process::Command::new(file.path())
+                    .output()
+                    .expect("Failed to execute bootstrap shell file.");
+            }
+            _ => continue,
+        }
     }
 
     Ok(())

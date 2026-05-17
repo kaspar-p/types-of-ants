@@ -1,0 +1,8 @@
+auth_modules:
+  typesofants-monitoring:
+    type: userpass
+    userpass:
+      username: monitoring
+      password: to-be-replaced
+    options:
+      sslmode: disable

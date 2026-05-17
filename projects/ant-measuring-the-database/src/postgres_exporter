@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -euo pipefail
+
+monitoring_user_password="$(cat ./secrets/ant_db_monitoring_password.secret)"
+
+sed -i "/password: /c\      password: $monitoring_user_password" postgres_exporter.yml
+
+./postgres_exporter.bin "$@"

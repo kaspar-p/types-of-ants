@@ -1,6 +1,9 @@
 {
   "project": "ant-host-agent",
   "build": "makefile",
+  "deployment": {
+    "port": 3232
+  },
   "secrets": [
     "jwt"
   ]

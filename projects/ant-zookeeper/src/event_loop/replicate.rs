@@ -74,16 +74,10 @@ fn source_env_variables(
 
     variables.insert(
         "PERSIST_DIR".to_string(),
-        ant_library::env::escape_env_variable(&format!("/home/ant/persist/{project}")),
+        format!("/home/ant/persist/{project}"),
     );
-    variables.insert(
-        "SECRETS_DIR".to_string(),
-        ant_library::env::escape_env_variable("./secrets"),
-    );
-    variables.insert(
-        "VERSION".to_string(),
-        ant_library::env::escape_env_variable(version),
-    );
+    variables.insert("SECRETS_DIR".to_string(), "./secrets".to_string());
+    variables.insert("VERSION".to_string(), version.to_string());
 
     // Turn ant-host-agent into ANT_HOST_AGENT, populate *_PORT and *_METRICS_PORT variables.
     let upcase_project = project.to_uppercase().replace("-", "_");
@@ -93,6 +87,7 @@ fn source_env_variables(
         variables.insert("PORT".to_string(), port.to_string());
         variables.insert(port_var, port.to_string());
     }
+
     if let Some(metrics_port) = manifest.deployment.as_ref().and_then(|d| d.metrics_port) {
         let metrics_port_var = format!("{upcase_project}_METRICS_PORT");
 
@@ -174,7 +169,8 @@ async fn inject_env_file(
         .open(dest.join(".env"))
         .await?;
     for (key, value) in source_env_variables(state, manifest, project, version, environment)? {
-        let content = format!("{}={}\n", key, value);
+        let escaped_value = value.replace(r#"""#, r#"\""#);
+        let content = format!("{}=\"{}\"\n", key, escaped_value);
         info!("Writing trimmed config [{}]", content.trim());
 
         env_file.write_all(content.as_bytes()).await?;

@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
-use ant_library::headers::{XAntRevisionHeader, XAntServiceIdHeader};
+use ant_library::headers::XAntRevisionHeader;
 use ant_library::{
     anthill::AnthillManifest,
     headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
