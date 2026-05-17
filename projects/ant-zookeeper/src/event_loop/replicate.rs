@@ -7,6 +7,7 @@ use std::{
 use ant_host_agent::client::AntHostAgentClientConfig;
 use ant_library::anthill::AnthillManifest;
 use ant_zookeeper_db::HostGroup;
+use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use tar::Archive;
 use tempfile::tempdir_in;
@@ -55,6 +56,7 @@ async fn inject_secrets(
 
 fn source_env_variables(
     state: &AntZookeeperState,
+    manifest: &AnthillManifest,
     project: &str,
     version: &str,
     environment: &str,
@@ -83,6 +85,21 @@ fn source_env_variables(
         ant_library::env::escape_env_variable(version),
     );
 
+    // Turn ant-host-agent into ANT_HOST_AGENT, populate *_PORT and *_METRICS_PORT variables.
+    let upcase_project = project.to_uppercase().replace("-", "_");
+    if let Some(port) = manifest.deployment.as_ref().and_then(|d| d.port) {
+        let port_var = format!("{upcase_project}_PORT");
+
+        variables.insert("PORT".to_string(), port.to_string());
+        variables.insert(port_var, port.to_string());
+    }
+    if let Some(metrics_port) = manifest.deployment.as_ref().and_then(|d| d.metrics_port) {
+        let metrics_port_var = format!("{upcase_project}_METRICS_PORT");
+
+        variables.insert("METRICS_PORT".to_string(), metrics_port.to_string());
+        variables.insert(metrics_port_var, metrics_port.to_string());
+    }
+
     Ok(variables)
 }
 
@@ -93,6 +110,7 @@ fn source_env_variables(
 /// So we need to mustache-replace the docker-compose.yml file that we find
 async fn render_docker_compose(
     state: &AntZookeeperState,
+    manifest: &AnthillManifest,
     dest: &PathBuf,
     project: &str,
     version: &str,
@@ -109,7 +127,7 @@ async fn render_docker_compose(
 
     let template = mustache::compile_path(&docker_compose_path)?;
     let variables = mustache::Data::Map(
-        source_env_variables(state, project, version, environment)?
+        source_env_variables(state, manifest, project, version, environment)?
             .into_iter()
             .map(|(k, v)| {
                 // The mustache engine takes a line like:
@@ -142,6 +160,7 @@ async fn render_docker_compose(
 
 async fn inject_env_file(
     state: &AntZookeeperState,
+    manifest: &AnthillManifest,
     dest: &PathBuf,
     project: &str,
     version: &str,
@@ -154,7 +173,7 @@ async fn inject_env_file(
         .create(true)
         .open(dest.join(".env"))
         .await?;
-    for (key, value) in source_env_variables(state, project, version, environment)? {
+    for (key, value) in source_env_variables(state, manifest, project, version, environment)? {
         let content = format!("{}={}\n", key, value);
         info!("Writing trimmed config [{}]", content.trim());
 
@@ -199,8 +218,12 @@ pub async fn replicate_artifact_step(
             );
             archive.unpack(&unpack_dir_path)?;
 
+            let manifest = AnthillManifest::from_file(&unpack_dir_path.join("anthill.json"))
+                .context("failed to find anthill.json in unpacked contents")?;
+
             inject_env_file(
                 state,
+                &manifest,
                 &unpack_dir_path,
                 &host_group.project,
                 &version,
@@ -210,6 +233,7 @@ pub async fn replicate_artifact_step(
             inject_secrets(state, &unpack_dir_path, &host_group.environment).await?;
             render_docker_compose(
                 state,
+                &manifest,
                 &unpack_dir_path,
                 &host_group.project,
                 &version,

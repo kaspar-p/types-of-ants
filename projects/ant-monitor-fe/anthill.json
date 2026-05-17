@@ -1,4 +1,7 @@
 {
   "project": "ant-monitor-fe",
-  "build": "docker"
+  "build": "docker",
+  "deployment": {
+    "port": 3243
+  }
 }

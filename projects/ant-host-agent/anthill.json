@@ -1,5 +1,9 @@
 {
   "project": "ant-host-agent",
   "build": "makefile",
-  "secrets": []
+  "secrets": [],
+  "deployment": {
+    "port": 3232,
+    "metrics_port": 3232
+  }
 }

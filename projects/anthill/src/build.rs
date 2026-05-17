@@ -9,6 +9,7 @@ use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRev
 use anyhow::Context;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};
+use clap::ArgAction;
 use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
@@ -33,8 +34,17 @@ pub fn find_up(filename: &str) -> std::path::PathBuf {
 #[derive(Clone, clap::Args)]
 pub struct BuildCmd {
     project: String,
-    #[arg(value_parser = HostArchitecture::from_str)]
+
+    #[arg(short, long, value_parser = HostArchitecture::from_str)]
     arch: Option<HostArchitecture>,
+
+    /// By default, deploy after building
+    #[clap(long = "no-deploy", action = ArgAction::SetFalse)]
+    deploy: bool,
+
+    /// Or choose --no-deploy to not deploy.
+    #[clap(long = "deploy", overrides_with = "deploy")]
+    _no_deploy: bool,
 }
 
 pub async fn build(cmd: BuildCmd) {
@@ -48,31 +58,41 @@ pub async fn build(cmd: BuildCmd) {
         endpoint: "localhost:3235".to_string(),
     });
 
-    let revision = client
-        .upsert_revision(UpsertRevisionRequest {
-            project: cmd.project.clone(),
-        })
-        .await
-        .unwrap();
+    let revision = if cmd.deploy {
+        Some(
+            client
+                .upsert_revision(UpsertRevisionRequest {
+                    project: cmd.project.clone(),
+                })
+                .await
+                .unwrap(),
+        )
+    } else {
+        None
+    };
 
-    let arches: HashSet<HostArchitecture> = services
-        .hosts
-        .iter()
-        .map(|(id, _)| id)
-        .map(|id| services.hosts.get(id).unwrap().architecture.clone())
-        .collect();
+    let arches: HashSet<HostArchitecture> = cmd
+        .clone()
+        .arch
+        .map(|a| HashSet::from([a]))
+        .unwrap_or_else(|| {
+            services
+                .hosts
+                .iter()
+                .map(|(id, _)| id)
+                .map(|id| services.hosts.get(id).unwrap().architecture.clone())
+                .collect()
+        });
 
     let mut handles = Vec::new();
     for arch in arches {
-        let revision: String = revision.revision.clone();
+        let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
         let cmd2 = cmd.clone();
         let proj = cmd2.project.clone();
         let handle = tokio::task::spawn_blocking(|| async move {
-            build_arch(cmd2, &arch, &revision).await.context(format!(
-                "building {} {}",
-                proj,
-                arch.as_str()
-            ))
+            build_arch(cmd2, &arch, revision.as_deref())
+                .await
+                .context(format!("building {} {}", proj, arch.as_str()))
         });
         handles.push(handle);
     }
@@ -121,7 +141,7 @@ fn format_datetime(t: git2::Time) -> String {
 async fn build_arch<'a>(
     cmd: BuildCmd,
     arch: &'a HostArchitecture,
-    revision: &'a str,
+    revision: Option<&'a str>,
 ) -> Result<(), anyhow::Error> {
     println!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
 
@@ -129,21 +149,25 @@ async fn build_arch<'a>(
 
     println!("... registering artifact");
 
-    let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
-        tls: false,
-        endpoint: "localhost:3235".to_string(),
-    });
-    client
-        .register_artifact(
-            &revision,
-            &cmd.project,
-            &arch,
-            &version,
-            &deployment_file_path,
-        )
-        .await?;
+    if let Some(revision) = revision {
+        let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
+            tls: false,
+            endpoint: "localhost:3235".to_string(),
+        });
+        client
+            .register_artifact(
+                &revision,
+                &cmd.project,
+                &arch,
+                &version,
+                &deployment_file_path,
+            )
+            .await?;
 
-    println!("... artifact registered.");
+        println!("... artifact registered.");
+    } else {
+        println!("artifact available: {}", deployment_file_path.display());
+    }
 
     Ok(())
 }

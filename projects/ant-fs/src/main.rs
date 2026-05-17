@@ -17,10 +17,10 @@ async fn main() {
 
     let app = ant_fs::make_routes(root_dir).expect("failed to init api");
 
-    let port: u16 = dotenv::var("ANT_FS_PORT")
-        .expect("ANT_FS_PORT environment variable not found")
+    let port: u16 = dotenv::var("PORT")
+        .expect("PORT environment variable not found")
         .parse()
-        .expect("ANT_FS_PORT was not u16");
+        .expect("PORT was not u16");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     debug!(

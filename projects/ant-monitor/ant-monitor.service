@@ -7,6 +7,7 @@ EnvironmentFile={{INSTALL_DIR}}/.env
 Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
 ExecStart={{INSTALL_DIR}}/prometheus --web.enable-admin-api --storage.tsdb.retention.time=30d --storage.tsdb.path={{PERSIST_DIR}}/prometheus-data
 WorkingDirectory={{INSTALL_DIR}}
+Slice=typesofants.slice
 Restart=always
 
 [Install]

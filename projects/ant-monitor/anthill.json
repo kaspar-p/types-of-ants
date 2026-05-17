@@ -1,4 +1,7 @@
 {
   "project": "ant-monitor",
-  "build": "makefile"
+  "build": "makefile",
+  "deployment": {
+    "port": 3242
+  }
 }

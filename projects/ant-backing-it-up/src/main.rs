@@ -73,10 +73,10 @@ async fn main() {
 
     let app = ant_backing_it_up::make_routes(state).expect("failed to init api");
 
-    let port: u16 = dotenv::var("ANT_BACKING_IT_UP_PORT")
-        .expect("ANT_BACKING_IT_UP_PORT environment variable not found")
+    let port: u16 = dotenv::var("PORT")
+        .expect("PORT environment variable not found")
         .parse()
-        .expect("ANT_BACKING_IT_UP_PORT was not u16");
+        .expect("PORT was not u16");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     debug!(

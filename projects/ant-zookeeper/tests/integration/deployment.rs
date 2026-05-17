@@ -148,7 +148,7 @@ async fn beta_stage_setup(fixture: &Fixture) {
             project: "ant-host-agent".to_string(),
             environment: "beta".to_string(),
             variables: vec![ProjectEnvironmentVariable {
-                key: "ANT_HOST_AGENT_PORT".to_string(),
+                key: "PORT".to_string(),
                 value: "3232".to_string(),
             }],
         };

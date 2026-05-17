@@ -112,7 +112,7 @@ services:
     environment:
       VERSION: "{{VERSION}}"
     ports:
-      - "{{ANT_MONITOR_FE_PORT}}:3000"
+      - "{{PORT}}:3000"
     volumes:
       - "{{PERSIST_DIR}}/grafana_storage:/var/lib/grafana"
 

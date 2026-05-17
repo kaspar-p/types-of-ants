@@ -6,39 +6,44 @@ use anyhow::Context;
 use flate2::read::GzDecoder;
 use handlebars::Handlebars;
 use humansize::DECIMAL;
-use std::{io::ErrorKind, path::PathBuf, time::Duration};
+use std::{collections::HashMap, io::ErrorKind, path::PathBuf};
 use tempfile::TempDir;
 use tokio_util::codec;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use axum_extra::{routing::RouterExt, TypedHeader};
 use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio::{fs::File, io::AsyncWriteExt, time::sleep};
+use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, error, info, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
 
 use std::default::Default;
 
-use crate::{err::AntHostAgentError, state::AntHostAgentState};
+use crate::{
+    err::AntHostAgentError,
+    state::{AntHostAgentState, HostService},
+    systemd::{restart_unit, SystemdUnitError},
+};
 
 fn unit_name(service_id: &str) -> String {
     format!("{service_id}.service")
 }
 
-fn unit_file_path(service_id: &str, version: &str) -> String {
-    format!(
-        "/home/ant/service/{}/{}/{}",
-        service_id,
-        version,
-        unit_name(service_id)
-    )
+fn unit_file_path(service_id: &str, version: &str) -> PathBuf {
+    PathBuf::from("/")
+        .join("home")
+        .join("ant")
+        .join("service")
+        .join(service_id)
+        .join(version)
+        .join(unit_name(service_id))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,7 +59,11 @@ async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str
     info!("Enabling service...");
     let unit_file_path = unit_file_path(service_id, version);
     let enable = manager
-        .enable_unit_files(vec![unit_file_path.clone()], false, true)
+        .enable_unit_files(
+            vec![unit_file_path.to_str().unwrap().to_string()],
+            false,
+            true,
+        )
         .await;
 
     match enable {
@@ -64,10 +73,14 @@ async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str
         Err(zbus::Error::MethodError(name, _, _))
             if name == "org.freedesktop.systemd1.NoSuchUnit" =>
         {
-            warn!("No such unit file: {}", unit_file_path);
+            warn!("No such unit file: {}", unit_file_path.display());
         }
         Err(e) => {
-            error!("Failed to enable unit file: {}, {}", unit_file_path, e);
+            error!(
+                "Failed to enable unit file: {}, {}",
+                unit_file_path.display(),
+                e
+            );
         }
     }
 }
@@ -76,6 +89,7 @@ async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str
 ///
 /// It requires that a service be _installed_ first on the host, done with the "POST /service-installation" endpoint.
 async fn enable_service(
+    State(state): State<AntHostAgentState>,
     Json(req): Json<EnableServiceRequest>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
     let conn = zbus::Connection::system().await.expect("system connection");
@@ -92,51 +106,32 @@ async fn enable_service(
     manager.reload().await.context("daemon reload")?;
 
     info!("Starting service...");
-    manager
-        .reload_or_restart_unit(unit_name.clone(), "replace".to_string())
-        .await
-        .context("systemd reload")?;
 
-    let mut queued = true;
-    while queued {
-        info!("Polling for job to start...");
-        queued = manager
-            .list_jobs()
-            .await
-            .context("list docker jobs")?
-            .iter()
-            .any(|(_, some_unit_name, _, _, _, _)| *some_unit_name == unit_name);
-
-        sleep(Duration::from_millis(500)).await;
+    match restart_unit(&manager, &unit_name).await? {
+        Ok(_) => {}
+        Err(SystemdUnitError::UnitTookTooLongToStart)
+        | Err(SystemdUnitError::UnitFailedToStart) => {
+            return Ok((StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start."));
+        }
+        Err(SystemdUnitError::UnrecognizedState(loaded, active)) => {
+            return Err(AntHostAgentError::InternalServerError(Some(
+                anyhow::Error::msg(format!(
+                    "Unrecognized state, loaded: {loaded}, active: {active}"
+                )),
+            )));
+        }
     }
 
-    let mut activating = true;
-    while activating {
-        let units = manager
-            .list_units_by_names(vec![unit_name.clone()])
-            .await
-            .context("list units")?;
-        let unit = units.first().unwrap();
-        let (_, _, loaded_state, active_state, _, _, _, _, _, _) = unit;
+    let install_dir = install_location_path(&state.install_root_dir, service_id, &req.version);
+    let manifest = AnthillManifest::from_file(&install_dir.join("anthill.json"))?;
 
-        info!("Polling for job to activate: {unit:?}");
-        activating = match (loaded_state.as_str(), active_state.as_str()) {
-            ("loaded", "activating") => true,
-            ("loaded", "active") => false,
-            (_, "failed") => {
-                return Ok((StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start."));
-            }
-            (loaded_state, active_state) => {
-                return Err(AntHostAgentError::InternalServerError(Some(
-                    anyhow::Error::msg(format!(
-                        "Unrecognized state, loaded: {loaded_state}, active: {active_state}"
-                    )),
-                )));
-            }
-        };
-
-        sleep(Duration::from_millis(500)).await;
-    }
+    state.services.lock().await.insert(
+        service_id.to_string(),
+        HostService {
+            project: manifest.project,
+            port: manifest.deployment.as_ref().and_then(|d| d.port),
+        },
+    );
 
     Ok((StatusCode::OK, "Service enabled."))
 }
@@ -346,6 +341,7 @@ pub struct DisableServiceRequest {
 }
 
 async fn disable_service(
+    State(state): State<AntHostAgentState>,
     Json(req): Json<DisableServiceRequest>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
     let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
@@ -364,6 +360,9 @@ async fn disable_service(
         .unwrap();
 
     manager.reload().await.expect("reload");
+
+    // Delete that from in-memory db of services
+    state.services.lock().await.remove(service_id);
 
     Ok((StatusCode::OK, "Service disabled."))
 }
@@ -419,8 +418,41 @@ async fn register_service(
     Ok((StatusCode::OK, "Service registered."))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceDiscoveryResponse(pub Vec<ServiceDiscoveryTargets>);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceDiscoveryTargets {
+    /// List of URLs, e.g. "localhost:1234"
+    targets: Vec<String>,
+    labels: HashMap<String, String>,
+}
+
+pub async fn get_service_discovery(
+    State(state): State<AntHostAgentState>,
+) -> Result<impl IntoResponse, AntHostAgentError> {
+    let mut targets = vec![];
+    for (service_id, service) in state.services.lock().await.iter() {
+        match service.port {
+            None => continue,
+            Some(port) => {
+                targets.push(ServiceDiscoveryTargets {
+                    targets: vec![format!("localhost:{}", port)],
+                    labels: HashMap::from([
+                        ("project".to_string(), service.project.to_string()),
+                        ("service_id".to_string(), service_id.to_string()),
+                    ]),
+                });
+            }
+        }
+    }
+
+    Ok((StatusCode::OK, Json(targets)))
+}
+
 pub fn make_routes() -> Router<AntHostAgentState> {
     Router::new()
+        .route_with_tsr("/sd", get(get_service_discovery))
         .route_with_tsr("/service", post(enable_service).delete(disable_service))
         .route_with_tsr("/service-installation", post(install_service))
         .route_with_tsr(

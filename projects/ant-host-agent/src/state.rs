@@ -1,7 +1,15 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-#[derive(Clone)]
+use tokio::sync::Mutex;
+
+#[derive(Debug, Clone)]
 pub struct AntHostAgentState {
+    /// A mini-database for keeping track of the services present on this host.
+    /// Filled on startup and as services are enabled/disabled.
+    ///
+    /// Keys are service IDs ("ant-host-agent", or "ant-db-metrics.ant-data-farm")
+    pub services: Arc<Mutex<HashMap<String, HostService>>>,
+
     /// Where secrets that this ant-host-agent service (and other services via replication) use.
     pub secrets_root_dir: PathBuf,
 
@@ -14,4 +22,10 @@ pub struct AntHostAgentState {
     ///
     /// This directory DOES NOT belong to ant-host-agent, be careful with it!
     pub install_root_dir: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct HostService {
+    pub project: String,
+    pub port: Option<u16>,
 }

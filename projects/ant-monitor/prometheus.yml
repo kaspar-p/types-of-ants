@@ -9,7 +9,7 @@ scrape_configs:
 
     static_configs:
       - targets:
-          # ANT_WORKER_NODE_METRICS_EXPORTER_PORT
+          # 3241 = ant-worker-node-metrics-exporter port
           - "antworker001.hosts.typesofants.org:3241"
           - "antworker003.hosts.typesofants.org:3241"
           - "antworker004.hosts.typesofants.org:3241"

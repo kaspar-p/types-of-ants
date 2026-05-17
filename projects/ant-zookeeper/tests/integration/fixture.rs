@@ -139,6 +139,19 @@ impl AntHostAgentClientFactory for TestAntHostAgentService {
     }
 }
 
+async fn inject_closure_handlebars_replacement(env_file: &mut File) {
+    // When calling function_name!() in a test to get a unique directory, the async-test
+    // wrapper makes a closure, so the name is something silly like:
+    //  "integration::service::service_artifact_docker_compose_includes_variables::{{closure}}"
+    // which Handlebars, when placing INSTALL_DIR and PERSIST_DIR variables into the systemd template file, sees as a bad substitution!
+    //
+    // We resolve this just by providing it, even though it's silly...
+    env_file
+        .write_all("closure=\"{{closure}}\"\n".as_bytes())
+        .await
+        .unwrap();
+}
+
 impl Fixture {
     pub async fn new(function_name: &str) -> Self {
         let (_guard, test_db_config) = test_database_config("ant-zookeeper-db").await;
@@ -151,6 +164,7 @@ impl Fixture {
         create_dir_all(&root_dir).await.unwrap();
 
         let ant_host_agent_state = AntHostAgentState {
+            services: Arc::new(Mutex::new(HashMap::new())),
             secrets_root_dir: root_dir.join("hostagent-secrets"),
             archive_root_dir: root_dir.join("hostagent-archive"),
             install_root_dir: root_dir.join("hostagent-install"),
@@ -188,7 +202,7 @@ impl Fixture {
                 .unwrap();
 
                 ant_host_agent_env
-                    .write_all("ANT_HOST_AGENT_PORT=3232\n".as_bytes())
+                    .write_all("PORT=3232\n".as_bytes())
                     .await
                     .unwrap();
             }
@@ -218,16 +232,7 @@ impl Fixture {
                     .await
                     .unwrap();
 
-                // When calling function_name!() in a test to get a unique directory, the async-test
-                // wrapper makes a closure, so the name is something silly like:
-                //  "integration::service::service_artifact_docker_compose_includes_variables::{{closure}}"
-                // which Handlebars, when placing INSTALL_DIR and PERSIST_DIR variables into the systemd template file, sees as a bad substitution!
-                //
-                // We resolve this just by providing it, even though it's silly...
-                ant_gateway_env
-                    .write_all("closure=\"{{closure}}\"\n".as_bytes())
-                    .await
-                    .unwrap();
+                inject_closure_handlebars_replacement(&mut ant_gateway_env).await;
             }
             {
                 let mut beta_env = File::create(root_dir.join("envs").join("beta.build.cfg"))
@@ -238,16 +243,7 @@ impl Fixture {
                     .await
                     .unwrap();
 
-                // When calling function_name!() in a test to get a unique directory, the async-test
-                // wrapper makes a closure, so the name is something silly like:
-                //  "integration::service::service_artifact_docker_compose_includes_variables::{{closure}}"
-                // which Handlebars, when placing INSTALL_DIR and PERSIST_DIR variables into the systemd template file, sees as a bad substitution!
-                //
-                // We resolve this just by providing it, even though it's silly...
-                beta_env
-                    .write_all("closure={{closure}}\n".as_bytes())
-                    .await
-                    .unwrap();
+                inject_closure_handlebars_replacement(&mut beta_env).await;
             }
         }
 

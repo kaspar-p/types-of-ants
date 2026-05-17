@@ -5,6 +5,7 @@ Description=The typesofants database for managing the ants!
 Type=simple
 ExecStart=/snap/bin/docker-compose --project-directory={{INSTALL_DIR}} up --no-build --force-recreate ant-zookeeper-db
 WorkingDirectory={{INSTALL_DIR}}
+Slice=typesofants.slice
 Restart=always
 
 [Install]

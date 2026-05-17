@@ -5,8 +5,9 @@ Description=The typesofants host agent!
 Type=simple
 EnvironmentFile={{INSTALL_DIR}}/.env
 Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
-ExecStart={{INSTALL_DIR}}/ant-host-agent --fake-data-directory {{PERSIST_DIR}}/fs --env {{TYPESOFANTS_ENV}} --fake-serve-at-port {{FAKE_ANT_HOST_AGENT_PORT}}
+ExecStart={{INSTALL_DIR}}/ant-host-agent --fake-data-directory {{PERSIST_DIR}}/fs --env {{TYPESOFANTS_ENV}} --fake-serve-at-port {{FAKE_PORT}}
 WorkingDirectory={{INSTALL_DIR}}
+Slice=typesofants.slice
 Restart=always
 
 [Install]

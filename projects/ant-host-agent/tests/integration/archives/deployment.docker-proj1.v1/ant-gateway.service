@@ -7,10 +7,8 @@ ExecStart=/snap/bin/docker-compose --project-directory=/home/ant/service/ant-gat
 ExecStop=/snap/bin/docker-compose --project-directory=/home/ant/service/ant-gateway/464-2025-10-26-19-48-55517e3 stop ant-gateway
 EnvironmentFile=/home/ant/service/ant-gateway/464-2025-10-26-19-48-55517e3/.env
 WorkingDirectory=/home/ant/service/ant-gateway/464-2025-10-26-19-48-55517e3
+Slice=typesofants.slice
 Restart=always
-
-LoadCredentialEncrypted=tls_cert.pem:/home/ant/service/ant-gateway/464-2025-10-26-19-48-55517e3/secrets/tls_cert.pem
-LoadCredentialEncrypted=tls_key.pem:/home/ant/service/ant-gateway/464-2025-10-26-19-48-55517e3/secrets/tls_key.pem
 
 [Install]
 WantedBy=multi-user.target

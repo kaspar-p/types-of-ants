@@ -1,6 +1,8 @@
 use std::{
+    collections::HashMap,
     fs::{create_dir_all, remove_dir_all},
     path::PathBuf,
+    sync::Arc,
 };
 
 use ant_host_agent::{make_routes, routes::secret::PutSecretRequest, state::AntHostAgentState};
@@ -8,6 +10,7 @@ use ant_library_test::axum_test_client::TestClient;
 use flate2::{write::GzEncoder, Compression};
 use hyper::StatusCode;
 use tempfile::NamedTempFile;
+use tokio::sync::Mutex;
 
 pub struct TestFixture {
     archive_root_dir: PathBuf,
@@ -40,6 +43,7 @@ impl TestFixture {
         create_dir_all(&install_root_dir).unwrap();
 
         let state = AntHostAgentState {
+            services: Arc::new(Mutex::new(HashMap::new())),
             archive_root_dir: archive_root_dir.clone(),
             install_root_dir: install_root_dir.clone(),
             secrets_root_dir: test_secrets_dir.clone(),

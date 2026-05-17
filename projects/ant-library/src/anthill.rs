@@ -5,7 +5,7 @@ use tracing::debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnthillManifest {
-    // pub project: String,
+    pub project: String,
     pub build: AnthillBuild,
     pub deployment: Option<DeploymentOptions>,
     pub secrets: Option<Vec<String>>,
@@ -22,15 +22,13 @@ pub enum AnthillBuild {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeploymentOptions {
-    pub versioned: Option<bool>,
-}
+    /// The main port meant for this project, for service discovery.
+    pub port: Option<u16>,
 
-impl Default for DeploymentOptions {
-    fn default() -> Self {
-        Self {
-            versioned: Some(true),
-        }
-    }
+    /// A different port for discovering metrics, e.g. for webservers that don't want to expose their metrics to the world.
+    pub metrics_port: Option<u16>,
+
+    pub versioned: Option<bool>,
 }
 
 #[derive(thiserror::Error, Debug)]

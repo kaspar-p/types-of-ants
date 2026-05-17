@@ -1,6 +1,9 @@
 {
   "project": "ant-host-agent",
   "build": "makefile",
+  "deployment": {
+    "port": 3238
+  },
   "secrets": [
     "ant_data_farm_db",
     "ant_data_farm_user",

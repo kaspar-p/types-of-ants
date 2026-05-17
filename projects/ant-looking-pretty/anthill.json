@@ -1,4 +1,7 @@
 {
   "project": "ant-looking-pretty",
-  "build": "makefile"
+  "build": "makefile",
+  "deployment": {
+    "port": 3240
+  }
 }
