@@ -1,6 +1,10 @@
 {
   "project": "ant-data-farm",
   "build": "docker",
+  "archetype": "postgres",
+  "deployment": {
+    "port": 7000
+  },
   "secrets": [
     "ant_data_farm_db",
     "ant_data_farm_user",

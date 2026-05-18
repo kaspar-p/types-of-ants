@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use ant_library::anthill::AnthillManifest;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -26,6 +27,5 @@ pub struct AntHostAgentState {
 
 #[derive(Debug)]
 pub struct HostService {
-    pub project: String,
-    pub port: Option<u16>,
+    pub manifest: AnthillManifest,
 }

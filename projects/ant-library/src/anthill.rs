@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -7,6 +7,7 @@ use tracing::debug;
 pub struct AnthillManifest {
     pub project: String,
     pub build: AnthillBuild,
+    pub archetype: Option<AnthillArchetype>,
     pub deployment: Option<DeploymentOptions>,
     pub secrets: Option<Vec<String>>,
 }
@@ -18,6 +19,27 @@ pub enum AnthillBuild {
 
     #[serde(rename = "docker")]
     Docker,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AnthillArchetype {
+    #[serde(rename = "postgres")]
+    Postgres,
+
+    #[serde(rename = "webservice")]
+    Webservice,
+}
+
+impl FromStr for AnthillArchetype {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "postgres" => Ok(AnthillArchetype::Postgres),
+            "webservice" => Ok(AnthillArchetype::Webservice),
+            s => Err(format!("No such archetype: {s}")),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

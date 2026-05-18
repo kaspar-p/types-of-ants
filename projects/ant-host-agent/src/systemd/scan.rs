@@ -108,13 +108,11 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
             Ok(s) if s == SLICE_NAME => {
                 let service_id = unit_name.strip_suffix(".service").unwrap();
                 info!("Found typesofants service: {service_id}");
-                state.services.lock().await.insert(
-                    service_id.to_string(),
-                    HostService {
-                        project: manifest.project,
-                        port: manifest.deployment.as_ref().and_then(|d| d.port),
-                    },
-                );
+                state
+                    .services
+                    .lock()
+                    .await
+                    .insert(service_id.to_string(), HostService { manifest });
             }
             r => {
                 debug!("Skipping {unit_name} due to not included in {SLICE_NAME}: {r:?}");

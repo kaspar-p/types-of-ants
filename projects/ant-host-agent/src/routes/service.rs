@@ -1,17 +1,17 @@
 use ant_library::{
-    anthill::{AnthillManifest, AnthillManifestError},
+    anthill::{AnthillArchetype, AnthillManifest, AnthillManifestError},
     headers::{XAntProjectHeader, XAntServiceIdHeader, XAntVersionHeader},
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
 use handlebars::Handlebars;
 use humansize::DECIMAL;
-use std::{collections::HashMap, io::ErrorKind, path::PathBuf};
+use std::{collections::HashMap, io::ErrorKind, path::PathBuf, str::FromStr};
 use tempfile::TempDir;
 use tokio_util::codec;
 
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, Query, State},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -125,13 +125,11 @@ async fn enable_service(
     let install_dir = install_location_path(&state.install_root_dir, service_id, &req.version);
     let manifest = AnthillManifest::from_file(&install_dir.join("anthill.json"))?;
 
-    state.services.lock().await.insert(
-        service_id.to_string(),
-        HostService {
-            project: manifest.project,
-            port: manifest.deployment.as_ref().and_then(|d| d.port),
-        },
-    );
+    state
+        .services
+        .lock()
+        .await
+        .insert(service_id.to_string(), HostService { manifest });
 
     Ok((StatusCode::OK, "Service enabled."))
 }
@@ -428,18 +426,39 @@ pub struct ServiceDiscoveryTargets {
     labels: HashMap<String, String>,
 }
 
-pub async fn get_service_discovery(
+#[derive(Debug, Serialize, Deserialize)]
+struct ServiceDiscoveryFilters {
+    pub archetype: Option<String>,
+}
+
+async fn get_service_discovery(
     State(state): State<AntHostAgentState>,
+    Query(filters): Query<ServiceDiscoveryFilters>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
     let mut targets = vec![];
     for (service_id, service) in state.services.lock().await.iter() {
-        match service.port {
-            None => continue,
+        if let Some(archetype) = &filters.archetype {
+            let archetype = AnthillArchetype::from_str(&archetype)
+                .map_err(|e| AntHostAgentError::validation_msg(&e))?;
+
+            if let Some(service_archetype) = &service.manifest.archetype {
+                if archetype != *service_archetype {
+                    warn!("Skipping {service_id} because archetype mismatch.");
+                    continue;
+                }
+            }
+        }
+
+        match service.manifest.deployment.as_ref().and_then(|d| d.port) {
+            None => {
+                warn!("Skipping {service_id} because no port is defined in the anthill.json manifest!");
+                continue;
+            }
             Some(port) => {
                 targets.push(ServiceDiscoveryTargets {
                     targets: vec![format!("localhost:{}", port)],
                     labels: HashMap::from([
-                        ("project".to_string(), service.project.to_string()),
+                        ("project".to_string(), service.manifest.project.to_string()),
                         ("service_id".to_string(), service_id.to_string()),
                     ]),
                 });
