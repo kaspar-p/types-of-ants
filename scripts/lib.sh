@@ -107,6 +107,26 @@ function is_project_docker() {
   test "$(get_build "$project")" == "docker"
 }
 
+function find_secrets_dir() {
+  local deploy_env="$1"
+
+  if [[ $deploy_env == "dev" ]]; then
+    echo "$repository_root/secrets/dev"
+  else
+    echo "$repository_root/projects/ant-zookeeper/dev-fs/dev-fs/secrets-db/$deploy_env"
+  fi
+}
+
+function deploy_env_filepath() {
+   local deploy_env="$1"
+
+  if [[ $deploy_env == "dev" ]]; then
+    echo "$repository_root/secrets/dev/build.cfg"
+  else
+    echo "$repository_root/projects/ant-zookeeper/dev-fs/dev-fs/envs/$deploy_env.build.cfg"
+  fi
+}
+
 function get_docker_platform() {
   local host="$1"
   local arch

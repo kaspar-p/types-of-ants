@@ -4,6 +4,7 @@
   "secrets": [
     "ant_backing_it_up_db_db",
     "ant_backing_it_up_db_user",
-    "ant_backing_it_up_db_password"
+    "ant_backing_it_up_db_password",
+    "ant_db_monitoring_password"
   ]
 }

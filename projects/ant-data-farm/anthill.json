@@ -4,6 +4,7 @@
   "secrets": [
     "ant_data_farm_db",
     "ant_data_farm_user",
-    "ant_data_farm_password"
+    "ant_data_farm_password",
+    "ant_db_monitoring_password"
   ]
 }

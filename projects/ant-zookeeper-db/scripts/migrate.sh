@@ -22,12 +22,9 @@ current_highest_migration="$(
   --command='select max(migration_seq) from migration;'
 )"
 
-echo "CURRENT HIGHEST MIGRATION: $current_highest_migration"
-exit 1
-
 migrations_root="$repository_root/projects/ant-zookeeper-db/migrations"
 for filename in "$migrations_root"/*; do
-  migration_num=$(basename "$filename" | cut -d '_' -f 1)
+  migration_num="$(basename "$filename" | cut -d '_' -f 1 | cut -d '-' -f 1)"
   if [ "$migration_num" -le "$current_highest_migration" ]; then
     echo "... skipping $filename" >> /dev/stderr
     continue

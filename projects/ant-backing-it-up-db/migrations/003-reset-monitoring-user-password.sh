@@ -2,8 +2,14 @@
 
 set -euo pipefail
 
+DB_USER_FILEPATH="${1:-/run/secrets/ant_backing_it_up_db_user}"
+DB_NAME_FILEPATH="${2:-/run/secrets/ant_backing_it_up_db_db}"
+MONITORING_PASSWORD_FILEPATH="${3:-/run/secrets/ant_db_monitoring_password}"
+HOST="${4:-localhost}"
+PORT="${5:-5432}"
+
 echo "Reading monitoring password..."
-MONITORING_PW="$(cat /run/secrets/ant_db_monitoring_password)"
+MONITORING_PW="$(cat "$MONITORING_PASSWORD_FILEPATH")"
 
 echo "Resetting monitoring user's password..."
 
@@ -17,6 +23,7 @@ COMMIT;
 "
 
 psql -c "$MIGRATION" \
-  -v MONITORING_PW="${MONITORING_PW}" \
-  --username "$(cat /run/secrets/ant_backing_it_up_db_user)" \
-  --dbname "$(cat /run/secrets/ant_backing_it_up_db_db)"
+  --host "$HOST" \
+  --port "$PORT" \
+  --username "$(cat "$DB_USER_FILEPATH")" \
+  --dbname "$(cat "$DB_NAME_FILEPATH")"
