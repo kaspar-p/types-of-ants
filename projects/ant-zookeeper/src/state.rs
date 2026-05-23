@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use acme_lib::DirectoryUrl;
 use ant_host_agent::client::AntHostAgentClientFactory;
+use ant_library::services::Services;
 use ant_zookeeper_db::AntZooStorageClient;
 use tokio::sync::Mutex;
 
@@ -10,6 +11,8 @@ use crate::dns::Dns;
 #[derive(Clone)]
 pub struct AntZookeeperState {
     pub root_dir: PathBuf,
+
+    pub services: Arc<Services>,
 
     pub db: AntZooStorageClient,
 

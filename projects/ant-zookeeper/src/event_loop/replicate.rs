@@ -4,8 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use ant_host_agent::client::AntHostAgentClientConfig;
-use ant_library::anthill::AnthillManifest;
+use ant_host_agent::{client::AntHostAgentClientConfig, state::HostService};
+use ant_library::{
+    anthill::AnthillManifest,
+    services::{ServiceInstance, Services},
+};
 use ant_zookeeper_db::HostGroup;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -56,6 +59,7 @@ async fn inject_secrets(
 
 fn source_env_variables(
     state: &AntZookeeperState,
+    service_instance: &ServiceInstance,
     manifest: &AnthillManifest,
     project: &str,
     version: &str,
@@ -95,6 +99,14 @@ fn source_env_variables(
         variables.insert(metrics_port_var, metrics_port.to_string());
     }
 
+    for (k, v) in service_instance
+        .additional_vars
+        .as_ref()
+        .unwrap_or(&HashMap::new())
+    {
+        variables.insert(k.clone(), v.clone());
+    }
+
     Ok(variables)
 }
 
@@ -105,6 +117,7 @@ fn source_env_variables(
 /// So we need to mustache-replace the docker-compose.yml file that we find
 async fn render_docker_compose(
     state: &AntZookeeperState,
+    service_instance: &ServiceInstance,
     manifest: &AnthillManifest,
     dest: &PathBuf,
     project: &str,
@@ -122,21 +135,28 @@ async fn render_docker_compose(
 
     let template = mustache::compile_path(&docker_compose_path)?;
     let variables = mustache::Data::Map(
-        source_env_variables(state, manifest, project, version, environment)?
-            .into_iter()
-            .map(|(k, v)| {
-                // The mustache engine takes a line like:
-                //  VARIABLE="my-value"
-                // and interpolated the quotes into &quot; into the docker-compose file, so remove the leading ones first.
-                (
-                    k,
-                    v.trim_end_matches("\"")
-                        .trim_start_matches("\"")
-                        .to_string(),
-                )
-            })
-            .map(|(k, v)| (k, mustache::Data::String(v)))
-            .collect(),
+        source_env_variables(
+            state,
+            service_instance,
+            manifest,
+            project,
+            version,
+            environment,
+        )?
+        .into_iter()
+        .map(|(k, v)| {
+            // The mustache engine takes a line like:
+            //  VARIABLE="my-value"
+            // and interpolated the quotes into &quot; into the docker-compose file, so remove the leading ones first.
+            (
+                k,
+                v.trim_end_matches("\"")
+                    .trim_start_matches("\"")
+                    .to_string(),
+            )
+        })
+        .map(|(k, v)| (k, mustache::Data::String(v)))
+        .collect(),
     );
 
     // Create in a temp place in case something fails
@@ -155,6 +175,7 @@ async fn render_docker_compose(
 
 async fn inject_env_file(
     state: &AntZookeeperState,
+    service_instance: &ServiceInstance,
     manifest: &AnthillManifest,
     dest: &PathBuf,
     project: &str,
@@ -168,7 +189,14 @@ async fn inject_env_file(
         .create(true)
         .open(dest.join(".env"))
         .await?;
-    for (key, value) in source_env_variables(state, manifest, project, version, environment)? {
+    for (key, value) in source_env_variables(
+        state,
+        service_instance,
+        manifest,
+        project,
+        version,
+        environment,
+    )? {
         let escaped_value = value.replace(r#"""#, r#"\""#);
         let content = format!("{}=\"{}\"\n", key, escaped_value);
         info!("Writing trimmed config [{}]", content.trim());
@@ -192,6 +220,14 @@ pub async fn replicate_artifact_step(
         .get_artifact_by_revision(&revision, &host_group.project, Some(&host_arch))
         .await?
         .unwrap();
+
+    let service_instance = state
+        .services
+        .service_instance(&host_group.project, host)
+        .ok_or(anyhow::Error::msg(format!(
+            "cannot deploy to a [{host}] that doesn't have service [{}] defined in services.json!",
+            host_group.project
+        )))?;
 
     let artifact_path = artifact_persist_dir(&state.root_dir).join(artifact_relative_path);
 
@@ -219,6 +255,7 @@ pub async fn replicate_artifact_step(
 
             inject_env_file(
                 state,
+                service_instance,
                 &manifest,
                 &unpack_dir_path,
                 &host_group.project,
@@ -229,6 +266,7 @@ pub async fn replicate_artifact_step(
             inject_secrets(state, &unpack_dir_path, &host_group.environment).await?;
             render_docker_compose(
                 state,
+                service_instance,
                 &manifest,
                 &unpack_dir_path,
                 &host_group.project,

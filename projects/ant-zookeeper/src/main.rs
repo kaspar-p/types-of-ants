@@ -1,7 +1,11 @@
 use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use ant_host_agent::client::RemoteAntHostAgentClientFactory;
-use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
+use ant_library::{
+    db::{DatabaseConfig, TypesOfAntsDatabase},
+    find_up::find_up,
+    services::Services,
+};
 use ant_zookeeper::{dns::CloudFlareDns, state::AntZookeeperState};
 use ant_zookeeper_db::AntZooStorageClient;
 use anyhow::Context;
@@ -22,8 +26,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let root_dir = PathBuf::from(persist_dir).join(root_path);
     create_dir_all(&root_dir)?;
 
+    let services = Services::from_path(&find_up("services.json"))?;
+
     let state = AntZookeeperState {
         root_dir,
+
+        services: Arc::new(services),
 
         db: AntZooStorageClient::connect(&DatabaseConfig {
             port: std::env::var("ANT_ZOOKEEPER_DB_PORT")

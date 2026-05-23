@@ -1,6 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
+    fs::File,
     hash::Hash,
+    path::Path,
 };
 
 use serde::{Deserialize, Serialize};
@@ -118,6 +120,13 @@ impl Services {
         Ok(())
     }
 
+    pub fn from_path(p: &Path) -> Result<Self, anyhow::Error> {
+        let f = File::open(p)?;
+        let content: Self = serde_json::from_reader(&f)?;
+        content.validate()?;
+        Ok(content)
+    }
+
     pub fn list_service_ids<'a>(&'a self) -> Vec<&'a str> {
         let mut service_ids = HashSet::<&str>::new();
 
@@ -132,6 +141,47 @@ impl Services {
         }
 
         service_ids.into_iter().collect()
+    }
+
+    pub fn list_hosts_with_project<'a>(
+        &'a self,
+        project: &str,
+    ) -> Vec<(&'a str, &'a ServiceInstance)> {
+        let mut hosts = HashSet::<(&'a str, &'a ServiceInstance)>::new();
+
+        for (host_id, host) in &self.hosts {
+            if host.ineligible() {
+                continue;
+            }
+
+            for host_service in &host.services {
+                if host_service.project == project {
+                    hosts.insert((host_id, host_service));
+                }
+            }
+        }
+
+        hosts.into_iter().collect()
+    }
+
+    pub fn service_instance<'a>(
+        &'a self,
+        service_id: &str,
+        host_id: &str,
+    ) -> Option<&'a ServiceInstance> {
+        for (host, host_config) in &self.hosts {
+            if host != host_id || host_config.ineligible() {
+                continue;
+            }
+
+            for host_service in &host_config.services {
+                if host_service.id() == service_id {
+                    return Some(&host_service);
+                }
+            }
+        }
+
+        return None;
     }
 
     pub fn list_hosts_with_service<'a>(

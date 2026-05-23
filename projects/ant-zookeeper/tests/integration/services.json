@@ -1,0 +1,30 @@
+{
+  "hosts": {
+    "antworker001.hosts.typesofants.org": {
+      "architecture": "arm",
+      "auto_deployable": true,
+      "services": [
+        {
+          "env": "prod",
+          "project": "ant-host-agent",
+          "additional_vars": {
+            "ADDITIONAL_KEY_1": "ADDITIONAL_VALUE_2"
+          }
+        }
+      ]
+    },
+    "antworker002.hosts.typesofants.org": {
+      "architecture": "arm",
+      "auto_deployable": true,
+      "services": [
+        {
+          "env": "prod",
+          "project": "ant-gateway",
+          "additional_vars": {
+            "ADDITIONAL_KEY_2": "ADDITIONAL_VALUE_2"
+          }
+        }
+      ]
+    }
+  }
+}

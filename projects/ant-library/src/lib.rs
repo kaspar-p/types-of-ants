@@ -14,6 +14,7 @@ use tracing_subscriber::{fmt::writer::Tee, EnvFilter, FmtSubscriber};
 pub mod anthill;
 pub mod db;
 pub mod env;
+pub mod find_up;
 pub mod headers;
 pub mod host_architecture;
 pub mod manifest_file;

@@ -5,32 +5,16 @@ use ant_zookeeper::{
     },
 };
 
-use ant_library::services::{ServiceEnv, Services};
-
-pub fn find_up(filename: &str) -> std::path::PathBuf {
-    let mut dir = std::env::current_dir().unwrap();
-
-    loop {
-        let candidate = dir.join(filename);
-        if std::fs::exists(&candidate).unwrap() {
-            return candidate;
-        }
-
-        dir = dir
-            .parent()
-            .expect(&format!("got to root without finding: {filename}"))
-            .to_path_buf()
-    }
-}
+use ant_library::{
+    find_up::find_up,
+    services::{ServiceEnv, Services},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt().init();
 
-    let services: Services =
-        serde_json::de::from_reader(std::fs::File::open(find_up("services.json")).unwrap())
-            .unwrap();
-    services.validate().expect("malformed services.json");
+    let services = Services::from_path(&find_up("services.json"))?;
 
     let client = AntZookeeperClient::new(AntZookeeperClientConfig {
         tls: false,

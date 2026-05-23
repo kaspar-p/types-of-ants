@@ -738,6 +738,9 @@ async fn service_artifact_docker_compose_includes_variables() {
         assert!(env_file_content.contains(r#"PERSIST_DIR="/home/ant/persist/ant-gateway""#));
         assert!(env_file_content.contains(r#"ANT_GATEWAY_FQDN="test.typesofants.org""#));
         assert!(env_file_content.contains(r#"VERSION="v1""#));
+
+        // And additional variables from the services.json file.
+        assert!(env_file_content.contains(r#"ADDITIONAL_KEY_2="ADDITIONAL_VALUE_2""#));
     }
 }
 

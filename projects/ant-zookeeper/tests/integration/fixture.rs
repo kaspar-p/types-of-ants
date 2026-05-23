@@ -4,7 +4,7 @@ use ant_host_agent::{
     client::{AntHostAgentClient, AntHostAgentClientConfig, AntHostAgentClientFactory},
     state::AntHostAgentState,
 };
-use ant_library::db::TypesOfAntsDatabase;
+use ant_library::{db::TypesOfAntsDatabase, services::Services};
 use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},
@@ -247,9 +247,18 @@ impl Fixture {
             }
         }
 
+        let services = Services::from_path(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests")
+                .join("integration")
+                .join("services.json"),
+        )
+        .expect("bad test services.json");
+
         let state = AntZookeeperState {
             dns: Arc::new(Mutex::new(TestDns::new())),
             rng: OsRng,
+            services: Arc::new(services),
             acme_url: acme_lib::DirectoryUrl::LetsEncryptStaging,
             acme_contact_email: "integ-test@typesofants.org".to_string(),
             root_dir: root_dir,
