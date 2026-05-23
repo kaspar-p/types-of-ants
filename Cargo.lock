@@ -497,6 +497,7 @@ dependencies = [
  "ant-library-test",
  "ant-zookeeper-db",
  "anyhow",
+ "assertables",
  "async-trait",
  "axum",
  "axum-extra",

@@ -232,6 +232,16 @@ impl Fixture {
                     .await
                     .unwrap();
 
+                ant_gateway_env
+                    .write_all(
+                        format!(
+                            "ANT_GATEWAY_FLAGS_FROM_ENV=\"--flag=val1 --flag2=\\\"val2\\\"\"\n",
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+
                 inject_closure_handlebars_replacement(&mut ant_gateway_env).await;
             }
             {

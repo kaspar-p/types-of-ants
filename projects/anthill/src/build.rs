@@ -237,6 +237,7 @@ async fn build_artifact<'a>(
             .args(["-e", &format!("RUST_TARGET={}", arch.rust_target())])
             .args(["-e", &format!("PROMETHEUS_OS={}", arch.prometheus_os())])
             .args(["-e", &format!("PROMETHEUS_ARCH={}", arch.prometheus_arch())])
+            .args(["-e", &format!("HASHICORP_ARCH={}", arch.hashicorp_arch())])
             .args(["-e", &format!("commit_sha={}", git.head_sha)])
             .arg("release")
             .spawn()

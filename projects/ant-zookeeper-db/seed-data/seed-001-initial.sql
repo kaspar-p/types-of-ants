@@ -47,6 +47,9 @@ values
   ('ant-zookeeper-db', true),
   ('ant-zookeeper', true),
   ('ant-monitor', true),
+  ('ant-matchmaker', true),
+  ('ant-lumberjack', true),
+  ('ant-sawmill', true),
   ('nextcloud-webdav', false)
 ;
 

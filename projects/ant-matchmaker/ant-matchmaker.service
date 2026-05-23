@@ -1,0 +1,24 @@
+[Unit]
+Description=The typesofants service discovery mechanism!
+
+[Service]
+Type=simple
+EnvironmentFile={{INSTALL_DIR}}/.env
+Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
+ExecStart={{INSTALL_DIR}}/consul agent \
+  -config-format=hcl \
+  -config-file={{INSTALL_DIR}}/consul.hcl \
+  -config-file={{SECRETS_DIR}}/consul_gossip_encryption_key.secret \
+  -data-dir={{PERSIST_DIR}}/consul-data \
+  -http-port={{ANT_MATCHMAKER_HTTP_PORT}} \
+  -serf-lan-port={{ANT_MATCHMAKER_GOSSIP_PORT}} \
+  -server-port={{ANT_MATCHMAKER_SERVER_PORT}} \
+  {{ANT_MATCHMAKER_SERVER_FLAGS}} \
+  {{ANT_MATCHMAKER_RETRY_JOIN_FLAGS}}
+ExecReload=/bin/kill -HUP $MAINPID
+WorkingDirectory={{INSTALL_DIR}}
+Slice=typesofants.slice
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

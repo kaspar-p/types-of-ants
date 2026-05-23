@@ -71,6 +71,7 @@ thiserror = "2.0.18"
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }
+assertables = "9.9.0"
 postgresql_embedded = "0.20.0"
 stdext = "0.3.3"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }

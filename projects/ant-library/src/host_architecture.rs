@@ -50,6 +50,14 @@ impl HostArchitecture {
             Self::X86_64 => "amd64",
         }
     }
+
+    pub fn hashicorp_arch(&self) -> &str {
+        match &self {
+            Self::ArmV7 => "arm",
+            Self::Aarch64 => "arm64",
+            Self::X86_64 => "amd64",
+        }
+    }
 }
 
 impl FromStr for HostArchitecture {

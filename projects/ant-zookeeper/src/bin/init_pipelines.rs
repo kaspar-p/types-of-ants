@@ -7,7 +7,7 @@ use ant_zookeeper::{
 
 use ant_library::{
     find_up::find_up,
-    services::{ServiceEnv, Services},
+    services::{ServiceEnv, ServiceInstance, Services},
 };
 
 #[tokio::main]
@@ -22,7 +22,7 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     for service_id in services.list_service_ids() {
-        let hosts = services.list_hosts_with_service(&service_id);
+        let hosts: Vec<(&str, &ServiceInstance)> = services.list_hosts_with_service(&service_id);
 
         let beta_hg_id = if hosts.iter().any(|(_, s)| matches!(s.env, ServiceEnv::Beta)) {
             let hg = client
@@ -47,16 +47,25 @@ async fn main() -> Result<(), anyhow::Error> {
             None
         };
 
-        let prod_hg_id = if hosts.iter().any(|(_, s)| matches!(s.env, ServiceEnv::Prod)) {
+        let mut prod_hg_ids = vec![];
+
+        let prod_hosts = hosts
+            .iter()
+            .filter_map(|h| match h.1.env {
+                ServiceEnv::Prod => Some(h.0),
+                ServiceEnv::Beta => None,
+            })
+            .collect::<Vec<_>>();
+        for (i, prod_wave) in decide_stages(service_id, &prod_hosts).iter().enumerate() {
             let hg = client
                 .create_host_group(CreateHostGroupRequest {
-                    name: format!("{service_id}/prod"),
+                    name: format!("{service_id}/{i}/prod"),
                     project: service_id.to_string(),
                     environment: "prod".to_string(),
                 })
                 .await?;
 
-            for (host_id, _) in hosts.iter().filter(|h| matches!(h.1.env, ServiceEnv::Prod)) {
+            for host_id in prod_wave {
                 client
                     .add_host_to_host_group(AddHostToHostGroupRequest {
                         host_group_id: hg.id.clone(),
@@ -65,28 +74,32 @@ async fn main() -> Result<(), anyhow::Error> {
                     .await?;
             }
 
-            Some(hg.id)
-        } else {
-            None
-        };
+            prod_hg_ids.push(hg.id);
+        }
 
         let beta_stage = beta_hg_id.map(|id| PutPipelineStage {
             name: "beta".to_string(),
             host_group_ids: vec![id],
         });
-        let prod_stage = prod_hg_id.map(|id| PutPipelineStage {
-            name: "prod".to_string(),
-            host_group_ids: vec![id],
-        });
+        let mut prod_stages = prod_hg_ids
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| PutPipelineStage {
+                name: format!("prod/{i}"),
+                host_group_ids: vec![id],
+            })
+            .collect::<Vec<_>>();
+
+        let mut stages = vec![];
+        if let Some(beta_stage) = beta_stage {
+            stages.push(beta_stage);
+        }
+        stages.append(&mut prod_stages);
 
         client
             .put_pipeline(PutPipelineRequest {
                 name: service_id.to_string(),
-                stages: vec![beta_stage, prod_stage]
-                    .into_iter()
-                    .filter_map(|s| s)
-                    .map(|s| vec![s])
-                    .collect(),
+                stages: stages.into_iter().map(|stage| vec![stage]).collect(),
             })
             .await?;
 
@@ -106,6 +119,89 @@ async fn main() -> Result<(), anyhow::Error> {
     // pipeline_ant_worker_metrics_exporter(&client).await?;
 
     Ok(())
+}
+
+fn decide_stages<'a>(service_id: &str, hosts: &'a [&str]) -> Vec<Vec<&'a str>> {
+    match service_id {
+        "ant-host-agent" => {
+            let hosts = hosts.iter().map(|&s| s).collect::<Vec<&str>>();
+            vec![hosts]
+        }
+        _ => wave_layout(hosts),
+    }
+}
+
+fn wave_layout<'a>(hosts: &'a [&str]) -> Vec<Vec<&'a str>> {
+    let mut host_chunks = vec![];
+    let sizes = [1, 2, 4];
+    let mut size_idx = 0;
+    let mut host_cursor = 0;
+    loop {
+        let chunk_size = if size_idx < sizes.len() {
+            sizes[size_idx]
+        } else {
+            4
+        };
+
+        let mut chunk = vec![];
+        for _ in 0..chunk_size {
+            if host_cursor >= hosts.len() {
+                // append half-built chunk and return
+                if !chunk.is_empty() {
+                    host_chunks.push(chunk);
+                };
+                return host_chunks;
+            }
+
+            chunk.push(hosts[host_cursor]);
+            host_cursor += 1;
+        }
+
+        host_chunks.push(chunk);
+        size_idx += 1;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{decide_stages, wave_layout};
+
+    #[test]
+    fn test_wave_layout() {
+        let hosts = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
+        let waves = wave_layout(&hosts);
+        assert_eq!(
+            waves,
+            vec![
+                vec!["a"],
+                vec!["b", "c"],
+                vec!["d", "e", "f", "g"],
+                vec!["h", "i", "j", "k"],
+                vec!["l"]
+            ]
+        )
+    }
+
+    #[test]
+    fn test_wave_layout2() {
+        let hosts = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
+        let waves = wave_layout(&hosts);
+        assert_eq!(
+            waves,
+            vec![
+                vec!["a"],
+                vec!["b", "c"],
+                vec!["d", "e", "f", "g"],
+                vec!["h", "i", "j", "k"],
+            ]
+        )
+    }
+
+    #[test]
+    fn test_agent() {
+        let waves = decide_stages("ant-host-agent", &["a", "b"]);
+        assert_eq!(waves, vec![vec!["a", "b"]]);
+    }
 }
 
 // async fn pipeline_ant_backing_it_up_and_ant_backing_it_up_db(

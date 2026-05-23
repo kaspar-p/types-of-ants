@@ -1,0 +1,14 @@
+[Unit]
+Description=The typesofants host agent!
+
+[Service]
+Type=simple
+EnvironmentFile={{INSTALL_DIR}}/.env
+Environment=TYPESOFANTS_SECRET_DIR={{INSTALL_DIR}}/secrets
+ExecStart={{INSTALL_DIR}}/ant-host-agent
+WorkingDirectory={{INSTALL_DIR}}
+Slice=typesofants.slice
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

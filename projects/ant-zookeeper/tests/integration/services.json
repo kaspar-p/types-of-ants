@@ -21,7 +21,9 @@
           "env": "prod",
           "project": "ant-gateway",
           "additional_vars": {
-            "ADDITIONAL_KEY_2": "ADDITIONAL_VALUE_2"
+            "ADDITIONAL_KEY_2": "ADDITIONAL_VALUE_2",
+            "ADDITIONAL_KEY_3": "a b=c",
+            "ANT_GATEWAY_FLAGS_FROM_ADDITIONAL": "--some_flag=val1 --other_flag=val2"
           }
         }
       ]

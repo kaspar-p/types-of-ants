@@ -14,6 +14,7 @@ use ant_zookeeper::{
         service::{UpsertRevisionRequest, UpsertRevisionResponse},
     },
 };
+use assertables::assert_contains;
 use http::StatusCode;
 use stdext::function_name;
 use tokio::test;
@@ -723,24 +724,50 @@ async fn service_artifact_docker_compose_includes_variables() {
         assert!(std::fs::exists(dir.join("secrets").join("tls_key.secret")).unwrap());
         assert!(std::fs::exists(dir.join("docker-compose.yml")).unwrap());
         let compose_yml_content = std::fs::read_to_string(dir.join("docker-compose.yml")).unwrap();
-        assert!(compose_yml_content.contains("- ant-gateway:latest")); // tags
-        assert!(compose_yml_content.contains("- ant-gateway:v1")); // tags
-        assert!(compose_yml_content.contains("VERSION: \"v1\"")); // environment
-        assert!(compose_yml_content.contains("ANT_GATEWAY_FQDN: \"test.typesofants.org\"")); // environment
+        assert_contains!(compose_yml_content, "- ant-gateway:latest"); // tags
+        assert_contains!(compose_yml_content, "- ant-gateway:v1"); // tags
+        assert_contains!(compose_yml_content, "VERSION: \"v1\""); // environment
+        assert_contains!(
+            compose_yml_content,
+            "ANT_GATEWAY_FQDN: \"test.typesofants.org\""
+        ); // environment
 
         let systemd_content = std::fs::read_to_string(dir.join("ant-gateway.service")).unwrap();
-        assert!(systemd_content.contains(r#"--listen-at-fake-port=":test.typesofants.org""#));
+        assert_contains!(
+            systemd_content,
+            r#"--listen-at-fake-port=":test.typesofants.org""#
+        );
+        assert_contains!(systemd_content, r#"--flag=val1"#);
+        assert_contains!(systemd_content, r#"--some_flag=val1 --other_flag=val2"#);
 
         assert!(std::fs::exists(dir.join(".env")).unwrap());
         let env_file_content = std::fs::read_to_string(dir.join(".env")).unwrap();
-        assert!(env_file_content.contains(r#"ANT_GATEWAY_JSON_DATA="{\"some\":\"data\"}""#));
-        assert!(env_file_content.contains(r#"TYPESOFANTS_ENV="beta""#));
-        assert!(env_file_content.contains(r#"PERSIST_DIR="/home/ant/persist/ant-gateway""#));
-        assert!(env_file_content.contains(r#"ANT_GATEWAY_FQDN="test.typesofants.org""#));
-        assert!(env_file_content.contains(r#"VERSION="v1""#));
+        assert_contains!(
+            env_file_content,
+            r#"ANT_GATEWAY_JSON_DATA="{\"some\":\"data\"}""#
+        );
+        assert_contains!(env_file_content, r#"TYPESOFANTS_ENV="beta""#);
+        assert_contains!(
+            env_file_content,
+            r#"PERSIST_DIR="/home/ant/persist/ant-gateway""#
+        );
+        assert_contains!(
+            env_file_content,
+            r#"ANT_GATEWAY_FQDN="test.typesofants.org""#
+        );
+        assert_contains!(env_file_content, r#"VERSION="v1""#);
+        assert_contains!(
+            env_file_content,
+            r#"ANT_GATEWAY_FLAGS_FROM_ENV="--flag=val1 --flag2=\"val2\"""#
+        );
 
         // And additional variables from the services.json file.
-        assert!(env_file_content.contains(r#"ADDITIONAL_KEY_2="ADDITIONAL_VALUE_2""#));
+        assert_contains!(env_file_content, r#"ADDITIONAL_KEY_2="ADDITIONAL_VALUE_2""#);
+        assert_contains!(env_file_content, r#"ADDITIONAL_KEY_3="a b=c""#);
+        assert_contains!(
+            env_file_content,
+            r#"ANT_GATEWAY_FLAGS_FROM_ADDITIONAL="--some_flag=val1 --other_flag=val2""#
+        );
     }
 }
 

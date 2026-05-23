@@ -64,6 +64,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-backing-it-up"
         },
         {
@@ -99,6 +106,13 @@
         {
           "env": "beta",
           "project": "ant-worker-node-metrics-exporter"
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
         },
         {
           "env": "beta",
@@ -152,6 +166,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-backing-it-up-db"
         }
       ]
@@ -174,6 +195,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-fs"
         }
       ]
@@ -193,6 +221,13 @@
         {
           "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
         },
         {
           "env": "prod",
@@ -222,6 +257,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-data-farm"
         }
       ]
@@ -237,6 +279,13 @@
         {
           "env": "prod",
           "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
         },
         {
           "env": "prod",

@@ -4,9 +4,15 @@ use ant_library::{
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
-use handlebars::Handlebars;
+use handlebars::{no_escape, Handlebars};
 use humansize::DECIMAL;
-use std::{collections::HashMap, io::ErrorKind, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap,
+    io::{ErrorKind, Write},
+    path::{Path, PathBuf},
+    str::FromStr,
+    thread::current,
+};
 use tempfile::TempDir;
 use tokio_util::codec;
 
@@ -36,16 +42,6 @@ fn unit_name(service_id: &str) -> String {
     format!("{service_id}.service")
 }
 
-fn unit_file_path(service_id: &str, version: &str) -> PathBuf {
-    PathBuf::from("/")
-        .join("home")
-        .join("ant")
-        .join("service")
-        .join(service_id)
-        .join(version)
-        .join(unit_name(service_id))
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct EnableServiceRequest {
     #[deprecated(note = "Prefer service_id")]
@@ -55,15 +51,10 @@ pub struct EnableServiceRequest {
     pub version: String,
 }
 
-async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str) {
+async fn enable_unit(manager: &ManagerProxy<'_>, unit_path: &Path) {
     info!("Enabling service...");
-    let unit_file_path = unit_file_path(service_id, version);
     let enable = manager
-        .enable_unit_files(
-            vec![unit_file_path.to_str().unwrap().to_string()],
-            false,
-            true,
-        )
+        .enable_unit_files(vec![unit_path.to_str().unwrap().to_string()], false, true)
         .await;
 
     match enable {
@@ -73,16 +64,34 @@ async fn enable_unit(manager: &ManagerProxy<'_>, service_id: &str, version: &str
         Err(zbus::Error::MethodError(name, _, _))
             if name == "org.freedesktop.systemd1.NoSuchUnit" =>
         {
-            warn!("No such unit file: {}", unit_file_path.display());
+            warn!("No such unit file: {}", unit_path.display());
         }
         Err(e) => {
-            error!(
-                "Failed to enable unit file: {}, {}",
-                unit_file_path.display(),
-                e
-            );
+            error!("Failed to enable unit file: {}, {}", unit_path.display(), e);
         }
     }
+}
+
+fn install_dir(install_root: &PathBuf, service_id: &str) -> PathBuf {
+    install_root.join(service_id).join("current")
+}
+
+/// Flip a symlink like dir/current/ from pointing at dir/v1 to dir/v2 for an upgrade
+fn flip_symlink(symlink: &Path, to: &Path) -> Result<(), anyhow::Error> {
+    info!(
+        "Changing symlink {} to point to {}",
+        symlink.display(),
+        to.display()
+    );
+    let tmp_link = symlink.with_added_extension(".tmp");
+
+    info!("Creating temporary: {}", tmp_link.display());
+    std::os::unix::fs::symlink(to, &tmp_link).context("creating <symlink>.tmp")?;
+
+    info!("Renaming {} to {}", tmp_link.display(), symlink.display());
+    std::fs::rename(&tmp_link, &symlink).context("renaming <symlink>.tmp to <symlink>")?;
+
+    Ok(())
 }
 
 /// A route to enable a systemd service. This is _fast_, and can be used to switch between versions quickly.
@@ -101,7 +110,21 @@ async fn enable_service(
 
     let unit_name = unit_name(&service_id);
 
-    enable_unit(&manager, &service_id, &req.version).await;
+    let previous_symlink = state.install_root_dir.join(service_id).join("previous");
+    let current_symlink = state.install_root_dir.join(service_id).join("current");
+
+    let active_version_dir =
+        std::fs::canonicalize(&current_symlink).context("resolve current symlink")?;
+    let incoming_version_dir =
+        resolve_latest_versioned_install_dir(&state.install_root_dir, service_id, &req.version)?
+            .ok_or(AntHostAgentError::validation_msg(
+                "No installation directories can be found, did you install first?",
+            ))?;
+
+    flip_symlink(&previous_symlink, &active_version_dir).context("flip symlink")?;
+    flip_symlink(&current_symlink, &incoming_version_dir).context("flip symlink")?;
+
+    // enable_unit(&manager, &install_dir.join(&unit_name)).await;
 
     manager.reload().await.context("daemon reload")?;
 
@@ -122,8 +145,7 @@ async fn enable_service(
         }
     }
 
-    let install_dir = install_location_path(&state.install_root_dir, service_id, &req.version);
-    let manifest = AnthillManifest::from_file(&install_dir.join("anthill.json"))?;
+    let manifest = AnthillManifest::from_file(&current_symlink.join("anthill.json"))?;
 
     state
         .services
@@ -151,9 +173,60 @@ fn deployment_file_name(service_id: &str, version: &str) -> String {
     format!("deployment.{service_id}.{version}.tar.gz")
 }
 
-/// The directory where all installable files for the project will live
-fn install_location_path(install_root: &PathBuf, service_id: &str, version: &str) -> PathBuf {
-    install_root.join(service_id).join(version)
+fn versioned_install_dir(
+    install_root: &PathBuf,
+    service_id: &str,
+    version: &str,
+) -> Result<PathBuf, anyhow::Error> {
+    let base_dir = install_root.join(service_id);
+
+    let mut attempt = 1;
+
+    loop {
+        let candidate = base_dir.join(format!("{version}.{attempt}"));
+        if !std::fs::exists(&candidate)? {
+            return Ok(candidate);
+        } else {
+            attempt += 1
+        }
+    }
+}
+
+fn resolve_latest_versioned_install_dir(
+    install_root: &PathBuf,
+    service_id: &str,
+    version: &str,
+) -> Result<Option<PathBuf>, anyhow::Error> {
+    let base_dir = install_root.join(service_id);
+    if !std::fs::exists(&base_dir)? {
+        return Ok(None);
+    }
+
+    let mut latest: Option<(i32, PathBuf)> = None;
+
+    for entry in std::fs::read_dir(&base_dir)? {
+        let entry = entry?;
+        let dir_name = entry.file_name().into_string().expect("file was not utf8");
+
+        // From v523-2025-12-12-01-01-01-deadbeef.99, extract the .99
+        if let Some(dir_attempt) = dir_name.strip_prefix(&format!("{version}.")) {
+            let dir_attempt = dir_attempt.parse::<i32>().expect(&format!(
+                "entry {dir_name} in {} malformed attempt number!",
+                base_dir.display()
+            ));
+
+            // If 99 is the highest we've seen so far, set best.
+            if latest
+                .as_ref()
+                .map(|(best_attempt, _)| dir_attempt > *best_attempt)
+                .unwrap_or(true)
+            {
+                latest = Some((dir_attempt, entry.path()));
+            }
+        }
+    }
+
+    Ok(latest.map(|l| l.1))
 }
 
 fn temp_dir(state: &AntHostAgentState) -> Result<TempDir, anyhow::Error> {
@@ -189,7 +262,7 @@ async fn install_service(
         _ => AntHostAgentError::InternalServerError(Some(e.into())),
     })?;
 
-    let dst = {
+    let versioned_install_dir = {
         let tmp_dst = temp_dir(&state)?;
 
         let mut deployment = tar::Archive::new(GzDecoder::new(file));
@@ -210,35 +283,46 @@ async fn install_service(
             .unwrap_or(true);
 
         let version = if versioned { &req.version } else { "service" };
-        let dst = install_location_path(&state.install_root_dir, &service_id, &version);
+        let dst = versioned_install_dir(&state.install_root_dir, &service_id, &version)?;
 
-        info!("Copying installation to: {}", dst.display());
-        std::fs::create_dir_all(&dst)?;
-        dircpy::copy_dir_advanced(&tmp_dst, &dst, true, true, true, vec![], vec![])
-            .context("move deployment to final location")?;
+        info!(
+            "Copying installation from [{}] to [{}]",
+            tmp_dst.path().display(),
+            dst.display()
+        );
+        dircpy::CopyBuilder::new(&tmp_dst, &dst)
+            .overwrite(true)
+            .with_progress(|total, cnt| info!("Replaced file: {cnt}/{total}"))
+            .run()
+            .context("copy deployment files to final location")?;
 
         dst
     };
 
-    let unit_file_path = dst.join(unit_name(&service_id));
-    if std::fs::exists(&unit_file_path)? {
+    let systemd_unit_path = versioned_install_dir.join(unit_name(&service_id));
+    if std::fs::exists(&systemd_unit_path)? {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(true);
+        handlebars.register_escape_fn(no_escape);
 
         handlebars
-            .register_template_file("systemd", &unit_file_path)
+            .register_template_file("systemd", &systemd_unit_path)
             .context("handlebars compilation")?;
 
-        let mut variables = ant_library::env::env_vars_to_map(&dst.join(".env"))?;
+        let mut variables = ant_library::env::env_vars_to_map(&versioned_install_dir.join(".env"))?;
 
         variables.insert(
             "INSTALL_DIR".to_string(),
-            dst.to_str()
+            versioned_install_dir
+                .to_str()
                 .expect("destination was not string")
                 .to_string(),
         );
 
-        info!("Rendering systemd template: {}", unit_file_path.display());
+        info!(
+            "Rendering systemd template: {}",
+            systemd_unit_path.display()
+        );
         let content = handlebars
             .render("systemd", &variables)
             .map_err(|e| match e.reason() {
@@ -258,11 +342,26 @@ async fn install_service(
                 }
             })?;
 
-        info!("Rewriting unit file with data...");
-        std::fs::write(unit_file_path, content)?;
+        let mut temp_unit_file =
+            tempfile::NamedTempFile::new().context("create temp systemd unit file")?;
+        info!(
+            "Writing temp unit [{}] file with rendered data...",
+            temp_unit_file.path().display()
+        );
+        temp_unit_file
+            .write_all(content.as_bytes())
+            .context("writing to temp systemd unit file")?;
+
+        info!(
+            "Replacing [{}] with [{}]",
+            temp_unit_file.path().display(),
+            systemd_unit_path.display()
+        );
+        std::fs::copy(temp_unit_file.path(), systemd_unit_path)
+            .context("copying to systemd unit file")?;
     }
 
-    let docker_img_path = dst.join("docker-image.tar");
+    let docker_img_path = versioned_install_dir.join("docker-image.tar");
     if std::fs::exists(&docker_img_path).context("docker img exists failed")? {
         info!("Loading docker image...");
 
@@ -391,6 +490,7 @@ async fn register_service(
     let path = state
         .archive_root_dir
         .join(deployment_file_name(&service_id, &version.0));
+    info!("Registering service: {}", path.display());
     let mut file = File::create(&path).await?;
 
     let mut field = multipart
@@ -488,4 +588,27 @@ pub fn make_routes() -> Router<AntHostAgentState> {
                 "POST /service/service-registration",
             ])
         })
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use handlebars::{no_escape, Handlebars};
+
+    #[test]
+    fn handlebars_no_replace_equals() {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(true);
+        handlebars.register_escape_fn(no_escape);
+
+        let mut variables = HashMap::new();
+        variables.insert("VARIABLE".to_string(), "a=b");
+
+        let output = handlebars
+            .render_template("data {{VARIABLE}}", &variables)
+            .unwrap();
+
+        assert_eq!(output, "data a=b");
+    }
 }

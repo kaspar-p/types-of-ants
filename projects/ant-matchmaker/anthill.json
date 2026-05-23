@@ -1,0 +1,7 @@
+{
+  "project": "ant-matchmaker",
+  "build": "makefile",
+  "secrets": [
+    "consul_gossip_encryption_key"
+  ]
+}
