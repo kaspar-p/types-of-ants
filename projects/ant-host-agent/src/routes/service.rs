@@ -1,6 +1,6 @@
 use ant_library::{
     anthill::{AnthillArchetype, AnthillManifest, AnthillManifestError},
-    headers::{XAntProjectHeader, XAntServiceIdHeader, XAntVersionHeader},
+    headers::{XAntServiceIdHeader, XAntVersionHeader},
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
@@ -11,7 +11,6 @@ use std::{
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
     str::FromStr,
-    thread::current,
 };
 use tempfile::TempDir;
 use tokio_util::codec;
@@ -27,7 +26,7 @@ use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 use zbus_systemd::{systemd1::ManagerProxy, zbus};
 
 use std::default::Default;
@@ -44,14 +43,13 @@ fn unit_name(service_id: &str) -> String {
 
 #[derive(Serialize, Deserialize)]
 pub struct EnableServiceRequest {
-    #[deprecated(note = "Prefer service_id")]
-    pub project: Option<String>,
-    pub service_id: Option<String>,
+    pub service_id: String,
 
     pub version: String,
 }
 
-async fn enable_unit(manager: &ManagerProxy<'_>, unit_path: &Path) {
+#[instrument(skip(manager))]
+async fn enable_unit(manager: &ManagerProxy<'_>, unit_path: &Path) -> Result<(), anyhow::Error> {
     info!("Enabling service...");
     let enable = manager
         .enable_unit_files(vec![unit_path.to_str().unwrap().to_string()], false, true)
@@ -68,30 +66,88 @@ async fn enable_unit(manager: &ManagerProxy<'_>, unit_path: &Path) {
         }
         Err(e) => {
             error!("Failed to enable unit file: {}, {}", unit_path.display(), e);
+            return Err(anyhow::Error::from(e));
         }
     }
+
+    Ok(())
 }
 
-fn install_dir(install_root: &PathBuf, service_id: &str) -> PathBuf {
-    install_root.join(service_id).join("current")
-}
-
-/// Flip a symlink like dir/current/ from pointing at dir/v1 to dir/v2 for an upgrade
-fn flip_symlink(symlink: &Path, to: &Path) -> Result<(), anyhow::Error> {
+/// Make a symlink `symlink` pointing to `to`, atomically, via making a temp file and moving it into place.
+fn symlink(symlink: &Path, to: &Path) -> Result<(), anyhow::Error> {
     info!(
         "Changing symlink {} to point to {}",
         symlink.display(),
         to.display()
     );
-    let tmp_link = symlink.with_added_extension(".tmp");
+    let tmp_link = symlink.with_added_extension("new");
 
     info!("Creating temporary: {}", tmp_link.display());
-    std::os::unix::fs::symlink(to, &tmp_link).context("creating <symlink>.tmp")?;
+    std::os::unix::fs::symlink(to, &tmp_link).context("creating <symlink>.new")?;
 
     info!("Renaming {} to {}", tmp_link.display(), symlink.display());
-    std::fs::rename(&tmp_link, &symlink).context("renaming <symlink>.tmp to <symlink>")?;
+    std::fs::rename(&tmp_link, &symlink).context("renaming <symlink>.new to <symlink>")?;
 
     Ok(())
+}
+
+/// Every project has the same-looking systemd file, linked once on startup. It delegates
+/// to the relevant version by resolving through symlinks in the ExecStart declaration.
+fn systemd_unit_file_content(service_id: &str) -> String {
+    format!(
+        "[Unit]
+Description={service_id}
+
+[Service]
+Type=simple
+EnvironmentFile=/home/ant/service/{service_id}/current/.env
+Environment=TYPESOFANTS_SECRET_DIR=/home/ant/service/{service_id}/current/secrets
+ExecStart=/home/ant/service/{service_id}/current/run.sh
+WorkingDirectory=/home/ant/service/{service_id}/current
+Slice=typesofants.slice
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+"
+    )
+}
+
+/// Creates a global systemd unit file for this service, the ExecStart of which points to
+/// the symlinked "current" directory, which can switch per version.
+#[instrument]
+async fn ensure_systemd(service_id: &str) -> Result<(), anyhow::Error> {
+    let unit_path = PathBuf::from("/")
+        .join("etc")
+        .join("systemd")
+        .join("system")
+        .join(unit_name(service_id));
+
+    let content = systemd_unit_file_content(service_id);
+
+    if !std::fs::exists(&unit_path)?
+        || std::fs::read_to_string(&unit_path).context("read systemd unit")? != content
+    {
+        info!(
+            "The systemd file {} didn't exist or was outdated",
+            unit_path.display()
+        );
+
+        std::fs::write(&unit_path, content).context("write systemd")?;
+
+        let conn = zbus::Connection::system().await.expect("system connection");
+        let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
+            .await
+            .context("manager init")?;
+
+        enable_unit(&manager, &unit_path).await?;
+
+        manager.reload().await.context("daemon reload")?;
+    } else {
+        info!("The systemd file was healthy, skipping.");
+    }
+
+    return Ok(());
 }
 
 /// A route to enable a systemd service. This is _fast_, and can be used to switch between versions quickly.
@@ -106,30 +162,44 @@ async fn enable_service(
         .await
         .context("manager init")?;
 
-    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
+    let unit_name = unit_name(&req.service_id);
 
-    let unit_name = unit_name(&service_id);
+    let previous_dir = state
+        .install_root_dir
+        .join(&req.service_id)
+        .join("previous");
+    let current_dir = state.install_root_dir.join(&req.service_id).join("current");
 
-    let previous_symlink = state.install_root_dir.join(service_id).join("previous");
-    let current_symlink = state.install_root_dir.join(service_id).join("current");
+    let active_version_dir: Option<PathBuf> = if std::fs::exists(&current_dir)? {
+        let active_version_dir =
+            std::fs::canonicalize(&current_dir).context("resolve current symlink")?;
+        info!("current -> {}", active_version_dir.display());
+        Some(active_version_dir)
+    } else {
+        None
+    };
 
-    let active_version_dir =
-        std::fs::canonicalize(&current_symlink).context("resolve current symlink")?;
-    let incoming_version_dir =
-        resolve_latest_versioned_install_dir(&state.install_root_dir, service_id, &req.version)?
-            .ok_or(AntHostAgentError::validation_msg(
-                "No installation directories can be found, did you install first?",
-            ))?;
+    let incoming_version_dir = resolve_latest_versioned_install_dir(
+        &state.install_root_dir,
+        &req.service_id,
+        &req.version,
+    )?
+    .ok_or(AntHostAgentError::validation_msg(
+        "No installation directories can be found, did you install first?",
+    ))?;
 
-    flip_symlink(&previous_symlink, &active_version_dir).context("flip symlink")?;
-    flip_symlink(&current_symlink, &incoming_version_dir).context("flip symlink")?;
+    if let Some(active_version_dir) = active_version_dir {
+        info!("Symlinking new previous");
+        symlink(&previous_dir, &active_version_dir).context("symlink previous")?;
+    }
+    info!("Symlinking new current...");
+    symlink(&current_dir, &incoming_version_dir).context("symlink current")?;
 
-    // enable_unit(&manager, &install_dir.join(&unit_name)).await;
-
-    manager.reload().await.context("daemon reload")?;
+    ensure_systemd(&req.service_id)
+        .await
+        .context("ensure systemd")?;
 
     info!("Starting service...");
-
     match restart_unit(&manager, &unit_name).await? {
         Ok(_) => {}
         Err(SystemdUnitError::UnitTookTooLongToStart)
@@ -145,23 +215,20 @@ async fn enable_service(
         }
     }
 
-    let manifest = AnthillManifest::from_file(&current_symlink.join("anthill.json"))?;
+    let manifest = AnthillManifest::from_file(&current_dir.join("anthill.json"))?;
 
     state
         .services
         .lock()
         .await
-        .insert(service_id.to_string(), HostService { manifest });
+        .insert(req.service_id.to_string(), HostService { manifest });
 
     Ok((StatusCode::OK, "Service enabled."))
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct InstallServiceRequest {
-    /// The name of the project, e.g. "ant-data-farm".
-    #[deprecated(note = "Prefer service_id")]
-    pub project: Option<String>,
-    pub service_id: Option<String>,
+    pub service_id: String,
 
     /// The unique version ID of the software, corresponds to a path on the host. Reinstalling the same
     /// version multiple times is still fine, but there may be files in the 'cwd' that the process doesn't
@@ -240,13 +307,11 @@ async fn install_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<InstallServiceRequest>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
-    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
-
-    let file_name = deployment_file_name(&service_id, &req.version);
+    let file_name = deployment_file_name(&req.service_id, &req.version);
     let file_path = state.archive_root_dir.join(file_name);
     info!(
         "Installing [{}] version [{}] from [{}]...",
-        service_id,
+        req.service_id,
         req.version,
         file_path.display()
     );
@@ -255,7 +320,7 @@ async fn install_service(
         ErrorKind::NotFound => AntHostAgentError::validation_msg(
             format!(
                 "No deployment tarball found for: {} version {}",
-                service_id, req.version
+                req.service_id, req.version
             )
             .as_str(),
         ),
@@ -283,7 +348,7 @@ async fn install_service(
             .unwrap_or(true);
 
         let version = if versioned { &req.version } else { "service" };
-        let dst = versioned_install_dir(&state.install_root_dir, &service_id, &version)?;
+        let dst = versioned_install_dir(&state.install_root_dir, &req.service_id, &version)?;
 
         info!(
             "Copying installation from [{}] to [{}]",
@@ -299,7 +364,7 @@ async fn install_service(
         dst
     };
 
-    let systemd_unit_path = versioned_install_dir.join(unit_name(&service_id));
+    let systemd_unit_path = versioned_install_dir.join(unit_name(&req.service_id));
     if std::fs::exists(&systemd_unit_path)? {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(true);
@@ -330,14 +395,14 @@ async fn install_service(
                     debug!("Replacement variables: {:#?}", variables);
                     return AntHostAgentError::validation_msg(&format!(
                         "Unknown template variable replacement attempt of [{var}] in file: {}",
-                        unit_name(&service_id)
+                        unit_name(&req.service_id)
                     ));
                 }
                 r => {
                     error!("Failed to render template: {r}");
                     return AntHostAgentError::validation_msg(&format!(
                         "Failed to replace template: {}",
-                        unit_name(&service_id)
+                        unit_name(&req.service_id)
                     ));
                 }
             })?;
@@ -431,24 +496,19 @@ async fn disable_unit(manager: &ManagerProxy<'_>, unit_name: &String) {
 
 #[derive(Deserialize, Serialize)]
 pub struct DisableServiceRequest {
-    #[deprecated(note = "Prefer service_id")]
-    project: Option<String>,
-    /// backwards compat optional.
-    service_id: Option<String>,
+    service_id: String,
 }
 
 async fn disable_service(
     State(state): State<AntHostAgentState>,
     Json(req): Json<DisableServiceRequest>,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
-    let service_id = compute_service_id(req.project.as_deref(), req.service_id.as_deref())?;
-
     let conn = zbus::Connection::system().await.expect("system connection");
     let manager = zbus_systemd::systemd1::ManagerProxy::new(&conn)
         .await
         .expect("manager init");
 
-    let unit_name = unit_name(&service_id);
+    let unit_name = unit_name(&req.service_id);
 
     disable_unit(&manager, &unit_name).await;
     manager
@@ -459,37 +519,20 @@ async fn disable_service(
     manager.reload().await.expect("reload");
 
     // Delete that from in-memory db of services
-    state.services.lock().await.remove(service_id);
+    state.services.lock().await.remove(&req.service_id);
 
     Ok((StatusCode::OK, "Service disabled."))
 }
 
-fn compute_service_id<'a>(
-    project_header: Option<&'a str>,
-    service_id_header: Option<&'a str>,
-) -> Result<&'a str, AntHostAgentError> {
-    let service_id = service_id_header
-        .as_ref()
-        .or(project_header.as_ref())
-        .ok_or(AntHostAgentError::validation_msg(
-            "One of X-Ant-Project or X-Ant-Service-Id must be specified",
-        ))?;
-
-    Ok(service_id)
-}
-
 async fn register_service(
     State(state): State<AntHostAgentState>,
-    TypedHeader(project): TypedHeader<XAntProjectHeader>,
     TypedHeader(service_id): TypedHeader<XAntServiceIdHeader>,
     TypedHeader(version): TypedHeader<XAntVersionHeader>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AntHostAgentError> {
-    let service_id = compute_service_id(project.0.as_deref(), service_id.0.as_deref())?;
-
     let path = state
         .archive_root_dir
-        .join(deployment_file_name(&service_id, &version.0));
+        .join(deployment_file_name(&service_id.0, &version.0));
     info!("Registering service: {}", path.display());
     let mut file = File::create(&path).await?;
 

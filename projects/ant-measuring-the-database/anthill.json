@@ -1,5 +1,6 @@
 {
   "project": "ant-measuring-the-database",
+  "description": "the typesofants database metrics exporter",
   "build": "makefile",
   "deployment": {
     "port": 3244

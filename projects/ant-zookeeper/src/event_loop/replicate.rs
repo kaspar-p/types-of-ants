@@ -4,11 +4,8 @@ use std::{
     path::PathBuf,
 };
 
-use ant_host_agent::{client::AntHostAgentClientConfig, state::HostService};
-use ant_library::{
-    anthill::AnthillManifest,
-    services::{ServiceInstance, Services},
-};
+use ant_host_agent::client::AntHostAgentClientConfig;
+use ant_library::{anthill::AnthillManifest, services::ServiceInstance};
 use ant_zookeeper_db::HostGroup;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -328,8 +325,7 @@ pub async fn replicate_artifact_step(
     info!("Installing service file file to: {host}");
     ant_host_agent
         .install_service(ant_host_agent::routes::service::InstallServiceRequest {
-            service_id: Some(host_group.project.clone()),
-            project: Some(host_group.project.clone()),
+            service_id: host_group.project.clone(),
             version: version.to_string(),
         })
         .await?;

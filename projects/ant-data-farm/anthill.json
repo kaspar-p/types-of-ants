@@ -1,5 +1,6 @@
 {
   "project": "ant-data-farm",
+  "description": "the typesofants database",
   "build": "docker",
   "archetype": "postgres",
   "deployment": {

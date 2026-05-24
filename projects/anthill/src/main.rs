@@ -17,6 +17,8 @@ enum Commands {
 
 #[tokio::main(flavor = "local")]
 async fn main() -> Result<()> {
+    ant_library::set_global_logs("anthill");
+
     let cli = Cli::parse();
 
     match cli.command {

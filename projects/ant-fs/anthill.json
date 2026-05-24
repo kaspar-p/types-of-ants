@@ -1,5 +1,6 @@
 {
   "project": "ant-fs",
+  "description": "the typesofants file storage server",
   "build": "makefile",
   "deployment": {
     "port": 3237

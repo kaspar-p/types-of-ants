@@ -1,5 +1,6 @@
 {
   "project": "ant-gateway",
+  "description": "the typesofants reverse proxy",
   "build": "docker",
   "secrets": [
     "tls_cert",

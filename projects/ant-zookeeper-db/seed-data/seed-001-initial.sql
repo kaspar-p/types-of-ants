@@ -47,6 +47,7 @@ values
   ('ant-zookeeper-db', true),
   ('ant-zookeeper', true),
   ('ant-monitor', true),
+  ('ant-monitor-fe', true),
   ('ant-matchmaker', true),
   ('ant-lumberjack', true),
   ('ant-sawmill', true),

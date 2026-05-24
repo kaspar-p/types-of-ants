@@ -1,5 +1,6 @@
 {
   "project": "ant-on-the-web",
+  "description": "the typesofants web server",
   "build": "makefile",
   "secrets": [
     "mailjet_api_key",

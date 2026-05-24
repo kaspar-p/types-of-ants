@@ -44,7 +44,7 @@ impl Header for XAntProjectHeader {
 }
 
 static X_ANT_SERVICE_ID_HEADER: HeaderName = http::HeaderName::from_static("x-ant-service-id");
-pub struct XAntServiceIdHeader(pub Option<String>);
+pub struct XAntServiceIdHeader(pub String);
 
 impl Header for XAntServiceIdHeader {
     fn name() -> &'static http::HeaderName {
@@ -56,26 +56,21 @@ impl Header for XAntServiceIdHeader {
         Self: Sized,
         I: Iterator<Item = &'i http::HeaderValue>,
     {
-        let value = values.next();
+        let value = values
+            .next()
+            .ok_or_else(axum_extra::headers::Error::invalid)?;
 
-        let val = match value {
-            Some(v) => Some(
-                v.to_str()
-                    .map_err(|_| axum_extra::headers::Error::invalid())?
-                    .to_string(),
-            ),
-            None => None,
-        };
+        let value = value
+            .to_str()
+            .map_err(|_| axum_extra::headers::Error::invalid())?
+            .to_string();
 
-        Ok(Self(val))
+        Ok(Self(value))
     }
 
     fn encode<E: Extend<http::HeaderValue>>(&self, values: &mut E) {
-        if let Some(value) = &self.0 {
-            let value =
-                HeaderValue::from_str(&value.as_str()).expect("invalid header value stored");
-            values.extend(std::iter::once(value));
-        }
+        let value = HeaderValue::from_str(&self.0).expect("invalid header value stored");
+        values.extend(std::iter::once(value));
     }
 }
 

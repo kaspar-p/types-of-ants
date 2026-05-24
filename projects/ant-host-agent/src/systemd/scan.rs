@@ -121,9 +121,18 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
         }
     }
 
+    let services_str = state
+        .services
+        .lock()
+        .await
+        .keys()
+        .map(|s| s.clone())
+        .collect::<Vec<_>>()
+        .join(", ");
     info!(
-        "Found [{}] active typesofants services",
-        state.services.lock().await.len()
+        "Found [{}] active typesofants services: {}",
+        state.services.lock().await.len(),
+        services_str
     );
 
     Ok(())

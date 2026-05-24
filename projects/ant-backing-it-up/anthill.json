@@ -1,5 +1,6 @@
 {
-  "project": "ant-host-agent",
+  "project": "ant-backing-it-up",
+  "description": "the typesofants backup processor",
   "build": "makefile",
   "deployment": {
     "port": 3238

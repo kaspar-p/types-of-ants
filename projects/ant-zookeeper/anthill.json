@@ -1,5 +1,6 @@
 {
   "project": "ant-zookeeper",
+  "description": "the typesofants deployment orchestrator",
   "build": "makefile",
   "secrets": []
 }

@@ -1,7 +1,7 @@
-use std::{collections::HashSet, path::PathBuf, str::FromStr};
+use std::{collections::HashSet, os::unix::fs::PermissionsExt, path::PathBuf, str::FromStr};
 
 use ant_library::{
-    anthill::{AnthillBuild, AnthillManifest},
+    anthill::{AnthillBuild, AnthillBuildParallelism, AnthillManifest},
     host_architecture::HostArchitecture,
     services::Services,
 };
@@ -14,6 +14,7 @@ use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{error, info};
 
 pub fn find_up(filename: &str) -> std::path::PathBuf {
     let mut dir = std::env::current_dir().unwrap();
@@ -84,31 +85,51 @@ pub async fn build(cmd: BuildCmd) {
                 .collect()
         });
 
-    let mut handles = Vec::new();
-    for arch in arches {
-        let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
-        let cmd2 = cmd.clone();
-        let proj = cmd2.project.clone();
-        let handle = tokio::task::spawn_blocking(|| async move {
-            build_arch(cmd2, &arch, revision.as_deref())
+    let git = GitState::new().unwrap();
+    let project_src = git.root.join("projects").join(&cmd.project);
+    let manifest = AnthillManifest::from_file(&project_src.join("anthill.json")).unwrap();
+
+    match manifest.build_parallelism {
+        AnthillBuildParallelism::Serial => {
+            for arch in arches {
+                let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
+                let cmd2 = cmd.clone();
+                let proj = cmd2.project.clone();
+                build_arch(cmd2, &arch, revision.as_deref())
+                    .await
+                    .context(format!("building {} {}", proj, arch.as_str()))
+                    .expect("build failed");
+            }
+        }
+
+        AnthillBuildParallelism::Parallel => {
+            let mut handles = Vec::new();
+            for arch in arches {
+                let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
+                let cmd2 = cmd.clone();
+                let proj = cmd2.project.clone();
+                let handle = tokio::task::spawn_blocking(|| async move {
+                    build_arch(cmd2, &arch, revision.as_deref())
+                        .await
+                        .context(format!("building {} {}", proj, arch.as_str()))
+                });
+                handles.push(handle);
+            }
+
+            let handles = futures::future::join_all(handles)
                 .await
-                .context(format!("building {} {}", proj, arch.as_str()))
-        });
-        handles.push(handle);
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("task scheduling failed")
+                .into_iter();
+
+            futures::future::join_all(handles)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<()>, _>>()
+                .expect("build failed");
+        }
     }
-
-    let handles = futures::future::join_all(handles)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .expect("task scheduling failed")
-        .into_iter();
-
-    futures::future::join_all(handles)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<()>, _>>()
-        .expect("build failed");
 }
 
 fn commit_count(repo: &Repository) -> Result<i32, anyhow::Error> {
@@ -143,11 +164,12 @@ async fn build_arch<'a>(
     arch: &'a HostArchitecture,
     revision: Option<&'a str>,
 ) -> Result<(), anyhow::Error> {
-    println!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
+    info!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
 
-    let (deployment_file_path, version) = build_artifact(&cmd, &arch).await?;
+    let (deployment_file_path, version) =
+        build_artifact(&cmd, &arch).await.context("build failed")?;
 
-    println!("... registering artifact");
+    info!("... registering artifact");
 
     if let Some(revision) = revision {
         let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
@@ -162,11 +184,12 @@ async fn build_arch<'a>(
                 &version,
                 &deployment_file_path,
             )
-            .await?;
+            .await
+            .context("register artifact")?;
 
-        println!("... artifact registered.");
+        info!("... artifact registered.");
     } else {
-        println!("artifact available: {}", deployment_file_path.display());
+        info!("artifact available: {}", deployment_file_path.display());
     }
 
     Ok(())
@@ -202,7 +225,7 @@ async fn build_artifact<'a>(
     let version = format!("{}-{}-{}", git.head_number, git.head_datetime, git.head_sha);
 
     let project_src = git.root.join("projects").join(&cmd.project);
-    if !std::fs::exists(&project_src).unwrap() {
+    if !std::fs::exists(&project_src).expect("project src exists") {
         return Err(anyhow::Error::msg(format!(
             "project directory {} does not exist",
             project_src.display()
@@ -234,6 +257,7 @@ async fn build_artifact<'a>(
                     build_output_dir.as_os_str().to_str().unwrap()
                 ),
             ])
+            .args(["-e", &format!("ARCH={}", arch.as_str())])
             .args(["-e", &format!("RUST_TARGET={}", arch.rust_target())])
             .args(["-e", &format!("PROMETHEUS_OS={}", arch.prometheus_os())])
             .args(["-e", &format!("PROMETHEUS_ARCH={}", arch.prometheus_arch())])
@@ -245,8 +269,9 @@ async fn build_artifact<'a>(
             .wait()
             .await
             .context("make cmd failed")?;
+
         if !exit.success() {
-            println!("make failed");
+            tracing::error!("make failed");
             return Err(anyhow::Error::msg("make failed, see logs"));
         }
     }
@@ -260,20 +285,24 @@ async fn build_artifact<'a>(
 
         let tmp_packaging_dir =
             tempfile::tempdir_in(&tmp_build_dir).context("creating packaging dir")?;
-        dircpy::copy_dir(&build_output_dir, &tmp_packaging_dir.path()).context(format!(
-            "copying build output from {} to {}",
-            build_output_dir.display(),
-            tmp_packaging_dir.path().display()
-        ))?;
+        dircpy::copy_dir(&build_output_dir, &tmp_packaging_dir.path())
+            .context(format!(
+                "copying build output from {} to {}",
+                build_output_dir.display(),
+                tmp_packaging_dir.path().display()
+            ))
+            .context("copying tmp packaging")?;
         tmp_packaging_dir
     };
 
     // Handle Docker projects
     if matches!(
-        AnthillManifest::from_file(&project_src.join("anthill.json"))?.build,
+        AnthillManifest::from_file(&project_src.join("anthill.json"))
+            .context("read anthill.json")?
+            .build,
         AnthillBuild::Docker
     ) {
-        println!("... creating docker image");
+        info!("... creating docker image");
 
         let compose_file_path = git
             .root
@@ -306,9 +335,25 @@ async fn build_artifact<'a>(
 
             let mut contents = Vec::new();
             tokio::fs::File::open(&build_context_tar)
-                .await?
+                .await
+                .context("open docker tar")?
                 .read_to_end(&mut contents)
-                .await?;
+                .await
+                .context("read docker tar")?;
+
+            const SIZE_MAX: usize = 1000 * 1000 * 1000; // 1gb
+            if contents.len() > SIZE_MAX {
+                return Err(anyhow::Error::msg(format!(
+                    "Docker image is {}, exceeding the limit.",
+                    humansize::format_size(contents.len(), humansize::DECIMAL)
+                )));
+            } else {
+                info!(
+                    "Docker image is {} bytes",
+                    humansize::format_size(contents.len(), humansize::DECIMAL)
+                );
+            }
+
             let mut stream = docker.build_image(
                 bollard::query_parameters::BuildImageOptionsBuilder::new()
                     .t(&image_name)
@@ -321,13 +366,13 @@ async fn build_artifact<'a>(
                 match build_log {
                     Ok(output) => {
                         if let Some(stream) = output.stream {
-                            print!("{}", stream);
+                            info!("{}", stream);
                         }
                     }
 
                     Err(e) => {
-                        eprintln!("Error while building docker image: {}", e);
-                        return Err(e.into());
+                        error!("Error while building docker image: {}", e);
+                        return Err(Into::<anyhow::Error>::into(e)).context("docker build failed");
                     }
                 }
             }
@@ -335,15 +380,19 @@ async fn build_artifact<'a>(
 
         // Save docker image
         {
-            println!("... exporting docker image");
+            info!("... exporting docker image");
             let image_path = tmp_packaging_dir.path().join("docker-image.tar");
 
             let mut stream = docker.export_image(&image_name);
-            let mut file = tokio::fs::File::create_new(image_path).await?;
+            let mut file = tokio::fs::File::create_new(image_path)
+                .await
+                .context("create docker image")?;
 
             while let Some(chunk) = stream.next().await {
                 let bytes = chunk?;
-                file.write_all(&bytes).await?;
+                file.write_all(&bytes)
+                    .await
+                    .context("write docker image chunk")?;
             }
         }
     }
@@ -361,20 +410,38 @@ async fn build_artifact<'a>(
             .context("writing manifest")?;
     }
 
-    // Copy systemd
+    // Copy run.sh
     {
-        let systemd_path = project_src.join(format!("{}.service", cmd.project));
-        if std::fs::exists(&systemd_path)? {
-            tokio::fs::copy(
-                systemd_path,
-                tmp_packaging_dir
-                    .path()
-                    .join(format!("{}.service", cmd.project)),
-            )
-            .await
-            .context("copying systemd")?;
+        let run_path = project_src.join(".anthill").join("run.sh");
+        if std::fs::exists(&run_path)? {
+            tokio::fs::copy(run_path, tmp_packaging_dir.path().join("run.sh"))
+                .await
+                .context("copying run.sh")?;
+
+            let mut perms =
+                std::fs::metadata(tmp_packaging_dir.path().join("run.sh"))?.permissions();
+            perms.set_mode(perms.mode() | 0o111);
+            std::fs::set_permissions(tmp_packaging_dir.path().join("run.sh"), perms)
+                .context("setting run.sh executable")?;
+        } else {
+            return Err(anyhow::Error::msg("Project needs run.sh"));
         }
     }
+
+    // // Copy systemd
+    // {
+    //     let systemd_path = project_src.join(format!("{}.service", cmd.project));
+    //     if std::fs::exists(&systemd_path)? {
+    //         tokio::fs::copy(
+    //             systemd_path,
+    //             tmp_packaging_dir
+    //                 .path()
+    //                 .join(format!("{}.service", cmd.project)),
+    //         )
+    //         .await
+    //         .context("copying systemd")?;
+    //     }
+    // }
 
     // Copy anthill manifest
     {
@@ -395,7 +462,7 @@ async fn build_artifact<'a>(
 
         let deployment_file_name = format!("{}.{}.{}.tar.gz", cmd.project, arch.as_str(), version);
 
-        println!("... building deployment file: {deployment_file_name}");
+        info!("... building deployment file: {deployment_file_name}");
 
         let deployment_file_path = registry_dir.join(deployment_file_name);
         let deployment_file = tokio::fs::File::create(&deployment_file_path)
@@ -412,7 +479,7 @@ async fn build_artifact<'a>(
         let mut encoder = tar.into_inner().await?;
         encoder.shutdown().await?;
 
-        println!(
+        info!(
             "... deployment file size: {}",
             humansize::format_size(
                 std::fs::metadata(&deployment_file_path)

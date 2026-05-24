@@ -2,7 +2,7 @@
 
 import { Heart, Info } from "lucide-react";
 import { ReleasedAnt } from "@/server/queries";
-import { useEffect, useState } from "react";
+import { MouseEventHandler, useEffect, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 import { favorite, unfavorite } from "@/server/posts";
 import { useRouter } from "next/navigation";
@@ -184,11 +184,13 @@ function AntHeart({ liked, enableHover, handleClick }: AntHeartProps) {
       }
       onMouseEnter={() => setLikeHover(true)}
       onMouseLeave={() => setLikeHover(false)}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        handleClick?.();
-      }}
+      onMouseDown={
+        ((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleClick?.();
+        }) satisfies MouseEventHandler<SVGSVGElement>
+      }
       size={ICON_SIZE}
       color={
         liked

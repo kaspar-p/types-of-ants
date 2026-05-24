@@ -27,9 +27,6 @@ release: $(BUILD_OUTPUT_DIR)/prometheus
 clean:
 	rm -rf build
 
-$(BUILD_OUTPUT_DIR):
-	@mkdir -p $@
-
 build/.cache/:
 	@mkdir -p $@
 

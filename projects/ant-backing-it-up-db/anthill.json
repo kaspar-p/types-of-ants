@@ -1,5 +1,6 @@
 {
   "project": "ant-backing-it-up-db",
+  "description": "the typesofants database for knowing about backups",
   "build": "docker",
   "secrets": [
     "ant_backing_it_up_db_db",

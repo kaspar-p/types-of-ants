@@ -1,5 +1,6 @@
 {
   "project": "ant-monitor",
+  "description": "the typesofants monitoring aggregator and storage server",
   "build": "makefile",
   "deployment": {
     "port": 3242

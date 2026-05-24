@@ -1,5 +1,6 @@
 {
   "project": "ant-naming-domains",
+  "description": "the typesofants dynamic dns client",
   "build": "docker",
   "secrets": [
     "cloudflare"

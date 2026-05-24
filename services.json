@@ -265,6 +265,10 @@
         {
           "env": "prod",
           "project": "ant-data-farm"
+        },
+        {
+          "env": "prod",
+          "project": "ant-monitor-fe"
         }
       ]
     },

@@ -47,7 +47,7 @@ impl AntHostAgentClient {
 
         self.client
             .post(self.endpoint("/service/service-registration"))
-            .header("X-Ant-Project", project)
+            .header("X-Ant-Service-Id", project)
             .header("X-Ant-Version", version)
             .multipart(form)
             .send()

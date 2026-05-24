@@ -1,15 +1,31 @@
 use std::{fs::File, io::Read, path::Path, str::FromStr};
 
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnthillManifest {
     pub project: String,
     pub build: AnthillBuild,
+    #[serde(default)]
+    pub build_parallelism: AnthillBuildParallelism,
     pub archetype: Option<AnthillArchetype>,
     pub deployment: Option<DeploymentOptions>,
     pub secrets: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum AnthillBuildParallelism {
+    #[serde(rename = "serial")]
+    Serial,
+
+    #[serde(rename = "parallel")]
+    Parallel,
+}
+
+impl Default for AnthillBuildParallelism {
+    fn default() -> Self {
+        Self::Parallel
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,7 +83,6 @@ impl AnthillManifest {
         let mut manifest_buf = String::new();
         File::open(path)?.read_to_string(&mut manifest_buf)?;
 
-        debug!("manifest: {}", manifest_buf);
         let manifest: AnthillManifest = serde_json::from_str(&manifest_buf)?;
 
         Ok(manifest)

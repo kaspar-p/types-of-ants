@@ -1,5 +1,6 @@
 {
   "project": "ant-matchmaker",
+  "description": "the typesofants service discovery mechanism",
   "build": "makefile",
   "secrets": [
     "consul_gossip_encryption_key"

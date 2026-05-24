@@ -1,5 +1,6 @@
 {
   "project": "ant-zookeeper-db",
+  "description": "the typesofants database for managing the ants",
   "build": "docker",
   "secrets": []
 }

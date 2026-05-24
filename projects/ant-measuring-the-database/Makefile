@@ -21,7 +21,7 @@ TARFILE=$(TARDIR).tar.gz
 
 all: release
 
-release: $(BUILD_OUTPUT_DIR)/postgres_exporter $(BUILD_OUTPUT_DIR)/postgres_exporter.yml $(BUILD_OUTPUT_DIR)/postgres_exporter.bin
+release: $(BUILD_OUTPUT_DIR)/postgres_exporter $(BUILD_OUTPUT_DIR)/postgres_exporter.yml
 	@echo "built" >> /dev/stderr
 
 clean:
@@ -40,13 +40,10 @@ build/.cache/$(TARFILE): | build/.cache/
 	@cd build/.cache && \
 	wget -N https://github.com/prometheus-community/postgres_exporter/releases/download/v$(POSTGRES_EXPORTER_VERSION)/$(TARFILE)
 
-$(BUILD_OUTPUT_DIR)/postgres_exporter.bin: | build/.packaging/$(TARDIR) $(BUILD_OUTPUT_DIR)
-	@cp build/.packaging/$(TARDIR)/postgres_exporter $(BUILD_OUTPUT_DIR)/postgres_exporter.bin
+$(BUILD_OUTPUT_DIR)/postgres_exporter: | build/.packaging/$(TARDIR) $(BUILD_OUTPUT_DIR)
+	@cp build/.packaging/$(TARDIR)/postgres_exporter $(BUILD_OUTPUT_DIR)/postgres_exporter
 
 $(BUILD_OUTPUT_DIR)/postgres_exporter.yml: | build/.packaging/$(TARDIR) $(BUILD_OUTPUT_DIR)
-	@cp src/postgres_exporter.yml $(BUILD_OUTPUT_DIR)/postgres_exporter.yml
-
-$(BUILD_OUTPUT_DIR)/postgres_exporter: | $(BUILD_OUTPUT_DIR)
-	@cp src/postgres_exporter $(BUILD_OUTPUT_DIR)/postgres_exporter
+	@cp postgres_exporter.yml $(BUILD_OUTPUT_DIR)/postgres_exporter.yml
 
 .PHONY: all clean release

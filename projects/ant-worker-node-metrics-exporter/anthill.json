@@ -1,5 +1,6 @@
 {
   "project": "ant-worker-node-metrics-exporter",
+  "description": "the typesofants per-host metrics exporter",
   "build": "makefile",
   "deployment": {
     "port": 3241

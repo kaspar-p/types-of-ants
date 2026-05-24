@@ -117,20 +117,6 @@ WantedBy=multi-user.target
 ")
 }
 
-fn compute_service_id<'a>(
-    project_header: Option<&'a str>,
-    service_id_header: Option<&'a str>,
-) -> Result<&'a str, AntZookeeperError> {
-    let service_id = service_id_header
-        .as_ref()
-        .or(project_header.as_ref())
-        .ok_or(AntZookeeperError::validation_msg(
-            "One of X-Ant-Project or X-Ant-Service-Id must be specified",
-        ))?;
-
-    Ok(service_id)
-}
-
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
 #[debug_handler]
 async fn register_artifact(
@@ -214,7 +200,7 @@ async fn register_artifact(
         let mut archive = Archive::new(gz);
 
         let mut anthill_file_found = false;
-        let mut service_file_found = false;
+        // let mut service_file_found = false;
 
         for entry in archive.entries()? {
             let mut entry = entry?;
@@ -268,9 +254,9 @@ async fn register_artifact(
                 }
             }
 
-            if file_name == format!("{}.service", &project_id).as_str() {
-                service_file_found = true;
-            }
+            // if file_name == format!("{}.service", &project_id).as_str() {
+            //     service_file_found = true;
+            // }
         }
 
         if !anthill_file_found {
@@ -279,15 +265,15 @@ async fn register_artifact(
             ));
         }
 
-        if !service_file_found {
-            return Err(AntZookeeperError::validation_msg(
-                format!(
-                    "Service file '{}.service' must be included in deployment tarball.",
-                    &project_id
-                )
-                .as_str(),
-            ));
-        }
+        // if !service_file_found {
+        //     return Err(AntZookeeperError::validation_msg(
+        //         format!(
+        //             "Service file '{}.service' must be included in deployment tarball.",
+        //             &project_id
+        //         )
+        //         .as_str(),
+        //     ));
+        // }
     }
 
     // Write the file to final location

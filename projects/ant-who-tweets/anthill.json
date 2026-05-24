@@ -1,5 +1,6 @@
 {
   "project": "ant-who-tweets",
+  "description": "the @typesofants twitter bot",
   "build": "makefile",
   "secrets": [
     "twitter_consumer_key",
