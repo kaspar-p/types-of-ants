@@ -25,7 +25,7 @@ async fn service_discovery_finds_no_service() {
 async fn service_discovery_finds_service_if_writer_before_reader() {
     let consul = ConsulFixture::new().await;
 
-    let sd_writer = ServiceDiscoveryWriter::new(consul.port()).await;
+    let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
         .register_service(&Service::AntMatchmaker, 20012)
@@ -53,7 +53,7 @@ async fn service_discovery_finds_if_reader_before_writer() {
     let endpoint = sd.resolve(&Service::AntMatchmaker).await;
     assert!(endpoint.is_none());
 
-    let sd_writer = ServiceDiscoveryWriter::new(consul.port()).await;
+    let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
         .register_service(&Service::AntMatchmaker, 20013)
@@ -82,7 +82,7 @@ async fn service_discovery_finds_nothing_when_removed() {
     let endpoint = sd.resolve(&Service::AntMatchmaker).await;
     assert!(endpoint.is_none());
 
-    let sd_writer = ServiceDiscoveryWriter::new(consul.port()).await;
+    let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
         .register_service(&Service::AntMatchmaker, 20013)

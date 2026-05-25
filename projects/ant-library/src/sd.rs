@@ -79,15 +79,17 @@ impl ServiceDiscovery {
                     ..Default::default()
                 },
                 Some(QueryOptions {
-                    // If index is requested, then wait 5 seconds as a polling query.
+                    // If index is requested, then wait for a polling query
                     index: index,
-                    wait: index.map(|_| Duration::from_secs(5)),
+                    wait: index.map(|_| Duration::from_secs(30)),
                     ..Default::default()
                 }),
             )
             .await?;
         debug!("consul fetch nodes: {:?}", nodes);
-        assert!(nodes.index > 0, "Hashicorp documentation insists that a returned index will always be greater than zero.");
+        if nodes.index <= 0 {
+            error!("Hashicorp documentation insists that a returned index will always be greater than zero, got: {}", nodes.index);
+        }
 
         let endpoints: Vec<ServiceEndpoint> = nodes
             .response
@@ -127,6 +129,13 @@ impl ServiceDiscovery {
     /// Spawns a background task to watch updates for `service_id`, or does nothing if already exists.
     async fn ensure_refreshing(&self, service: &Service) -> () {
         let service_name = service.to_string();
+
+        {
+            // Idempotency.
+            if self.refreshers.read().await.contains_key(&service_name) {
+                return;
+            }
+        }
 
         // Initial fetch, ignore errors if they happen
         info!("Fetching initial endpoints...");
@@ -207,7 +216,7 @@ struct RegisterServiceRequest {
 }
 
 impl ServiceDiscoveryWriter {
-    pub async fn new(port: u16) -> Self {
+    pub fn new(port: u16) -> Self {
         let consul_endpoint = format!("http://localhost:{port}");
         Self {
             consul_endpoint: consul_endpoint.clone(),
