@@ -39,7 +39,6 @@ impl ConsulFixture {
         let cmd = cmd
             .arg("agent")
             .arg("-server")
-            .args(["-bind", "127.0.0.1"])
             .args(["-node", "test-node1"])
             .args([
                 "-config-file",

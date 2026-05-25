@@ -1,4 +1,6 @@
+use reqwest::Client;
 use rs_consul::{Consul, ConsulError, GetServiceNodesRequest, QueryOptions};
+
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
@@ -45,21 +47,16 @@ impl ServiceDiscovery {
 
         // Fast path: cache hit
         {
-            info!("x1!");
             let cache = self.cache.read().await;
             if let Some(endpoints) = cache.get(service_name.as_str()) {
-                info!("x2!");
                 info!("resolved [{}] hit cache", service);
                 return endpoints.first().cloned();
             }
         }
-        info!("x3!");
 
         // Slow path: first resolution — fetch, cache, start watcher
         info!("first resolve: [{}], starting background task...", service);
         self.ensure_refreshing(&service).await;
-
-        info!("x4!");
 
         let cache = self.cache.read().await;
         cache.get(service_name.as_str())?.first().cloned()
@@ -95,9 +92,16 @@ impl ServiceDiscovery {
         let endpoints: Vec<ServiceEndpoint> = nodes
             .response
             .into_iter()
-            .map(|node| ServiceEndpoint {
-                address: node.service.address,
-                port: node.service.port,
+            .map(|node| {
+                // The "service address" is really an override, only if the client sets it
+                let address = Some(node.service.address)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(node.node.address);
+
+                ServiceEndpoint {
+                    address: address,
+                    port: node.service.port,
+                }
             })
             .collect();
 
@@ -181,5 +185,79 @@ impl ServiceDiscovery {
         for (_, handle) in refreshers.drain() {
             handle.abort();
         }
+    }
+}
+
+pub struct ServiceDiscoveryWriter {
+    consul_endpoint: String,
+    client: Client,
+}
+
+/// From: https://developer.hashicorp.com/consul/api-docs/agent/service#json-request-body-schema
+/// Can't use the one from rs_consul because it doesn't work, for some reason doesn't set the Address
+/// correctly: https://github.com/Roblox/rs-consul
+///
+/// But keep this struct private.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct RegisterServiceRequest {
+    name: String,
+    tags: Vec<String>,
+    port: u16,
+}
+
+impl ServiceDiscoveryWriter {
+    pub async fn new(port: u16) -> Self {
+        let consul_endpoint = format!("http://localhost:{port}");
+        Self {
+            consul_endpoint: consul_endpoint.clone(),
+            client: Client::new(),
+        }
+    }
+
+    pub async fn register_service(
+        &self,
+        service: &Service,
+        port: u16,
+    ) -> Result<(), anyhow::Error> {
+        let req = RegisterServiceRequest {
+            name: service.to_string(),
+            port,
+            tags: vec!["typesofants:service".to_string()],
+        };
+
+        let res = self
+            .client
+            .put(format!(
+                "{}/v1/agent/service/register",
+                self.consul_endpoint
+            ))
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let raw: String = res.text().await?;
+        debug!("[consul register response] {}", raw);
+
+        return Ok(());
+    }
+
+    pub async fn deregister_service(&self, service: &Service) -> Result<(), anyhow::Error> {
+        let res = self
+            .client
+            .put(format!(
+                "{}/v1/agent/service/deregister/{}",
+                self.consul_endpoint,
+                service.to_string()
+            ))
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let raw: String = res.text().await?;
+        debug!("[consul register response] {}", raw);
+
+        return Ok(());
     }
 }

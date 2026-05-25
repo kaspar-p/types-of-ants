@@ -2,6 +2,7 @@ pub mod client;
 mod err;
 pub mod routes;
 pub mod state;
+pub mod systemd;
 
 use axum::{
     http::{header::CONTENT_TYPE, Method},
@@ -13,8 +14,6 @@ use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 
 use crate::state::AntHostAgentState;
-
-pub mod systemd;
 
 pub fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
     let cors = CorsLayer::new()

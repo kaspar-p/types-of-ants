@@ -4,8 +4,6 @@ bind_addr  = "{{ GetPrivateIP }}"
 
 leave_on_terminate = true
 rejoin_after_leave = true
-encrypt_verify_incoming = false
-encrypt_verify_outgoing = false
 
 ports {
   dns      = -1
