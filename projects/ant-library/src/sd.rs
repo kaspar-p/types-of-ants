@@ -197,6 +197,7 @@ impl ServiceDiscovery {
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceDiscoveryWriter {
     consul_endpoint: String,
     client: Client,
@@ -235,6 +236,7 @@ impl ServiceDiscoveryWriter {
             tags: vec!["typesofants:service".to_string()],
         };
 
+        debug!("[consul register request] {}", serde_json::to_string(&req)?);
         let res = self
             .client
             .put(format!(
@@ -253,6 +255,7 @@ impl ServiceDiscoveryWriter {
     }
 
     pub async fn deregister_service(&self, service: &Service) -> Result<(), anyhow::Error> {
+        debug!("[consul deregister request] {}", service);
         let res = self
             .client
             .put(format!(
@@ -265,7 +268,7 @@ impl ServiceDiscoveryWriter {
             .error_for_status()?;
 
         let raw: String = res.text().await?;
-        debug!("[consul register response] {}", raw);
+        debug!("[consul deregister response] {}", raw);
 
         return Ok(());
     }

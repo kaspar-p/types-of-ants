@@ -42,9 +42,9 @@ impl ConsulFixture {
             .args(["-node", "test-node1"])
             .args([
                 "-config-file",
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("tests")
-                    .join("integration")
+                PathBuf::from(env!("CARGO_WORKSPACE_DIR"))
+                    .join("projects")
+                    .join("ant-library-test")
                     .join("test-data")
                     .join("consul.hcl")
                     .to_str()

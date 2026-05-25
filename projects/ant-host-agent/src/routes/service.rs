@@ -1,6 +1,7 @@
 use ant_library::{
     anthill::{AnthillArchetype, AnthillManifest, AnthillManifestError},
     headers::{XAntServiceIdHeader, XAntVersionHeader},
+    service::Service,
 };
 use anyhow::Context;
 use flate2::read::GzDecoder;
@@ -33,7 +34,7 @@ use std::default::Default;
 
 use crate::{
     err::AntHostAgentError,
-    state::{AntHostAgentState, HostService},
+    state::AntHostAgentState,
     systemd::{restart_unit, SystemdUnitError},
 };
 
@@ -217,11 +218,17 @@ async fn enable_service(
 
     let manifest = AnthillManifest::from_file(&current_dir.join("anthill.json"))?;
 
+    let service = Service::from_str(&format!("{}.service.ant", req.service_id))
+        .context("parsing service id into ant-matchmaker service id")?;
+
     state
-        .services
-        .lock()
+        .sd
+        .register_service(
+            &service,
+            manifest.deployment.and_then(|d| d.port).unwrap_or(0),
+        )
         .await
-        .insert(req.service_id.to_string(), HostService { manifest });
+        .context("register ant-matchmaker service")?;
 
     Ok((StatusCode::OK, "Service enabled."))
 }
@@ -518,8 +525,14 @@ async fn disable_service(
 
     manager.reload().await.expect("reload");
 
-    // Delete that from in-memory db of services
-    state.services.lock().await.remove(&req.service_id);
+    let service = Service::from_str(&format!("{}.service.ant", req.service_id))
+        .context("parsing service id into ant-matchmaker service id")?;
+
+    state
+        .sd
+        .deregister_service(&service)
+        .await
+        .context("deregister ant-matchmaker service")?;
 
     Ok((StatusCode::OK, "Service disabled."))
 }

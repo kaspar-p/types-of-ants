@@ -1,2 +1,1 @@
-mod fixture;
 mod sd;

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use ant_library::anthill::AnthillManifest;
+use ant_library::{anthill::AnthillManifest, sd::ServiceDiscoveryWriter};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -10,6 +10,8 @@ pub struct AntHostAgentState {
     ///
     /// Keys are service IDs ("ant-host-agent", or "ant-db-metrics.ant-data-farm")
     pub services: Arc<Mutex<HashMap<String, HostService>>>,
+
+    pub sd: Arc<ServiceDiscoveryWriter>,
 
     /// Where secrets that this ant-host-agent service (and other services via replication) use.
     pub secrets_root_dir: PathBuf,

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use crate::fixture::ConsulFixture;
 use ant_library::{
     sd::{ServiceDiscovery, ServiceDiscoveryWriter},
     service::Service,
 };
+use ant_library_test::consul_fixture::ConsulFixture;
 use tokio::test;
 use tracing_test::traced_test;
 

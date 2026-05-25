@@ -345,6 +345,7 @@ dependencies = [
 name = "ant-library"
 version = "1.0.0"
 dependencies = [
+ "ant-library-test",
  "anyhow",
  "async-trait",
  "axum",
@@ -388,11 +389,14 @@ dependencies = [
  "axum",
  "bytes",
  "http 1.4.0",
+ "portpicker",
  "postgresql_embedded",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
