@@ -12,7 +12,7 @@ source "$repository_root/secrets/dev/build.cfg"
 set +o allexport
 
 if [[ -f "$repository_root/projects/$project/.anthill/dev.sh" ]]; then
-  "$repository_root/projects/$project/.anthill/dev.sh"
+  "$repository_root/projects/$project/.anthill/dev.sh" "${@:2}"
 else
   echo "Unknown project: $project"
   exit 1

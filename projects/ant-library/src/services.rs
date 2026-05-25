@@ -47,7 +47,7 @@ pub struct ServiceInstance {
     /// there may be multiple databases ("ant-data-farm", "ant-backing-it-up", ...) on the same host,
     /// and each needs its own metrics collection. The `service_id` might therefore include the
     /// _target service_ for the metrics collector, "ant-data-farm", being then:
-    /// ```
+    /// ```ignore
     /// ant-collecting-the-database.ant-data-farm
     /// ```
     /// or something.
@@ -55,7 +55,7 @@ pub struct ServiceInstance {
     /// The directory on-host will look like ~/service/<service_id>/<version>/...
     /// For example:
     ///
-    /// ```
+    /// ```ignore
     /// ~/service/
     ///     ant-collecting-the-database.ant-data-farm/
     ///         ...

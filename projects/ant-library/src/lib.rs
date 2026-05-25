@@ -18,7 +18,9 @@ pub mod find_up;
 pub mod headers;
 pub mod host_architecture;
 pub mod manifest_file;
+pub mod sd;
 pub mod secret;
+pub mod service;
 pub mod services;
 
 /// The standard ping that all typesofants web servers should use.

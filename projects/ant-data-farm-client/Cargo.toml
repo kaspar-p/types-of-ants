@@ -51,5 +51,5 @@ validator = "0.20.0"
 [dev-dependencies]
 testcontainers = "0.25.0"
 rstest = "0.25.0"
-tracing-test = "0.2.5"
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 which = "8.0.2"
