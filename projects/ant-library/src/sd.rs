@@ -225,6 +225,19 @@ impl ServiceDiscoveryWriter {
         }
     }
 
+    pub async fn healthy(&self) -> bool {
+        match reqwest::get(format!("{}/v1/agent/self", self.consul_endpoint))
+            .await
+            .and_then(|r| r.error_for_status())
+        {
+            Ok(_) => true,
+            Err(e) => {
+                error!("ant-matchmaker consul endpoint not healthy: {e}");
+                false
+            }
+        }
+    }
+
     pub async fn register_service(
         &self,
         service: &Service,

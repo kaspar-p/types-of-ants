@@ -12,6 +12,7 @@ use std::{
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
     str::FromStr,
+    time::Duration,
 };
 use tempfile::TempDir;
 use tokio_util::codec;
@@ -221,14 +222,27 @@ async fn enable_service(
     let service = Service::from_str(&format!("{}.service.ant", req.service_id))
         .context("parsing service id into ant-matchmaker service id")?;
 
-    state
-        .sd
-        .register_service(
-            &service,
-            manifest.deployment.and_then(|d| d.port).unwrap_or(0),
-        )
-        .await
-        .context("register ant-matchmaker service")?;
+    let mut attempts = 0;
+    let mut healthy = state.sd.healthy().await;
+    while !healthy && attempts < 100 {
+        info!("Checking consul health...");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        healthy = state.sd.healthy().await;
+        attempts += 1
+    }
+
+    if healthy {
+        state
+            .sd
+            .register_service(
+                &service,
+                manifest.deployment.and_then(|d| d.port).unwrap_or(0),
+            )
+            .await
+            .context("register ant-matchmaker service")?;
+    } else {
+        error!("Failed to wait for Consul's health, skipping registration!");
+    }
 
     Ok((StatusCode::OK, "Service enabled."))
 }
