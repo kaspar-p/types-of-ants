@@ -154,8 +154,6 @@ impl AntBackingItUpStorageClient {
         project: &str,
         source: &DatabaseParams,
         encryption_nonce: &Vec<u8>,
-        destination_host: &str,
-        destination_port: u16,
         destination_filepath: &str,
     ) -> Result<DateTime<Utc>, anyhow::Error> {
         let created_at: DateTime<Utc> = self
@@ -165,12 +163,18 @@ impl AntBackingItUpStorageClient {
             .query_one(
                 "
                 insert into backup
-                  (project, database_host, database_port, encryption_nonce, destination_host, destination_port, destination_filepath)
+                  (project, database_host, database_port, encryption_nonce, destination_filepath)
                 values
                   ($1, $2, $3, $4, $5, $6, $7)
                 returning created_at
               ",
-                &[&project, &source.host, &(source.port as i32), encryption_nonce, &destination_host, &(destination_port as i32), &destination_filepath],
+                &[
+                    &project,
+                    &source.host,
+                    &(source.port as i32),
+                    encryption_nonce,
+                    &destination_filepath,
+                ],
             )
             .await?
             .get("created_at");

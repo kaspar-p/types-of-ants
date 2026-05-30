@@ -16,6 +16,7 @@ pub struct ServiceEndpoint {
     pub port: u16,
 }
 
+#[derive(Clone)]
 /// Use typesofants' Consul deployments to discover the (IP, Port) pairs of services on other hosts.
 pub struct ServiceDiscovery {
     consul: Arc<Consul>,

@@ -6,6 +6,7 @@ use ant_backing_it_up::{
     BackupRequest,
 };
 use ant_fs_client::{AntFsClient, AntFsHostPorts};
+use ant_library::sd::ServiceDiscovery;
 use futures::future::join_all;
 use stdext::prelude::DurationExt;
 use tokio::time::sleep;
@@ -65,7 +66,15 @@ async fn main() {
         ant_fs_host_ports[0].tls,
     );
 
+    let sd = ServiceDiscovery::new(
+        dotenv::var("ANT_MATCHMAKER_HTTP_PORT")
+            .expect("No ANT_MATCHMAKER_HTTP_PORT variable.")
+            .parse::<u16>()
+            .expect("port was not u16"),
+    );
+
     let state = AntBackingItUpState {
+        sd: Arc::new(sd),
         root_dir,
         db,
         ant_fs,

@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use ant_library::{sd::ServiceDiscovery, service::Service};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -12,8 +15,10 @@ pub struct AntFsHostPort {
 
 #[derive(Clone)]
 pub struct AntFsClient {
-    pub host: String,
-    pub port: u16,
+    sd: Option<Arc<ServiceDiscovery>>,
+
+    host: Option<String>,
+    port: Option<u16>,
 
     client: Client,
     username: String,
@@ -22,12 +27,30 @@ pub struct AntFsClient {
 }
 
 impl AntFsClient {
-    pub fn new(host: &str, port: u16, username: String, password: String, use_tls: bool) -> Self {
+    pub fn new_via_sd(
+        sd: Arc<ServiceDiscovery>,
+        username: String,
+        password: String,
+        use_tls: bool,
+    ) -> Self {
         Self {
             client: Client::new(),
+            sd: Some(sd),
+            host: None,
+            port: None,
+            username,
+            password,
             use_tls,
-            host: host.to_string(),
-            port,
+        }
+    }
+
+    pub fn new(host: &str, port: u16, username: String, password: String, use_tls: bool) -> Self {
+        Self {
+            sd: None,
+            client: Client::new(),
+            use_tls,
+            host: Some(host.to_string()),
+            port: Some(port),
             username,
             password,
         }
@@ -40,14 +63,34 @@ impl AntFsClient {
         }
     }
 
-    fn url(&self, path: &str) -> String {
-        format!("http{}://{}:{}/{}", self.tls(), self.host, self.port, path)
+    async fn host_port(&self) -> Option<(String, u16)> {
+        if let Some(sd) = &self.sd {
+            let endpoint = sd.resolve(&Service::AntFs).await;
+            return endpoint.map(|e| (e.address, e.port));
+        }
+
+        let host = self.host.clone().unwrap(); // cannot happen based on constructors
+        let port = self.port.unwrap();
+
+        return Some((host, port));
+    }
+
+    async fn url(&self, path: &str) -> Result<String, anyhow::Error> {
+        let address = self.host_port().await;
+
+        match address {
+            Some((host, port)) => Ok(format!("http{}://{}:{}/{}", self.tls(), host, port, path)),
+            None => Err(anyhow::Error::msg(format!(
+                "Unable to find endpoint for: {}",
+                Service::AntFs
+            ))),
+        }
     }
 
     pub async fn delete_file(&mut self, path: &str) -> Result<(), anyhow::Error> {
         let response = self
             .client
-            .delete(self.url(path))
+            .delete(self.url(path).await?)
             .basic_auth(self.username.clone(), Some(self.password.clone()))
             .send()
             .await?;
@@ -64,7 +107,7 @@ impl AntFsClient {
     pub async fn put_file(&mut self, path: &str, bytes: Vec<u8>) -> Result<(), anyhow::Error> {
         let response = self
             .client
-            .put(self.url(path))
+            .put(self.url(path).await?)
             .basic_auth(self.username.clone(), Some(self.password.clone()))
             .body(bytes)
             .send()
@@ -82,7 +125,7 @@ impl AntFsClient {
     pub async fn get_file(&self, path: &str) -> Result<Option<Vec<u8>>, anyhow::Error> {
         let response = self
             .client
-            .get(self.url(path))
+            .get(self.url(path).await?)
             .basic_auth(self.username.clone(), Some(self.password.clone()))
             .send()
             .await?;

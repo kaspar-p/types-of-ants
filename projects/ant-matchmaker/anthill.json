@@ -3,7 +3,7 @@
   "description": "the typesofants service discovery mechanism",
   "build": "makefile",
   "deployment": {
-    "port": "3245"
+    "port": 3245
   },
   "secrets": [
     "consul_gossip_encryption_key"

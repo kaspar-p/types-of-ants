@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.100"
 openssl = { version = "0.10.75", features = ["vendored"] }
 reqwest = { version = "0.12.23", features = ["rustls-tls"] }
