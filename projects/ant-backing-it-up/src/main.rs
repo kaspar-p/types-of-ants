@@ -1,4 +1,4 @@
-use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use ant_backing_it_up::{
     state::AntBackingItUpState,
@@ -82,12 +82,12 @@ async fn main() {
 
     let app = ant_backing_it_up::make_routes(state).expect("failed to init api");
 
-    let port: u16 = dotenv::var("PORT")
-        .expect("PORT environment variable not found")
+    let primary_port: u16 = dotenv::var("PRIMARY_PORT")
+        .expect("PRIMARY_PORT environment variable not found")
         .parse()
-        .expect("PORT was not u16");
+        .expect("PRIMARY_PORT was not u16");
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], primary_port));
     debug!(
         "Starting [{}] server on [{}]...",
         ant_library::get_mode(),

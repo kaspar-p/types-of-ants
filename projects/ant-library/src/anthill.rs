@@ -15,6 +15,10 @@ pub struct AnthillManifest {
 
     pub deployment: Option<DeploymentOptions>,
 
+    /// For the reverse-proxy to the outside, this setting affects the NGINX settings when
+    /// this project deploys.
+    pub routing: Option<Routing>,
+
     /// Optionally deploy more than 1 systemd services alongside this one, with other entrypoints.
     /// All services get the same persist directory, working directory, secrets directory, and secrets.
     pub services: Vec<AnthillService>,
@@ -41,6 +45,28 @@ pub struct AnthillManifest {
     /// ```
     #[serde(default)]
     pub secrets: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Routing {
+    /// If this project deploys a custom subdomain like "new-project.typesofants.org",
+    /// then this should the full domain "new-project.typesofants.org".
+    ///
+    /// If the project just defines a subpath of "typesofants.org" it should still specify that
+    /// alongside paths.
+    pub domain: Option<String>,
+
+    /// The query paths that get routed to this project. For example, ant-on-the-web wants
+    /// all of the routes like /api/*, so would configure:
+    /// ```json
+    /// {
+    ///   "paths": ["/api"]
+    /// }
+    /// ```
+    ///
+    /// If specified, domain must also be specified.
+    #[serde(default)]
+    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,6 +187,18 @@ impl AnthillManifest {
                 "The .services entry is nonempty but does not contain entry with 'service={}'",
                 self.project
             )));
+        }
+
+        // If .routing.paths, then also .routing.domain must be set
+        if self
+            .routing
+            .as_ref()
+            .map(|r| !r.paths.is_empty() && r.domain.is_none())
+            .unwrap_or(false)
+        {
+            return Err(anyhow::Error::msg(
+                "You must specify .routing.paths alongside .routing.domain, or else we don't know which domain to modify!",
+            ));
         }
 
         Ok(())
