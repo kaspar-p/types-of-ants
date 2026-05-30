@@ -92,6 +92,10 @@ fn source_env_variables(
 
         variables.insert("PORT".to_string(), port.to_string());
         variables.insert(port_var, port.to_string());
+
+        let port_var = format!("{upcase_project}_PRIMARY_PORT");
+        variables.insert("PRIMARY_PORT".to_string(), port.to_string());
+        variables.insert(port_var, port.to_string());
     }
 
     let metrics_port = manifest
