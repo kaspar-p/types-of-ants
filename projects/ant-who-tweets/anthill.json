@@ -2,6 +2,9 @@
   "project": "ant-who-tweets",
   "description": "the @typesofants twitter bot",
   "build": "makefile",
+  "ports": {
+    "metrics": 3246
+  },
   "secrets": [
     "twitter_consumer_key",
     "twitter_consumer_secret",
