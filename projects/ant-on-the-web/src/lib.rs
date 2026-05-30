@@ -106,7 +106,7 @@ pub fn make_routes(
         // .nest("/deployments", deployments::router())
         .with_state(state.clone())
         .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
-            ant_library::middleware_print_request_response,
+            ant_library::middleware::print_request_response,
         )))
         .fallback(|| async {
             ant_library::api_fallback(&[
@@ -129,9 +129,11 @@ pub fn make_routes(
         .fallback_service(ServeDir::new(state.static_dir.clone()))
         .layer(
             ServiceBuilder::new()
-                .layer(ant_library::http_log_layer())
+                .layer(ant_library::middleware::http_log_layer())
                 .layer(cors)
-                .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
+                .layer(CatchPanicLayer::custom(
+                    ant_library::middleware::catch_panic,
+                ))
                 .layer(GovernorLayer { config: throttling })
                 .layer(CookieManagerLayer::new())
                 .layer(axum::middleware::from_fn_with_state(

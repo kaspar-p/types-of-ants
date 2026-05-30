@@ -95,7 +95,7 @@ async fn main() {
     );
     let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .expect(format!("failed to bind server to {port}").as_str());
+        .expect(format!("failed to bind server to {primary_port}").as_str());
 
     let api_handle = tokio::spawn(async {
         axum::serve(listener, app).await.expect("server failed");

@@ -41,11 +41,13 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
         .with_state(s)
         .layer(
             ServiceBuilder::new()
-                .layer(ant_library::http_log_layer())
+                .layer(ant_library::middleware::http_log_layer())
                 .layer(cors)
-                .layer(CatchPanicLayer::custom(ant_library::middleware_catch_panic))
+                .layer(CatchPanicLayer::custom(
+                    ant_library::middleware::catch_panic,
+                ))
                 .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
-                    ant_library::middleware_print_request_response,
+                    ant_library::middleware::print_request_response,
                 ))),
         );
 
