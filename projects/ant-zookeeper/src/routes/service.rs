@@ -4,11 +4,10 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, io::Write};
 
-use ant_library::headers::XAntRevisionHeader;
-use ant_library::{
-    anthill::AnthillManifest,
-    headers::{XAntArchitectureHeader, XAntProjectHeader, XAntVersionHeader},
+use ant_library::headers::{
+    XAntArchitectureHeader, XAntProjectHeader, XAntRevisionHeader, XAntVersionHeader,
 };
+use anthill_manifest::AnthillManifest;
 use axum::debug_handler;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},

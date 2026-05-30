@@ -11,7 +11,6 @@ use std::{env::set_var, fmt::Display};
 use tracing::{debug, error, Level};
 use tracing_subscriber::{fmt::writer::Tee, EnvFilter, FmtSubscriber};
 
-pub mod anthill;
 pub mod db;
 pub mod env;
 pub mod find_up;

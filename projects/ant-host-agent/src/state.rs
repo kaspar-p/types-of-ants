@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use ant_library::{anthill::AnthillManifest, sd::ServiceDiscoveryWriter};
+use ant_library::sd::ServiceDiscoveryWriter;
+use anthill_manifest::AnthillManifest;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]

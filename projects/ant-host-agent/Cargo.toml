@@ -69,6 +69,7 @@ dircpy = "0.3.20"
 handlebars = "6.4.0"
 dotenvy = "0.15.7"
 rs-consul = "0.14.0"
+anthill-manifest = { version = "0.1.0", path = "../anthill-manifest" }
 
 [dev-dependencies]
 ant-library-test = { path = "../ant-library-test" }

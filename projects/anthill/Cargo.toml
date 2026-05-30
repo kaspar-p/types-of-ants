@@ -30,3 +30,4 @@ flate2 = "1.1.9"
 bollard = "^0.19.3"
 astral-tokio-tar = "0.6.1"
 async-compression = { version = "0.4.42", features = ["gzip", "tokio"] }
+anthill-manifest = { version = "0.1.0", path = "../anthill-manifest" }

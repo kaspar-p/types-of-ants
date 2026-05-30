@@ -1,10 +1,12 @@
 use std::{fs::File, io::Read, path::Path, str::FromStr};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AnthillManifest {
     pub project: String,
+    pub description: Option<String>,
 
     pub build: AnthillBuild,
 
@@ -21,13 +23,12 @@ pub struct AnthillManifest {
 
     /// Optionally deploy more than 1 systemd services alongside this one, with other entrypoints.
     /// All services get the same persist directory, working directory, secrets directory, and secrets.
+    #[serde(default)]
     pub services: Vec<AnthillService>,
 
     /// A map of port-identifier to port number, for example:
     /// ```json
-    /// {
-    ///   "primary": 3000
-    /// }
+    /// { "primary": 3000 }
     /// ```
     /// where the port identifier will become a key in ant-matchmaker's Consul "meta" tag.
     ///
@@ -39,15 +40,13 @@ pub struct AnthillManifest {
     /// The project can expect that {installation-dir}/secrets/{name}.secret will exist
     /// if configured as:
     /// ```json
-    /// {
-    ///   "secrets": ["name"]
-    /// }
+    /// { "secrets": ["name"] }
     /// ```
     #[serde(default)]
     pub secrets: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Routing {
     /// If this project deploys a custom subdomain like "new-project.typesofants.org",
     /// then this should the full domain "new-project.typesofants.org".
@@ -69,7 +68,7 @@ pub struct Routing {
     pub paths: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AnthillService {
     /// The name of the service. If not specified
     pub service: String,
@@ -79,14 +78,39 @@ pub struct AnthillService {
     pub entrypoint: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Ports {
+    /// This is the port that is returned on service-discovery requests as the default port.
+    /// Most services that expose some networked interface should specify this:
+    /// - Web services should specify their main API port.
+    /// - Databases should specify their server connection port.
     pub primary: Option<u16>,
+
+    /// The port that metrics are served from. This MAY be the same port as the primary,
+    /// in the case of databases for example where the metric are collected via regular
+    /// connection and querying of database-specific tables.
+    ///
+    /// But for web-services or public services it wouldn't be safe to serve metrics from
+    /// the same port that serves end-user traffic.
+    ///
+    /// If this setting is not set, the ant-monitor prometheus will have nothing to monitor.
+    ///
+    /// If for some reason the project cannot natively export metrics (e.g. nginx), this
+    /// port may be missing.
     pub metrics: Option<u16>,
+
+    /// A separate port for admin/control-plane functionality to affect the service at runtime.
+    /// Generally something that could be done via deployment.
+    ///
+    /// For example, the ant-lumberjack promtail project needs a dynamic set of log => metric
+    /// rules to emit for ant-monitor. These dynamic rules are set at deploy-time OF OTHER SERVICES.
+    /// There is a small server listening for those updates at this "config" port.
+    ///
+    /// The deployment system will use this port for deploy-time dynamic actions.
     pub config: Option<u16>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub enum AnthillBuildParallelism {
     #[serde(rename = "serial")]
     Serial,
@@ -101,7 +125,7 @@ impl Default for AnthillBuildParallelism {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub enum AnthillBuild {
     #[serde(rename = "makefile")]
     Makefile,
@@ -110,7 +134,7 @@ pub enum AnthillBuild {
     Docker,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub enum AnthillArchetype {
     #[serde(rename = "postgres")]
     Postgres,
@@ -131,7 +155,7 @@ impl FromStr for AnthillArchetype {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DeploymentOptions {
     /// The main port meant for this project, for service discovery.
     #[deprecated(note = "Prefer .ports.primary")]

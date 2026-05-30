@@ -1,8 +1,8 @@
 use ant_library::{
-    anthill::{AnthillArchetype, AnthillManifest, AnthillManifestError},
     headers::{XAntServiceIdHeader, XAntVersionHeader},
     service::Service,
 };
+use anthill_manifest::{AnthillArchetype, AnthillManifest, AnthillManifestError};
 use anyhow::Context;
 use flate2::read::GzDecoder;
 use handlebars::{no_escape, Handlebars};

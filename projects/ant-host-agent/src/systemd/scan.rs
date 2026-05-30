@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ant_library::anthill::AnthillManifest;
+use anthill_manifest::AnthillManifest;
 use anyhow::Context;
 use tracing::{debug, info, instrument, warn};
 use zbus_systemd::{

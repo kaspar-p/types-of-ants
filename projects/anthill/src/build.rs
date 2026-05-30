@@ -1,11 +1,8 @@
 use std::{collections::HashSet, os::unix::fs::PermissionsExt, path::PathBuf, str::FromStr};
 
-use ant_library::{
-    anthill::{AnthillBuild, AnthillBuildParallelism, AnthillManifest},
-    host_architecture::HostArchitecture,
-    services::Services,
-};
+use ant_library::{host_architecture::HostArchitecture, services::Services};
 use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRevisionRequest};
+use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};

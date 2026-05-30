@@ -1,0 +1,13 @@
+{
+  "rust-analyzer.showUnlinkedFileNotification": false,
+  "editor.wordWrap": "off",
+  "makefile.configureOnOpen": false,
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "**/anthill.json"
+      ],
+      "url": "./schemas/anthill_schema.json"
+    }
+  ]
+}

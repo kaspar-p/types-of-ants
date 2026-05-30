@@ -5,8 +5,9 @@ use std::{
 };
 
 use ant_host_agent::client::AntHostAgentClientConfig;
-use ant_library::{anthill::AnthillManifest, services::ServiceInstance};
+use ant_library::services::ServiceInstance;
 use ant_zookeeper_db::HostGroup;
+use anthill_manifest::AnthillManifest;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use tar::Archive;

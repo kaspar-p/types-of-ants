@@ -1,0 +1,13 @@
+[package]
+name = "anthill-manifest-build"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+anthill-manifest = { version = "0.1.0", path = "../anthill-manifest" }
+schemars = "1.2.1"
+serde_json = "1.0.150"
+
+[dependencies]
+anthill-manifest = { version = "0.1.0", path = "../anthill-manifest" }
