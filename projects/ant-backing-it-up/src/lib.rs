@@ -37,7 +37,7 @@ pub struct ListBackupsResponse {
 }
 
 async fn list_backups(
-    State(AntBackingItUpState { db, .. }): State<AntBackingItUpState<'_>>,
+    State(AntBackingItUpState { db, .. }): State<AntBackingItUpState>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let backups = db.get_all_backups().await.map_err(|e| {
         error!("db: {e}");
@@ -66,7 +66,7 @@ async fn post_backup(
         mut db,
         mut ant_fs,
         ..
-    }): State<AntBackingItUpState<'_>>,
+    }): State<AntBackingItUpState>,
     Json(req): Json<BackupRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     // First, backup the remote database to a local file

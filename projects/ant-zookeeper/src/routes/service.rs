@@ -241,7 +241,7 @@ async fn register_artifact(
 
                 info!("Read manifest: {:?}", manifest);
 
-                for secret in manifest.secrets.unwrap_or_default() {
+                for secret in manifest.secrets {
                     // TODO better way to get environments
                     for environment in ["beta", "prod"] {
                         if !exists(secret_file_path(&state.root_dir, environment, &secret))? {

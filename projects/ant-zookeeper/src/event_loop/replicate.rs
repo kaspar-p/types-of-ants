@@ -36,11 +36,11 @@ async fn inject_secrets(
     let project_secrets_dir = dest.join("secrets");
 
     // Only make secrets directory if they have any
-    if !manifest.secrets.as_deref().unwrap_or_default().is_empty() {
+    if !manifest.secrets.is_empty() {
         create_dir_all(&project_secrets_dir).await?;
     }
 
-    for secret in manifest.secrets.unwrap_or_default() {
+    for secret in manifest.secrets {
         let src_file = secret_file_path(&state.root_dir, environment, &secret);
         let dest_file = project_secrets_dir.join(secret_file_name(&secret));
         info!(
@@ -80,20 +80,37 @@ fn source_env_variables(
     variables.insert("SECRETS_DIR".to_string(), "./secrets".to_string());
     variables.insert("VERSION".to_string(), version.to_string());
 
+    let port = manifest
+        .ports
+        .as_ref()
+        .and_then(|p| p.primary)
+        .or(manifest.deployment.as_ref().and_then(|d| d.port));
     // Turn ant-host-agent into ANT_HOST_AGENT, populate *_PORT and *_METRICS_PORT variables.
     let upcase_project = project.to_uppercase().replace("-", "_");
-    if let Some(port) = manifest.deployment.as_ref().and_then(|d| d.port) {
+    if let Some(port) = port {
         let port_var = format!("{upcase_project}_PORT");
 
         variables.insert("PORT".to_string(), port.to_string());
         variables.insert(port_var, port.to_string());
     }
 
-    if let Some(metrics_port) = manifest.deployment.as_ref().and_then(|d| d.metrics_port) {
+    let metrics_port = manifest
+        .ports
+        .as_ref()
+        .and_then(|p| p.metrics)
+        .or(manifest.deployment.as_ref().and_then(|d| d.metrics_port));
+    if let Some(metrics_port) = metrics_port {
         let metrics_port_var = format!("{upcase_project}_METRICS_PORT");
 
         variables.insert("METRICS_PORT".to_string(), metrics_port.to_string());
         variables.insert(metrics_port_var, metrics_port.to_string());
+    }
+
+    if let Some(config_port) = manifest.ports.as_ref().and_then(|p| p.config) {
+        let config_port_var = format!("{upcase_project}_CONFIG_PORT");
+
+        variables.insert("CONFIG_PORT".to_string(), config_port.to_string());
+        variables.insert(config_port_var, config_port.to_string());
     }
 
     for (k, v) in service_instance
