@@ -2,6 +2,9 @@
   "project": "ant-backing-it-up-db",
   "description": "the typesofants database for knowing about backups",
   "build": "docker",
+  "ports": {
+    "primary": 3239
+  },
   "secrets": [
     "ant_backing_it_up_db_db",
     "ant_backing_it_up_db_user",

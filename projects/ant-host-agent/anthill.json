@@ -3,8 +3,8 @@
   "description": "the typesofants host agent",
   "build": "makefile",
   "secrets": [],
-  "deployment": {
-    "port": 3232,
-    "metrics_port": 3232
+  "ports": {
+    "primary": 3232,
+    "metrics": 3232
   }
 }

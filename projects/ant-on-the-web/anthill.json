@@ -2,6 +2,9 @@
   "project": "ant-on-the-web",
   "description": "the typesofants web server",
   "build": "makefile",
+  "ports": {
+    "primary": 3231
+  },
   "secrets": [
     "mailjet_api_key",
     "mailjet_secret_key",

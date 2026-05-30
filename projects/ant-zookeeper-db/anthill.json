@@ -2,5 +2,8 @@
   "project": "ant-zookeeper-db",
   "description": "the typesofants database for managing the ants",
   "build": "docker",
+  "ports": {
+    "primary": 3234
+  },
   "secrets": []
 }

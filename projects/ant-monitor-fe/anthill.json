@@ -2,7 +2,7 @@
   "project": "ant-monitor-fe",
   "description": "the typesofants monitoring frontend",
   "build": "docker",
-  "deployment": {
-    "port": 3243
+  "ports": {
+    "primary": 3243
   }
 }

@@ -2,8 +2,8 @@
   "project": "ant-fs",
   "description": "the typesofants file storage server",
   "build": "makefile",
-  "deployment": {
-    "port": 3237
+  "ports": {
+    "primary": 3237
   },
   "secrets": [
     "ant_fs_users"

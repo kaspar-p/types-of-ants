@@ -3,7 +3,7 @@
   "description": "the typesofants frontend",
   "build": "makefile",
   "build_parallelism": "serial",
-  "deployment": {
-    "port": 3240
+  "ports": {
+    "primary": 3240
   }
 }

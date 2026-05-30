@@ -2,8 +2,8 @@
   "project": "ant-backing-it-up",
   "description": "the typesofants backup processor",
   "build": "makefile",
-  "deployment": {
-    "port": 3238
+  "ports": {
+    "primary": 3238
   },
   "secrets": [
     "ant_data_farm_db",

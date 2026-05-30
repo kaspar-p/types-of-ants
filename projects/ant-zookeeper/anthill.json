@@ -2,5 +2,8 @@
   "project": "ant-zookeeper",
   "description": "the typesofants deployment orchestrator",
   "build": "makefile",
+  "ports": {
+    "primary": 3235
+  },
   "secrets": []
 }
