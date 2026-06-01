@@ -219,7 +219,7 @@ async fn enable_service(
 
     let manifest = AnthillManifest::from_file(&current_dir.join("anthill.json"))?;
 
-    let service = Service::from_str(&format!("{}.service.ant", req.service_id))
+    let service = Service::from_str(&req.service_id)
         .context("parsing service id into ant-matchmaker service id")?;
 
     let mut attempts = 0;
@@ -539,7 +539,7 @@ async fn disable_service(
 
     manager.reload().await.expect("reload");
 
-    let service = Service::from_str(&format!("{}.service.ant", req.service_id))
+    let service = Service::from_str(&req.service_id)
         .context("parsing service id into ant-matchmaker service id")?;
 
     state

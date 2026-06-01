@@ -219,6 +219,10 @@
         {
           "env": "prod",
           "project": "ant-fs"
+        },
+        {
+          "env": "prod",
+          "project": "ant-just-checking-in"
         }
       ]
     },

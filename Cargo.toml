@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
   "projects/ant-data-farm-client",
-  "projects/ant-just-checking-in",
   "projects/ant-on-the-web",
   "projects/ant-who-tweets",
   "projects/ant-host-agent",
@@ -16,5 +15,6 @@ members = [
   "projects/ant-zookeeper-db",
   "projects/ant-backing-it-up",
   "projects/ant-fs-client",
-  "projects/anthill-manifest-build", "projects/anthill-manifest",
+  "projects/anthill-manifest-build",
+  "projects/anthill-manifest",
 ]

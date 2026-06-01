@@ -11,6 +11,11 @@ set -o allexport
 source "$repository_root/secrets/dev/build.cfg"
 set +o allexport
 
+if [[ -f "$repository_root/projects/$project/anthill.json" ]]; then
+  PORT="$(cat "$repository_root/projects/$project/anthill.json" | jq '.ports.primary')"
+  export PORT
+fi
+
 if [[ -f "$repository_root/projects/$project/.anthill/dev.sh" ]]; then
   "$repository_root/projects/$project/.anthill/dev.sh" "${@:2}"
 else

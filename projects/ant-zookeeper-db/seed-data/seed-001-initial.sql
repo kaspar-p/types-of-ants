@@ -51,6 +51,7 @@ values
   ('ant-matchmaker', true),
   ('ant-lumberjack', true),
   ('ant-sawmill', true),
+  ('ant-just-checking-in', true),
   ('nextcloud-webdav', false)
 ;
 

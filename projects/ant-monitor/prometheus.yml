@@ -23,3 +23,32 @@ scrape_configs:
           - "antworker002.hosts.typesofants.org:3241"
         labels:
           group: "beta"
+
+  - job_name: "blackbox-http"
+    scrape_interval: 30s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://typesofants.org
+          - https://www.typesofants.org
+          - https://beta.typesofants.org
+          - https://typeofants.org
+          - https://typesofant.org
+          - https://typeofant.org
+          - https://6krill.com
+          # Add each app's external URL as deployed
+    consul_sd_configs:
+      - server: "localhost:3245" # ant-matchmaker http port
+        services: ["ant-just-checking-in"]
+    relabel_configs:
+      # Save the probe target URL before relabeling overwrites __address__
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__address__]
+        target_label: instance
+      # Rewrite __address__ to the Consul-discovered blackbox_exporter host:port
+      - source_labels: [__meta_consul_address, __meta_consul_service_port]
+        separator: ":"
+        target_label: __address__

@@ -2,60 +2,60 @@ use strum::{Display, EnumString};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString)]
 pub enum Service {
-    #[strum(serialize = "ant-data-farm.service.ant")]
+    #[strum(serialize = "ant-data-farm")]
     AntDataFarm,
 
-    #[strum(serialize = "ant-on-the-web.service.ant")]
+    #[strum(serialize = "ant-on-the-web")]
     AntOnTheWeb,
 
-    #[strum(serialize = "ant-looking-pretty.service.ant")]
+    #[strum(serialize = "ant-looking-pretty")]
     AntLookingPretty,
 
-    #[strum(serialize = "ant-fs.service.ant")]
+    #[strum(serialize = "ant-fs")]
     AntFs,
 
-    #[strum(serialize = "ant-backing-it-up.service.ant")]
+    #[strum(serialize = "ant-backing-it-up")]
     AntBackingItUp,
 
-    #[strum(serialize = "ant-backing-it-up-db.service.ant")]
+    #[strum(serialize = "ant-backing-it-up-db")]
     AntBackingItUpDb,
 
-    #[strum(serialize = "ant-gateway.service.ant")]
+    #[strum(serialize = "ant-gateway")]
     AntGateway,
 
-    #[strum(serialize = "ant-host-agent.service.ant")]
+    #[strum(serialize = "ant-host-agent")]
     AntHostAgent,
 
-    #[strum(serialize = "ant-matchmaker.service.ant")]
+    #[strum(serialize = "ant-matchmaker")]
     AntMatchmaker,
 
-    #[strum(serialize = "ant-who-tweets.service.ant")]
+    #[strum(serialize = "ant-who-tweets")]
     AntWhoTweets,
 
-    #[strum(serialize = "ant-monitor.service.ant")]
+    #[strum(serialize = "ant-monitor")]
     AntMonitor,
 
-    #[strum(serialize = "ant-monitor-fe.service.ant")]
+    #[strum(serialize = "ant-monitor-fe")]
     AntMonitorFe,
 
-    #[strum(serialize = "ant-naming-domains.service.ant")]
+    #[strum(serialize = "ant-naming-domains")]
     AntNamingDomains,
 
-    #[strum(serialize = "ant-worker-node-metrics-exporter.service.ant")]
+    #[strum(serialize = "ant-worker-node-metrics-exporter")]
     AntWorkerNodeMetricsExporter,
 
-    #[strum(serialize = "ant-measuring-the-database.service.ant")]
+    #[strum(serialize = "ant-measuring-the-database")]
     AntMeasuringTheDatabase,
 
-    #[strum(serialize = "ant-siren.service.ant")]
+    #[strum(serialize = "ant-siren")]
     AntSiren,
 
-    #[strum(serialize = "ant-sawmill.service.ant")]
+    #[strum(serialize = "ant-sawmill")]
     AntSawmill,
 
-    #[strum(serialize = "ant-lumberjack.service.ant")]
+    #[strum(serialize = "ant-lumberjack")]
     AntLumberjack,
 
-    #[strum(serialize = "ant-just-checking-in.service.ant")]
+    #[strum(serialize = "ant-just-checking-in")]
     AntJustCheckingIn,
 }

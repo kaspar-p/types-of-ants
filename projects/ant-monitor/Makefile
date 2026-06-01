@@ -10,10 +10,6 @@ ifeq ($(PROMETHEUS_ARCH),)
     $(error PROMETHEUS_ARCH is not set. Please define it.)
 endif
 
-ifeq ($(BUILD_OUTPUT_DIR),)
-    $(error PROMETHEUS_ARCH is not set. Please define it.)
-endif
-
 TARDIR=prometheus-$(PROMETHEUS_VERSION).$(PROMETHEUS_OS)-$(PROMETHEUS_ARCH)
 TARFILE=$(TARDIR).tar.gz
 

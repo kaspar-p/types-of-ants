@@ -321,29 +321,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ant-just-checking-in"
-version = "0.1.0"
-dependencies = [
- "ant-data-farm",
- "ant-host-agent",
- "ant-library",
- "anyhow",
- "chrono",
- "cronjob",
- "dotenv",
- "futures",
- "futures-util",
- "openssl",
- "reqwest 0.12.28",
- "tokio",
- "tokio-cron-scheduler 0.14.0",
- "tokio-postgres",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "ant-library"
 version = "1.0.0"
 dependencies = [
@@ -1680,17 +1657,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
-name = "cron"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d76219e9243e100d5a37676005f08379297f8addfebc247613299600625c734d"
-dependencies = [
- "chrono",
- "nom",
- "once_cell",
-]
-
-[[package]]
 name = "croner"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1708,16 +1674,6 @@ dependencies = [
  "chrono",
  "derive_builder",
  "strum 0.27.2",
-]
-
-[[package]]
-name = "cronjob"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e596f513d5b176f3cb139af86439c9f97c1ba61ff15eb266059afc8fab27f6dc"
-dependencies = [
- "chrono",
- "cron",
 ]
 
 [[package]]

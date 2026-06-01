@@ -1,5 +1,9 @@
 {
   "project": "ant-just-checking-in",
+  "description": "the typesofants endpoint health probe",
   "build": "makefile",
+  "ports": {
+    "primary": 3250
+  },
   "secrets": []
 }
