@@ -60,6 +60,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-lumberjack"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -102,6 +106,10 @@
         {
           "env": "beta",
           "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
         },
         {
           "env": "beta",
@@ -162,6 +170,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-lumberjack"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -188,6 +200,10 @@
         {
           "env": "prod",
           "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
         },
         {
           "env": "prod",
@@ -220,6 +236,10 @@
         },
         {
           "env": "prod",
+          "project": "ant-lumberjack"
+        },
+        {
+          "env": "prod",
           "project": "ant-worker-node-metrics-exporter"
         },
         {
@@ -236,6 +256,10 @@
         {
           "env": "prod",
           "project": "ant-monitor"
+        },
+        {
+          "env": "prod",
+          "project": "ant-sawmill"
         }
       ]
     },
@@ -250,6 +274,10 @@
         {
           "env": "prod",
           "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
         },
         {
           "env": "prod",
@@ -283,6 +311,10 @@
         {
           "env": "prod",
           "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
         },
         {
           "env": "prod",

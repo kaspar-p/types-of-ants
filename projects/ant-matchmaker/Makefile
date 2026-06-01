@@ -10,10 +10,6 @@ ifeq ($(HASHICORP_ARCH),)
     $(error HASHICORP_ARCH is not set. Please define it.)
 endif
 
-ifeq ($(BUILD_OUTPUT_DIR),)
-    $(error BUILD_OUTPUT_DIR is not set. Please define it.)
-endif
-
 ZIPDIR=consul_$(CONSUL_VERSION)_$(PROMETHEUS_OS)_$(HASHICORP_ARCH)
 ZIPFILE=$(ZIPDIR).zip
 

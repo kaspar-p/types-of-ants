@@ -51,6 +51,14 @@ impl HostArchitecture {
         }
     }
 
+    pub fn alloy_arch(&self) -> &str {
+        match &self {
+            Self::ArmV7 => "arm64",
+            Self::Aarch64 => "arm64",
+            Self::X86_64 => "amd64",
+        }
+    }
+
     pub fn hashicorp_arch(&self) -> &str {
         match &self {
             Self::ArmV7 => "arm",
