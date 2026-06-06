@@ -84,7 +84,10 @@ pub async fn build(cmd: BuildCmd) {
 
     let git = GitState::new().unwrap();
     let project_src = git.root.join("projects").join(&cmd.project);
-    let manifest = AnthillManifest::from_file(&project_src.join("anthill.json")).unwrap();
+    let manifest = AnthillManifest::from_file(&project_src.join("anthill.json")).expect(&format!(
+        "Project {} had no anthill.json in its root.",
+        cmd.project
+    ));
 
     match manifest.build_parallelism {
         AnthillBuildParallelism::Serial => {

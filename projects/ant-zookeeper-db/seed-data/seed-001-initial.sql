@@ -52,6 +52,7 @@ values
   ('ant-lumberjack', true),
   ('ant-sawmill', true),
   ('ant-just-checking-in', true),
+  ('ant-printing-press', true),
   ('nextcloud-webdav', false)
 ;
 

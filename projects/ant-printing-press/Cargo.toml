@@ -1,0 +1,20 @@
+[package]
+name = "ant-printing-press"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+anyhow = "1.0.102"
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", features = ["routing"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+dotenv = "0.15.0"
+escpos = { version = "0.19.0", features = ["usb"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+strum = { version = "0.28.0", features = ["derive"] }
+tokio = "1.52.3"
+tower = "0.5.3"
+tower-http = { version = "0.6.11", features = ["catch-panic"] }
+tracing = "0.1.44"

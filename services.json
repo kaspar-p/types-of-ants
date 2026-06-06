@@ -264,6 +264,10 @@
         {
           "env": "prod",
           "project": "ant-sawmill"
+        },
+        {
+          "env": "prod",
+          "project": "ant-printing-press"
         }
       ]
     },

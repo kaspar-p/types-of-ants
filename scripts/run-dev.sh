@@ -14,6 +14,9 @@ set +o allexport
 if [[ -f "$repository_root/projects/$project/anthill.json" ]]; then
   PORT="$(cat "$repository_root/projects/$project/anthill.json" | jq '.ports.primary')"
   export PORT
+  
+  PRIMARY_PORT="$PORT"
+  export PRIMARY_PORT
 fi
 
 if [[ -f "$repository_root/projects/$project/.anthill/dev.sh" ]]; then

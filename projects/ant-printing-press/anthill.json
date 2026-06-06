@@ -1,0 +1,9 @@
+{
+  "project": "ant-printing-press",
+  "description": "the typesofants printer",
+  "build": "makefile",
+  "ports": {
+    "primary": 3251,
+    "metrics": 3252
+  }
+}

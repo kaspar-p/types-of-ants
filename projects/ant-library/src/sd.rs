@@ -8,8 +8,6 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 
-use crate::service::Service;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
     pub address: String,
@@ -43,7 +41,7 @@ impl ServiceDiscovery {
         }
     }
 
-    pub async fn resolve(&self, service: &Service) -> Option<ServiceEndpoint> {
+    pub async fn resolve(&self, service: &str) -> Option<ServiceEndpoint> {
         let service_name = &service.to_string();
 
         // Fast path: cache hit
@@ -66,16 +64,15 @@ impl ServiceDiscovery {
     async fn fetch_endpoints(
         consul: Arc<Consul>,
         cache: Arc<RwLock<HashMap<String, Vec<ServiceEndpoint>>>>,
-        service: &Service,
+        service: &str,
         index: Option<u64>,
     ) -> Result<u64, ConsulError> {
         info!("Fetching remote endpoints of [{}]", service);
-        let service_name = service.to_string();
 
         let nodes = consul
             .get_service_nodes(
                 GetServiceNodesRequest {
-                    service: &service_name,
+                    service: service,
                     passing: true,
                     ..Default::default()
                 },
@@ -114,7 +111,7 @@ impl ServiceDiscovery {
             .collect::<Vec<_>>()
             .join(", ");
         info!("Discovered [{service}] => [{endpoints_str}]");
-        cache.write().await.insert(service_name, endpoints);
+        cache.write().await.insert(service.to_string(), endpoints);
 
         // The documentation: https://developer.hashicorp.com/consul/api-docs/features/blocking#implementation-details
         // lists this as a failure mode: if the index returned is every less than the previous, reset the entire counter.
@@ -128,12 +125,10 @@ impl ServiceDiscovery {
     }
 
     /// Spawns a background task to watch updates for `service_id`, or does nothing if already exists.
-    async fn ensure_refreshing(&self, service: &Service) -> () {
-        let service_name = service.to_string();
-
+    async fn ensure_refreshing(&self, service: &str) -> () {
         {
             // Idempotency.
-            if self.refreshers.read().await.contains_key(&service_name) {
+            if self.refreshers.read().await.contains_key(service) {
                 return;
             }
         }
@@ -155,9 +150,9 @@ impl ServiceDiscovery {
         // Spawn background watcher (blocking query loop)
         let consul = self.consul.clone();
         let cache = self.cache.clone();
-        let service2 = service.clone();
+        let service2 = service.to_string().clone();
         let handle = tokio::spawn(async move {
-            let service3 = service2;
+            let service3 = service2.clone();
             let mut index = 0u64;
             loop {
                 match ServiceDiscovery::fetch_endpoints(
@@ -177,17 +172,18 @@ impl ServiceDiscovery {
             }
         });
 
-        self.refreshers.write().await.insert(service_name, handle);
+        self.refreshers
+            .write()
+            .await
+            .insert(service.to_string(), handle);
     }
 
-    pub async fn stop_refreshing(&self, service: &Service) {
-        let service_name = service.to_string();
-
+    pub async fn stop_refreshing(&self, service: &str) {
         let mut refreshers = self.refreshers.write().await;
-        if let Some(handle) = refreshers.remove(&service_name) {
+        if let Some(handle) = refreshers.remove(service) {
             handle.abort();
         }
-        self.cache.write().await.remove(&service_name);
+        self.cache.write().await.remove(service);
     }
 
     pub async fn shutdown(&self) {
@@ -239,11 +235,7 @@ impl ServiceDiscoveryWriter {
         }
     }
 
-    pub async fn register_service(
-        &self,
-        service: &Service,
-        port: u16,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn register_service(&self, service: &str, port: u16) -> Result<(), anyhow::Error> {
         let req = RegisterServiceRequest {
             name: service.to_string(),
             port,
@@ -268,14 +260,13 @@ impl ServiceDiscoveryWriter {
         return Ok(());
     }
 
-    pub async fn deregister_service(&self, service: &Service) -> Result<(), anyhow::Error> {
+    pub async fn deregister_service(&self, service: &str) -> Result<(), anyhow::Error> {
         debug!("[consul deregister request] {}", service);
         let res = self
             .client
             .put(format!(
                 "{}/v1/agent/service/deregister/{}",
-                self.consul_endpoint,
-                service.to_string()
+                self.consul_endpoint, service
             ))
             .send()
             .await?

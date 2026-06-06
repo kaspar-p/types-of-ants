@@ -1,7 +1,4 @@
-use ant_library::{
-    headers::{XAntServiceIdHeader, XAntVersionHeader},
-    service::Service,
-};
+use ant_library::headers::{XAntServiceIdHeader, XAntVersionHeader};
 use anthill_manifest::{AnthillArchetype, AnthillManifest, AnthillManifestError};
 use anyhow::Context;
 use flate2::read::GzDecoder;
@@ -219,9 +216,6 @@ async fn enable_service(
 
     let manifest = AnthillManifest::from_file(&current_dir.join("anthill.json"))?;
 
-    let service = Service::from_str(&req.service_id)
-        .context("parsing service id into ant-matchmaker service id")?;
-
     let mut attempts = 0;
     let mut healthy = state.sd.healthy().await;
     while !healthy && attempts < 100 {
@@ -235,11 +229,11 @@ async fn enable_service(
         state
             .sd
             .register_service(
-                &service,
+                &req.service_id,
                 manifest.deployment.and_then(|d| d.port).unwrap_or(0),
             )
             .await
-            .context("register ant-matchmaker service")?;
+            .context("register service to ant-matchmaker service")?;
     } else {
         error!("Failed to wait for Consul's health, skipping registration!");
     }
@@ -539,14 +533,14 @@ async fn disable_service(
 
     manager.reload().await.expect("reload");
 
-    let service = Service::from_str(&req.service_id)
-        .context("parsing service id into ant-matchmaker service id")?;
-
-    state
-        .sd
-        .deregister_service(&service)
-        .await
-        .context("deregister ant-matchmaker service")?;
+    // De-register (unless of course it's the service registry itself)
+    if req.service_id != "ant-matchmaker" {
+        state
+            .sd
+            .deregister_service(&req.service_id)
+            .await
+            .context("deregister ant-matchmaker service")?;
+    }
 
     Ok((StatusCode::OK, "Service disabled."))
 }

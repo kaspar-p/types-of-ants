@@ -82,6 +82,9 @@ group:
 sudo adduser ant
 sudo usermod -aG ubuntu ant
 sudo groupmod -n ants ubuntu
+
+echo "Adding to USB-using group..."
+sudo usermod -aG lp ant
 ```
 
 Add the `ant` user to be able to `sudo` by adding via `visudo`:

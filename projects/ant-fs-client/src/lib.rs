@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ant_library::{sd::ServiceDiscovery, service::Service};
+use ant_library::sd::ServiceDiscovery;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -65,7 +65,7 @@ impl AntFsClient {
 
     async fn host_port(&self) -> Option<(String, u16)> {
         if let Some(sd) = &self.sd {
-            let endpoint = sd.resolve(&Service::AntFs).await;
+            let endpoint = sd.resolve(&"ant-fs").await;
             return endpoint.map(|e| (e.address, e.port));
         }
 
@@ -82,7 +82,7 @@ impl AntFsClient {
             Some((host, port)) => Ok(format!("http{}://{}:{}/{}", self.tls(), host, port, path)),
             None => Err(anyhow::Error::msg(format!(
                 "Unable to find endpoint for: {}",
-                Service::AntFs
+                "ant-fs"
             ))),
         }
     }
