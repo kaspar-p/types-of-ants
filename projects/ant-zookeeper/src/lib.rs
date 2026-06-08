@@ -1,3 +1,4 @@
+use ant_library::routes::Routes;
 use axum::Router;
 use http::{header, Method};
 use serde::{Deserialize, Serialize};
@@ -33,11 +34,12 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
         .allow_origin(AllowOrigin::any());
 
     debug!("Initializing site routes...");
-    let app = Router::new()
-        .nest("/pipeline", routes::pipeline::make_routes())
-        .nest("/deployment", routes::deployment::make_routes())
-        .nest("/service", routes::service::make_routes())
-        .nest("/cert", routes::cert::make_routes())
+    let app = Routes::new()
+        .nest_routes("/pipeline", routes::pipeline::routes())
+        .nest_routes("/deployment", routes::deployment::routes())
+        .nest_routes("/service", routes::service::routes())
+        .nest_routes("/cert", routes::cert::routes())
+        .build()
         .with_state(s)
         .layer(
             ServiceBuilder::new()

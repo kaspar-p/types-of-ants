@@ -3,12 +3,16 @@ use http::StatusCode;
 use serde_json::json;
 
 fn make_stripe_signature(payload: &str, secret: &str) -> String {
-    use hmac::{Hmac, Mac};
-    use sha2::Sha256;
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
+    make_stripe_signature_at(payload, secret, timestamp)
+}
+
+fn make_stripe_signature_at(payload: &str, secret: &str, timestamp: u64) -> String {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
     let signed_payload = format!("{}.{}", timestamp, payload);
     type HmacSha256 = Hmac<Sha256>;
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
@@ -42,6 +46,77 @@ async fn stripe_webhook_returns_400_invalid_signature() {
         .post("/api/webhooks/stripe")
         .header("stripe-signature", "bad-value")
         .body("{}".to_string())
+        .send()
+        .await;
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+// Well-formed `t=...,v1=<64 hex>` signature signed with the wrong secret. Unlike
+// `bad-value` above (which fails signature parsing), this reaches and exercises
+// the HMAC verification itself.
+#[tokio::test]
+async fn stripe_webhook_returns_400_wrong_secret() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    let payload = "{}";
+    let sig = make_stripe_signature(payload, "the-wrong-secret");
+
+    let res = fixture
+        .client
+        .post("/api/webhooks/stripe")
+        .header("stripe-signature", sig.as_str())
+        .header("content-type", "application/json")
+        .body(payload.to_string())
+        .send()
+        .await;
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+// Signature computed over one body, but a different body is sent. Verifies the
+// signature actually protects body integrity, not just header presence.
+#[tokio::test]
+async fn stripe_webhook_returns_400_tampered_body() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    let signed_body = json!({ "id": "evt_signed", "object": "event" }).to_string();
+    let sig = make_stripe_signature(&signed_body, TEST_SECRET);
+
+    let tampered_body = json!({ "id": "evt_tampered", "object": "event" }).to_string();
+
+    let res = fixture
+        .client
+        .post("/api/webhooks/stripe")
+        .header("stripe-signature", sig.as_str())
+        .header("content-type", "application/json")
+        .body(tampered_body)
+        .send()
+        .await;
+
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+// Correctly signed with the right secret, but the signature timestamp is older
+// than Stripe's 5-minute tolerance, so verification must reject it (replay).
+#[tokio::test]
+async fn stripe_webhook_returns_400_expired_timestamp() {
+    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+
+    let payload = "{}";
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let stale_timestamp = now - 600; // 10 minutes ago, outside the 300s window
+    let sig = make_stripe_signature_at(payload, TEST_SECRET, stale_timestamp);
+
+    let res = fixture
+        .client
+        .post("/api/webhooks/stripe")
+        .header("stripe-signature", sig.as_str())
+        .header("content-type", "application/json")
+        .body(payload.to_string())
         .send()
         .await;
 

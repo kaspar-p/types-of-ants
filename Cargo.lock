@@ -401,6 +401,7 @@ dependencies = [
  "ant-library-test",
  "anyhow",
  "argon2",
+ "assertables",
  "async-stripe",
  "async-trait",
  "axum",
@@ -1013,17 +1014,21 @@ checksum = "9963ff19f40c6102c76756ef0a46004c0d58957d87259fc9208ff8441c12ab96"
 dependencies = [
  "axum",
  "axum-core",
+ "axum-macros",
  "bytes",
  "cookie",
+ "form_urlencoded",
  "futures-util",
  "headers 0.4.1",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
  "mime",
+ "percent-encoding",
  "pin-project-lite",
  "rustversion",
  "serde_core",
+ "serde_html_form",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -5799,6 +5804,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "serde_html_form"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2f2d7ff8a2140333718bb329f5c40fc5f0865b84c426183ce14c97d2ab8154f"
+dependencies = [
+ "form_urlencoded",
+ "indexmap 2.14.0",
+ "itoa",
+ "ryu",
+ "serde_core",
 ]
 
 [[package]]

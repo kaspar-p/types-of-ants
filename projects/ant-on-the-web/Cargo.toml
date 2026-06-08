@@ -60,6 +60,7 @@ async-stripe = { version = "0.39", features = ["runtime-tokio-hyper-rustls", "we
 
 [dev-dependencies]
 ant-library-test = { path = "../ant-library-test" }
+assertables = "9.9.0"
 http = "1.3.1"
 http-body-util = "0.1.3"
 mime = "0.3.17"

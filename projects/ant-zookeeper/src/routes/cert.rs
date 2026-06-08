@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use acme_lib::{persist::FilePersist, Directory};
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
-use axum_extra::routing::RouterExt;
+use ant_library::routes::Routes;
+use axum::{extract::State, response::IntoResponse, routing::post, Json};
 use http::StatusCode;
 use rsa::{pkcs1::EncodeRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
@@ -168,6 +168,7 @@ async fn provision_certificate(
     return Ok((StatusCode::OK, "Certificate provisioned.".to_string()));
 }
 
-pub fn make_routes() -> Router<AntZookeeperState> {
-    Router::new().route_with_tsr("/cert", post(provision_certificate))
+pub fn routes() -> Routes<AntZookeeperState> {
+    Routes::new()
+        .post("/cert", post(provision_certificate))
 }

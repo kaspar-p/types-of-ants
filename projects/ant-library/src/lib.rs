@@ -10,6 +10,7 @@ use tracing::{debug, Level};
 use tracing_subscriber::{fmt::writer::Tee, EnvFilter, FmtSubscriber};
 
 pub mod db;
+pub mod routes;
 pub mod env;
 pub mod find_up;
 pub mod headers;

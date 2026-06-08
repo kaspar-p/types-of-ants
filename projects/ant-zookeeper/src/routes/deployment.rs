@@ -1,6 +1,6 @@
 use anyhow::Context;
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
-use axum_extra::routing::RouterExt;
+use ant_library::routes::Routes;
+use axum::{extract::State, response::IntoResponse, routing::post, Json};
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use http::StatusCode;
@@ -180,8 +180,8 @@ async fn retry_job(
     ));
 }
 
-pub fn make_routes() -> Router<AntZookeeperState> {
-    Router::new()
-        .route_with_tsr("/iteration", post(iterate_pipeline))
-        .route_with_tsr("/retry", post(retry_job))
+pub fn routes() -> Routes<AntZookeeperState> {
+    Routes::new()
+        .post("/iteration", post(iterate_pipeline))
+        .post("/retry", post(retry_job))
 }

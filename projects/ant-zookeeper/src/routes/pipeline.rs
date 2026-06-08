@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use ant_library::host_architecture::HostArchitecture;
 use ant_zookeeper_db::HostGroup;
+use ant_library::routes::Routes;
 use axum::{
     extract::{Query, State},
-    routing::{get, post},
-    Json, Router,
+    routing::{delete, get, post},
+    Json,
 };
-use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -768,16 +768,13 @@ async fn list_pipelines(
     ))
 }
 
-pub fn make_routes() -> Router<AntZookeeperState> {
-    Router::new()
-        .route_with_tsr(
-            "/host-group/host-group",
-            get(get_host_group).post(create_host_group),
-        )
-        .route_with_tsr(
-            "/host-group/host",
-            post(add_host_to_host_group).delete(remove_host_from_host_group),
-        )
-        .route_with_tsr("/pipeline", get(get_pipeline).post(put_pipeline))
-        .route_with_tsr("/pipelines", get(list_pipelines))
+pub fn routes() -> Routes<AntZookeeperState> {
+    Routes::new()
+        .get("/host-group/host-group", get(get_host_group))
+        .post("/host-group/host-group", post(create_host_group))
+        .post("/host-group/host", post(add_host_to_host_group))
+        .delete("/host-group/host", delete(remove_host_from_host_group))
+        .get("/pipeline", get(get_pipeline))
+        .post("/pipeline", post(put_pipeline))
+        .get("/pipelines", get(list_pipelines))
 }

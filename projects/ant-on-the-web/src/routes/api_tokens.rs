@@ -1,10 +1,10 @@
+use ant_library::routes::Routes;
 use axum::{
     extract::State,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
+    Json,
 };
-use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
 use http::StatusCode;
 use rand::distr::SampleString;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     err::AntOnTheWebError,
     routes::lib::auth::{authenticate_admin, AuthClaims},
-    state::{ApiRouter, ApiState, InnerApiState},
+    state::{ApiRoutes, ApiState, InnerApiState},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -68,8 +68,8 @@ async fn list_tokens() -> Result<impl IntoResponse, AntOnTheWebError> {
     Ok(StatusCode::NOT_IMPLEMENTED)
 }
 
-pub fn router() -> ApiRouter {
-    Router::new()
-        .route_with_tsr("/tokens", get(list_tokens))
-        .route_with_tsr("/token", post(grant_token))
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .get("/tokens", get(list_tokens))
+        .post("/token", post(grant_token))
 }

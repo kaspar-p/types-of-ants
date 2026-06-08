@@ -1,16 +1,16 @@
-use crate::state::{ApiRouter, ApiState, InnerApiState};
+use crate::state::{ApiRoutes, ApiState, InnerApiState};
 use ant_data_farm::{
     hosts::{Host, HostId},
     DaoTrait,
 };
+use ant_library::routes::Routes;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
+    Json,
 };
-use axum_extra::routing::RouterExt;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
@@ -62,13 +62,10 @@ async fn all_hosts(
     ))
 }
 
-pub fn router() -> ApiRouter {
-    Router::new()
-        .route_with_tsr("/host/{host}", get(host))
-        .route_with_tsr("/hosts", get(all_hosts))
-        .fallback(|| async {
-            ant_library::api_fallback(&["GET /host/{host_id_or_name}", "GET /hosts"])
-        })
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .get("/host/{host}", get(host))
+        .get("/hosts", get(all_hosts))
 }
 
 struct HostsError(anyhow::Error);

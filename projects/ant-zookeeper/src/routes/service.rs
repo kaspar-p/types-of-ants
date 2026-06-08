@@ -9,13 +9,14 @@ use ant_library::headers::{
 };
 use anthill_manifest::AnthillManifest;
 use axum::debug_handler;
+use ant_library::routes::Routes;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
     routing::post,
-    Json, Router,
+    Json,
 };
-use axum_extra::{routing::RouterExt, TypedHeader};
+use axum_extra::TypedHeader;
 use flate2::read::GzDecoder;
 use http::StatusCode;
 use humansize::DECIMAL;
@@ -527,15 +528,12 @@ async fn upsert_revision(
     ));
 }
 
-pub fn make_routes() -> Router<AntZookeeperState> {
-    Router::new()
-        .route_with_tsr("/revision", post(upsert_revision))
-        .route_with_tsr("/service", post(register_service))
-        .route_with_tsr("/env", post(put_project_environment))
-        .route_with_tsr(
-            "/artifact",
-            post(register_artifact).layer(
-                DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
-            ),
-        )
+pub fn routes() -> Routes<AntZookeeperState> {
+    Routes::new()
+        .post("/revision", post(upsert_revision))
+        .post("/service", post(register_service))
+        .post("/env", post(put_project_environment))
+        .post("/artifact", post(register_artifact).layer(
+            DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
+        ))
 }

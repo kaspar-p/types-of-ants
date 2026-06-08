@@ -4,15 +4,15 @@ use crate::{
         auth::{authenticate, authenticate_admin, optional_strict_authenticate},
         response::AntOnTheWebResponse,
     },
-    state::{ApiRouter, ApiState, InnerApiState},
+    state::{ApiRoutes, ApiState, InnerApiState},
 };
 use ant_data_farm::users::UserId;
+use ant_library::routes::Routes;
 use axum::{
     extract::{Query, State},
     routing::{get, post},
-    Json, Router,
+    Json,
 };
-use axum_extra::routing::RouterExt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -557,36 +557,20 @@ async fn unfavorite_ant(
 //     };
 // }
 
-pub fn router() -> ApiRouter {
-    Router::new()
-        .route_with_tsr("/latest-ants", get(latest_ants))
-        .route_with_tsr("/unreleased-ants", get(unreleased_ants))
-        .route_with_tsr("/released-ants", get(released_ants))
-        .route_with_tsr("/declined-ants", get(declined_ants))
-        .route_with_tsr("/all-ants", get(all_ants))
-        .route_with_tsr("/release", get(get_release).post(create_release))
-        .route_with_tsr("/latest-release", get(latest_release))
-        .route_with_tsr("/total", get(total))
-        .route_with_tsr("/suggest", post(make_suggestion))
-        .route_with_tsr("/decline", post(decline_ant))
-        .route_with_tsr("/favorite", post(favorite_ant))
-        .route_with_tsr("/unfavorite", post(unfavorite_ant))
-        // .route_with_tsr("/tweet", post(tweet))
-        .fallback(|| async {
-            ant_library::api_fallback(&[
-                "GET /latest-ants",
-                "GET /unreleased-ants",
-                "GET /released-ants",
-                "GET /declined-ants",
-                "GET /all-ants",
-                "GET+POST /release",
-                "GET /latest-release",
-                "GET /total",
-                "POST /suggest",
-                "POST /decline",
-                "POST /favorite",
-                "POST /unfavorite",
-                // "POST /tweet",
-            ])
-        })
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .get("/latest-ants", get(latest_ants))
+        .get("/unreleased-ants", get(unreleased_ants))
+        .get("/released-ants", get(released_ants))
+        .get("/declined-ants", get(declined_ants))
+        .get("/all-ants", get(all_ants))
+        .get("/release", get(get_release))
+        .post("/release", post(create_release))
+        .get("/latest-release", get(latest_release))
+        .get("/total", get(total))
+        .post("/suggest", post(make_suggestion))
+        .post("/decline", post(decline_ant))
+        .post("/favorite", post(favorite_ant))
+        .post("/unfavorite", post(unfavorite_ant))
+        // .post("/tweet", post(tweet))
 }

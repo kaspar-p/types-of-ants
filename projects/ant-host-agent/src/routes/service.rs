@@ -14,13 +14,14 @@ use std::{
 use tempfile::TempDir;
 use tokio_util::codec;
 
+use ant_library::routes::Routes;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Query, State},
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    routing::{delete, get, post},
+    Json,
 };
-use axum_extra::{routing::RouterExt, TypedHeader};
+use axum_extra::TypedHeader;
 use futures_util::stream::StreamExt;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -633,25 +634,15 @@ async fn get_service_discovery(
     Ok((StatusCode::OK, Json(targets)))
 }
 
-pub fn make_routes() -> Router<AntHostAgentState> {
-    Router::new()
-        .route_with_tsr("/sd", get(get_service_discovery))
-        .route_with_tsr("/service", post(enable_service).delete(disable_service))
-        .route_with_tsr("/service-installation", post(install_service))
-        .route_with_tsr(
-            "/service-registration",
-            post(register_service).layer(
-                DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
-            ),
-        )
-        .fallback(|| async {
-            ant_library::api_fallback(&[
-                "POST /service/service",
-                "DELETE /service/service",
-                "POST /service/service-installation",
-                "POST /service/service-registration",
-            ])
-        })
+pub fn routes() -> Routes<AntHostAgentState> {
+    Routes::new()
+        .get("/sd", get(get_service_discovery))
+        .post("/service", post(enable_service))
+        .delete("/service", delete(disable_service))
+        .post("/service-installation", post(install_service))
+        .post("/service-registration", post(register_service).layer(
+            DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
+        ))
 }
 
 #[cfg(test)]

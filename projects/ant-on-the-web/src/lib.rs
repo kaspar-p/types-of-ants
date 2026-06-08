@@ -1,3 +1,4 @@
+use ant_library::routes::Routes;
 use axum::{response::IntoResponse, routing::get, Router};
 use axum_extra::routing::RouterExt;
 use http::{header, Response, StatusCode};
@@ -94,33 +95,23 @@ pub fn make_routes(
         .allow_credentials(true)
         .allow_headers([header::CONTENT_TYPE]);
 
-    let api_routes = Router::new()
-        .merge(version::router())
-        .nest("/ants", ants::router())
-        // .nest("/msg", routes::msg::router())
-        .nest("/api-tokens", api_tokens::router())
-        .nest("/users", users::router())
-        .nest("/hosts", hosts::router())
-        .nest("/web-actions", web_actions::router())
-        .nest("/webhooks", webhooks::router())
-        // .nest("/tests", tests::router())
-        // .nest("/metrics", metrics::router())
-        // .nest("/deployments", deployments::router())
+    let api_routes = Routes::new()
+        .merge_routes(version::routes())
+        .nest_routes("/ants", ants::routes())
+        // .nest_routes("/msg", routes::msg::routes())
+        .nest_routes("/api-tokens", api_tokens::routes())
+        .nest_routes("/users", users::routes())
+        .nest_routes("/hosts", hosts::routes())
+        .nest_routes("/web-actions", web_actions::routes())
+        .nest_routes("/webhooks", webhooks::routes())
+        // .nest_routes("/tests", tests::routes())
+        // .nest_routes("/metrics", metrics::routes())
+        // .nest_routes("/deployments", deployments::routes())
+        .build()
         .with_state(state.clone())
         .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
             ant_library::middleware::print_request_response,
-        )))
-        .fallback(|| async {
-            ant_library::api_fallback(&[
-                "GET /version",
-                "nested: /ants",
-                "nested: /users",
-                "nested: /hosts",
-                "nested: /tests",
-                "nested: /metrics",
-                "nested: /deployments",
-            ])
-        });
+        )));
 
     debug!("Initializing site routes...");
     let app = Router::new()

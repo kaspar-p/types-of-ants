@@ -1,5 +1,5 @@
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
-use axum_extra::routing::RouterExt;
+use ant_library::routes::Routes;
+use axum::{extract::State, response::IntoResponse, routing::{delete, get, post}, Json};
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
@@ -100,17 +100,9 @@ async fn peek_secret(
     ))
 }
 
-pub fn make_routes() -> Router<AntHostAgentState> {
-    Router::new()
-        .route_with_tsr(
-            "/secret",
-            post(put_secret).delete(delete_secret).get(peek_secret),
-        )
-        .fallback(|| async {
-            ant_library::api_fallback(&[
-                "GET /secret/secret",
-                "POST /secret/secret",
-                "DELETE /secret/secret",
-            ])
-        })
+pub fn routes() -> Routes<AntHostAgentState> {
+    Routes::new()
+        .post("/secret", post(put_secret))
+        .delete("/secret", delete(delete_secret))
+        .get("/secret", get(peek_secret))
 }

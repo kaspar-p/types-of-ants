@@ -1,6 +1,6 @@
 use ant_data_farm::web_actions::{WebAction, WebTargetType};
-use axum::{extract::State, routing::post, Json, Router};
-use axum_extra::routing::RouterExt;
+use ant_library::routes::Routes;
+use axum::{extract::State, routing::post, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
         response::AntOnTheWebResponse,
         telemetry::TelemetryCookie,
     },
-    state::{ApiRouter, ApiState, InnerApiState},
+    state::{ApiRoutes, ApiState, InnerApiState},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +42,7 @@ async fn new_web_action(
     Ok(AntOnTheWebResponse::WebActionResponse)
 }
 
-pub fn router() -> ApiRouter {
-    Router::new().route_with_tsr("/action", post(new_web_action))
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .post("/action", post(new_web_action))
 }

@@ -1,4 +1,5 @@
 pub mod ants;
+pub mod fallback;
 pub mod api_tokens;
 pub mod files;
 pub mod fixture;

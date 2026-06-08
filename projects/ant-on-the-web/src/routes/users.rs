@@ -8,16 +8,16 @@ use crate::{
         response::AntOnTheWebResponse,
         two_factor,
     },
-    state::{ApiRouter, ApiState, InnerApiState},
+    state::{ApiRoutes, ApiState, InnerApiState},
     two_factor::VerificationReceipt,
 };
 use ant_data_farm::users::{verify_password_hash, User, UserId};
+use ant_library::routes::Routes;
 use axum::{
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
+    Json,
 };
-use axum_extra::routing::RouterExt;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
@@ -886,38 +886,19 @@ async fn signup_request(
     return Ok(AntOnTheWebResponse::SignupResponse(SignupResponse));
 }
 
-pub fn router() -> ApiRouter {
-    Router::new()
-        .route_with_tsr("/subscribe-newsletter", post(subscribe_email))
-        .route_with_tsr("/phone-number", post(add_phone_number))
-        .route_with_tsr("/email", post(add_email))
-        .route_with_tsr("/password-reset-code", post(password_reset_code))
-        .route_with_tsr("/password-reset-secret", post(password_reset_secret))
-        .route_with_tsr("/password", post(password))
-        .route_with_tsr("/login", post(login))
-        .route_with_tsr("/logout", post(logout))
-        .route_with_tsr("/signup", post(signup_request))
-        .route_with_tsr(
-            "/verification-attempt",
-            post(two_factor_verification_attempt),
-        )
-        .route_with_tsr("/user", get(get_user_by_name))
-        .route_with_tsr("/username", post(change_username))
-        .route_with_tsr("/user/{user_name}", get(get_user_by_name))
-        .fallback(|| async {
-            ant_library::api_fallback(&[
-                "POST /subscribe-newsletter",
-                "POST /phone-number",
-                "POST /email",
-                "POST /password-reset-code",
-                "POST /password-reset-secret",
-                "POST /password",
-                "POST /login",
-                "POST /logout",
-                "POST /signup",
-                "POST /verification-attempt",
-                "GET /user",
-                "GET /user/{user_name}",
-            ])
-        })
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .post("/subscribe-newsletter", post(subscribe_email))
+        .post("/phone-number", post(add_phone_number))
+        .post("/email", post(add_email))
+        .post("/password-reset-code", post(password_reset_code))
+        .post("/password-reset-secret", post(password_reset_secret))
+        .post("/password", post(password))
+        .post("/login", post(login))
+        .post("/logout", post(logout))
+        .post("/signup", post(signup_request))
+        .post("/verification-attempt", post(two_factor_verification_attempt))
+        .get("/user", get(get_user_by_name))
+        .post("/username", post(change_username))
+        .get("/user/{user_name}", get(get_user_by_name))
 }

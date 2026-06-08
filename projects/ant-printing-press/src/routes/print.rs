@@ -1,6 +1,6 @@
 use anyhow::Context;
-use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
-use axum_extra::routing::RouterExt;
+use ant_library::routes::Routes;
+use axum::{Json, http::StatusCode, response::IntoResponse, routing::post};
 use chrono::{DateTime, Utc};
 use escpos::{
     driver::{Driver, UsbDriver},
@@ -130,9 +130,9 @@ async fn print_raw_message(body: String) -> Result<impl IntoResponse, AntPrintin
     return Ok(StatusCode::OK);
 }
 
-pub fn router() -> Router<AntPrintingPressState> {
-    Router::new()
-        .route_with_tsr("/secret", post(print_secret))
-        .route_with_tsr("/msg", post(print_wrapped_message))
-        .route_with_tsr("/raw-msg", post(print_raw_message))
+pub fn routes() -> Routes<AntPrintingPressState> {
+    Routes::new()
+        .post("/secret", post(print_secret))
+        .post("/msg", post(print_wrapped_message))
+        .post("/raw-msg", post(print_raw_message))
 }

@@ -1,14 +1,13 @@
-use axum::{response::IntoResponse, routing::get, Router};
-use axum_extra::routing::RouterExt;
+use axum::{response::IntoResponse, routing::get};
+use ant_library::routes::Routes;
 
-use crate::state::ApiRouter;
+use crate::state::ApiRoutes;
 
 async fn current_version() -> impl IntoResponse {
     ant_library::manifest_file::read_local_manifest_file(None).commit_number
 }
 
-pub fn router() -> ApiRouter {
-    Router::new()
-        .route_with_tsr("/version", get(current_version))
-        .fallback(|| async { ant_library::api_fallback(&["GET /version"]) })
+pub fn routes() -> ApiRoutes {
+    Routes::new()
+        .get("/version", get(current_version))
 }

@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 
+use ant_library::routes::Routes;
 use axum::{
     extract::State,
     response::IntoResponse,
@@ -217,9 +218,10 @@ pub fn make_routes(s: AntBackingItUpState) -> Result<Router, anyhow::Error> {
         .allow_headers([header::CONTENT_TYPE]);
 
     debug!("Initializing site routes...");
-    let app = Router::new()
-        .route("/backups", get(list_backups))
-        .route("/backup", post(post_backup))
+    let app = Routes::new()
+        .get("/backups", get(list_backups))
+        .post("/backup", post(post_backup))
+        .build()
         .with_state(s)
         .layer(
             ServiceBuilder::new()

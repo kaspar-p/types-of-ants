@@ -1,9 +1,10 @@
+use ant_library::routes::Routes;
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Request, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::put,
+    routing::{get, post, put},
     Router,
 };
 use axum_extra::{
@@ -119,11 +120,12 @@ pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
         .allow_headers([header::CONTENT_TYPE]);
 
     debug!("Initializing site routes...");
-    let app = Router::new()
-        .route(
-            "/{path}",
-            put(upload).post(upload).get(download).delete(delete),
-        )
+    let app = Routes::new()
+        .put("/{path}", put(upload))
+        .post("/{path}", post(upload))
+        .get("/{path}", get(download))
+        .delete("/{path}", axum::routing::delete(delete))
+        .build()
         .with_state(root)
         .layer(
             ServiceBuilder::new()

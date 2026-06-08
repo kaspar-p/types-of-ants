@@ -4,12 +4,12 @@ pub mod routes;
 pub mod state;
 pub mod systemd;
 
+use ant_library::routes::Routes;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
-    routing::get,
+    routing::{get, post},
     Router,
 };
-use axum_extra::routing::RouterExt;
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 
@@ -21,13 +21,12 @@ pub fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
         .allow_origin(tower_http::cors::Any)
         .allow_headers([CONTENT_TYPE]);
 
-    let api: Router = Router::new()
-        .nest("/service", crate::routes::service::make_routes())
-        .nest("/secret", crate::routes::secret::make_routes())
-        .route_with_tsr(
-            "/ping",
-            get(ant_library::api_ping).post(ant_library::api_ping),
-        )
+    let api: Router = Routes::new()
+        .nest_routes("/service", crate::routes::service::routes())
+        .nest_routes("/secret", crate::routes::secret::routes())
+        .get("/ping", get(ant_library::api_ping))
+        .post("/ping", post(ant_library::api_ping))
+        .build()
         .with_state(state)
         .layer(
             ServiceBuilder::new()
@@ -39,10 +38,7 @@ pub fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
                 .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
                     ant_library::middleware::print_request_response,
                 ))),
-        )
-        .fallback(|| async {
-            ant_library::api_fallback(&["GET|POST /ping", "/service/...", "/secret/..."])
-        });
+        );
 
     return Ok(api);
 }

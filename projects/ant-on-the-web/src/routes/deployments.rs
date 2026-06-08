@@ -1,7 +1,7 @@
-use axum::Router;
+use ant_library::routes::Routes;
 
-use crate::state::ApiRouter;
+use crate::state::ApiRoutes;
 
-pub fn router() -> ApiRouter {
-    Router::new()
+pub fn routes() -> ApiRoutes {
+    Routes::new()
 }

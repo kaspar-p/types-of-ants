@@ -1,4 +1,5 @@
 use ant_data_farm::AntDataFarmClient;
+use ant_library::routes::Routes;
 use axum::{
     extract::{FromRef, State},
     Router,
@@ -21,3 +22,4 @@ pub struct InnerApiState {
 
 pub type ApiState = State<InnerApiState>;
 pub type ApiRouter = Router<InnerApiState>;
+pub type ApiRoutes = Routes<InnerApiState>;
