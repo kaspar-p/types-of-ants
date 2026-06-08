@@ -1,7 +1,7 @@
 use ant_library::routes::Routes;
 use axum::{
-    body::Bytes,
-    extract::{DefaultBodyLimit, Path, Request, State},
+    body::Body,
+    extract::{DefaultBodyLimit, Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post, put},
@@ -12,16 +12,14 @@ use axum_extra::{
     TypedHeader,
 };
 use base64ct::{Base64, Encoding};
+use futures::StreamExt;
 use http::{header, Method};
 use sha2::{Digest, Sha256};
-use std::{
-    io::{ErrorKind, Write},
-    path::PathBuf,
-};
-use tower::{ServiceBuilder, ServiceExt};
-use tower_http::{
-    catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer, services::ServeDir,
-};
+use std::{io::ErrorKind, path::PathBuf};
+use tokio::io::AsyncWriteExt;
+use tokio_util::io::ReaderStream;
+use tower::ServiceBuilder;
+use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBodyLimitLayer};
 use tracing::{debug, error, info};
 
 fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), (StatusCode, String)> {
@@ -49,40 +47,112 @@ fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), (StatusCode, 
     Ok(())
 }
 
+/// Resolve a request path to its on-disk location: `<root>/<username>/<hash>`,
+/// where `<hash>` is the hex SHA-256 of the request path. Hashing makes the
+/// stored filename a fixed-format hex string, so arbitrary request paths
+/// (slashes, `..`, special characters) can never escape the user's namespace
+/// or collide with the directory structure.
+fn user_file_path(root: &PathBuf, username: &str, path: &str) -> PathBuf {
+    let digest = Sha256::digest(path.as_bytes());
+    let hashed = base16ct::lower::encode_string(&digest);
+    PathBuf::from(root).join(username).join(hashed)
+}
+
 async fn download(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     State(root): State<PathBuf>,
-    req: Request,
+    Path(path): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     bearer_authorization(&auth)?;
 
-    let service = ServeDir::new(PathBuf::from(root));
+    let full_path = user_file_path(&root, auth.0.username(), &path);
 
-    return Ok(service.oneshot(req).await);
+    let file = tokio::fs::File::open(&full_path).await.map_err(|err| match err.kind() {
+        ErrorKind::NotFound => (
+            StatusCode::NOT_FOUND,
+            format!("error: {} does not exist.\n", &path),
+        ),
+        _ => {
+            error!("Failed to open file: {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error, please retry.".to_string(),
+            )
+        }
+    })?;
+
+    // Stream the file from disk rather than buffering it into memory.
+    Ok(Body::from_stream(ReaderStream::new(file)))
 }
 
 async fn upload(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     State(root): State<PathBuf>,
     Path(path): Path<String>,
-    body: Bytes,
+    body: Body,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     bearer_authorization(&auth)?;
 
-    let path = PathBuf::from(root).join(path);
-    info!("Uploading {}...", path.display());
+    let full_path = user_file_path(&root, auth.0.username(), &path);
+    info!("Uploading {}...", &path);
 
-    let mut file = std::fs::File::create(path).map_err(|err| {
-        error!("Failed to write file: {err}");
+    if let Err(e) = stream_body_to_file(&full_path, body).await {
+        // Don't leave a partially-written file behind on failure.
+        let _ = tokio::fs::remove_file(&full_path).await;
+        return Err(e);
+    }
+
+    Ok(StatusCode::OK)
+}
+
+/// Stream a request body to disk chunk-by-chunk so memory stays O(chunk_size)
+/// rather than O(file_size). Creates the user's namespace directory on demand.
+async fn stream_body_to_file(full_path: &PathBuf, body: Body) -> Result<(), (StatusCode, String)> {
+    if let Some(parent) = full_path.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|err| {
+            error!("Failed to create directories: {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error, please retry.".to_string(),
+            )
+        })?;
+    }
+
+    let mut file = tokio::fs::File::create(full_path).await.map_err(|err| {
+        error!("Failed to create file: {err}");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Internal server error, please retry.".to_string(),
         )
     })?;
 
-    file.write_all(&body).unwrap();
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|err| {
+            error!("Failed to read request body: {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read request body.".to_string(),
+            )
+        })?;
+        file.write_all(&chunk).await.map_err(|err| {
+            error!("Failed to write file: {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error, please retry.".to_string(),
+            )
+        })?;
+    }
 
-    return Ok(StatusCode::OK);
+    file.flush().await.map_err(|err| {
+        error!("Failed to flush file: {err}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Internal server error, please retry.".to_string(),
+        )
+    })?;
+
+    Ok(())
 }
 
 async fn delete(
@@ -92,10 +162,10 @@ async fn delete(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     bearer_authorization(&auth)?;
 
-    let full_path = PathBuf::from(root).join(&path);
-    info!("Deleting {}...", full_path.display());
+    let full_path = user_file_path(&root, auth.0.username(), &path);
+    info!("Deleting {}...", &path);
 
-    std::fs::remove_file(full_path).map_err(|err| {
+    tokio::fs::remove_file(&full_path).await.map_err(|err| {
         error!("Failed to delete file: {err}");
         match err.kind() {
             ErrorKind::NotFound => (
@@ -121,10 +191,10 @@ pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Routes::new()
-        .put("/{path}", put(upload))
-        .post("/{path}", post(upload))
-        .get("/{path}", get(download))
-        .delete("/{path}", axum::routing::delete(delete))
+        .put("/{*path}", put(upload))
+        .post("/{*path}", post(upload))
+        .get("/{*path}", get(download))
+        .delete("/{*path}", axum::routing::delete(delete))
         .build()
         .with_state(root)
         .layer(

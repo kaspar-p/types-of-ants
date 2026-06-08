@@ -96,14 +96,18 @@ where
 
     // Uses route_with_tsr for the first registration of a path; plain route()
     // for subsequent registrations on the same path to avoid TSR conflicts.
+    // Catch-all routes (e.g. `/{*path}`) are registered without TSR: the
+    // redirect path `/{*path}/` would put a segment after the wildcard, which
+    // axum rejects.
     fn register(mut self, path: &'static str, method_router: MethodRouter<S>) -> Self {
-        if self.paths.contains(path) {
+        let is_catch_all = path.contains("{*");
+        if is_catch_all || self.paths.contains(path) {
             self.router = self.router.route(path, method_router);
         } else {
             use axum_extra::routing::RouterExt;
             self.router = self.router.route_with_tsr(path, method_router);
-            self.paths.insert(path);
         }
+        self.paths.insert(path);
         self
     }
 }
