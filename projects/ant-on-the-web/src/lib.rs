@@ -31,6 +31,7 @@ pub use crate::routes::lib::err;
 use crate::routes::lib::telemetry::telemetry_cookie_middleware;
 pub use crate::routes::lib::two_factor;
 pub use crate::routes::metrics;
+pub use crate::routes::webhooks;
 pub use crate::routes::tests;
 pub use crate::routes::users;
 pub use crate::routes::web_actions;
@@ -101,6 +102,7 @@ pub fn make_routes(
         .nest("/users", users::router())
         .nest("/hosts", hosts::router())
         .nest("/web-actions", web_actions::router())
+        .nest("/webhooks", webhooks::router())
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
         // .nest("/deployments", deployments::router())
