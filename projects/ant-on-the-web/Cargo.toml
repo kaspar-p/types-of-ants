@@ -56,7 +56,12 @@ mailjet-rs = "0.3.0"
 openssl = { version = "0.10", features = ["vendored"] }
 tower-cookies = "0.11.0"
 serde-json-assert = "0.4.0"
-async-stripe = { version = "0.39", features = ["runtime-tokio-hyper-rustls", "webhook-events", "issuing"] }
+async-stripe = { version = "0.39", features = [
+  "runtime-tokio-hyper-rustls",
+  "webhook-events",
+  "issuing",
+] }
+reqwest = "0.13.4"
 
 [dev-dependencies]
 ant-library-test = { path = "../ant-library-test" }

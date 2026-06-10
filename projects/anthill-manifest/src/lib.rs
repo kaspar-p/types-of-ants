@@ -19,7 +19,8 @@ pub struct AnthillManifest {
 
     /// For the reverse-proxy to the outside, this setting affects the NGINX settings when
     /// this project deploys.
-    pub routing: Option<Routing>,
+    #[serde(default)]
+    pub routing: OneOrMany<Route>,
 
     /// Optionally deploy more than 1 systemd services alongside this one, with other entrypoints.
     /// All services get the same persist directory, working directory, secrets directory, and secrets.
@@ -46,8 +47,32 @@ pub struct AnthillManifest {
     pub secrets: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> Default for OneOrMany<T> {
+    fn default() -> Self {
+        Self::Many(vec![])
+    }
+}
+
+// Convert to &[T] easily
+impl<T> std::ops::Deref for OneOrMany<T> {
+    type Target = [T];
+    fn deref(&self) -> &[T] {
+        match self {
+            OneOrMany::One(item) => std::slice::from_ref(item),
+            OneOrMany::Many(list) => list,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Routing {
+pub struct Route {
     /// If this project deploys a custom subdomain like "new-project.typesofants.org",
     /// then this should the full domain "new-project.typesofants.org".
     ///
@@ -97,7 +122,7 @@ pub struct Ports {
     ///
     /// If for some reason the project cannot natively export metrics (e.g. nginx), this
     /// port may be missing.
-    pub metrics: Option<u16>,
+    pub metrics: Option<Metrics>,
 
     /// A separate port for admin/control-plane functionality to affect the service at runtime.
     /// Generally something that could be done via deployment.
@@ -117,6 +142,22 @@ pub enum AnthillBuildParallelism {
 
     #[serde(rename = "parallel")]
     Parallel,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Metrics {
+    Port(u16),
+    PortAndPath { port: u16, path: String },
+}
+
+impl Metrics {
+    pub fn port(&self) -> u16 {
+        match self {
+            Metrics::PortAndPath { port, .. } => *port,
+            Metrics::Port(port) => *port,
+        }
+    }
 }
 
 impl Default for AnthillBuildParallelism {
@@ -214,15 +255,12 @@ impl AnthillManifest {
         }
 
         // If .routing.paths, then also .routing.domain must be set
-        if self
-            .routing
-            .as_ref()
-            .map(|r| !r.paths.is_empty() && r.domain.is_none())
-            .unwrap_or(false)
-        {
-            return Err(anyhow::Error::msg(
-                "You must specify .routing.paths alongside .routing.domain, or else we don't know which domain to modify!",
-            ));
+        for route in self.routing.iter() {
+            if !route.paths.is_empty() && route.domain.is_none() {
+                return Err(anyhow::Error::msg(
+                    "You must specify .paths alongside .domain within .routing, or else we don't know which domain to modify!",
+                ));
+            }
         }
 
         Ok(())

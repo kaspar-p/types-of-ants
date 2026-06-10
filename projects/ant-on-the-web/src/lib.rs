@@ -32,10 +32,11 @@ pub use crate::routes::lib::err;
 use crate::routes::lib::telemetry::telemetry_cookie_middleware;
 pub use crate::routes::lib::two_factor;
 pub use crate::routes::metrics;
-pub use crate::routes::webhooks;
+pub use crate::routes::prints;
 pub use crate::routes::tests;
 pub use crate::routes::users;
 pub use crate::routes::web_actions;
+pub use crate::routes::webhooks;
 
 fn origins() -> AllowOrigin {
     match dotenv::var("ANT_ON_THE_WEB_ALLOWED_ORIGINS") {
@@ -98,15 +99,15 @@ pub fn make_routes(
     let api_routes = Routes::new()
         .merge_routes(version::routes())
         .nest_routes("/ants", ants::routes())
-        // .nest_routes("/msg", routes::msg::routes())
+        // .nest("/msg", routes::msg::router())
         .nest_routes("/api-tokens", api_tokens::routes())
         .nest_routes("/users", users::routes())
         .nest_routes("/hosts", hosts::routes())
         .nest_routes("/web-actions", web_actions::routes())
-        .nest_routes("/webhooks", webhooks::routes())
-        // .nest_routes("/tests", tests::routes())
-        // .nest_routes("/metrics", metrics::routes())
-        // .nest_routes("/deployments", deployments::routes())
+        .nest_routes("/prints", prints::routes())
+        // .nest("/tests", tests::router())
+        // .nest("/metrics", metrics::router())
+        // .nest("/deployments", deployments::router())
         .build()
         .with_state(state.clone())
         .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(

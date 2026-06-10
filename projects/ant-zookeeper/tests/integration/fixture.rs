@@ -4,8 +4,12 @@ use ant_host_agent::{
     client::{AntHostAgentClient, AntHostAgentClientConfig, AntHostAgentClientFactory},
     state::AntHostAgentState,
 };
-use ant_library::{db::TypesOfAntsDatabase, services::Services};
-use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
+use ant_library::{
+    db::TypesOfAntsDatabase, sd::writer::ServiceDiscoveryWriter, services::Services,
+};
+use ant_library_test::{
+    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::test_database_config,
+};
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},
     make_routes,
@@ -94,6 +98,7 @@ pub struct Fixture {
     pub ant_host_agent_state: AntHostAgentState,
 
     _guard: postgresql_embedded::PostgreSQL,
+    _consul: ConsulFixture,
 }
 
 impl Drop for Fixture {
@@ -163,7 +168,10 @@ impl Fixture {
             .join(function_name);
         create_dir_all(&root_dir).await.unwrap();
 
+        let consul = ConsulFixture::new().await;
+
         let ant_host_agent_state = AntHostAgentState {
+            sd: Arc::new(ServiceDiscoveryWriter::new(consul.port())),
             services: Arc::new(Mutex::new(HashMap::new())),
             secrets_root_dir: root_dir.join("hostagent-secrets"),
             archive_root_dir: root_dir.join("hostagent-archive"),
@@ -288,6 +296,7 @@ impl Fixture {
             client,
             state,
             ant_host_agent_state,
+            _consul: consul,
             _guard,
         }
     }

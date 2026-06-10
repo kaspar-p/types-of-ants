@@ -102,7 +102,8 @@ fn source_env_variables(
     let metrics_port = manifest
         .ports
         .as_ref()
-        .and_then(|p| p.metrics)
+        .and_then(|p| p.metrics.as_ref())
+        .map(|m| m.port())
         .or(manifest.deployment.as_ref().and_then(|d| d.metrics_port));
     if let Some(metrics_port) = metrics_port {
         let metrics_port_var = format!("{upcase_project}_METRICS_PORT");

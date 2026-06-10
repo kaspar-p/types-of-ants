@@ -229,7 +229,7 @@ async fn enable_service(
     if healthy {
         state
             .sd
-            .register_service(
+            .register_local_service(
                 &req.service_id,
                 manifest.deployment.and_then(|d| d.port).unwrap_or(0),
             )
@@ -538,7 +538,7 @@ async fn disable_service(
     if req.service_id != "ant-matchmaker" {
         state
             .sd
-            .deregister_service(&req.service_id)
+            .deregister_local_service(&req.service_id)
             .await
             .context("deregister ant-matchmaker service")?;
     }

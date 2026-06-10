@@ -1,9 +1,10 @@
 use std::net::IpAddr;
-
 use tower_governor::{
     key_extractor::{KeyExtractor, SmartIpKeyExtractor},
     GovernorError,
 };
+
+use crate::routes::lib::{auth::AuthClaims, jwt::decode_jwt};
 
 #[derive(Clone)]
 pub struct ThrottleExtractor {
@@ -54,5 +55,37 @@ impl KeyExtractor for ThrottleExtractor {
 
     fn name(&self) -> &'static str {
         "ant-on-the-web"
+    }
+}
+
+#[derive(Clone)]
+pub struct UserIdExtractor;
+
+impl KeyExtractor for UserIdExtractor {
+    type Key = String;
+
+    fn extract<T>(
+        &self,
+        req: &http::Request<T>,
+    ) -> Result<Self::Key, tower_governor::GovernorError> {
+        let header = req
+            .headers()
+            .get(http::header::COOKIE)
+            .ok_or(tower_governor::GovernorError::UnableToExtractKey)?
+            .to_str()
+            .map_err(|_| tower_governor::GovernorError::UnableToExtractKey)?;
+
+        let claims = decode_jwt::<AuthClaims>(header)
+            .map_err(|_| tower_governor::GovernorError::UnableToExtractKey)?;
+
+        Ok(claims.sub.to_string())
+    }
+
+    fn key_name(&self, key: &Self::Key) -> Option<String> {
+        Some(key.clone())
+    }
+
+    fn name(&self) -> &'static str {
+        "user-id-extractor"
     }
 }

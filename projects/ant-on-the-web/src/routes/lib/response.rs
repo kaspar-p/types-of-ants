@@ -46,6 +46,7 @@ pub enum AntOnTheWebResponse {
     UnfavoriteAntResponse,
 
     WebActionResponse,
+    PrintMessageResponse,
 }
 
 impl IntoResponse for AntOnTheWebResponse {

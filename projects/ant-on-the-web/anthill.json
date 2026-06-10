@@ -2,6 +2,12 @@
   "project": "ant-on-the-web",
   "description": "the typesofants web server",
   "build": "makefile",
+  "routing": {
+    "domain": "typesofants.org",
+    "paths": [
+      "/api"
+    ]
+  },
   "ports": {
     "primary": 3231
   },

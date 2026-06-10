@@ -1,8 +1,10 @@
 use std::{env::set_var, path::PathBuf, sync::Arc};
 
 use ant_data_farm::AntDataFarmClient;
-use ant_library::db::TypesOfAntsDatabase;
-use ant_library_test::{axum_test_client::TestClient, db::test_database_config};
+use ant_library::{db::TypesOfAntsDatabase, sd::reader::ServiceDiscovery};
+use ant_library_test::{
+    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::test_database_config,
+};
 use ant_on_the_web::{
     make_routes,
     sms::{SmsError, SmsSender},
@@ -59,6 +61,7 @@ pub struct TestFixture {
     pub client: TestClient,
     pub state: InnerApiState,
     _guard: PostgreSQL,
+    _consul: ConsulFixture,
 }
 
 pub struct FixtureOptions {
@@ -111,8 +114,12 @@ async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
         msgs: Arc::new(Mutex::new(vec![])),
     };
 
+    let consul = ConsulFixture::new().await;
+
     let state = InnerApiState {
         static_dir: PathBuf::from("./tests/integration/test-static"),
+
+        sd: Arc::new(ServiceDiscovery::new(consul.port())),
 
         dao: Arc::new(AntDataFarmClient::connect(&db_config).await.unwrap()),
         sms: Arc::new(sms),
@@ -136,6 +143,7 @@ async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
         client: TestClient::new(app).await,
         state: state,
         _guard: db,
+        _consul: consul,
     };
 }
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use ant_library::sd::{ServiceDiscovery, ServiceDiscoveryWriter};
+use ant_library::sd::{reader::ServiceDiscovery, writer::ServiceDiscoveryWriter};
 use ant_library_test::consul_fixture::ConsulFixture;
 use tokio::test;
 use tracing_test::traced_test;
@@ -25,7 +25,7 @@ async fn service_discovery_finds_service_if_writer_before_reader() {
     let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
-        .register_service("ant-matchmaker", 20012)
+        .register_local_service("ant-matchmaker", 20012)
         .await
         .unwrap();
 
@@ -53,7 +53,7 @@ async fn service_discovery_finds_if_reader_before_writer() {
     let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
-        .register_service("ant-matchmaker", 20013)
+        .register_local_service("ant-matchmaker", 20013)
         .await
         .unwrap();
 
@@ -82,7 +82,7 @@ async fn service_discovery_finds_nothing_when_removed() {
     let sd_writer = ServiceDiscoveryWriter::new(consul.port());
 
     sd_writer
-        .register_service("ant-matchmaker", 20013)
+        .register_local_service("ant-matchmaker", 20013)
         .await
         .unwrap();
 
@@ -98,7 +98,7 @@ async fn service_discovery_finds_nothing_when_removed() {
     assert_eq!(endpoint.port, 20013);
 
     sd_writer
-        .deregister_service("ant-matchmaker")
+        .deregister_local_service("ant-matchmaker")
         .await
         .unwrap();
 

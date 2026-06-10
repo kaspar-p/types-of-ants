@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use ant_fs_client::AntFsClient;
-use ant_library::sd::ServiceDiscovery;
+use ant_library::sd::reader::ServiceDiscovery;
 
 use crate::storage_client::AntBackingItUpStorageClient;
 

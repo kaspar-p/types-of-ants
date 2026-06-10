@@ -1,5 +1,5 @@
 use ant_host_agent::{make_routes, state::AntHostAgentState};
-use ant_library::sd::ServiceDiscoveryWriter;
+use ant_library::sd::writer::ServiceDiscoveryWriter;
 use std::{collections::HashMap, fs, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, instrument};

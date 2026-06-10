@@ -1,4 +1,3 @@
-use reqwest::Client;
 use rs_consul::{Consul, ConsulError, GetServiceNodesRequest, QueryOptions};
 
 use serde::{Deserialize, Serialize};
@@ -12,6 +11,12 @@ use tracing::{debug, error, info};
 pub struct ServiceEndpoint {
     pub address: String,
     pub port: u16,
+}
+
+impl ToString for ServiceEndpoint {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.address, self.port)
+    }
 }
 
 #[derive(Clone)]
@@ -48,8 +53,15 @@ impl ServiceDiscovery {
         {
             let cache = self.cache.read().await;
             if let Some(endpoints) = cache.get(service_name.as_str()) {
-                info!("resolved [{}] hit cache", service);
-                return endpoints.first().cloned();
+                let endpoint = endpoints.first().cloned();
+                info!(
+                    "resolved [{service}] hit cache: {}",
+                    match &endpoint {
+                        None => "none".to_string(),
+                        Some(e) => e.to_string(),
+                    }
+                );
+                return endpoint;
             }
         }
 
@@ -107,7 +119,7 @@ impl ServiceDiscovery {
 
         let endpoints_str = endpoints
             .iter()
-            .map(|e| format!("{}:{}", e.address, e.port))
+            .map(|e| e.to_string())
             .collect::<Vec<_>>()
             .join(", ");
         info!("Discovered [{service}] => [{endpoints_str}]");
@@ -143,7 +155,7 @@ impl ServiceDiscovery {
         )
         .await
         {
-            error!("Failed to fetch {service} endpoints, but ignoring error: {e}")
+            error!("Failed to fetch [{service}] endpoints, but ignoring error: {e}")
         }
 
         info!("Spawning background worker...");
@@ -164,8 +176,11 @@ impl ServiceDiscovery {
                 .await
                 {
                     Ok(new_index) => index = new_index,
+                    Err(ConsulError::TimeoutExceeded(_)) => {
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
                     Err(e) => {
-                        error!("Failed to fetch {} endpoints: {e}", service2);
+                        error!("Failed to fetch [{}] endpoints: {e}", service2);
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
                 }
@@ -191,90 +206,5 @@ impl ServiceDiscovery {
         for (_, handle) in refreshers.drain() {
             handle.abort();
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ServiceDiscoveryWriter {
-    consul_endpoint: String,
-    client: Client,
-}
-
-/// From: https://developer.hashicorp.com/consul/api-docs/agent/service#json-request-body-schema
-/// Can't use the one from rs_consul because it doesn't work, for some reason doesn't set the Address
-/// correctly: https://github.com/Roblox/rs-consul
-///
-/// But keep this struct private.
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct RegisterServiceRequest {
-    name: String,
-    tags: Vec<String>,
-    port: u16,
-}
-
-impl ServiceDiscoveryWriter {
-    pub fn new(port: u16) -> Self {
-        let consul_endpoint = format!("http://localhost:{port}");
-        Self {
-            consul_endpoint: consul_endpoint.clone(),
-            client: Client::new(),
-        }
-    }
-
-    pub async fn healthy(&self) -> bool {
-        match reqwest::get(format!("{}/v1/agent/self", self.consul_endpoint))
-            .await
-            .and_then(|r| r.error_for_status())
-        {
-            Ok(_) => true,
-            Err(e) => {
-                error!("ant-matchmaker consul endpoint not healthy: {e}");
-                false
-            }
-        }
-    }
-
-    pub async fn register_service(&self, service: &str, port: u16) -> Result<(), anyhow::Error> {
-        let req = RegisterServiceRequest {
-            name: service.to_string(),
-            port,
-            tags: vec!["typesofants:service".to_string()],
-        };
-
-        debug!("[consul register request] {}", serde_json::to_string(&req)?);
-        let res = self
-            .client
-            .put(format!(
-                "{}/v1/agent/service/register",
-                self.consul_endpoint
-            ))
-            .json(&req)
-            .send()
-            .await?
-            .error_for_status()?;
-
-        let raw: String = res.text().await?;
-        debug!("[consul register response] {}", raw);
-
-        return Ok(());
-    }
-
-    pub async fn deregister_service(&self, service: &str) -> Result<(), anyhow::Error> {
-        debug!("[consul deregister request] {}", service);
-        let res = self
-            .client
-            .put(format!(
-                "{}/v1/agent/service/deregister/{}",
-                self.consul_endpoint, service
-            ))
-            .send()
-            .await?
-            .error_for_status()?;
-
-        let raw: String = res.text().await?;
-        debug!("[consul deregister response] {}", raw);
-
-        return Ok(());
     }
 }

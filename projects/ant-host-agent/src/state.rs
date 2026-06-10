@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use ant_library::sd::ServiceDiscoveryWriter;
+use ant_library::sd::writer::ServiceDiscoveryWriter;
 use anthill_manifest::AnthillManifest;
 use tokio::sync::Mutex;
 

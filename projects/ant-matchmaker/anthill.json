@@ -3,7 +3,11 @@
   "description": "the typesofants service discovery mechanism",
   "build": "makefile",
   "ports": {
-    "primary": 3245
+    "primary": 3245,
+    "metrics": {
+      "port": 3245,
+      "path": "/v1/agent/metrics?format=prometheus"
+    }
   },
   "secrets": [
     "consul_gossip_encryption_key"

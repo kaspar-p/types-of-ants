@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ant_library::sd::ServiceDiscovery;
+use ant_library::sd::reader::ServiceDiscovery;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;

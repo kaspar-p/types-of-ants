@@ -6,7 +6,7 @@ use std::{
 };
 
 use ant_host_agent::{make_routes, routes::secret::PutSecretRequest, state::AntHostAgentState};
-use ant_library::sd::ServiceDiscoveryWriter;
+use ant_library::sd::writer::ServiceDiscoveryWriter;
 use ant_library_test::{axum_test_client::TestClient, consul_fixture::ConsulFixture};
 use flate2::{write::GzEncoder, Compression};
 use hyper::StatusCode;
