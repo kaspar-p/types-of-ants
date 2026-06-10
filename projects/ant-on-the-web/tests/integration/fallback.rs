@@ -1,10 +1,10 @@
-use crate::fixture::{test_router_no_auth, FixtureOptions};
+use crate::fixture::{TestFixture, FixtureOptions};
 use assertables::{assert_contains, assert_lt};
 use http::StatusCode;
 
 #[tokio::test]
 async fn api_fallback_returns_404_with_sorted_route_list() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let res = fixture
         .client

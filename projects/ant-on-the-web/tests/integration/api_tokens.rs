@@ -5,12 +5,12 @@ use ant_on_the_web::{
 use http::StatusCode;
 use tracing_test::traced_test;
 
-use crate::fixture::{test_router_admin_auth, test_router_auth, FixtureOptions};
+use crate::fixture::{TestFixture, FixtureOptions};
 
 #[tokio::test]
 #[traced_test]
 async fn api_tokens_token_post_returns_401_if_user_not_admin() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = GrantTokenRequest {
@@ -31,7 +31,7 @@ async fn api_tokens_token_post_returns_401_if_user_not_admin() {
 #[tokio::test]
 #[traced_test]
 async fn api_tokens_token_post_returns_404_for_not_existing_user() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     {
         let req = GrantTokenRequest {
@@ -52,7 +52,7 @@ async fn api_tokens_token_post_returns_404_for_not_existing_user() {
 #[tokio::test]
 #[traced_test]
 async fn api_tokens_token_post_returns_200_for_existing_user() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     let token = {
         let req = GrantTokenRequest {

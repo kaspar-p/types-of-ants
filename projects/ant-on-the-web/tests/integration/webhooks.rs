@@ -1,4 +1,4 @@
-use crate::fixture::{test_router_no_auth, FixtureOptions};
+use crate::fixture::{TestFixture, FixtureOptions};
 use http::StatusCode;
 use serde_json::json;
 
@@ -25,7 +25,7 @@ const TEST_SECRET: &str = "test-stripe-webhook-secret";
 
 #[tokio::test]
 async fn stripe_webhook_returns_400_missing_signature() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let res = fixture
         .client
@@ -39,7 +39,7 @@ async fn stripe_webhook_returns_400_missing_signature() {
 
 #[tokio::test]
 async fn stripe_webhook_returns_400_invalid_signature() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let res = fixture
         .client
@@ -57,7 +57,7 @@ async fn stripe_webhook_returns_400_invalid_signature() {
 // the HMAC verification itself.
 #[tokio::test]
 async fn stripe_webhook_returns_400_wrong_secret() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let payload = "{}";
     let sig = make_stripe_signature(payload, "the-wrong-secret");
@@ -78,7 +78,7 @@ async fn stripe_webhook_returns_400_wrong_secret() {
 // signature actually protects body integrity, not just header presence.
 #[tokio::test]
 async fn stripe_webhook_returns_400_tampered_body() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let signed_body = json!({ "id": "evt_signed", "object": "event" }).to_string();
     let sig = make_stripe_signature(&signed_body, TEST_SECRET);
@@ -101,7 +101,7 @@ async fn stripe_webhook_returns_400_tampered_body() {
 // than Stripe's 5-minute tolerance, so verification must reject it (replay).
 #[tokio::test]
 async fn stripe_webhook_returns_400_expired_timestamp() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let payload = "{}";
     let now = std::time::SystemTime::now()
@@ -125,7 +125,7 @@ async fn stripe_webhook_returns_400_expired_timestamp() {
 
 #[tokio::test]
 async fn stripe_webhook_returns_200_issuing_authorization_request() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let payload = json!({
         "id": "evt_test_auth",
@@ -265,7 +265,7 @@ async fn stripe_webhook_returns_200_issuing_authorization_request() {
 
 #[tokio::test]
 async fn stripe_webhook_returns_200_payment_intent_succeeded() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let payload = json!({
         "id": "evt_test_123",
@@ -311,7 +311,7 @@ async fn stripe_webhook_returns_200_payment_intent_succeeded() {
 
 #[tokio::test]
 async fn stripe_webhook_returns_200_unknown_event() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     // Use an unrecognized event type so EventType::Unknown is set.
     // The data.object must still be a known Stripe object type (we use "account"

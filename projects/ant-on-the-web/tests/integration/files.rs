@@ -1,12 +1,12 @@
 use http::StatusCode;
 use tracing_test::traced_test;
 
-use crate::fixture::{get_telemetry_cookie, test_router_no_auth, FixtureOptions};
+use crate::fixture::{get_telemetry_cookie, TestFixture, FixtureOptions};
 
 #[tokio::test]
 #[traced_test]
 async fn static_files_returns_200_and_gets_telemetry_cookies() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let res = fixture.client.get("/test-file.txt").send().await;
 

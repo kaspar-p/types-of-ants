@@ -1,4 +1,4 @@
-use crate::fixture::{test_router_no_auth, FixtureOptions};
+use crate::fixture::{TestFixture, FixtureOptions};
 use futures::StreamExt;
 use http::StatusCode;
 use tracing::error;
@@ -7,7 +7,7 @@ use tracing_test::traced_test;
 #[tokio::test]
 #[traced_test]
 async fn many_parallel_requests_get_429_too_many_requests() {
-    let fixture = test_router_no_auth(FixtureOptions::new().with_throttle()).await;
+    let fixture = TestFixture::new(FixtureOptions::new().with_throttle()).await;
 
     const NUM_REQUESTS: usize = 1000;
 

@@ -1,7 +1,4 @@
-use crate::fixture::{
-    test_router_admin_auth, test_router_auth, test_router_no_auth, test_router_weak_auth,
-    FixtureOptions,
-};
+use crate::fixture::{TestFixture, FixtureOptions};
 use ant_data_farm::{ants::AntId, releases::AntReleaseRequest};
 use ant_on_the_web::{
     ants::{
@@ -20,7 +17,7 @@ use uuid::Uuid;
 #[tokio::test]
 #[traced_test]
 async fn ants_total_matches_ants_released() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let ants_res = fixture
         .client
@@ -63,7 +60,7 @@ async fn ants_total_matches_ants_released() {
 #[tokio::test]
 #[traced_test]
 async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_in() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let res = fixture
@@ -79,7 +76,7 @@ async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_i
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_with_user_if_authenticated() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = SuggestionRequest {
@@ -99,7 +96,7 @@ async fn ants_suggest_returns_200_with_user_if_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_even_if_not_authenticated() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let req = SuggestionRequest {
         suggestion_content: "some ant content".to_string(),
@@ -116,7 +113,7 @@ async fn ants_suggest_returns_200_even_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_suggest_returns_200_with_weak_authentication() {
-    let (fixture, cookie) = test_router_weak_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_weak_auth(FixtureOptions::new()).await;
 
     {
         let req = SuggestionRequest {
@@ -136,7 +133,7 @@ async fn ants_suggest_returns_200_with_weak_authentication() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_401_if_not_authenticated() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -171,7 +168,7 @@ async fn ants_favorite_returns_401_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_400_if_no_such_ant() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -197,7 +194,7 @@ async fn ants_favorite_returns_400_if_no_such_ant() {
 #[tokio::test]
 #[traced_test]
 async fn ants_favorite_returns_200_idempotently() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     let ant_id = {
         let res = fixture
@@ -257,7 +254,7 @@ async fn ants_favorite_returns_200_idempotently() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_401_if_not_authenticated() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -292,7 +289,7 @@ async fn ants_unfavorite_returns_401_if_not_authenticated() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_400_if_no_such_ant() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = FavoriteAntRequest {
@@ -318,7 +315,7 @@ async fn ants_unfavorite_returns_400_if_no_such_ant() {
 #[tokio::test]
 #[traced_test]
 async fn ants_unfavorite_returns_200_idempotently_and_unfavorites() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     let ant_id = {
         let res = fixture
@@ -394,7 +391,7 @@ async fn ants_unfavorite_returns_200_idempotently_and_unfavorites() {
 #[tokio::test]
 #[traced_test]
 async fn ants_release_post_returns_401_if_not_admin() {
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = CreateReleaseRequest {
@@ -416,7 +413,7 @@ async fn ants_release_post_returns_401_if_not_admin() {
 #[tokio::test]
 #[traced_test]
 async fn ants_release_post_returns_200_if_release_made() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     let ants = {
         let res1 = fixture
@@ -504,7 +501,7 @@ async fn ants_release_post_returns_200_if_release_made() {
 #[tokio::test]
 #[traced_test]
 async fn ants_release_post_returns_400_if_validation_error() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     // prereq: suggest 1000 things
     let mut ids: Vec<AntId> = vec![];
@@ -741,7 +738,7 @@ async fn ants_release_post_returns_400_if_validation_error() {
 #[tokio::test]
 #[traced_test]
 async fn ants_release_get_returns_200_same_as_latest_release() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     let latest_release = {
         let res = fixture.client.get("/api/ants/latest-release").send().await;
@@ -772,7 +769,7 @@ async fn ants_release_get_returns_200_same_as_latest_release() {
 #[tokio::test]
 #[traced_test]
 async fn ants_release_get_returns_404_if_no_such_release() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     {
         let req = GetReleaseRequest { release: 99999 };
@@ -790,7 +787,7 @@ async fn ants_release_get_returns_404_if_no_such_release() {
 #[tokio::test]
 #[traced_test]
 async fn ants_decline_returns_4xx_if_not_admin() {
-    let fixture = test_router_no_auth(FixtureOptions::new()).await;
+    let fixture = TestFixture::new(FixtureOptions::new()).await;
 
     {
         let req = DeclineAntRequest {
@@ -821,7 +818,7 @@ async fn ants_decline_returns_4xx_if_not_admin() {
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
 
-    let (fixture, cookie) = test_router_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
     {
         let req = DeclineAntRequest {
@@ -842,7 +839,7 @@ async fn ants_decline_returns_4xx_if_not_admin() {
 #[tokio::test]
 #[traced_test]
 async fn ants_decline_returns_400_if_ant_not_exists() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     {
         let req = DeclineAntRequest {
@@ -868,7 +865,7 @@ async fn ants_decline_returns_400_if_ant_not_exists() {
 #[tokio::test]
 #[traced_test]
 async fn ants_decline_returns_400_if_ant_already_declined_or_released() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     {
         let declined_ant = {
@@ -947,7 +944,7 @@ async fn ants_decline_returns_400_if_ant_already_declined_or_released() {
 #[tokio::test]
 #[traced_test]
 async fn ants_decline_returns_200_for_declining_new_ant() {
-    let (fixture, cookie) = test_router_admin_auth(FixtureOptions::new()).await;
+    let (fixture, cookie) = TestFixture::with_admin_auth(FixtureOptions::new()).await;
 
     let unreleased_ant = {
         let res = fixture
