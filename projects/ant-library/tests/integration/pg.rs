@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ant_library::sd::{
-    pg::{make_connection_string, DynamicPostgresManager},
+    pg::{make_connection_string, PostgresManager},
     reader::ServiceDiscovery,
     writer::ServiceDiscoveryWriter,
 };
@@ -49,7 +49,7 @@ async fn pool_recycles_on_endpoint_change() {
     }
 
     let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-    let manager = DynamicPostgresManager::new_dynamic(
+    let manager = PostgresManager::new_dynamic(
         sd.clone(),
         "ant-data-farm",
         db1.config.database_name.clone(),

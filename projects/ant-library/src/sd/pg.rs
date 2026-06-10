@@ -44,14 +44,14 @@ impl ServiceRef {
     }
 }
 
-pub struct DynamicPostgresManager {
+pub struct PostgresManager {
     source: ServiceRef,
     dbname: String,
     user: String,
     password: String,
 }
 
-impl DynamicPostgresManager {
+impl PostgresManager {
     /// Connect to a fixed host:port — the endpoint never changes.
     pub fn new_static(
         host: impl Into<String>,
@@ -117,7 +117,7 @@ pub fn make_connection_string(
     format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
 }
 
-impl ManageConnection for DynamicPostgresManager {
+impl ManageConnection for PostgresManager {
     type Connection = TrackedConnection;
     type Error = PoolError;
 

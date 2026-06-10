@@ -1,4 +1,4 @@
-use ant_library::sd::pg::{DynamicPostgresManager, make_connection_string};
+use ant_library::sd::pg::{PostgresManager, make_connection_string};
 use ant_library::sd::reader::ServiceDiscovery;
 use bb8_postgres::bb8::Pool;
 use chrono::{DateTime, Utc};
@@ -9,7 +9,7 @@ use tracing::debug;
 
 #[derive(Clone)]
 pub struct AntBackingItUpStorageClient {
-    db: Pool<DynamicPostgresManager>,
+    db: Pool<PostgresManager>,
 }
 
 pub struct DatabaseParams {
@@ -57,7 +57,7 @@ impl AntBackingItUpStorageClient {
             make_connection_string("[redacted]", "[redacted]", &params.host, params.port, &params.db_name)
         );
 
-        let manager = DynamicPostgresManager::new_static(
+        let manager = PostgresManager::new_static(
             &params.host,
             params.port,
             &params.db_name,
@@ -71,7 +71,7 @@ impl AntBackingItUpStorageClient {
     /// Connect via Consul service discovery. The pool re-resolves "ant-backing-it-up-db" on
     /// every new connection and recycles connections when the endpoint changes.
     pub async fn connect_discovered(sd: &ServiceDiscovery) -> Result<Self, anyhow::Error> {
-        let manager = DynamicPostgresManager::new_dynamic(
+        let manager = PostgresManager::new_dynamic(
             Arc::new(sd.clone()),
             "ant-backing-it-up-db",
             ant_library::secret::load_secret("ant_backing_it_up_db_db")?,

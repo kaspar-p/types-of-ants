@@ -5,7 +5,7 @@ use bb8::{Pool, PooledConnection};
 use std::fs::read_dir;
 use tracing::debug;
 
-use crate::sd::pg::DynamicPostgresManager;
+use crate::sd::pg::PostgresManager;
 use crate::sd::reader::ServiceDiscovery;
 
 #[derive(Debug, Clone)]
@@ -32,10 +32,10 @@ pub struct DatabaseCredentialsConfig {
     pub migration_dirs: Vec<PathBuf>,
 }
 
-/// A bb8 connection pool backed by `DynamicPostgresManager`. For static connections the
+/// A bb8 connection pool backed by `PostgresManager`. For static connections the
 /// manager holds a fixed endpoint; for SD-based connections it re-resolves on every checkout
 /// and recycles connections when the endpoint changes.
-pub type ConnectionPool = Pool<DynamicPostgresManager>;
+pub type ConnectionPool = Pool<PostgresManager>;
 
 /// Build a static connection pool from a `DatabaseConfig` (host/port known at startup).
 pub async fn database_connection(config: &DatabaseConfig) -> Result<ConnectionPool, anyhow::Error> {
@@ -44,7 +44,7 @@ pub async fn database_connection(config: &DatabaseConfig) -> Result<ConnectionPo
         config.host, config.port, config.database_name
     );
 
-    let manager = DynamicPostgresManager::new_static(
+    let manager = PostgresManager::new_static(
         &config.host,
         config.port,
         &config.database_name,
@@ -71,7 +71,7 @@ pub async fn database_connection_dynamic(
     let service = service.into();
     debug!("Connecting to database '{}' via service discovery", service);
 
-    let manager = DynamicPostgresManager::new_dynamic(
+    let manager = PostgresManager::new_dynamic(
         sd,
         service,
         &config.database_name,
@@ -95,7 +95,7 @@ pub trait TypesOfAntsDatabase: Sized {
 
 /// Bootstrap the database with many migration files, ordered by their filenames within a directory.
 async fn bootstrap<'a>(
-    db_con: PooledConnection<'a, DynamicPostgresManager>,
+    db_con: PooledConnection<'a, PostgresManager>,
     migration_dir: &PathBuf,
 ) -> Result<(), anyhow::Error> {
     let mut files: Vec<std::fs::DirEntry> = read_dir(migration_dir)
