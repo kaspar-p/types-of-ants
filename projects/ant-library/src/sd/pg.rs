@@ -5,7 +5,7 @@ use tokio::task::JoinHandle;
 use tokio_postgres::{Client, NoTls};
 use tracing::debug;
 
-use crate::sd::reader::ServiceDiscovery;
+use crate::sd::reader::{ServiceDiscovery, ServiceEndpoint};
 
 pub struct TrackedConnection {
     _handle: JoinHandle<Result<(), tokio_postgres::Error>>,
@@ -27,16 +27,50 @@ impl DerefMut for TrackedConnection {
     }
 }
 
+enum ServiceRef {
+    Static { host: String, port: u16 },
+    Dynamic { sd: Arc<ServiceDiscovery>, service: String },
+}
+
+impl ServiceRef {
+    async fn resolve(&self) -> Option<ServiceEndpoint> {
+        match self {
+            ServiceRef::Static { host, port } => Some(ServiceEndpoint {
+                address: host.clone(),
+                port: *port,
+            }),
+            ServiceRef::Dynamic { sd, service } => sd.resolve(service).await,
+        }
+    }
+}
+
 pub struct DynamicPostgresManager {
-    sd: Arc<ServiceDiscovery>,
-    service: String,
+    source: ServiceRef,
     dbname: String,
     user: String,
     password: String,
 }
 
 impl DynamicPostgresManager {
-    pub fn new(
+    /// Connect to a fixed host:port — the endpoint never changes.
+    pub fn new_static(
+        host: impl Into<String>,
+        port: u16,
+        dbname: impl Into<String>,
+        user: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
+        Self {
+            source: ServiceRef::Static { host: host.into(), port },
+            dbname: dbname.into(),
+            user: user.into(),
+            password: password.into(),
+        }
+    }
+
+    /// Connect via Consul service discovery — endpoint is re-resolved on every
+    /// new connection and recycled when it changes.
+    pub fn new_dynamic(
         sd: Arc<ServiceDiscovery>,
         service: impl Into<String>,
         dbname: impl Into<String>,
@@ -44,8 +78,7 @@ impl DynamicPostgresManager {
         password: impl Into<String>,
     ) -> Self {
         Self {
-            sd,
-            service: service.into(),
+            source: ServiceRef::Dynamic { sd, service: service.into() },
             dbname: dbname.into(),
             user: user.into(),
             password: password.into(),
@@ -90,10 +123,13 @@ impl ManageConnection for DynamicPostgresManager {
 
     async fn connect(&self) -> Result<Self::Connection, Self::Error> {
         let ep = self
-            .sd
-            .resolve(&self.service)
+            .source
+            .resolve()
             .await
-            .ok_or_else(|| PoolError::ServiceNotFound(self.service.clone()))?;
+            .ok_or_else(|| PoolError::ServiceNotFound(match &self.source {
+                ServiceRef::Static { host, .. } => host.clone(),
+                ServiceRef::Dynamic { service, .. } => service.clone(),
+            }))?;
 
         let mut config = tokio_postgres::Config::new();
         config.host(&ep.address);
@@ -123,7 +159,11 @@ impl ManageConnection for DynamicPostgresManager {
         if conn.conn.is_closed() {
             return Err(PoolError::ConnectionClosed);
         }
-        match self.sd.resolve(&self.service).await {
+        // Static connections never change endpoint; skip the resolve.
+        if let ServiceRef::Static { .. } = &self.source {
+            return Ok(());
+        }
+        match self.source.resolve().await {
             Some(ref ep) if ep.address == conn.host && ep.port == conn.port => Ok(()),
             _ => Err(PoolError::EndpointChanged),
         }

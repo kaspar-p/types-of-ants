@@ -49,7 +49,7 @@ async fn pool_recycles_on_endpoint_change() {
     }
 
     let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-    let manager = DynamicPostgresManager::new(
+    let manager = DynamicPostgresManager::new_dynamic(
         sd.clone(),
         "ant-data-farm",
         db1.config.database_name.clone(),

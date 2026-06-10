@@ -1,12 +1,15 @@
-use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
+use ant_library::sd::pg::{DynamicPostgresManager, make_connection_string};
+use ant_library::sd::reader::ServiceDiscovery;
+use bb8_postgres::bb8::Pool;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{NoTls, Row};
+use std::sync::Arc;
+use tokio_postgres::Row;
 use tracing::debug;
 
 #[derive(Clone)]
 pub struct AntBackingItUpStorageClient {
-    db: Pool<PostgresConnectionManager<NoTls>>,
+    db: Pool<DynamicPostgresManager>,
 }
 
 pub struct DatabaseParams {
@@ -49,42 +52,34 @@ fn row_to_backup(row: &Row) -> Backup {
 
 impl AntBackingItUpStorageClient {
     pub async fn connect(params: &DatabaseParams) -> Result<Self, anyhow::Error> {
-        let connection_string = AntBackingItUpStorageClient::make_connection_string(
-            &params.username,
-            &params.password,
+        debug!(
+            "Connecting to database {}",
+            make_connection_string("[redacted]", "[redacted]", &params.host, params.port, &params.db_name)
+        );
+
+        let manager = DynamicPostgresManager::new_static(
             &params.host,
             params.port,
             &params.db_name,
+            &params.username,
+            &params.password,
         );
-
-        debug!(
-            "Connecting to database {}",
-            AntBackingItUpStorageClient::make_connection_string(
-                "[redacted]",
-                "[redacted]",
-                &params.host,
-                params.port,
-                &params.db_name
-            )
-        );
-        let pool_manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)
-            .expect("db connection");
-        let pool = Pool::builder()
-            .build(pool_manager)
-            .await
-            .expect("db connection failed");
-
+        let pool = Pool::builder().build(manager).await?;
         Ok(Self { db: pool })
     }
 
-    fn make_connection_string(
-        username: &str,
-        password: &str,
-        host: &str,
-        port: u16,
-        db_name: &str,
-    ) -> String {
-        format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
+    /// Connect via Consul service discovery. The pool re-resolves "ant-backing-it-up-db" on
+    /// every new connection and recycles connections when the endpoint changes.
+    pub async fn connect_discovered(sd: &ServiceDiscovery) -> Result<Self, anyhow::Error> {
+        let manager = DynamicPostgresManager::new_dynamic(
+            Arc::new(sd.clone()),
+            "ant-backing-it-up-db",
+            ant_library::secret::load_secret("ant_backing_it_up_db_db")?,
+            ant_library::secret::load_secret("ant_backing_it_up_db_user")?,
+            ant_library::secret::load_secret("ant_backing_it_up_db_password")?,
+        );
+        let pool = Pool::builder().build(manager).await?;
+        Ok(Self { db: pool })
     }
 
     pub async fn get_latest_backup_for_project(

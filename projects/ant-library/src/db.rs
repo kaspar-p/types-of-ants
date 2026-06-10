@@ -1,11 +1,12 @@
-use std::{fs::read_to_string, path::PathBuf};
+use std::{fs::read_to_string, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use bb8::{Pool, PooledConnection};
-use bb8_postgres::PostgresConnectionManager;
 use std::fs::read_dir;
-use tokio_postgres::NoTls;
 use tracing::debug;
+
+use crate::sd::pg::DynamicPostgresManager;
+use crate::sd::reader::ServiceDiscovery;
 
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
@@ -22,54 +23,66 @@ pub struct DatabaseConfig {
     pub migration_dirs: Vec<PathBuf>,
 }
 
+/// Credentials and migration config without a static host/port — used with service discovery.
 #[derive(Debug, Clone)]
 pub struct DatabaseCredentialsConfig {
-    /// The credentials to connect to the database.
     pub database_name: String,
     pub database_user: String,
     pub database_password: String,
-    /// On client startup, execute the SQL within the directory to bootstrap schemas and databases.
-    /// Executes in the order of the vector.
     pub migration_dirs: Vec<PathBuf>,
 }
 
-fn make_connection_string(
-    username: &str,
-    password: &str,
-    host: &str,
-    port: u16,
-    db_name: &str,
-) -> String {
-    format!("postgresql://{username}:{password}@{host}:{port}/{db_name}")
-}
+/// A bb8 connection pool backed by `DynamicPostgresManager`. For static connections the
+/// manager holds a fixed endpoint; for SD-based connections it re-resolves on every checkout
+/// and recycles connections when the endpoint changes.
+pub type ConnectionPool = Pool<DynamicPostgresManager>;
 
-pub type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
-
+/// Build a static connection pool from a `DatabaseConfig` (host/port known at startup).
 pub async fn database_connection(config: &DatabaseConfig) -> Result<ConnectionPool, anyhow::Error> {
-    let connection_string = make_connection_string(
-        &config.database_user,
-        &config.database_password,
+    debug!(
+        "Connecting to database postgresql://{}:{}/{}",
+        config.host, config.port, config.database_name
+    );
+
+    let manager = DynamicPostgresManager::new_static(
         &config.host,
         config.port,
         &config.database_name,
+        &config.database_user,
+        &config.database_password,
     );
-
-    debug!(
-        "Connecting to database {}",
-        make_connection_string(
-            "[redacted]",
-            "[redacted]",
-            &config.host,
-            config.port,
-            &config.database_name
-        )
-    );
-    let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)?;
     let db: ConnectionPool = Pool::builder().build(manager).await?;
 
     for migration_dir in &config.migration_dirs {
         let con = db.get().await?;
-        bootstrap(con, &migration_dir).await?;
+        bootstrap(con, migration_dir).await?;
+    }
+
+    Ok(db)
+}
+
+/// Build a dynamic connection pool whose host/port are resolved via Consul on every
+/// new connection. Connections are automatically recycled when the endpoint changes.
+pub async fn database_connection_dynamic(
+    sd: Arc<ServiceDiscovery>,
+    service: impl Into<String>,
+    config: &DatabaseCredentialsConfig,
+) -> Result<ConnectionPool, anyhow::Error> {
+    let service = service.into();
+    debug!("Connecting to database '{}' via service discovery", service);
+
+    let manager = DynamicPostgresManager::new_dynamic(
+        sd,
+        service,
+        &config.database_name,
+        &config.database_user,
+        &config.database_password,
+    );
+    let db: ConnectionPool = Pool::builder().build(manager).await?;
+
+    for migration_dir in &config.migration_dirs {
+        let con = db.get().await?;
+        bootstrap(con, migration_dir).await?;
     }
 
     Ok(db)
@@ -81,10 +94,8 @@ pub trait TypesOfAntsDatabase: Sized {
 }
 
 /// Bootstrap the database with many migration files, ordered by their filenames within a directory.
-/// Reads all SQL files and executes the SQL within. Intended to be used on startup by a database process
-/// For testing or any first-time use.
 async fn bootstrap<'a>(
-    db_con: PooledConnection<'a, PostgresConnectionManager<NoTls>>,
+    db_con: PooledConnection<'a, DynamicPostgresManager>,
     migration_dir: &PathBuf,
 ) -> Result<(), anyhow::Error> {
     let mut files: Vec<std::fs::DirEntry> = read_dir(migration_dir)

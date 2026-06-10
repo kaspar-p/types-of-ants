@@ -6,7 +6,7 @@ use ant_backing_it_up::{
     BackupRequest,
 };
 use ant_fs_client::{AntFsClient, AntFsHostPorts};
-use ant_library::sd::ServiceDiscovery;
+use ant_library::sd::reader::ServiceDiscovery;
 use futures::future::join_all;
 use stdext::prelude::DurationExt;
 use tokio::time::sleep;
@@ -25,19 +25,16 @@ async fn main() {
     let root_dir = PathBuf::from(persist_dir).join(root_path);
     create_dir_all(&root_dir).expect("failed to create root dir");
 
-    let db = AntBackingItUpStorageClient::connect(&DatabaseParams {
-        db_name: ant_library::secret::load_secret("ant_backing_it_up_db_db").unwrap(),
-        username: ant_library::secret::load_secret("ant_backing_it_up_db_user").unwrap(),
-        password: ant_library::secret::load_secret("ant_backing_it_up_db_password").unwrap(),
-        host: dotenv::var("ANT_BACKING_IT_UP_DB_HOST")
-            .expect("No ANT_BACKING_IT_UP_DB_HOST variable."),
-        port: dotenv::var("ANT_BACKING_IT_UP_DB_PORT")
-            .expect("No ANT_BACKING_IT_UP_DB_PORT variable.")
+    let sd = ServiceDiscovery::new(
+        dotenv::var("ANT_MATCHMAKER_HTTP_PORT")
+            .expect("No ANT_MATCHMAKER_HTTP_PORT variable.")
             .parse::<u16>()
             .expect("port was not u16"),
-    })
-    .await
-    .expect("db param");
+    );
+
+    let db = AntBackingItUpStorageClient::connect_discovered(&sd)
+        .await
+        .expect("db connection failed");
 
     let ant_fs_host_ports = serde_json::from_str::<AntFsHostPorts>(
         &dotenv::var("ANT_FS_HOST_PORTS").expect("no ANT_FS_HOST_PORTS variable"),
@@ -64,13 +61,6 @@ async fn main() {
             .collect::<Vec<&str>>()[1]
             .to_string(),
         ant_fs_host_ports[0].tls,
-    );
-
-    let sd = ServiceDiscovery::new(
-        dotenv::var("ANT_MATCHMAKER_HTTP_PORT")
-            .expect("No ANT_MATCHMAKER_HTTP_PORT variable.")
-            .parse::<u16>()
-            .expect("port was not u16"),
     );
 
     let state = AntBackingItUpState {

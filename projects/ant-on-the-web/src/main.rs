@@ -17,19 +17,17 @@ async fn main() {
             .expect("ANT_MATCHMAKER_HTTP_PORT was not u16!"),
     );
 
+    let dao = AntDataFarmClient::connect_discovered(Arc::new(sd.clone()), vec![])
+        .await
+        .expect("db connection failed");
+
     debug!("Setting up state...");
     let state = InnerApiState {
         // Static files all stored locally in ./static
         static_dir: PathBuf::from("./static"),
 
         sd: Arc::new(sd),
-
-        // None config for production use-case
-        dao: Arc::new(
-            AntDataFarmClient::connect_from_env(vec![])
-                .await
-                .expect("db connection failed"),
-        ),
+        dao: Arc::new(dao),
 
         // Twilio client for sending texts
         sms: Arc::new(Sms::new()),
