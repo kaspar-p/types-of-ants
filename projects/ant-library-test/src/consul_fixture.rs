@@ -27,6 +27,21 @@ impl Drop for ConsulFixture {
 
 impl ConsulFixture {
     pub async fn new() -> Self {
+        // Verify the consul binary is present before trying to start the agent,
+        // so the error is actionable rather than a bare NotFound from spawn().
+        match std::process::Command::new("consul")
+            .arg("version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+        {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                panic!("consul binary not found in PATH — install it to run tests that use ConsulFixture: https://developer.hashicorp.com/consul/install");
+            }
+            Err(e) => panic!("consul binary check failed: {e}"),
+            Ok(_) => {}
+        }
+
         let http_port = portpicker::pick_unused_port().expect("No ports free: http");
         let gossip_port = portpicker::pick_unused_port().expect("No ports free: gossip");
         let server_port = portpicker::pick_unused_port().expect("No ports free: server");
@@ -117,4 +132,5 @@ impl ConsulFixture {
     pub fn port(&self) -> u16 {
         self.consul_port
     }
+
 }

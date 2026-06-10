@@ -34,6 +34,10 @@ pub struct ServiceDiscovery {
 impl ServiceDiscovery {
     pub fn new(ant_matchmaker_http_port: u16) -> Self {
         info!("init service discovery on port {ant_matchmaker_http_port}");
+        // rs-consul builds a hyper-rustls HTTPS connector even for HTTP addresses.
+        // rustls 0.23 requires an explicit CryptoProvider; install ring here so any
+        // caller doesn't need to know about this detail.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let consul = Consul::new(rs_consul::Config {
             address: format!("http://localhost:{ant_matchmaker_http_port}"),
             ..Default::default()

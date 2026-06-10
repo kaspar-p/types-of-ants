@@ -25,6 +25,7 @@ reqwest = { version = "0.12.25", default-features = false, features = [
   "rustls-tls",
 ] }
 rs-consul = "0.14.0"
+rustls = { version = "0.23", features = ["ring"] }
 schemars = "1.2.1"
 serde = "1.0.219"
 serde_json = "1.0.140"

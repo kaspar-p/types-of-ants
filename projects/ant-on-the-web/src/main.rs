@@ -41,7 +41,7 @@ async fn main() {
         rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_rng(&mut rand::rng()))),
     };
     let app =
-        ant_on_the_web::make_routes(state, ApiOptions { tps: 250 }).expect("route init failed");
+        ant_on_the_web::make_routes(&state, ApiOptions { tps: 250 }).expect("route init failed");
 
     let port: u16 = dotenv::var("ANT_ON_THE_WEB_PORT")
         .expect("ANT_ON_THE_WEB_PORT environment variable not found")

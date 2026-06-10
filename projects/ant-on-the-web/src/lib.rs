@@ -104,6 +104,7 @@ pub fn make_routes(
         .nest_routes("/users", users::routes())
         .nest_routes("/hosts", hosts::routes())
         .nest_routes("/web-actions", web_actions::routes())
+        .nest_routes("/webhooks", webhooks::routes())
         .nest_routes("/prints", prints::routes())
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
