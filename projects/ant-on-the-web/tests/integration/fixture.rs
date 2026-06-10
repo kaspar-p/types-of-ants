@@ -3,7 +3,7 @@ use std::{env::set_var, path::PathBuf, sync::Arc};
 use ant_data_farm::AntDataFarmClient;
 use ant_library::{db::TypesOfAntsDatabase, sd::reader::ServiceDiscovery};
 use ant_library_test::{
-    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::test_database_config,
+    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
 use ant_on_the_web::{
     make_routes,
@@ -17,7 +17,6 @@ use ant_on_the_web::{
     ApiOptions,
 };
 use http::{header::SET_COOKIE, HeaderMap, StatusCode};
-use postgresql_embedded::PostgreSQL;
 use rand::SeedableRng;
 use serde_json::json;
 use serde_json_assert::assert_json_eq;
@@ -60,7 +59,7 @@ impl SmsSender for TestSmsSender {
 pub struct TestFixture {
     pub client: TestClient,
     pub state: InnerApiState,
-    _guard: PostgreSQL,
+    _guard: TestDatabase,
     _consul: ConsulFixture,
 }
 
@@ -109,7 +108,7 @@ pub fn get_telemetry_cookie(headers: &HeaderMap) -> String {
 async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
     unsafe { set_var("TYPESOFANTS_SECRET_DIR", "./tests/integration/test-secrets") };
 
-    let (db, db_config) = test_database_config("ant-data-farm").await;
+    let db = TestDatabase::new("ant-data-farm").await;
     let sms = TestSmsSender {
         msgs: Arc::new(Mutex::new(vec![])),
     };
@@ -121,7 +120,7 @@ async fn test_router_seeded_no_auth(opts: FixtureOptions) -> TestFixture {
 
         sd: Arc::new(ServiceDiscovery::new(consul.port())),
 
-        dao: Arc::new(AntDataFarmClient::connect(&db_config).await.unwrap()),
+        dao: Arc::new(AntDataFarmClient::connect(&db.config).await.unwrap()),
         sms: Arc::new(sms),
         email: Arc::new(TestEmailSender::new()),
 

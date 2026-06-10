@@ -8,7 +8,7 @@ use ant_library::{
     db::TypesOfAntsDatabase, sd::writer::ServiceDiscoveryWriter, services::Services,
 };
 use ant_library_test::{
-    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::test_database_config,
+    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
 use ant_zookeeper::{
     dns::{Dns, TxtRecord},
@@ -97,7 +97,7 @@ pub struct Fixture {
     pub state: AntZookeeperState,
     pub ant_host_agent_state: AntHostAgentState,
 
-    _guard: postgresql_embedded::PostgreSQL,
+    _guard: TestDatabase,
     _consul: ConsulFixture,
 }
 
@@ -159,7 +159,7 @@ async fn inject_closure_handlebars_replacement(env_file: &mut File) {
 
 impl Fixture {
     pub async fn new(function_name: &str) -> Self {
-        let (_guard, test_db_config) = test_database_config("ant-zookeeper-db").await;
+        let _guard = TestDatabase::new("ant-zookeeper-db").await;
 
         let root_dir = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").unwrap())
             .join("tests")
@@ -280,7 +280,7 @@ impl Fixture {
             acme_url: acme_lib::DirectoryUrl::LetsEncryptStaging,
             acme_contact_email: "integ-test@typesofants.org".to_string(),
             root_dir: root_dir,
-            db: AntZooStorageClient::connect(&test_db_config).await.unwrap(),
+            db: AntZooStorageClient::connect(&_guard.config).await.unwrap(),
             ant_host_agent_factory: Arc::new(Mutex::new(
                 TestAntHostAgentService::new(ant_host_agent_service)
                     .await
