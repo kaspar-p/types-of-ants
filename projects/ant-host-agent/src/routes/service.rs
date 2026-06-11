@@ -14,9 +14,9 @@ use tokio_util::codec;
 
 use ant_library::routes::Routes;
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, Query, State},
     response::IntoResponse,
-    routing::{delete, post},
+    routing::{delete, get, post},
     Json,
 };
 use axum_extra::TypedHeader;
@@ -582,8 +582,45 @@ async fn register_service(
 }
 
 
+#[derive(Serialize, Deserialize)]
+pub struct GetServiceRequest {
+    pub service_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ServiceInfo {
+    pub version: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetServiceResponse {
+    pub service: Option<ServiceInfo>,
+}
+
+async fn get_service(
+    State(state): State<AntHostAgentState>,
+    Query(req): Query<GetServiceRequest>,
+) -> Result<impl IntoResponse, AntHostAgentError> {
+    let version_file = state
+        .install_root_dir
+        .join(&req.service_id)
+        .join("current")
+        .join("VERSION");
+
+    let service = match std::fs::read_to_string(&version_file) {
+        Ok(contents) => Some(ServiceInfo {
+            version: contents.trim().to_string(),
+        }),
+        Err(e) if e.kind() == ErrorKind::NotFound => None,
+        Err(e) => return Err(AntHostAgentError::InternalServerError(Some(e.into()))),
+    };
+
+    Ok(Json(GetServiceResponse { service }))
+}
+
 pub fn routes() -> Routes<AntHostAgentState> {
     Routes::new()
+        .get("/service", get(get_service))
         .post("/service", post(enable_service))
         .delete("/service", delete(disable_service))
         .post("/service-installation", post(install_service))

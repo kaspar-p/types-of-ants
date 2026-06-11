@@ -1,4 +1,4 @@
-use ant_host_agent::routes::service::InstallServiceRequest;
+use ant_host_agent::routes::service::{GetServiceResponse, InstallServiceRequest};
 use assertables::assert_contains;
 use hyper::StatusCode;
 use reqwest::multipart::Form;
@@ -101,6 +101,55 @@ async fn service_registration_plus_installation_smoke() {
         assert!(std::fs::exists(dir.join("ant-host-agent")).unwrap());
         assert!(std::fs::exists(dir.join(".env")).unwrap());
     }
+}
+
+#[test]
+#[traced_test]
+async fn get_service_returns_200_not_installed() {
+    let fixture = TestFixture::new(function_name!()).await;
+
+    let response = fixture
+        .client
+        .get("/service/service?service_id=proj1")
+        .send()
+        .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: GetServiceResponse = response.json().await;
+    assert!(body.service.is_none());
+}
+
+#[test]
+#[traced_test]
+async fn get_service_returns_200_installed() {
+    let fixture = TestFixture::new(function_name!()).await;
+
+    let version = "523-1718234567-abc1234";
+    let version_dir = fixture
+        .test_root_dir
+        .join("service")
+        .join("proj1")
+        .join(format!("{version}.1"));
+
+    std::fs::create_dir_all(&version_dir).unwrap();
+    std::fs::write(version_dir.join("VERSION"), version).unwrap();
+
+    let current = fixture
+        .test_root_dir
+        .join("service")
+        .join("proj1")
+        .join("current");
+    std::os::unix::fs::symlink(&version_dir, &current).unwrap();
+
+    let response = fixture
+        .client
+        .get("/service/service?service_id=proj1")
+        .send()
+        .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: GetServiceResponse = response.json().await;
+    assert_eq!(body.service.unwrap().version, version);
 }
 
 #[test]
