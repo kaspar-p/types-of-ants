@@ -1,17 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use ant_library::sd::writer::ServiceDiscoveryWriter;
-use anthill_manifest::AnthillManifest;
-use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct AntHostAgentState {
-    /// A mini-database for keeping track of the services present on this host.
-    /// Filled on startup and as services are enabled/disabled.
-    ///
-    /// Keys are service IDs ("ant-host-agent", or "ant-db-metrics.ant-data-farm")
-    pub services: Arc<Mutex<HashMap<String, HostService>>>,
-
     pub sd: Arc<ServiceDiscoveryWriter>,
 
     /// Where secrets that this ant-host-agent service (and other services via replication) use.
@@ -26,9 +18,4 @@ pub struct AntHostAgentState {
     ///
     /// This directory DOES NOT belong to ant-host-agent, be careful with it!
     pub install_root_dir: PathBuf,
-}
-
-#[derive(Debug)]
-pub struct HostService {
-    pub manifest: AnthillManifest,
 }

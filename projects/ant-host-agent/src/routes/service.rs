@@ -1,14 +1,12 @@
 use ant_library::headers::{XAntServiceIdHeader, XAntVersionHeader};
-use anthill_manifest::{AnthillArchetype, AnthillManifest, AnthillManifestError};
+use anthill_manifest::{AnthillManifest, AnthillManifestError};
 use anyhow::Context;
 use flate2::read::GzDecoder;
 use handlebars::{no_escape, Handlebars};
 use humansize::DECIMAL;
 use std::{
-    collections::HashMap,
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
-    str::FromStr,
     time::Duration,
 };
 use tempfile::TempDir;
@@ -16,9 +14,9 @@ use tokio_util::codec;
 
 use ant_library::routes::Routes;
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Query, State},
+    extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{delete, post},
     Json,
 };
 use axum_extra::TypedHeader;
@@ -231,7 +229,9 @@ async fn enable_service(
             .sd
             .register_local_service(
                 &req.service_id,
-                manifest.deployment.and_then(|d| d.port).unwrap_or(0),
+                manifest.ports.as_ref().and_then(|p| p.primary)
+                    .or_else(|| manifest.deployment.as_ref().and_then(|d| d.port))
+                    .unwrap_or(0),
             )
             .await
             .context("register service to ant-matchmaker service")?;
@@ -581,62 +581,9 @@ async fn register_service(
     Ok((StatusCode::OK, "Service registered."))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ServiceDiscoveryResponse(pub Vec<ServiceDiscoveryTargets>);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ServiceDiscoveryTargets {
-    /// List of URLs, e.g. "localhost:1234"
-    targets: Vec<String>,
-    labels: HashMap<String, String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ServiceDiscoveryFilters {
-    pub archetype: Option<String>,
-}
-
-async fn get_service_discovery(
-    State(state): State<AntHostAgentState>,
-    Query(filters): Query<ServiceDiscoveryFilters>,
-) -> Result<impl IntoResponse, AntHostAgentError> {
-    let mut targets = vec![];
-    for (service_id, service) in state.services.lock().await.iter() {
-        if let Some(archetype) = &filters.archetype {
-            let archetype = AnthillArchetype::from_str(&archetype)
-                .map_err(|e| AntHostAgentError::validation_msg(&e))?;
-
-            if let Some(service_archetype) = &service.manifest.archetype {
-                if archetype != *service_archetype {
-                    warn!("Skipping {service_id} because archetype mismatch.");
-                    continue;
-                }
-            }
-        }
-
-        match service.manifest.deployment.as_ref().and_then(|d| d.port) {
-            None => {
-                warn!("Skipping {service_id} because no port is defined in the anthill.json manifest!");
-                continue;
-            }
-            Some(port) => {
-                targets.push(ServiceDiscoveryTargets {
-                    targets: vec![format!("localhost:{}", port)],
-                    labels: HashMap::from([
-                        ("project".to_string(), service.manifest.project.to_string()),
-                        ("service_id".to_string(), service_id.to_string()),
-                    ]),
-                });
-            }
-        }
-    }
-
-    Ok((StatusCode::OK, Json(targets)))
-}
 
 pub fn routes() -> Routes<AntHostAgentState> {
     Routes::new()
-        .get("/sd", get(get_service_discovery))
         .post("/service", post(enable_service))
         .delete("/service", delete(disable_service))
         .post("/service-installation", post(install_service))

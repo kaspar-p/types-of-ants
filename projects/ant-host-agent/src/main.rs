@@ -1,7 +1,6 @@
 use ant_host_agent::{make_routes, state::AntHostAgentState};
 use ant_library::sd::writer::ServiceDiscoveryWriter;
-use std::{collections::HashMap, fs, net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc};
 use tracing::{debug, error, info, instrument};
 
 #[tokio::main]
@@ -11,7 +10,6 @@ async fn main() {
 
     info!("Initializing state...");
     let state = AntHostAgentState {
-        services: Arc::new(Mutex::new(HashMap::new())),
         sd: Arc::new(ServiceDiscoveryWriter::new(
             dotenv::var("ANT_MATCHMAKER_HTTP_PORT")
                 .expect("No ANT_MATCHMAKER_HTTP_PORT variable.")

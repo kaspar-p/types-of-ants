@@ -9,14 +9,12 @@ use zbus_systemd::{
 };
 
 use crate::{
-    state::{AntHostAgentState, HostService},
+    state::AntHostAgentState,
     systemd::SLICE_NAME,
 };
 
-/// On startup, scan for all ACTIVE systemd units with the following requirements:
-/// - Must be included in Slice=typesofants.slice
-/// - Must have the {service}.service file in the installation directory, symlinked to the loaded unit file.
-/// - Must have a valid anthill.json in its installation directory
+/// On startup, scan for all ACTIVE systemd units in the typesofants slice and register them with
+/// Consul. Failures are non-fatal: the service may not be healthy yet or Consul may not be up.
 #[instrument(skip(state))]
 pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow::Error> {
     let conn = zbus::Connection::system()
@@ -30,6 +28,8 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
         .list_units_by_patterns(vec!["active".to_string()], vec!["*.service".to_string()])
         .await
         .context("list units")?;
+
+    let mut registered = Vec::new();
 
     info!("Scanning units to find typesofants related services...");
     for unit in units {
@@ -108,11 +108,13 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
             Ok(s) if s == SLICE_NAME => {
                 let service_id = unit_name.strip_suffix(".service").unwrap();
                 info!("Found typesofants service: {service_id}");
-                state
-                    .services
-                    .lock()
-                    .await
-                    .insert(service_id.to_string(), HostService { manifest });
+                let port = manifest.ports.as_ref().and_then(|p| p.primary)
+                    .or_else(|| manifest.deployment.as_ref().and_then(|d| d.port))
+                    .unwrap_or(0);
+                if let Err(e) = state.sd.register_local_service(service_id, port).await {
+                    warn!("Failed to register {service_id} with Consul on startup: {e}");
+                }
+                registered.push(service_id.to_string());
             }
             r => {
                 debug!("Skipping {unit_name} due to not included in {SLICE_NAME}: {r:?}");
@@ -121,18 +123,10 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
         }
     }
 
-    let services_str = state
-        .services
-        .lock()
-        .await
-        .keys()
-        .map(|s| s.clone())
-        .collect::<Vec<_>>()
-        .join(", ");
     info!(
-        "Found [{}] active typesofants services: {}",
-        state.services.lock().await.len(),
-        services_str
+        "Registered [{}] active typesofants services with Consul: {}",
+        registered.len(),
+        registered.join(", ")
     );
 
     Ok(())
