@@ -284,6 +284,7 @@ pub async fn replicate_artifact_step(
             )
             .await?;
             inject_secrets(state, &unpack_dir_path, &host_group.environment).await?;
+            tokio::fs::write(unpack_dir_path.join("VERSION"), &version).await?;
             render_docker_compose(
                 state,
                 service_instance,
