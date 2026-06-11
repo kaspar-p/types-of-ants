@@ -17,4 +17,5 @@ members = [
   "projects/ant-fs-client",
   "projects/anthill-manifest-build",
   "projects/anthill-manifest", "projects/ant-printing-press",
+  "projects/ant-archive-storage",
 ]

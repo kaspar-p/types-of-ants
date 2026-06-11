@@ -1,0 +1,12 @@
+{
+  "project": "ant-archive-storage",
+  "description": "the typesofants archive storage node",
+  "build": "makefile",
+  "ports": {
+    "primary": 3253,
+    "metrics": 3254
+  },
+  "secrets": [
+    "archive_storage_auth"
+  ]
+}

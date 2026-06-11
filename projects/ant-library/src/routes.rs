@@ -70,6 +70,11 @@ where
         self.register(path, method_router)
     }
 
+    pub fn head(mut self, path: &'static str, method_router: MethodRouter<S>) -> Self {
+        self.descriptions.push((Method::HEAD, path.to_string()));
+        self.register(path, method_router)
+    }
+
     pub fn delete(mut self, path: &'static str, method_router: MethodRouter<S>) -> Self {
         self.descriptions.push((Method::DELETE, path.to_string()));
         self.register(path, method_router)
