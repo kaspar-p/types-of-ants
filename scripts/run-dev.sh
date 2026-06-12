@@ -12,11 +12,16 @@ source "$repository_root/secrets/dev/build.cfg"
 set +o allexport
 
 if [[ -f "$repository_root/projects/$project/anthill.json" ]]; then
-  PORT="$(cat "$repository_root/projects/$project/anthill.json" | jq '.ports.primary')"
+  PORT="$(jq '.ports.primary' "$repository_root/projects/$project/anthill.json")"
   export PORT
-  
+
   PRIMARY_PORT="$PORT"
   export PRIMARY_PORT
+
+  METRICS_PORT="$(jq '.ports.metrics | if type == "object" then .port else . end // empty' "$repository_root/projects/$project/anthill.json")"
+  if [[ -n "$METRICS_PORT" ]]; then
+    export METRICS_PORT
+  fi
 fi
 
 if [[ -f "$repository_root/projects/$project/.anthill/dev.sh" ]]; then
