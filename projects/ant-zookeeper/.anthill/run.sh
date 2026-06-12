@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-exec "${BIN:-./ant-on-the-web}"
+exec "${BIN:-./ant-zookeeper}"

@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::Path, str::FromStr};
+use std::{collections::HashMap, fs::File, io::Read, path::Path, str::FromStr};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -233,6 +233,44 @@ impl AnthillManifest {
         manifest.validate()?;
 
         Ok(manifest)
+    }
+
+    /// Returns port-derived environment variables for the given project name.
+    /// Produces both short names (PORT, METRICS_PORT, CONFIG_PORT) and
+    /// project-scoped names (ANT_FOO_PORT, ANT_FOO_METRICS_PORT, ANT_FOO_CONFIG_PORT).
+    pub fn to_port_env_vars(&self, project: &str) -> HashMap<String, String> {
+        let mut vars = HashMap::new();
+        let upcase = project.to_uppercase().replace('-', "_");
+
+        let primary = self
+            .ports
+            .as_ref()
+            .and_then(|p| p.primary)
+            .or_else(|| self.deployment.as_ref().and_then(|d| d.port));
+        if let Some(port) = primary {
+            vars.insert("PORT".to_string(), port.to_string());
+            vars.insert("PRIMARY_PORT".to_string(), port.to_string());
+            vars.insert(format!("{upcase}_PORT"), port.to_string());
+            vars.insert(format!("{upcase}_PRIMARY_PORT"), port.to_string());
+        }
+
+        let metrics = self
+            .ports
+            .as_ref()
+            .and_then(|p| p.metrics.as_ref())
+            .map(|m| m.port())
+            .or_else(|| self.deployment.as_ref().and_then(|d| d.metrics_port));
+        if let Some(port) = metrics {
+            vars.insert("METRICS_PORT".to_string(), port.to_string());
+            vars.insert(format!("{upcase}_METRICS_PORT"), port.to_string());
+        }
+
+        if let Some(port) = self.ports.as_ref().and_then(|p| p.config) {
+            vars.insert("CONFIG_PORT".to_string(), port.to_string());
+            vars.insert(format!("{upcase}_CONFIG_PORT"), port.to_string());
+        }
+
+        vars
     }
 
     pub fn validate(&self) -> Result<(), anyhow::Error> {

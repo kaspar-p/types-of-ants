@@ -189,15 +189,15 @@ async fn build_arch<'a>(
 
         info!("... artifact registered.");
     } else {
-        deployment_file.keep()?;
-        info!("artifact available: {}", deployment_file_path.display());
+        let (_, path) = deployment_file.keep()?;
+        info!("artifact available: {}", path.display());
     }
 
     Ok(())
 }
 
-struct GitState {
-    root: PathBuf,
+pub struct GitState {
+    pub root: PathBuf,
     head_sha: String,
     head_number: i32,
     head_datetime: String,
@@ -468,18 +468,18 @@ async fn build_artifact<'a>(
 
         let deployment_file_path = registry_dir.join(deployment_file_name);
         let deployment_file = NamedTempFile::new_in(&registry_dir)
-            .await
-            .context("creating deployment file");
+            .context("creating deployment file")?;
 
-        let mut tar = tokio_tar::Builder::new(async_compression::tokio::write::GzipEncoder::new(
-            deployment_file,
-        ));
-        tar.append_dir_all(".", tmp_packaging_dir.path())
-            .await
-            .context("appending packaging to tar")?;
-        tar.finish().await.context("building tar")?;
-        let mut encoder = tar.into_inner().await?;
-        encoder.shutdown().await?;
+        {
+            let gz = flate2::write::GzEncoder::new(
+                deployment_file.as_file().try_clone().context("cloning deployment file")?,
+                flate2::Compression::default(),
+            );
+            let mut tar = tar::Builder::new(gz);
+            tar.append_dir_all(".", tmp_packaging_dir.path())
+                .context("appending packaging to tar")?;
+            tar.finish().context("building tar")?;
+        }
 
         info!(
             "... deployment file size: {}",
