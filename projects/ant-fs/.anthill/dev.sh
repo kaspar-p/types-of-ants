@@ -4,7 +4,6 @@ set -euo pipefail
 
 repository_root="$(git rev-parse --show-toplevel)"
 
-cd "$repository_root/projects/ant-fs"
 cargo build --bin ant-fs
 
 export BIN="$repository_root/target/debug/ant-fs"

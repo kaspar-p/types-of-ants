@@ -23,7 +23,7 @@ pub fn make_routes(state: AntHostAgentState) -> Result<Router, anyhow::Error> {
 
     let api: Router = Routes::new()
         .nest_routes("/service", crate::routes::service::routes())
-        .nest_routes("/secret", crate::routes::secret::routes())
+
         .get("/ping", get(ant_library::api_ping))
         .post("/ping", post(ant_library::api_ping))
         .build()

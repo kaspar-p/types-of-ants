@@ -41,6 +41,5 @@ else
   usage
 fi
 
-cd "$repository_root/projects/ant-matchmaker" || exit 1
 
 exec "$repository_root/projects/ant-matchmaker/.anthill/run.sh"

@@ -4,7 +4,6 @@ set -euo pipefail
 
 repository_root="$(git rev-parse --show-toplevel)"
 
-cd "$repository_root/projects/ant-printing-press"
 cargo build --bin ant-printing-press
 
 export BIN="$repository_root/target/debug/ant-printing-press"

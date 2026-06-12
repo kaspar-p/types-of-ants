@@ -6,9 +6,6 @@ use ant_library::sd::writer::ServiceDiscoveryWriter;
 pub struct AntHostAgentState {
     pub sd: Arc<ServiceDiscoveryWriter>,
 
-    /// Where secrets that this ant-host-agent service (and other services via replication) use.
-    pub secrets_root_dir: PathBuf,
-
     /// Where to save temporary files or find deployment archive files, as the input.
     ///
     /// This directory belongs to the ant-host-agent process
