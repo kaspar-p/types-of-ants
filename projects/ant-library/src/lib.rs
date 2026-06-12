@@ -10,13 +10,13 @@ use tracing::{debug, Level};
 use tracing_subscriber::{fmt::writer::Tee, EnvFilter, FmtSubscriber};
 
 pub mod db;
-pub mod routes;
 pub mod env;
 pub mod find_up;
 pub mod headers;
 pub mod host_architecture;
 pub mod manifest_file;
 pub mod middleware;
+pub mod routes;
 pub mod sd;
 pub mod secret;
 pub mod services;

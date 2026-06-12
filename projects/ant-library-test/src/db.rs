@@ -61,4 +61,3 @@ impl TestDatabase {
         return Self { _db: pg, config };
     }
 }
-

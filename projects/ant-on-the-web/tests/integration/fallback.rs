@@ -1,4 +1,4 @@
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 use assertables::{assert_contains, assert_lt};
 use http::StatusCode;
 

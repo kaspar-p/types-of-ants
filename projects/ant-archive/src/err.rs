@@ -1,12 +1,11 @@
 use axum::response::{IntoResponse, Response};
 use http::StatusCode;
-use tracing::{error, warn};
+use tracing::error;
 
 #[derive(Debug)]
 pub enum AntArchiveError {
     InternalServerError(Option<anyhow::Error>),
-    Unauthorized,
-    Forbidden,
+    Unauthorized(Option<anyhow::Error>),
     NotFound(String),
     BadRequest(String),
 }
@@ -18,20 +17,16 @@ impl IntoResponse for AntArchiveError {
                 error!("AntArchiveError::InternalServerError: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error.").into_response()
             }
-            AntArchiveError::Unauthorized => {
-                warn!("AntArchiveError::Unauthorized");
+            AntArchiveError::Unauthorized(e) => {
+                if let Some(e) = e {
+                    tracing::debug!("AntArchiveError::Unauthorized: {e:?}");
+                }
                 (StatusCode::UNAUTHORIZED, "Unauthorized.").into_response()
-            }
-            AntArchiveError::Forbidden => {
-                warn!("AntArchiveError::Forbidden");
-                (StatusCode::FORBIDDEN, "Forbidden.").into_response()
             }
             AntArchiveError::NotFound(key) => {
                 (StatusCode::NOT_FOUND, format!("{key} not found")).into_response()
             }
-            AntArchiveError::BadRequest(msg) => {
-                (StatusCode::BAD_REQUEST, msg).into_response()
-            }
+            AntArchiveError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::{
-    fixture::{get_auth_cookie, TestFixture, FixtureOptions, TestSmsSender},
+    fixture::{get_auth_cookie, FixtureOptions, TestFixture, TestSmsSender},
     fixture_email::TestEmailSender,
     fixture_sms::{first_otp, second_otp, third_otp},
 };
@@ -918,7 +918,8 @@ async fn users_email_returns_200_and_sends_new_code() {
 
 a login or sign-in request generated a one-time code: {}
 
-if you did not generate this code, someone may be trying to access your account, please reset your password as soon as possible.
+if you did not generate this code, someone may be trying to access your account, please reset your \
+                 password as soon as possible.
 
 with love,
     the typesofants.org team",

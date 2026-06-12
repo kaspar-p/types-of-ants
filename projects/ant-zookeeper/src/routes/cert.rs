@@ -169,6 +169,5 @@ async fn provision_certificate(
 }
 
 pub fn routes() -> Routes<AntZookeeperState> {
-    Routes::new()
-        .post("/cert", post(provision_certificate))
+    Routes::new().post("/cert", post(provision_certificate))
 }

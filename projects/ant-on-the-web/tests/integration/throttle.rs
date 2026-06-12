@@ -1,4 +1,4 @@
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 use futures::StreamExt;
 use http::StatusCode;
 use tracing::error;

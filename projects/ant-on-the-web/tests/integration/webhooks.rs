@@ -1,4 +1,4 @@
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 use http::StatusCode;
 use serde_json::json;
 

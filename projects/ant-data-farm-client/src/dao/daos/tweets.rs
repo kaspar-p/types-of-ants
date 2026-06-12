@@ -117,18 +117,23 @@ impl TweetsDao {
             .get("user_name");
 
         let tweet_ants: Vec<TweetAnt> = con
-                .query("select
+            .query(
+                "select
             scheduled_tweet.scheduled_tweet_id, scheduled_tweet_ant.ant_id, ant_release.ant_content
         from
-            scheduled_tweet left join scheduled_tweet_ant on scheduled_tweet.scheduled_tweet_id = scheduled_tweet_ant.scheduled_tweet_id
-                            left join ant_release on scheduled_tweet_ant.ant_id = ant_release.ant_id
+            scheduled_tweet left join scheduled_tweet_ant on scheduled_tweet.scheduled_tweet_id = \
+                 scheduled_tweet_ant.scheduled_tweet_id
+                            left join ant_release on scheduled_tweet_ant.ant_id = \
+                 ant_release.ant_id
         where
             scheduled_tweet.scheduled_tweet_id = $1::uuid
-            ", &[&scheduled_tweet_id.0])
-                .await?
-                .into_iter()
-                .map(|ant_row: Row| row_to_tweet_ant(ant_row))
-                .collect();
+            ",
+                &[&scheduled_tweet_id.0],
+            )
+            .await?
+            .into_iter()
+            .map(|ant_row: Row| row_to_tweet_ant(ant_row))
+            .collect();
 
         return Ok(Some(row_to_scheduled_tweet(
             scheduled_tweet_row,

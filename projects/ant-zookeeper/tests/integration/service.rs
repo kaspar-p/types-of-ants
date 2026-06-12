@@ -478,7 +478,10 @@ async fn service_artifact_includes_env_file() {
         assert!(env_file_content.contains("TYPESOFANTS_ENV=\"beta\""));
         assert!(env_file_content.contains("PERSIST_DIR=\"/home/ant/persist/ant-host-agent\""));
         assert!(env_file_content.contains("ANT_HOST_AGENT_PORT=\"3232\""));
-        assert!(env_file_content.contains("ANT_FS_HOST_PORTS=\"[{\\\"tls\\\":false,\\\"url\\\":\\\"antworker002.hosts.typesofants.org:3237\\\"}]\""));
+        assert!(env_file_content.contains(
+            "ANT_FS_HOST_PORTS=\"[{\\\"tls\\\":false,\\\"url\\\":\\\"antworker002.hosts.\
+             typesofants.org:3237\\\"}]\""
+        ));
     }
 }
 

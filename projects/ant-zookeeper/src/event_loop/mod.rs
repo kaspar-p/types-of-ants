@@ -217,9 +217,10 @@ async fn drive_iteration<'a, T: Iterator<Item = &'a DeploymentEvent>>(
             let successful = previous_jobs.iter().find(|(_, _, is_success)| *is_success);
             if let Some(successful) = successful {
                 panic!(
-            "[p={deployment_pipeline_id} v={}] Previous job {} succeeded, this shouldn't {}",
-            "happen!", event.0, successful.0
-        );
+                    "[p={deployment_pipeline_id} v={}] Previous job {} succeeded, this shouldn't \
+                     {}",
+                    "happen!", event.0, successful.0
+                );
             }
 
             let retryable = previous_jobs

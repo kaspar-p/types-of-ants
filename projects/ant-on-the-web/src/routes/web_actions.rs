@@ -43,6 +43,5 @@ async fn new_web_action(
 }
 
 pub fn routes() -> ApiRoutes {
-    Routes::new()
-        .post("/action", post(new_web_action))
+    Routes::new().post("/action", post(new_web_action))
 }

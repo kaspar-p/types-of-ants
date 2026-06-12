@@ -19,7 +19,10 @@ impl V1Codec {
     /// Open a V1 blob for reading. `file` must be positioned immediately after
     /// the version byte. `physical_body_size` = file_size - 1.
     pub fn new(file: tokio::fs::File, physical_body_size: u64) -> Self {
-        V1Codec { file, size: physical_body_size }
+        V1Codec {
+            file,
+            size: physical_body_size,
+        }
     }
 
     /// Create a new V1 blob for writing. Writes the version byte immediately;
@@ -39,10 +42,12 @@ impl V1Codec {
     }
 
     pub async fn verify(path: &Path) -> Result<(), CodecError> {
-        let mut file = tokio::fs::File::open(path).await.map_err(|e| match e.kind() {
-            ErrorKind::NotFound => CodecError::NotFound(path.to_string_lossy().into_owned()),
-            _ => CodecError::Internal(e.into()),
-        })?;
+        let mut file = tokio::fs::File::open(path)
+            .await
+            .map_err(|e| match e.kind() {
+                ErrorKind::NotFound => CodecError::NotFound(path.to_string_lossy().into_owned()),
+                _ => CodecError::Internal(e.into()),
+            })?;
 
         let mut buf = [0u8; 1];
         file.read_exact(&mut buf)
@@ -91,13 +96,21 @@ impl BlobCodec for V1Codec {
 }
 
 impl AsyncRead for V1Codec {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut TaskContext<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.get_mut().file).poll_read(cx, buf)
     }
 }
 
 impl AsyncWrite for V1Codec {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut TaskContext<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
         Pin::new(&mut self.get_mut().file).poll_write(cx, buf)
     }
 

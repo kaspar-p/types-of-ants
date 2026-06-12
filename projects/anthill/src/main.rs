@@ -20,7 +20,9 @@ enum Commands {
 
 #[tokio::main(flavor = "local")]
 async fn main() -> Result<()> {
-    clap_complete::CompleteEnv::with_factory(Cli::command).bin("ah").complete();
+    clap_complete::CompleteEnv::with_factory(Cli::command)
+        .bin("ah")
+        .complete();
 
     ant_library::set_global_logs("anthill");
 

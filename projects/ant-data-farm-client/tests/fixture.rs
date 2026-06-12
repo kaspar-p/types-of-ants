@@ -21,10 +21,13 @@ pub struct TestFixture {
 
 #[must_use]
 pub async fn test_fixture(tag: &str, override_port: Option<u16>) -> TestFixture {
-    let cwd = PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!"));
+    let cwd =
+        PathBuf::from(dotenv::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR present!"));
     println!("{}", cwd.display());
 
-    which::which("docker").context("docker must be installed!").unwrap();
+    which::which("docker")
+        .context("docker must be installed!")
+        .unwrap();
 
     // Build the test images in the repository
     let output = Command::new("docker")

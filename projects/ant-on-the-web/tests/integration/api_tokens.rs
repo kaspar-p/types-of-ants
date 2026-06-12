@@ -5,7 +5,7 @@ use ant_on_the_web::{
 use http::StatusCode;
 use tracing_test::traced_test;
 
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 
 #[tokio::test]
 #[traced_test]

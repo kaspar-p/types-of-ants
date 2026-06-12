@@ -5,26 +5,33 @@ use std::{
     sync::Arc,
 };
 
-use ant_archive::{AntArchiveState, AntArchiveStorageNodeClient, make_routes};
-use ant_archive_db::AntArchiveDb;
-use ant_archive_storage::{AntArchiveStorageState, build_metric_layer, make_routes as make_storage_routes};
-use ant_library::db::{DatabaseConfig, TypesOfAntsDatabase};
-use ant_library_test::{axum_test_client::TestClient, db::TestDatabase};
+use ant_archive::{make_routes, AntArchiveDb, AntArchiveState};
+use ant_archive_storage::{
+    build_metric_layer, make_routes as make_storage_routes, AntArchiveStorageState,
+};
+use ant_library::{
+    db::TypesOfAntsDatabase as _,
+    sd::{reader::ServiceDiscovery, writer::ServiceDiscoveryWriter},
+};
+use ant_library_test::{
+    axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
+};
 use base64ct::{Base64, Encoding};
 use sha2::{Digest, Sha256};
 use tokio::{net::TcpListener, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
-pub const TEST_NODE_ID: &str = "sn-testnode";
 const TEST_KEK_ID: &str = "kek-test";
 const TEST_CLIENT_ID: &str = "client-test";
 pub const TEST_BUCKET_ID: &str = "b-testbucket";
 pub const TEST_PUBLIC_BUCKET_ID: &str = "b-testpublic";
 pub const TEST_INTERNAL_BUCKET_ID: &str = "b-testinternal";
 
+// The Consul node name used by ConsulFixture.
+const CONSUL_NODE_NAME: &str = "test-node1";
+
 pub struct StorageNode {
-    pub node_id: String,
-    pub base_url: String,
+    pub port: u16,
     root: PathBuf,
     _handle: Arc<JoinHandle<()>>,
 }
@@ -47,31 +54,23 @@ impl StorageNode {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("could not bind ephemeral storage socket");
-        let addr = listener.local_addr().unwrap();
+        let port = listener.local_addr().unwrap().port();
 
         let (metric_layer, handle) = build_metric_layer();
         let state = AntArchiveStorageState::new(root.clone(), handle);
         let app = make_storage_routes(state, metric_layer).unwrap();
 
         let join = tokio::spawn(async move {
-            axum::serve(listener, app).await.expect("storage server error");
+            axum::serve(listener, app)
+                .await
+                .expect("storage server error");
         });
 
         StorageNode {
-            node_id: TEST_NODE_ID.to_string(),
-            base_url: format!("http://{}", addr),
+            port,
             root,
             _handle: Arc::new(join),
         }
-    }
-
-    pub fn client(&self) -> AntArchiveStorageNodeClient {
-        AntArchiveStorageNodeClient::new(
-            self.node_id.clone(),
-            self.base_url.clone(),
-            "user",
-            "test-password",
-        )
     }
 }
 
@@ -83,6 +82,7 @@ pub struct Fixture {
     pub internal_bucket_id: String,
     _db: TestDatabase,
     _storage: StorageNode,
+    _consul: ConsulFixture,
 }
 
 impl Fixture {
@@ -97,27 +97,22 @@ impl Fixture {
             );
         }
 
+        let consul = ConsulFixture::new().await;
         let db = TestDatabase::new("ant-archive-db").await;
         let storage = StorageNode::new(name).await;
+
+        // Register the storage node with the test Consul instance.
+        ServiceDiscoveryWriter::new(consul.port())
+            .register_remote_service("ant-archive-storage", "127.0.0.1", storage.port)
+            .await
+            .expect("failed to register storage node with Consul");
 
         let archive_db = AntArchiveDb::connect(&db.config).await.unwrap();
         seed_db(&archive_db).await;
 
-        let kek: [u8; 32] = hex::decode(
-            "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
-
-        let state = AntArchiveState::new(
-            archive_db,
-            vec![storage.client()],
-            TEST_KEK_ID.to_string(),
-            kek,
-        );
-
-        let app = make_routes(state).unwrap();
+        let sd = Arc::new(ServiceDiscovery::new(consul.port()));
+        let state = AntArchiveState::new(archive_db, sd);
+        let app = make_routes(state);
 
         Fixture {
             client: TestClient::new(app).await,
@@ -127,6 +122,7 @@ impl Fixture {
             internal_bucket_id: TEST_INTERNAL_BUCKET_ID.to_string(),
             _db: db,
             _storage: storage,
+            _consul: consul,
         }
     }
 }
@@ -135,7 +131,8 @@ async fn seed_db(db: &AntArchiveDb) {
     let token_hash = Base64::encode_string(&Sha256::digest(TEST_BEARER_TOKEN.as_bytes()));
 
     db.register_kek(TEST_KEK_ID).await.unwrap();
-    db.register_storage_node(TEST_NODE_ID, "test-node")
+    // host_id matches the Consul node name so resolve_storage_nodes can find it.
+    db.register_storage_node("sn-test", CONSUL_NODE_NAME)
         .await
         .unwrap();
     db.create_client(TEST_CLIENT_ID, "test-client", &token_hash)

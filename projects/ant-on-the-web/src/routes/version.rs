@@ -1,5 +1,5 @@
-use axum::{response::IntoResponse, routing::get};
 use ant_library::routes::Routes;
+use axum::{response::IntoResponse, routing::get};
 
 use crate::state::ApiRoutes;
 
@@ -8,6 +8,5 @@ async fn current_version() -> impl IntoResponse {
 }
 
 pub fn routes() -> ApiRoutes {
-    Routes::new()
-        .get("/version", get(current_version))
+    Routes::new().get("/version", get(current_version))
 }

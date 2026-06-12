@@ -1,8 +1,8 @@
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
         atomic::{AtomicI64, Ordering},
+        Arc,
     },
 };
 

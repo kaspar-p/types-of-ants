@@ -94,7 +94,8 @@ async fn send_email_verification_code(
 
 a login or sign-in request generated a one-time code: {otp}
 
-if you did not generate this code, someone may be trying to access your account, please reset your password as soon as possible.
+if you did not generate this code, someone may be trying to access your account, please reset your \
+         password as soon as possible.
 
 with love,
     the typesofants.org team"

@@ -23,11 +23,7 @@ pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
         .context(format!("no anthill.json for project {}", cmd.project))?;
 
     let dev_sh = project_dir.join(".anthill").join("dev.sh");
-    anyhow::ensure!(
-        dev_sh.exists(),
-        "{} has no .anthill/dev.sh",
-        cmd.project
-    );
+    anyhow::ensure!(dev_sh.exists(), "{} has no .anthill/dev.sh", cmd.project);
 
     let build_cfg = repo_root.join("secrets").join("dev").join("build.cfg");
     let mut env = ant_library::env::env_vars_to_map(&build_cfg)
@@ -37,7 +33,11 @@ pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
 
     env.insert(
         "TYPESOFANTS_SECRET_DIR".to_string(),
-        repo_root.join("secrets").join("dev").to_string_lossy().into_owned(),
+        repo_root
+            .join("secrets")
+            .join("dev")
+            .to_string_lossy()
+            .into_owned(),
     );
     env.insert(
         "PERSIST_DIR".to_string(),
@@ -95,9 +95,9 @@ async fn maybe_register(
 
     if !sd.healthy().await {
         eprintln!(
-            "warning: could not reach local ant-matchmaker on port {matchmaker_port} — \
-             {} will start but won't be discoverable by other local services.\n\
-             Run `ah dev ant-matchmaker` in another terminal first.",
+            "warning: could not reach local ant-matchmaker on port {matchmaker_port} — {} will \
+             start but won't be discoverable by other local services.\nRun `ah dev \
+             ant-matchmaker` in another terminal first.",
             manifest.project
         );
         return None;

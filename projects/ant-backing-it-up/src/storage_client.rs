@@ -1,4 +1,4 @@
-use ant_library::sd::pg::{PostgresManager, make_connection_string};
+use ant_library::sd::pg::{make_connection_string, PostgresManager};
 use ant_library::sd::reader::ServiceDiscovery;
 use bb8_postgres::bb8::Pool;
 use chrono::{DateTime, Utc};
@@ -54,7 +54,13 @@ impl AntBackingItUpStorageClient {
     pub async fn connect(params: &DatabaseParams) -> Result<Self, anyhow::Error> {
         debug!(
             "Connecting to database {}",
-            make_connection_string("[redacted]", "[redacted]", &params.host, params.port, &params.db_name)
+            make_connection_string(
+                "[redacted]",
+                "[redacted]",
+                &params.host,
+                params.port,
+                &params.db_name
+            )
         );
 
         let manager = PostgresManager::new_static(

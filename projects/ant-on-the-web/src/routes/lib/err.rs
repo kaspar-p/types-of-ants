@@ -67,8 +67,12 @@ pub enum AntOnTheWebError {
     AccessDenied(#[serde(skip)] Option<String>),
     InternalServerError(#[serde(skip)] Option<anyhow::Error>),
     ValidationError(ValidationError),
-    ConflictError { msg: &'static str },
-    NoSuchPage { page: i32 },
+    ConflictError {
+        msg: &'static str,
+    },
+    NoSuchPage {
+        page: i32,
+    },
     NoSuchResource,
     /// A webhook request's signature is missing, malformed, or fails
     /// verification. Stripe expects a 400 in this case so it retries delivery.

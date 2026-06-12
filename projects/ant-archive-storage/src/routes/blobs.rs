@@ -1,10 +1,10 @@
-use anyhow::Context;
 use crate::{
     codec::{BlobHandle, CodecError},
     err::AntArchiveStorageError,
     state::AntArchiveStorageState,
 };
 use ant_library::routes::Routes;
+use anyhow::Context;
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Path, State},
@@ -19,12 +19,12 @@ use axum_extra::{
 };
 use axum_prometheus::PrometheusMetricLayer;
 use base64ct::{Base64, Encoding};
+use futures::TryStreamExt;
 use http::{header, StatusCode};
 use sha2::{Digest, Sha256};
-use std::{path::Path as FsPath, path::PathBuf};
 use std::io::ErrorKind;
+use std::{path::Path as FsPath, path::PathBuf};
 use subtle::ConstantTimeEq;
-use futures::TryStreamExt;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::{ReaderStream, StreamReader};
 use tower::ServiceBuilder;
@@ -149,10 +149,12 @@ async fn get_blob(
 
     let path = blob_path(&state.root, &storage_key);
 
-    let file = tokio::fs::File::open(&path).await.map_err(|e| match e.kind() {
-        ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
-        _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
-    })?;
+    let file = tokio::fs::File::open(&path)
+        .await
+        .map_err(|e| match e.kind() {
+            ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
+            _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
+        })?;
 
     let mut handle = BlobHandle::open(file).await?;
     let size = handle.size;
@@ -212,10 +214,12 @@ async fn delete_blob(
 
     let size = BlobHandle::size(&path).await?;
 
-    tokio::fs::remove_file(&path).await.map_err(|e| match e.kind() {
-        ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
-        _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
-    })?;
+    tokio::fs::remove_file(&path)
+        .await
+        .map_err(|e| match e.kind() {
+            ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
+            _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
+        })?;
 
     state.adjust_bytes(-(size as i64));
     Ok(StatusCode::OK)
@@ -236,7 +240,9 @@ pub fn make_routes(
             ServiceBuilder::new()
                 .layer(metric_layer)
                 .layer(ant_library::middleware::http_log_layer())
-                .layer(CatchPanicLayer::custom(ant_library::middleware::catch_panic))
+                .layer(CatchPanicLayer::custom(
+                    ant_library::middleware::catch_panic,
+                ))
                 .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
                     ant_library::middleware::print_request_response,
                 )))

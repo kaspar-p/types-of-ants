@@ -25,9 +25,8 @@ async fn metrics_handler(State(state): State<AntArchiveStorageState>) -> (Status
     let mut output = state.metrics_handle.render();
     let bytes = state.bytes_stored.load(Ordering::Relaxed);
     output.push_str(&format!(
-        "# HELP ant_archive_storage_bytes_stored Total logical bytes currently stored\n\
-         # TYPE ant_archive_storage_bytes_stored gauge\n\
-         ant_archive_storage_bytes_stored {bytes}\n"
+        "# HELP ant_archive_storage_bytes_stored Total logical bytes currently stored\n# TYPE \
+         ant_archive_storage_bytes_stored gauge\nant_archive_storage_bytes_stored {bytes}\n"
     ));
     (StatusCode::OK, output)
 }

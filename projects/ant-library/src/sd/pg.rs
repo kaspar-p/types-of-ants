@@ -28,8 +28,14 @@ impl DerefMut for TrackedConnection {
 }
 
 enum ServiceRef {
-    Static { host: String, port: u16 },
-    Dynamic { sd: Arc<ServiceDiscovery>, service: String },
+    Static {
+        host: String,
+        port: u16,
+    },
+    Dynamic {
+        sd: Arc<ServiceDiscovery>,
+        service: String,
+    },
 }
 
 impl ServiceRef {
@@ -62,7 +68,10 @@ impl PostgresManager {
         password: impl Into<String>,
     ) -> Self {
         Self {
-            source: ServiceRef::Static { host: host.into(), port },
+            source: ServiceRef::Static {
+                host: host.into(),
+                port,
+            },
             dbname: dbname.into(),
             user: user.into(),
             password: password.into(),
@@ -79,7 +88,10 @@ impl PostgresManager {
         password: impl Into<String>,
     ) -> Self {
         Self {
-            source: ServiceRef::Dynamic { sd, service: service.into() },
+            source: ServiceRef::Dynamic {
+                sd,
+                service: service.into(),
+            },
             dbname: dbname.into(),
             user: user.into(),
             password: password.into(),
@@ -123,14 +135,12 @@ impl ManageConnection for PostgresManager {
     type Error = PoolError;
 
     async fn connect(&self) -> Result<Self::Connection, Self::Error> {
-        let ep = self
-            .source
-            .resolve()
-            .await
-            .ok_or_else(|| PoolError::ServiceNotFound(match &self.source {
+        let ep = self.source.resolve().await.ok_or_else(|| {
+            PoolError::ServiceNotFound(match &self.source {
                 ServiceRef::Static { host, .. } => host.clone(),
                 ServiceRef::Dynamic { service, .. } => service.clone(),
-            }))?;
+            })
+        })?;
 
         let mut config = tokio_postgres::Config::new();
         config.host(&ep.address);

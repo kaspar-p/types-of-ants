@@ -1,5 +1,5 @@
-use anyhow::Context;
 use ant_library::routes::Routes;
+use anyhow::Context;
 use axum::{extract::State, response::IntoResponse, routing::post, Json};
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
@@ -71,9 +71,10 @@ async fn iterate_pipeline(
                         async move {
                             perform_fn(&state, event2).await.with_context(|| {
                                 format!(
-                                "Failed to perform scheduled deployment job [{}] for event [{}]",
-                                job_id, event3
-                            )
+                                    "Failed to perform scheduled deployment job [{}] for event \
+                                     [{}]",
+                                    job_id, event3
+                                )
                             })
                         }
                         .instrument(span)

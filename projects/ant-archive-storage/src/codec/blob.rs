@@ -29,7 +29,9 @@ impl BlobHandle {
             .len();
 
         if physical == 0 {
-            return Err(CodecError::Internal(anyhow::anyhow!("Blob is empty (no version byte)")));
+            return Err(CodecError::Internal(anyhow::anyhow!(
+                "Blob is empty (no version byte)"
+            )));
         }
 
         let mut buf = [0u8; 1];
@@ -41,8 +43,9 @@ impl BlobHandle {
         let version = buf[0];
         let physical_body = physical - 1;
 
-        let codec_version = CodecVersion::try_from(version)
-            .map_err(|_| CodecError::Internal(anyhow::anyhow!("Unknown encoding version {version}")))?;
+        let codec_version = CodecVersion::try_from(version).map_err(|_| {
+            CodecError::Internal(anyhow::anyhow!("Unknown encoding version {version}"))
+        })?;
 
         let inner: Box<dyn BlobCodec> = match codec_version {
             CodecVersion::V1 => Box::new(V1Codec::new(file, physical_body)),
@@ -54,7 +57,10 @@ impl BlobHandle {
 
     pub async fn create(dest: &Path) -> Result<Self, CodecError> {
         let codec = V1Codec::create(dest).await?;
-        Ok(BlobHandle { size: 0, inner: Box::new(codec) })
+        Ok(BlobHandle {
+            size: 0,
+            inner: Box::new(codec),
+        })
     }
 
     pub async fn write(dest: &Path, mut reader: impl AsyncRead + Unpin) -> Result<(), CodecError> {
@@ -76,22 +82,32 @@ impl BlobHandle {
     }
 
     pub async fn size(path: &Path) -> Result<u64, CodecError> {
-        let file = tokio::fs::File::open(path).await.map_err(|e| match e.kind() {
-            ErrorKind::NotFound => CodecError::NotFound(path.to_string_lossy().into_owned()),
-            _ => CodecError::Internal(e.into()),
-        })?;
+        let file = tokio::fs::File::open(path)
+            .await
+            .map_err(|e| match e.kind() {
+                ErrorKind::NotFound => CodecError::NotFound(path.to_string_lossy().into_owned()),
+                _ => CodecError::Internal(e.into()),
+            })?;
         Ok(BlobHandle::open(file).await?.size)
     }
 }
 
 impl AsyncRead for BlobHandle {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut TaskContext<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.get_mut().inner).poll_read(cx, buf)
     }
 }
 
 impl AsyncWrite for BlobHandle {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut TaskContext<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
         Pin::new(&mut self.get_mut().inner).poll_write(cx, buf)
     }
 

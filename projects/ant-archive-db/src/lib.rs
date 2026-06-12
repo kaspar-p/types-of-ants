@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use ant_library::db::{
-    ConnectionPool, DatabaseConfig, DatabaseCredentialsConfig, TypesOfAntsDatabase,
-    database_connection, database_connection_dynamic,
+    database_connection, database_connection_dynamic, ConnectionPool, DatabaseConfig,
+    DatabaseCredentialsConfig, TypesOfAntsDatabase,
 };
 use ant_library::sd::reader::ServiceDiscovery;
 use async_trait::async_trait;
@@ -62,10 +62,7 @@ impl AntArchiveDb {
         Ok(Self { pool })
     }
 
-    pub async fn authenticate_bearer(
-        &self,
-        token: &str,
-    ) -> Result<Option<String>, anyhow::Error> {
+    pub async fn authenticate_bearer(&self, token: &str) -> Result<Option<String>, anyhow::Error> {
         let hash = Sha256::digest(token.as_bytes());
         let hash_b64 = Base64::encode_string(&hash);
 

@@ -802,9 +802,10 @@ fn validate_password(password: &str) -> Vec<ValidationMessage> {
 
     if !password.contains("ant") {
         validations.push(ValidationMessage::new(
-                 "password",
-                                 "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly." 
-            ));
+            "password",
+            "Field must contain the word 'ant'. Please do not reuse a password from another \
+             place, you are typing this into a website called typesofants.org, be a little silly.",
+        ));
     }
 
     return validations;
@@ -897,7 +898,10 @@ pub fn routes() -> ApiRoutes {
         .post("/login", post(login))
         .post("/logout", post(logout))
         .post("/signup", post(signup_request))
-        .post("/verification-attempt", post(two_factor_verification_attempt))
+        .post(
+            "/verification-attempt",
+            post(two_factor_verification_attempt),
+        )
         .get("/user", get(get_user_by_name))
         .post("/username", post(change_username))
         .get("/user/{user_name}", get(get_user_by_name))

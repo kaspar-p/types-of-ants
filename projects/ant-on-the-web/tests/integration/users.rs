@@ -1,5 +1,5 @@
 use crate::{
-    fixture::{get_auth_cookie, TestFixture, FixtureOptions},
+    fixture::{get_auth_cookie, FixtureOptions, TestFixture},
     fixture_sms::first_otp,
 };
 use http::StatusCode;
@@ -326,7 +326,11 @@ async fn users_signup_returns_400_with_multiple_errors() {
             .find(|f| f.field.clone().unwrap() == "password")
             .unwrap();
         assert_eq!(e_password.field.clone().unwrap(), "password");
-        assert_eq!(e_password.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+        assert_eq!(
+            e_password.msg,
+            "Field must contain the word 'ant'. Please do not reuse a password from another \
+             place, you are typing this into a website called typesofants.org, be a little silly."
+        );
 
         let e_username_len = j
             .errors
@@ -376,7 +380,11 @@ async fn users_signup_returns_400_if_password_invalid() {
         let err = j.errors.first().unwrap();
 
         assert_eq!(err.field.clone().unwrap(), "password");
-        assert_eq!(err.msg, "Field must contain the word 'ant'. Please do not reuse a password from another place, you are typing this into a website called typesofants.org, be a little silly.");
+        assert_eq!(
+            err.msg,
+            "Field must contain the word 'ant'. Please do not reuse a password from another \
+             place, you are typing this into a website called typesofants.org, be a little silly."
+        );
     }
 
     {

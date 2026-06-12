@@ -1,7 +1,7 @@
 use axum::extract::{FromRef, FromRequestParts, OptionalFromRequestParts};
 use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
     TypedHeader,
-    headers::{Authorization, authorization::Bearer},
 };
 use http::request::Parts;
 
@@ -25,7 +25,7 @@ where
                 parts, state,
             )
             .await
-            .map_err(|_| AntArchiveError::Unauthorized)?;
+            .map_err(|e| AntArchiveError::Unauthorized(Some(e.into())))?;
 
         let state = AntArchiveState::from_ref(state);
         let client_id = state
@@ -33,7 +33,7 @@ where
             .authenticate_bearer(auth.token())
             .await
             .map_err(AntArchiveError::from)?
-            .ok_or(AntArchiveError::Unauthorized)?;
+            .ok_or(AntArchiveError::Unauthorized(None))?;
 
         Ok(BearerClaims { client_id })
     }

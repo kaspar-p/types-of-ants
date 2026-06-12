@@ -8,10 +8,7 @@ use zbus_systemd::{
     zbus,
 };
 
-use crate::{
-    state::AntHostAgentState,
-    systemd::SLICE_NAME,
-};
+use crate::{state::AntHostAgentState, systemd::SLICE_NAME};
 
 /// On startup, scan for all ACTIVE systemd units in the typesofants slice and register them with
 /// Consul. Failures are non-fatal: the service may not be healthy yet or Consul may not be up.

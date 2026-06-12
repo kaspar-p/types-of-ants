@@ -8,7 +8,7 @@ use http::StatusCode;
 use tracing_test::traced_test;
 
 use crate::{
-    fixture::{TestFixture, FixtureOptions, TestSmsSender},
+    fixture::{FixtureOptions, TestFixture, TestSmsSender},
     fixture_sms::{second_otp, third_otp},
 };
 

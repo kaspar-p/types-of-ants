@@ -67,19 +67,21 @@ async fn download(
 
     let full_path = user_file_path(&root, auth.0.username(), &path);
 
-    let file = tokio::fs::File::open(&full_path).await.map_err(|err| match err.kind() {
-        ErrorKind::NotFound => (
-            StatusCode::NOT_FOUND,
-            format!("error: {} does not exist.\n", &path),
-        ),
-        _ => {
-            error!("Failed to open file: {err}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error, please retry.".to_string(),
-            )
-        }
-    })?;
+    let file = tokio::fs::File::open(&full_path)
+        .await
+        .map_err(|err| match err.kind() {
+            ErrorKind::NotFound => (
+                StatusCode::NOT_FOUND,
+                format!("error: {} does not exist.\n", &path),
+            ),
+            _ => {
+                error!("Failed to open file: {err}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error, please retry.".to_string(),
+                )
+            }
+        })?;
 
     // Stream the file from disk rather than buffering it into memory.
     Ok(Body::from_stream(ReaderStream::new(file)))

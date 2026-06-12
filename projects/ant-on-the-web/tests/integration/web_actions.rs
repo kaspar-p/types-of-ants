@@ -4,7 +4,7 @@ use http::{header::COOKIE, StatusCode};
 use tracing::debug;
 use tracing_test::traced_test;
 
-use crate::fixture::{get_telemetry_cookie, TestFixture, FixtureOptions};
+use crate::fixture::{get_telemetry_cookie, FixtureOptions, TestFixture};
 
 #[tokio::test]
 #[traced_test]

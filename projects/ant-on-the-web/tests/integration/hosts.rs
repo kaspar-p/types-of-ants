@@ -1,4 +1,4 @@
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 use ant_on_the_web::hosts::{GetHostResponse, GetHostsResponse};
 use http::StatusCode;
 use tracing_test::traced_test;

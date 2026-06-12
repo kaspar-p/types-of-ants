@@ -36,7 +36,9 @@ impl ConsulFixture {
             .status()
         {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                panic!("consul binary not found in PATH — install it to run tests that use ConsulFixture: https://developer.hashicorp.com/consul/install");
+                panic!(
+                    "consul binary not found in PATH — install it to run tests that use ConsulFixture: https://developer.hashicorp.com/consul/install"
+                );
             }
             Err(e) => panic!("consul binary check failed: {e}"),
             Ok(_) => {}
@@ -132,5 +134,4 @@ impl ConsulFixture {
     pub fn port(&self) -> u16 {
         self.consul_port
     }
-
 }

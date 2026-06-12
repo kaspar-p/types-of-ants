@@ -283,7 +283,8 @@ impl AnthillManifest {
         for route in self.routing.iter() {
             if !route.paths.is_empty() && route.domain.is_none() {
                 return Err(anyhow::Error::msg(
-                    "You must specify .paths alongside .domain within .routing, or else we don't know which domain to modify!",
+                    "You must specify .paths alongside .domain within .routing, or else we don't \
+                     know which domain to modify!",
                 ));
             }
         }

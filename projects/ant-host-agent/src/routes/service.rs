@@ -579,7 +579,6 @@ async fn register_service(
     Ok((StatusCode::OK, "Service registered."))
 }
 
-
 #[derive(Serialize, Deserialize)]
 pub struct GetServiceRequest {
     pub service_id: String,
@@ -622,9 +621,12 @@ pub fn routes() -> Routes<AntHostAgentState> {
         .post("/service", post(enable_service))
         .delete("/service", delete(disable_service))
         .post("/service-installation", post(install_service))
-        .post("/service-registration", post(register_service).layer(
-            DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
-        ))
+        .post(
+            "/service-registration",
+            post(register_service).layer(
+                DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
+            ),
+        )
 }
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use ant_library::host_architecture::HostArchitecture;
-use ant_zookeeper_db::HostGroup;
 use ant_library::routes::Routes;
+use ant_zookeeper_db::HostGroup;
 use axum::{
     extract::{Query, State},
     routing::{delete, get, post},

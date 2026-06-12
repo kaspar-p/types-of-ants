@@ -124,7 +124,10 @@ async fn put_blob_uses_sharded_path_on_disk() {
         .await;
 
     let expected = ant_archive_storage::blob_path(&fixture.root, key);
-    assert!(expected.exists(), "blob not at expected sharded path: {expected:?}");
+    assert!(
+        expected.exists(),
+        "blob not at expected sharded path: {expected:?}"
+    );
 
     // Verify two-level fan-out: blobs/<h[0..2]>/<h[2..4]>/<h>
     let components: Vec<_> = expected.components().collect();

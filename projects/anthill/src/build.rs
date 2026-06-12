@@ -471,12 +471,15 @@ async fn build_artifact<'a>(
         info!("... building deployment file: {deployment_file_name}");
 
         let deployment_file_path = registry_dir.join(deployment_file_name);
-        let deployment_file = NamedTempFile::new_in(&registry_dir)
-            .context("creating deployment file")?;
+        let deployment_file =
+            NamedTempFile::new_in(&registry_dir).context("creating deployment file")?;
 
         {
             let gz = flate2::write::GzEncoder::new(
-                deployment_file.as_file().try_clone().context("cloning deployment file")?,
+                deployment_file
+                    .as_file()
+                    .try_clone()
+                    .context("cloning deployment file")?,
                 flate2::Compression::default(),
             );
             let mut tar = tar::Builder::new(gz);

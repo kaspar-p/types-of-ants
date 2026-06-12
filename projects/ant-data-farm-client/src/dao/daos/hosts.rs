@@ -40,7 +40,8 @@ impl HostsDao {
             .await?
             .query(
                 "
-                        select host_id, host_label, host_location, host_hostname, host_type, host_os
+                        select host_id, host_label, host_location, host_hostname, host_type, \
+                 host_os
                         from host
                         where host_hostname = $1 or host_label = $1
                         limit 1",
@@ -59,14 +60,19 @@ impl DaoTrait<HostsDao, Host> for HostsDao {
     }
 
     async fn get_all(&self) -> Result<Vec<Host>> {
-        Ok(self.pool
-                
-                .get().await?
-                .query("select host_id, host_label, host_location, host_hostname, host_type, host_os from host;", &[])
-                .await?
-                .iter()
-                .map(|row| row_to_host(row))
-                .collect())
+        Ok(self
+            .pool
+            .get()
+            .await?
+            .query(
+                "select host_id, host_label, host_location, host_hostname, host_type, host_os \
+                 from host;",
+                &[],
+            )
+            .await?
+            .iter()
+            .map(|row| row_to_host(row))
+            .collect())
     }
 
     async fn get_one_by_id(&self, host_id: &HostId) -> Result<Option<Host>> {

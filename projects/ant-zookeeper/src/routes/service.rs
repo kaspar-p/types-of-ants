@@ -7,9 +7,9 @@ use std::{fs::File, io::Write};
 use ant_library::headers::{
     XAntArchitectureHeader, XAntProjectHeader, XAntRevisionHeader, XAntVersionHeader,
 };
+use ant_library::routes::Routes;
 use anthill_manifest::AnthillManifest;
 use axum::debug_handler;
-use ant_library::routes::Routes;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     response::IntoResponse,
@@ -101,12 +101,14 @@ pub fn docker_systemd_unit(
 ) -> String {
     let install_dir = install_dir.to_str().unwrap();
 
-    format!("[Unit]
+    format!(
+        "[Unit]
 Description={project_description}
 
 [Service]
 Type=simple
-ExecStart=/snap/bin/docker-compose --project-directory={install_dir} up --no-build --force-recreate {project}
+ExecStart=/snap/bin/docker-compose --project-directory={install_dir} up --no-build \
+         --force-recreate {project}
 ExecStop=/snap/bin/docker-compose --project-directory={install_dir} stop {project}
 EnvironmentFile={install_dir}/.env
 WorkingDirectory={install_dir}
@@ -114,7 +116,8 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-")
+"
+    )
 }
 
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
@@ -149,7 +152,8 @@ async fn register_artifact(
             Some(revision) => {
                 if revision.activated_at.is_some() {
                     return Err(AntZookeeperError::validation_msg(
-                        "Revision has already been activated and is immutable, so cannot be updated.",
+                        "Revision has already been activated and is immutable, so cannot be \
+                         updated.",
                     ));
                 }
             }
@@ -533,7 +537,10 @@ pub fn routes() -> Routes<AntZookeeperState> {
         .post("/revision", post(upsert_revision))
         .post("/service", post(register_service))
         .post("/env", post(put_project_environment))
-        .post("/artifact", post(register_artifact).layer(
-            DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
-        ))
+        .post(
+            "/artifact",
+            post(register_artifact).layer(
+                DefaultBodyLimit::max(1000 * 1000 * 1000), // 1GB
+            ),
+        )
 }

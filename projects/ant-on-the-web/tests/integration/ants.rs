@@ -1,4 +1,4 @@
-use crate::fixture::{TestFixture, FixtureOptions};
+use crate::fixture::{FixtureOptions, TestFixture};
 use ant_data_farm::{ants::AntId, releases::AntReleaseRequest};
 use ant_on_the_web::{
     ants::{

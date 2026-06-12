@@ -52,22 +52,7 @@ impl ServiceDiscovery {
     }
 
     pub async fn resolve(&self, service: &str) -> Option<ServiceEndpoint> {
-        let service_name = &service.to_string();
-
-        // Fast path: cache hit
-        {
-            let cache = self.cache.read().await;
-            if let Some(endpoints) = cache.get(service_name.as_str()) {
-                return endpoints.first().cloned();
-            }
-        }
-
-        // Slow path: first resolution — fetch, cache, start watcher
-        info!("first resolve: [{}], starting background task...", service);
-        self.ensure_refreshing(&service).await;
-
-        let cache = self.cache.read().await;
-        cache.get(service_name.as_str())?.first().cloned()
+        self.resolve_all(service).await.into_iter().next()
     }
 
     async fn fetch_endpoints(
@@ -94,7 +79,11 @@ impl ServiceDiscovery {
             )
             .await?;
         if nodes.index <= 0 {
-            error!("Hashicorp documentation insists that a returned index will always be greater than zero, got: {}", nodes.index);
+            error!(
+                "Hashicorp documentation insists that a returned index will always be greater \
+                 than zero, got: {}",
+                nodes.index
+            );
         }
 
         let endpoints: Vec<ServiceEndpoint> = nodes
@@ -191,19 +180,17 @@ impl ServiceDiscovery {
     }
 
     pub async fn resolve_all(&self, service: &str) -> Vec<ServiceEndpoint> {
-        let service_name = service.to_string();
-
         {
             let cache = self.cache.read().await;
-            if let Some(endpoints) = cache.get(&service_name) {
+            if let Some(endpoints) = cache.get(service) {
                 return endpoints.clone();
             }
         }
 
-        self.ensure_refreshing(service).await;
+        self.ensure_refreshing(&service).await;
 
         let cache = self.cache.read().await;
-        cache.get(&service_name).cloned().unwrap_or_default()
+        cache.get(service).cloned().unwrap_or_default()
     }
 
     pub async fn stop_refreshing(&self, service: &str) {

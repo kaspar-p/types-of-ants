@@ -240,7 +240,8 @@ pub async fn authenticate_or_weak_matching_method(
     // Allow the user in because they have weak auth and they are doing 2fa with a registered attempt
     if verifications.verified.contains(&attempt) {
         info!(
-            "Allow WEAK authentication user {}:{} with verifications {:?} because attempt {:?} matches",
+            "Allow WEAK authentication user {}:{} with verifications {:?} because attempt {:?} \
+             matches",
             user.user_id, user.username, verifications, attempt
         );
         return Ok(user);
