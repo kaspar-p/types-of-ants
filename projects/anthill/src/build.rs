@@ -10,6 +10,7 @@ use clap::ArgAction;
 use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
+use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{error, info};
 
@@ -166,8 +167,7 @@ async fn build_arch<'a>(
 ) -> Result<(), anyhow::Error> {
     info!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
 
-    let (deployment_file_path, version) =
-        build_artifact(&cmd, &arch).await.context("build failed")?;
+    let (deployment_file, version) = build_artifact(&cmd, &arch).await.context("build failed")?;
 
     info!("... registering artifact");
 
@@ -182,13 +182,14 @@ async fn build_arch<'a>(
                 &cmd.project,
                 &arch,
                 &version,
-                &deployment_file_path,
+                &deployment_file.path(),
             )
             .await
             .context("register artifact")?;
 
         info!("... artifact registered.");
     } else {
+        deployment_file.keep()?;
         info!("artifact available: {}", deployment_file_path.display());
     }
 
@@ -219,7 +220,7 @@ impl GitState {
 async fn build_artifact<'a>(
     cmd: &'a BuildCmd,
     arch: &'a HostArchitecture,
-) -> Result<(PathBuf, String), anyhow::Error> {
+) -> Result<(NamedTempFile, String), anyhow::Error> {
     let git = GitState::new()?;
 
     let version = format!("{}-{}-{}", git.head_number, git.head_datetime, git.head_sha);
@@ -455,7 +456,7 @@ async fn build_artifact<'a>(
     }
 
     // Create deployment file
-    let deployment_file_path = {
+    let deployment_file = {
         let registry_dir = git.root.join("build").join("registry");
         tokio::fs::create_dir_all(&registry_dir)
             .await
@@ -466,9 +467,9 @@ async fn build_artifact<'a>(
         info!("... building deployment file: {deployment_file_name}");
 
         let deployment_file_path = registry_dir.join(deployment_file_name);
-        let deployment_file = tokio::fs::File::create(&deployment_file_path)
+        let deployment_file = NamedTempFile::new_in(&registry_dir)
             .await
-            .context("creating deployment file")?;
+            .context("creating deployment file");
 
         let mut tar = tokio_tar::Builder::new(async_compression::tokio::write::GzipEncoder::new(
             deployment_file,
@@ -490,8 +491,8 @@ async fn build_artifact<'a>(
             )
         );
 
-        deployment_file_path
+        deployment_file
     };
 
-    Ok((deployment_file_path, version))
+    Ok((deployment_file, version))
 }
