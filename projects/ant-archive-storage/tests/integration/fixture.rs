@@ -40,10 +40,6 @@ pub async fn test_router_no_auth(name: &str) -> TestFixture {
         .join(name);
     create_dir_all(&root).unwrap();
 
-    ant_archive_storage::startup_init(&root)
-        .await
-        .expect("startup_init failed");
-
     let (metric_layer, handle) = build_metric_layer();
     let state = AntArchiveStorageState::new(root.clone(), handle);
     let api = make_routes(state.clone(), metric_layer).unwrap();

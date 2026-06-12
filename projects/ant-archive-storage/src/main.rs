@@ -11,9 +11,9 @@ async fn main() {
     let persist_dir = dotenv::var("PERSIST_DIR").expect("No PERSIST_DIR environment variable!");
     let root_dir = PathBuf::from(persist_dir);
 
-    ant_archive_storage::startup_init(&root_dir)
+    tokio::fs::create_dir_all(root_dir.join("blobs"))
         .await
-        .expect("startup init failed");
+        .expect("failed to create blobs directory");
 
     let port: u16 = dotenv::var("PORT")
         .expect("PORT environment variable not found")

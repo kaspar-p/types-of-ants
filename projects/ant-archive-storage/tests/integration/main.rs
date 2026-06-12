@@ -311,25 +311,6 @@ async fn get_blob_returns_404_after_delete() {
 
 #[tokio::test]
 #[traced_test]
-async fn startup_sweeps_tmp_directory() {
-    let (fixture, _auth) = test_router_auth(function_name!()).await;
-
-    // Drop a stale file into tmp to simulate a torn upload.
-    let stale = fixture.root.join("tmp").join("stale-upload-fragment");
-    std::fs::write(&stale, b"partial").unwrap();
-    assert!(stale.exists());
-
-    // Re-run startup_init — it should sweep tmp and recreate it empty.
-    ant_archive_storage::startup_init(&fixture.root)
-        .await
-        .expect("startup_init failed");
-
-    assert!(!stale.exists(), "stale tmp file should have been swept");
-    assert!(fixture.root.join("tmp").exists(), "tmp dir should be recreated");
-}
-
-#[tokio::test]
-#[traced_test]
 async fn metrics_returns_200_with_prometheus_content() {
     let (fixture, _auth) = test_router_auth(function_name!()).await;
     let metrics = TestClient::new(make_metrics_routes(fixture.state.clone())).await;

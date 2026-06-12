@@ -151,6 +151,7 @@ dependencies = [
  "ant-library",
  "ant-library-test",
  "anyhow",
+ "async-trait",
  "axum",
  "axum-extra 0.10.3",
  "axum-prometheus",
@@ -160,8 +161,11 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "metrics-exporter-prometheus",
+ "num_enum",
  "sha2 0.10.9",
  "stdext",
+ "subtle",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tower",
@@ -169,7 +173,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-test",
- "uuid 1.23.1",
 ]
 
 [[package]]
@@ -4277,6 +4280,28 @@ checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
  "libm",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d0bca838442ec211fa11de3a8b0e0e8f3a4522575b5c4c06ed722e005036f26"
+dependencies = [
+ "num_enum_derive",
+ "rustversion",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
+dependencies = [
+ "proc-macro-crate 3.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
