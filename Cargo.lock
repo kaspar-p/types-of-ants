@@ -145,6 +145,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "ant-archive"
+version = "1.0.0"
+dependencies = [
+ "aes-gcm",
+ "ant-archive-db",
+ "ant-archive-storage",
+ "ant-library",
+ "ant-library-test",
+ "anyhow",
+ "axum",
+ "axum-extra 0.10.3",
+ "base16ct",
+ "base64ct",
+ "bytes",
+ "dotenv",
+ "futures",
+ "hex",
+ "http 1.4.0",
+ "http-body-util",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "sha2 0.10.9",
+ "stdext",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-test",
+]
+
+[[package]]
+name = "ant-archive-db"
+version = "1.0.0"
+dependencies = [
+ "ant-library",
+ "anyhow",
+ "async-trait",
+ "base16ct",
+ "base64ct",
+ "rand 0.8.6",
+ "sha2 0.10.9",
+ "tracing",
+]
+
+[[package]]
 name = "ant-archive-storage"
 version = "1.0.0"
 dependencies = [

@@ -78,6 +78,29 @@ services:
       - ant_zookeeper_db_password
       - ant_db_monitoring_password
 
+  ant-archive-db:
+    image: ant-archive-db:{{VERSION}}
+    container_name: ant-archive-db
+    build:
+      context: ./projects/ant-archive-db
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "{{ANT_ARCHIVE_DB_PORT}}:5432"
+    environment:
+      VERSION: "{{VERSION}}"
+      POSTGRES_DB_FILE: /run/secrets/ant_archive_db_db
+      POSTGRES_USER_FILE: /run/secrets/ant_archive_db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/ant_archive_db_password
+      PGDATA: /var/lib/postgresql/data/
+    volumes:
+      - "{{PERSIST_DIR}}/ant-archive-db/:/var/lib/postgresql/data"
+    secrets:
+      - ant_archive_db_db
+      - ant_archive_db_user
+      - ant_archive_db_password
+      - ant_db_monitoring_password
+
   ant-gateway:
     image: ant-gateway:{{VERSION}}
     container_name: ant-gateway
@@ -194,6 +217,13 @@ secrets:
     file: "{{SECRETS_DIR}}/ant_data_farm_user.secret"
   ant_data_farm_password:
     file: "{{SECRETS_DIR}}/ant_data_farm_password.secret"
+
+  ant_archive_db_db:
+    file: "{{SECRETS_DIR}}/ant_archive_db_db.secret"
+  ant_archive_db_user:
+    file: "{{SECRETS_DIR}}/ant_archive_db_user.secret"
+  ant_archive_db_password:
+    file: "{{SECRETS_DIR}}/ant_archive_db_password.secret"
 
   tls_cert:
     file: "{{SECRETS_DIR}}/tls_cert.secret"

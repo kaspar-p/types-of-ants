@@ -6,6 +6,7 @@ exec ${BIN:-./consul} agent \
   -config-format=hcl \
   -config-file=./consul.hcl \
   -config-file="$TYPESOFANTS_SECRET_DIR/consul_gossip_encryption_key.secret" \
+  -config-dir=./conf.d \
   -data-dir="$PERSIST_DIR/consul-data" \
   -http-port="$ANT_MATCHMAKER_HTTP_PORT" \
   -serf-lan-port="$ANT_MATCHMAKER_GOSSIP_PORT" \

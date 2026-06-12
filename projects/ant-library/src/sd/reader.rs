@@ -9,13 +9,14 @@ use tracing::{debug, error, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
+    pub node: String,
     pub address: String,
     pub port: u16,
 }
 
 impl ToString for ServiceEndpoint {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.address, self.port)
+        format!("{} ({}:{})", self.node, self.address, self.port)
     }
 }
 
@@ -57,15 +58,7 @@ impl ServiceDiscovery {
         {
             let cache = self.cache.read().await;
             if let Some(endpoints) = cache.get(service_name.as_str()) {
-                let endpoint = endpoints.first().cloned();
-                info!(
-                    "resolved [{service}] hit cache: {}",
-                    match &endpoint {
-                        None => "none".to_string(),
-                        Some(e) => e.to_string(),
-                    }
-                );
-                return endpoint;
+                return endpoints.first().cloned();
             }
         }
 
@@ -100,7 +93,6 @@ impl ServiceDiscovery {
                 }),
             )
             .await?;
-        debug!("consul fetch nodes: {:?}", nodes);
         if nodes.index <= 0 {
             error!("Hashicorp documentation insists that a returned index will always be greater than zero, got: {}", nodes.index);
         }
@@ -115,7 +107,8 @@ impl ServiceDiscovery {
                     .unwrap_or(node.node.address);
 
                 ServiceEndpoint {
-                    address: address,
+                    node: node.node.node,
+                    address,
                     port: node.service.port,
                 }
             })
@@ -195,6 +188,22 @@ impl ServiceDiscovery {
             .write()
             .await
             .insert(service.to_string(), handle);
+    }
+
+    pub async fn resolve_all(&self, service: &str) -> Vec<ServiceEndpoint> {
+        let service_name = service.to_string();
+
+        {
+            let cache = self.cache.read().await;
+            if let Some(endpoints) = cache.get(&service_name) {
+                return endpoints.clone();
+            }
+        }
+
+        self.ensure_refreshing(service).await;
+
+        let cache = self.cache.read().await;
+        cache.get(&service_name).cloned().unwrap_or_default()
     }
 
     pub async fn stop_refreshing(&self, service: &str) {

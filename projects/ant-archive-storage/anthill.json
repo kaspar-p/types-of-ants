@@ -7,6 +7,6 @@
     "metrics": 3254
   },
   "secrets": [
-    "archive_storage_auth"
+    "ant_archive_storage_auth"
   ]
 }

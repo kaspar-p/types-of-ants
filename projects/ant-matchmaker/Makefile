@@ -17,7 +17,7 @@ ZIPFILE=$(ZIPDIR).zip
 
 all: release
 
-release: $(BUILD_OUTPUT_DIR)/consul $(BUILD_OUTPUT_DIR)/consul.hcl
+release: $(BUILD_OUTPUT_DIR)/consul $(BUILD_OUTPUT_DIR)/consul.hcl $(BUILD_OUTPUT_DIR)/conf.d
 	@echo "built" >> /dev/stderr
 
 clean:
@@ -41,5 +41,8 @@ $(BUILD_OUTPUT_DIR)/consul: | build/.packaging/$(ZIPDIR)/ $(BUILD_OUTPUT_DIR)
 
 $(BUILD_OUTPUT_DIR)/consul.hcl: consul.hcl | $(BUILD_OUTPUT_DIR)
 	@cp consul.hcl $(BUILD_OUTPUT_DIR)/consul.hcl
+
+$(BUILD_OUTPUT_DIR)/conf.d: conf.d | $(BUILD_OUTPUT_DIR)
+	@cp -r conf.d $(BUILD_OUTPUT_DIR)/conf.d
 
 .PHONY: all clean release

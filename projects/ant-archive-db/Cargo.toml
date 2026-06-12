@@ -1,0 +1,14 @@
+[package]
+name = "ant-archive-db"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+anyhow = "1.0.99"
+async-trait = "0.1"
+base64ct = { version = "1.8.0", features = ["alloc"] }
+base16ct = { version = "0.3.0", features = ["alloc"] }
+rand = "0.8"
+sha2 = "0.10.9"
+tracing = { version = "0.1.41", features = ["max_level_debug"] }

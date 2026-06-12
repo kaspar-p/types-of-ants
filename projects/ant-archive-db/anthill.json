@@ -1,0 +1,14 @@
+{
+  "project": "ant-archive-db",
+  "description": "the typesofants archive metadata and key database",
+  "build": "docker",
+  "ports": {
+    "primary": 3257
+  },
+  "secrets": [
+    "ant_archive_db_db",
+    "ant_archive_db_user",
+    "ant_archive_db_password",
+    "ant_db_monitoring_password"
+  ]
+}

@@ -1,3 +1,4 @@
+use ant_library::sd::writer::ServiceDiscoveryWriter;
 use anthill_manifest::AnthillManifest;
 use anyhow::Context;
 use clap_complete::engine::ArgValueCompleter;
@@ -43,15 +44,81 @@ pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
         project_dir.join("dev-fs").to_string_lossy().into_owned(),
     );
 
-    tokio::process::Command::new("bash")
+    let consul = maybe_register(&manifest, &env).await;
+
+    let mut child = tokio::process::Command::new("bash")
         .arg(&dev_sh)
         .args(&cmd.args)
         .envs(&env)
+        .current_dir(&project_dir)
         .spawn()
-        .context("failed to spawn dev.sh")?
-        .wait()
-        .await
-        .context("dev.sh failed")?;
+        .context("failed to spawn dev.sh")?;
+
+    tokio::select! {
+        _ = child.wait() => {}
+        _ = tokio::signal::ctrl_c() => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+        }
+    }
+
+    if let Some(sd) = consul {
+        if let Err(e) = sd.deregister_local_service(&manifest.project).await {
+            tracing::warn!("Failed to deregister {} from Consul: {e}", manifest.project);
+        }
+    }
 
     Ok(())
+}
+
+/// Registers the service with the local Consul instance if both a matchmaker port and primary
+/// port are configured. Returns the writer so the caller can deregister on exit.
+///
+/// Fails gracefully: if Consul is not reachable, prints a clear message and returns None so
+/// the service still starts unregistered.
+async fn maybe_register(
+    manifest: &AnthillManifest,
+    env: &std::collections::HashMap<String, String>,
+) -> Option<ServiceDiscoveryWriter> {
+    if manifest.project == "ant-matchmaker" {
+        eprintln!("skipping Consul registration for ant-matchmaker (that's the Consul instance)");
+        return None;
+    }
+
+    let matchmaker_port: u16 = env
+        .get("ANT_MATCHMAKER_HTTP_PORT")
+        .and_then(|p| p.parse().ok())?;
+
+    let primary_port: u16 = manifest.ports.as_ref()?.primary?;
+
+    let sd = ServiceDiscoveryWriter::new(matchmaker_port);
+
+    if !sd.healthy().await {
+        eprintln!(
+            "warning: could not reach local ant-matchmaker on port {matchmaker_port} — \
+             {} will start but won't be discoverable by other local services.\n\
+             Run `ah dev ant-matchmaker` in another terminal first.",
+            manifest.project
+        );
+        return None;
+    }
+
+    if let Err(e) = sd
+        .register_local_service(&manifest.project, primary_port)
+        .await
+    {
+        eprintln!(
+            "warning: failed to register {} with Consul: {e}",
+            manifest.project
+        );
+        return None;
+    }
+
+    tracing::debug!(
+        "registered {}:{} with local Consul",
+        manifest.project,
+        primary_port
+    );
+
+    Some(sd)
 }

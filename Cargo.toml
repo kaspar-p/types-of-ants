@@ -18,4 +18,6 @@ members = [
   "projects/anthill-manifest-build",
   "projects/anthill-manifest", "projects/ant-printing-press",
   "projects/ant-archive-storage",
+  "projects/ant-archive-db",
+  "projects/ant-archive",
 ]

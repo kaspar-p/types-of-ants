@@ -229,9 +229,7 @@ async fn enable_service(
             .sd
             .register_local_service(
                 &req.service_id,
-                manifest.ports.as_ref().and_then(|p| p.primary)
-                    .or_else(|| manifest.deployment.as_ref().and_then(|d| d.port))
-                    .unwrap_or(0),
+                manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0),
             )
             .await
             .context("register service to ant-matchmaker service")?;

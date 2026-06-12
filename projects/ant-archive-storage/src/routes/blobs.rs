@@ -40,7 +40,7 @@ pub fn blob_path(root: &FsPath, storage_key: &str) -> PathBuf {
 }
 
 fn authenticate(auth: &Authorization<Basic>) -> Result<(), AntArchiveStorageError> {
-    let tokens = ant_library::secret::load_secret("archive_storage_auth")
+    let tokens = ant_library::secret::load_secret("ant_archive_storage_auth")
         .context("Failed to read auth secret")?;
 
     let attempt_hash = Sha256::digest(auth.0.password().as_bytes());

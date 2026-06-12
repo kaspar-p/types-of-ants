@@ -108,9 +108,7 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
             Ok(s) if s == SLICE_NAME => {
                 let service_id = unit_name.strip_suffix(".service").unwrap();
                 info!("Found typesofants service: {service_id}");
-                let port = manifest.ports.as_ref().and_then(|p| p.primary)
-                    .or_else(|| manifest.deployment.as_ref().and_then(|d| d.port))
-                    .unwrap_or(0);
+                let port = manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0);
                 if let Err(e) = state.sd.register_local_service(service_id, port).await {
                     warn!("Failed to register {service_id} with Consul on startup: {e}");
                 }

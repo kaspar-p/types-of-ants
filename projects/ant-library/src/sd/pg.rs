@@ -36,6 +36,7 @@ impl ServiceRef {
     async fn resolve(&self) -> Option<ServiceEndpoint> {
         match self {
             ServiceRef::Static { host, port } => Some(ServiceEndpoint {
+                node: host.clone(),
                 address: host.clone(),
                 port: *port,
             }),

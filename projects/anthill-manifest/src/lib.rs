@@ -198,14 +198,6 @@ impl FromStr for AnthillArchetype {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DeploymentOptions {
-    /// The main port meant for this project, for service discovery.
-    #[deprecated(note = "Prefer .ports.primary")]
-    pub port: Option<u16>,
-
-    /// A different port for discovering metrics, e.g. for webservers that don't want to expose their metrics to the world.
-    #[deprecated(note = "Prefer .ports.metrics")]
-    pub metrics_port: Option<u16>,
-
     #[deprecated(
         note = "All projects now support unversioned deployments via the 'current' symlink"
     )]
@@ -242,11 +234,7 @@ impl AnthillManifest {
         let mut vars = HashMap::new();
         let upcase = project.to_uppercase().replace('-', "_");
 
-        let primary = self
-            .ports
-            .as_ref()
-            .and_then(|p| p.primary)
-            .or_else(|| self.deployment.as_ref().and_then(|d| d.port));
+        let primary = self.ports.as_ref().and_then(|p| p.primary);
         if let Some(port) = primary {
             vars.insert("PORT".to_string(), port.to_string());
             vars.insert("PRIMARY_PORT".to_string(), port.to_string());
@@ -258,8 +246,7 @@ impl AnthillManifest {
             .ports
             .as_ref()
             .and_then(|p| p.metrics.as_ref())
-            .map(|m| m.port())
-            .or_else(|| self.deployment.as_ref().and_then(|d| d.metrics_port));
+            .map(|m| m.port());
         if let Some(port) = metrics {
             vars.insert("METRICS_PORT".to_string(), port.to_string());
             vars.insert(format!("{upcase}_METRICS_PORT"), port.to_string());

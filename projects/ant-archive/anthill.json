@@ -1,0 +1,16 @@
+{
+  "project": "ant-archive",
+  "description": "the typesofants archive router — encryption, placement, and blob serving",
+  "build": "makefile",
+  "ports": {
+    "primary": 3255,
+    "metrics": 3256
+  },
+  "secrets": [
+    "ant_archive_kek",
+    "ant_archive_db_db",
+    "ant_archive_db_user",
+    "ant_archive_db_password",
+    "ant_archive_storage_client_password"
+  ]
+}

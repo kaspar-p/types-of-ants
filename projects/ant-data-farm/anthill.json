@@ -3,8 +3,8 @@
   "description": "the typesofants database",
   "build": "docker",
   "archetype": "postgres",
-  "deployment": {
-    "port": 7000
+  "ports": {
+    "primary": 7000
   },
   "secrets": [
     "ant_data_farm_db",
