@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -euo pipefail
+
+exec cargo run -p anthill -- "$@"

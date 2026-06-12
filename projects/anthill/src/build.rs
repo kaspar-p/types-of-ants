@@ -7,12 +7,15 @@ use anyhow::Context;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};
 use clap::ArgAction;
+use clap_complete::engine::ArgValueCompleter;
 use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{error, info};
+
+use crate::complete::complete_projects;
 
 pub fn find_up(filename: &str) -> std::path::PathBuf {
     let mut dir = std::env::current_dir().unwrap();
@@ -32,6 +35,7 @@ pub fn find_up(filename: &str) -> std::path::PathBuf {
 
 #[derive(Clone, clap::Args)]
 pub struct BuildCmd {
+    #[arg(add = ArgValueCompleter::new(complete_projects))]
     project: String,
 
     #[arg(short, long, value_parser = HostArchitecture::from_str)]

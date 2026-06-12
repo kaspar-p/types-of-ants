@@ -1,11 +1,17 @@
 use anthill_manifest::AnthillManifest;
 use anyhow::Context;
+use clap_complete::engine::ArgValueCompleter;
 
 use crate::build::GitState;
+use crate::complete::complete_projects;
 
 #[derive(clap::Args)]
 pub struct DevCmd {
+    #[arg(add = ArgValueCompleter::new(complete_projects))]
     project: String,
+
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    args: Vec<String>,
 }
 
 pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
@@ -39,6 +45,7 @@ pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
 
     tokio::process::Command::new("bash")
         .arg(&dev_sh)
+        .args(&cmd.args)
         .envs(&env)
         .spawn()
         .context("failed to spawn dev.sh")?

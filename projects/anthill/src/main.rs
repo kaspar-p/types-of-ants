@@ -1,7 +1,8 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 mod build;
+mod complete;
 mod dev;
 
 #[derive(clap::Parser)]
@@ -19,6 +20,8 @@ enum Commands {
 
 #[tokio::main(flavor = "local")]
 async fn main() -> Result<()> {
+    clap_complete::CompleteEnv::with_factory(Cli::command).bin("ah").complete();
+
     ant_library::set_global_logs("anthill");
 
     let cli = Cli::parse();

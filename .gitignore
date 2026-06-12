@@ -28,6 +28,7 @@ images/*
 
 # secrets
 *.env*
+!.envrc
 *.secret
 *.pem
 *.key
