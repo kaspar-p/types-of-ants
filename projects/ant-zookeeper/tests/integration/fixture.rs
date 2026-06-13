@@ -172,14 +172,9 @@ impl Fixture {
 
         let ant_host_agent_state = AntHostAgentState {
             sd: Arc::new(ServiceDiscoveryWriter::new(consul.port())),
-            services: Arc::new(Mutex::new(HashMap::new())),
-            secrets_root_dir: root_dir.join("hostagent-secrets"),
             archive_root_dir: root_dir.join("hostagent-archive"),
             install_root_dir: root_dir.join("hostagent-install"),
         };
-        create_dir_all(&ant_host_agent_state.secrets_root_dir)
-            .await
-            .unwrap();
         create_dir_all(&ant_host_agent_state.archive_root_dir)
             .await
             .unwrap();

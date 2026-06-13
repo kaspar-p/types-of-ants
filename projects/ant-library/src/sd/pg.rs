@@ -166,7 +166,6 @@ impl ManageConnection for PostgresManager {
     }
 
     async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
-        debug!("Checking connection validity.");
         if conn.conn.is_closed() {
             return Err(PoolError::ConnectionClosed);
         }

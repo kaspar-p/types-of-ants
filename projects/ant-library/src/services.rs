@@ -28,7 +28,7 @@ pub struct HostConfig {
 }
 
 impl HostConfig {
-    pub fn ineligible(&self) -> bool {
+    pub fn ineligible_for_deployments(&self) -> bool {
         self.inactive.unwrap_or(false) || !self.auto_deployable
     }
 }
@@ -131,7 +131,7 @@ impl Services {
         let mut service_ids = HashSet::<&str>::new();
 
         for (_, host) in &self.hosts {
-            if host.ineligible() {
+            if host.ineligible_for_deployments() {
                 continue;
             }
 
@@ -150,7 +150,7 @@ impl Services {
         let mut hosts = HashSet::<(&'a str, &'a ServiceInstance)>::new();
 
         for (host_id, host) in &self.hosts {
-            if host.ineligible() {
+            if host.ineligible_for_deployments() {
                 continue;
             }
 
@@ -170,7 +170,7 @@ impl Services {
         host_id: &str,
     ) -> Option<&'a ServiceInstance> {
         for (host, host_config) in &self.hosts {
-            if host != host_id || host_config.ineligible() {
+            if host != host_id || host_config.ineligible_for_deployments() {
                 continue;
             }
 
@@ -191,7 +191,7 @@ impl Services {
         let mut hosts = HashSet::<(&'a str, &'a ServiceInstance)>::new();
 
         for (host_id, host) in &self.hosts {
-            if host.ineligible() {
+            if host.ineligible_for_deployments() {
                 continue;
             }
 

@@ -8,6 +8,7 @@ use bollard::body_full;
 use chrono::{Datelike, Timelike};
 use clap::ArgAction;
 use clap_complete::engine::ArgValueCompleter;
+use flate2::{write::GzEncoder, Compression};
 use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
@@ -74,18 +75,12 @@ pub async fn build(cmd: BuildCmd) {
         None
     };
 
-    let arches: HashSet<HostArchitecture> = cmd
-        .clone()
-        .arch
-        .map(|a| HashSet::from([a]))
-        .unwrap_or_else(|| {
-            services
-                .hosts
-                .iter()
-                .map(|(id, _)| id)
-                .map(|id| services.hosts.get(id).unwrap().architecture.clone())
-                .collect()
-        });
+    let arches: HashSet<HostArchitecture> = services
+        .hosts
+        .iter()
+        .filter(|(_, host)| !host.ineligible_for_deployments())
+        .map(|(_, host)| host.architecture.clone())
+        .collect();
 
     let git = GitState::new().unwrap();
     let project_src = git.root.join("projects").join(&cmd.project);
@@ -471,18 +466,12 @@ async fn build_artifact<'a>(
         info!("... building deployment file: {deployment_file_name}");
 
         let deployment_file_path = registry_dir.join(deployment_file_name);
-        let deployment_file =
+        let mut deployment_file =
             NamedTempFile::new_in(&registry_dir).context("creating deployment file")?;
 
         {
-            let gz = flate2::write::GzEncoder::new(
-                deployment_file
-                    .as_file()
-                    .try_clone()
-                    .context("cloning deployment file")?,
-                flate2::Compression::default(),
-            );
-            let mut tar = tar::Builder::new(gz);
+            let mut tar =
+                tar::Builder::new(GzEncoder::new(&mut deployment_file, Compression::best()));
             tar.append_dir_all(".", tmp_packaging_dir.path())
                 .context("appending packaging to tar")?;
             tar.finish().context("building tar")?;
