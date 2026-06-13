@@ -27,6 +27,8 @@ where
             .await
             .map_err(|e| AntArchiveError::Unauthorized(Some(e.into())))?;
 
+        println!("req auth: {}", auth.token());
+
         let state = AntArchiveState::from_ref(state);
         let client_id = state
             .db
@@ -63,12 +65,16 @@ where
             return Ok(None);
         };
 
+        println!("opt auth: {}", auth.token());
+
         let state = AntArchiveState::from_ref(state);
         let maybe_client_id = state
             .db
             .authenticate_bearer(auth.token())
             .await
             .map_err(AntArchiveError::from)?;
+
+        println!("opt auth: {:?}", maybe_client_id);
 
         Ok(maybe_client_id.map(|client_id| BearerClaims { client_id }))
     }

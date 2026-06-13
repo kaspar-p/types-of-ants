@@ -1,5 +1,5 @@
 pub use super::lib::Id as UserId;
-use crate::users::verify_password_hash;
+use ant_library::crypto::verify_password_hash;
 use ant_library::db::ConnectionPool;
 use chrono::Duration;
 use std::sync::Arc;

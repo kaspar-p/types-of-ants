@@ -6,7 +6,7 @@ repository_root="$(git rev-parse --show-toplevel)"
 
 export SECRETS_DIR="$repository_root/secrets/dev"
 export VERSION="dev"
-export PERSIST_DIR="$repository_root/projects/ant-archive-db"
+export PERSIST_DIR="$repository_root/projects/ant-archive-db/database-files"
 
 mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/ant-archive-db.compose.yaml"
 

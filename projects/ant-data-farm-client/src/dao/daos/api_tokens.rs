@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use crate::users::{make_password_hash, verify_password_hash, UserId};
+use crate::users::UserId;
+use ant_library::crypto::{make_password_hash, verify_password_hash};
 use ant_library::db::ConnectionPool;
 use tracing::{info, warn};
 

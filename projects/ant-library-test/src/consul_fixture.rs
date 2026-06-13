@@ -94,18 +94,18 @@ impl ConsulFixture {
             }
         });
 
+        const MAX_ATTEMPTS: i32 = 250;
+
         let mut attempts = 0;
         let mut ready = false;
-        while !ready && attempts < 100 {
-            info!("Waiting for Consul to come up...");
+        while !ready && attempts < MAX_ATTEMPTS {
             ready = Self::check_health(http_port).await;
-
             attempts += 1;
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        if attempts >= 100 {
-            panic!("Timed out waiting for consul's healthcheck.")
+        if attempts >= MAX_ATTEMPTS {
+            panic!("Timed out waiting for consul's healthcheck after {MAX_ATTEMPTS} attempts.")
         }
 
         info!("Consul started...");

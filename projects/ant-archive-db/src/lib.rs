@@ -6,8 +6,6 @@ use ant_library::db::{
 };
 use ant_library::sd::reader::ServiceDiscovery;
 use async_trait::async_trait;
-use base64ct::{Base64, Encoding};
-use sha2::{Digest, Sha256};
 use tracing::debug;
 
 #[derive(Clone)]
@@ -21,8 +19,8 @@ pub struct ArchiveBucket {
     pub read_policy: String,
 }
 
-pub struct ArchiveBlob {
-    pub blob_id: String,
+pub struct ArchiveObject {
+    pub object_id: String,
     pub kek_id: String,
     pub size_bytes: i64,
     pub encrypted_dek: Vec<u8>,
@@ -63,8 +61,7 @@ impl AntArchiveDb {
     }
 
     pub async fn authenticate_bearer(&self, token: &str) -> Result<Option<String>, anyhow::Error> {
-        let hash = Sha256::digest(token.as_bytes());
-        let hash_b64 = Base64::encode_string(&hash);
+        let hash = ant_library::crypto::make_token_hash(token);
 
         let row = self
             .pool
@@ -72,7 +69,7 @@ impl AntArchiveDb {
             .await?
             .query_opt(
                 "SELECT client_id FROM archive_client WHERE token_hash = $1",
-                &[&hash_b64],
+                &[&hash],
             )
             .await?;
 
@@ -132,25 +129,30 @@ impl AntArchiveDb {
         Ok(row.map(|r| r.get("kek_id")))
     }
 
-    pub async fn get_blob(
+    pub async fn get_object(
         &self,
         bucket_id: &str,
         key: &str,
-    ) -> Result<Option<ArchiveBlob>, anyhow::Error> {
+    ) -> Result<Option<ArchiveObject>, anyhow::Error> {
         let row = self
             .pool
             .get()
             .await?
             .query_opt(
-                "SELECT blob_id, kek_id, size_bytes, encrypted_dek, dek_nonce
-                 FROM archive_blob
-                 WHERE bucket_id = $1 AND key = $2 AND deleted_at IS NULL",
+                "
+                select object_id, kek_id, size_bytes, encrypted_dek, dek_nonce
+                from archive_object
+                where
+                    bucket_id = $1 and
+                    key = $2 and
+                    deleted_at is null
+                ",
                 &[&bucket_id, &key],
             )
             .await?;
 
-        Ok(row.map(|r| ArchiveBlob {
-            blob_id: r.get("blob_id"),
+        Ok(row.map(|r| ArchiveObject {
+            object_id: r.get("object_id"),
             kek_id: r.get("kek_id"),
             size_bytes: r.get("size_bytes"),
             encrypted_dek: r.get("encrypted_dek"),
@@ -160,7 +162,7 @@ impl AntArchiveDb {
 
     pub async fn get_placements(
         &self,
-        blob_id: &str,
+        object_id: &str,
     ) -> Result<Vec<ArchivePlacement>, anyhow::Error> {
         let rows = self
             .pool
@@ -168,9 +170,9 @@ impl AntArchiveDb {
             .await?
             .query(
                 "SELECT storage_node_id, storage_key
-                 FROM archive_blob_placement
-                 WHERE blob_id = $1",
-                &[&blob_id],
+                 FROM archive_object_placement
+                 WHERE object_id = $1",
+                &[&object_id],
             )
             .await?;
 
@@ -183,7 +185,7 @@ impl AntArchiveDb {
             .collect())
     }
 
-    pub async fn upsert_blob(
+    pub async fn upsert_object(
         &self,
         bucket_id: &str,
         kek_id: &str,
@@ -192,26 +194,27 @@ impl AntArchiveDb {
         encrypted_dek: &[u8],
         dek_nonce: &[u8],
     ) -> Result<String, anyhow::Error> {
-        let candidate_id = generate_id("blob");
-
-        let row = self
+        let object_id = self
             .pool
             .get()
             .await?
             .query_one(
-                "INSERT INTO archive_blob
-                   (blob_id, bucket_id, kek_id, key, size_bytes, encrypted_dek, dek_nonce)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 ON CONFLICT (bucket_id, key) DO UPDATE SET
-                   kek_id = EXCLUDED.kek_id,
-                   size_bytes = EXCLUDED.size_bytes,
-                   encrypted_dek = EXCLUDED.encrypted_dek,
-                   dek_nonce = EXCLUDED.dek_nonce,
-                   updated_at = NOW(),
-                   deleted_at = NULL
-                 RETURNING blob_id",
+                "
+                insert into archive_object
+                   (bucket_id, kek_id, key, size_bytes, encrypted_dek, dek_nonce)
+                values
+                    ($1, $2, $3, $4, $5, $6)
+                on conflict (bucket_id, key)
+                do update set
+                    kek_id = EXCLUDED.kek_id,
+                    size_bytes = EXCLUDED.size_bytes,
+                    encrypted_dek = EXCLUDED.encrypted_dek,
+                    dek_nonce = EXCLUDED.dek_nonce,
+                    updated_at = NOW(),
+                    deleted_at = NULL
+                returning object_id
+                ",
                 &[
-                    &candidate_id,
                     &bucket_id,
                     &kek_id,
                     &key,
@@ -220,37 +223,34 @@ impl AntArchiveDb {
                     &dek_nonce,
                 ],
             )
-            .await?;
+            .await?
+            .get("object_id");
 
-        Ok(row.get("blob_id"))
+        Ok(object_id)
     }
 
     pub async fn upsert_placement(
         &self,
-        blob_id: &str,
+        object_id: &str,
         storage_node_id: &str,
         storage_key: &str,
         checksum: &str,
     ) -> Result<(), anyhow::Error> {
-        let placement_id = generate_id("pl");
-
         self.pool
             .get()
             .await?
             .execute(
-                "INSERT INTO archive_blob_placement
-                   (placement_id, blob_id, storage_node_id, idx, role, storage_key, checksum)
-                 VALUES ($1, $2, $3, 0, 'replica', $4, $5)
-                 ON CONFLICT (blob_id, idx) DO UPDATE SET
-                   storage_key = EXCLUDED.storage_key,
-                   checksum = EXCLUDED.checksum",
-                &[
-                    &placement_id,
-                    &blob_id,
-                    &storage_node_id,
-                    &storage_key,
-                    &checksum,
-                ],
+                "
+                insert into archive_object_placement
+                   (object_id, storage_node_id, idx, role, storage_key, object_checksum)
+                values
+                    ($1, $2, 0, 'replica', $3, $4)
+                on conflict (object_id, idx)
+                do update set
+                    storage_key = EXCLUDED.storage_key,
+                    object_checksum = EXCLUDED.object_checksum
+                ",
+                &[&object_id, &storage_node_id, &storage_key, &checksum],
             )
             .await?;
 
@@ -262,7 +262,12 @@ impl AntArchiveDb {
             .get()
             .await?
             .execute(
-                "INSERT INTO archive_kek_version (kek_id, is_active) VALUES ($1, true)",
+                "
+                insert into archive_kek_version
+                    (kek_id, is_active)
+                values
+                    ($1, true)
+                ",
                 &[&kek_id],
             )
             .await?;
@@ -286,22 +291,27 @@ impl AntArchiveDb {
         Ok(())
     }
 
-    pub async fn create_client(
-        &self,
-        client_id: &str,
-        name: &str,
-        token_hash: &str,
-    ) -> Result<(), anyhow::Error> {
-        self.pool
+    pub async fn create_client(&self, name: &str, token: &str) -> Result<String, anyhow::Error> {
+        let token_hash = ant_library::crypto::make_token_hash(token);
+
+        let client_id = self
+            .pool
             .get()
             .await?
-            .execute(
-                "INSERT INTO archive_client (client_id, client_name, token_hash)
-                 VALUES ($1, $2, $3)",
-                &[&client_id, &name, &token_hash],
+            .query_one(
+                "
+                insert into archive_client
+                    (client_name, token_hash)
+                values
+                    ($1, $2)
+                returning client_id
+                ",
+                &[&name, &token_hash],
             )
-            .await?;
-        Ok(())
+            .await?
+            .get("client_id");
+
+        Ok(client_id)
     }
 
     pub async fn create_bucket(
@@ -323,7 +333,7 @@ impl AntArchiveDb {
         Ok(())
     }
 
-    pub async fn soft_delete_blob(
+    pub async fn soft_delete_object(
         &self,
         bucket_id: &str,
         key: &str,
@@ -333,7 +343,7 @@ impl AntArchiveDb {
             .get()
             .await?
             .execute(
-                "UPDATE archive_blob SET deleted_at = NOW()
+                "UPDATE archive_object SET deleted_at = NOW()
                  WHERE bucket_id = $1 AND key = $2 AND deleted_at IS NULL",
                 &[&bucket_id, &key],
             )
@@ -341,11 +351,4 @@ impl AntArchiveDb {
 
         Ok(count > 0)
     }
-}
-
-pub fn generate_id(prefix: &str) -> String {
-    use rand::RngCore;
-    let mut bytes = [0u8; 8];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    format!("{}-{}", prefix, base16ct::lower::encode_string(&bytes))
 }

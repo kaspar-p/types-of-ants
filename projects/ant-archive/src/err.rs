@@ -6,7 +6,8 @@ use tracing::error;
 pub enum AntArchiveError {
     InternalServerError(Option<anyhow::Error>),
     Unauthorized(Option<anyhow::Error>),
-    NotFound(String),
+    BucketNotFound(String),
+    ObjectNotFound(String),
     BadRequest(String),
 }
 
@@ -23,8 +24,11 @@ impl IntoResponse for AntArchiveError {
                 }
                 (StatusCode::UNAUTHORIZED, "Unauthorized.").into_response()
             }
-            AntArchiveError::NotFound(key) => {
-                (StatusCode::NOT_FOUND, format!("{key} not found")).into_response()
+            AntArchiveError::BucketNotFound(bucket) => {
+                (StatusCode::NOT_FOUND, format!("bucket {bucket} not found")).into_response()
+            }
+            AntArchiveError::ObjectNotFound(key) => {
+                (StatusCode::NOT_FOUND, format!("object {key} not found")).into_response()
             }
             AntArchiveError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
         }

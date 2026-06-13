@@ -5,10 +5,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.98"
+argon2 = "0.5.3"
 async-trait = "0.1.89"
 axum = { version = "0.8.4", features = ["tracing", "json"] }
 axum-extra = { version = "0.10.1", features = ["typed-header", "typed-routing"] }
 axum-macros = "0.5.0"
+base64ct = "1.8.3"
 bb8 = "0.9.1"
 bb8-postgres = "0.9.0"
 bytes = "1.10.1"
@@ -30,6 +32,7 @@ schemars = "1.2.1"
 serde = "1.0.219"
 serde_json = "1.0.140"
 serde_with = "3.18.0"
+sha2 = "0.11.0"
 strum = { version = "0.28.0", features = ["derive"] }
 thiserror = "2.0.18"
 tokio = "1.45.0"

@@ -1,10 +1,6 @@
 pub use super::lib::Id as UserId;
 use crate::dao::dao_trait::DaoTrait;
 use ant_library::db::ConnectionPool;
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
-};
 use chrono::{DateTime, Utc};
 use futures::future;
 use serde::{Deserialize, Serialize};
@@ -157,61 +153,6 @@ impl DaoTrait<UsersDao, User> for UsersDao {
     }
 }
 
-pub fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-
-    // Step 1: Hash the password using the salt
-    info!("Hashing password");
-    let phc: String = match argon2.hash_password(password.as_bytes(), &salt) {
-        Ok(phc) => {
-            info!("Password hashed successfully");
-            phc.to_string()
-        }
-        Err(e) => {
-            debug!("Hashing password failed: {}", e);
-            return Err(anyhow::Error::msg(e.to_string()));
-        }
-    };
-
-    // Step 2: Sanity check verify works
-    info!("Running sanity password check");
-    if !verify_password_hash(password, phc.as_str())? {
-        debug!("password self-verification failed");
-        return Err(anyhow::Error::msg("sanity test self-verification failed!"));
-    }
-
-    return Ok(phc);
-}
-
-pub fn verify_password_hash(
-    password_attempt: &str,
-    db_password: &str,
-) -> Result<bool, anyhow::Error> {
-    // Step: Verify attempt with stored PHC string
-    let argon2 = Argon2::default();
-
-    debug!("Parsing stored password as PHC formatted string...");
-    let phc = match PasswordHash::new(db_password) {
-        Ok(phc) => phc,
-        Err(e) => {
-            debug!("Stored password was not PHC formatted string: {}", e);
-            return Err(anyhow::Error::msg(e.to_string()));
-        }
-    };
-
-    debug!("Verifying hash...");
-    match argon2.verify_password(password_attempt.as_bytes(), &phc) {
-        Err(e) => {
-            debug!("hash verification failed: {}", e);
-            return Ok(false);
-        }
-        Ok(()) => {
-            return Ok(true);
-        }
-    }
-}
-
 impl UsersDao {
     /// Create a user in the database, the user_name, phone_number, or email should not already be taken
     /// or else the transaction will fail.
@@ -226,7 +167,7 @@ impl UsersDao {
         let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
-        let password_hash = make_password_hash(&password)?;
+        let password_hash = ant_library::crypto::make_password_hash(&password)?;
 
         let role_id: Uuid = t
             .query(
@@ -302,7 +243,7 @@ impl UsersDao {
         new_password: &str,
     ) -> Result<(), anyhow::Error> {
         let con = self.pool.get().await?;
-        let password_hash = make_password_hash(&new_password)?;
+        let password_hash = ant_library::crypto::make_password_hash(&new_password)?;
 
         con.query_one(
             "
@@ -447,18 +388,5 @@ impl UsersDao {
             .find(|user| user.username == username);
 
         Ok(user)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::users::make_password_hash;
-
-    #[test]
-    fn password_hashing_works() {
-        let hash = make_password_hash("super-secret-ant-password").unwrap();
-        println!("{}", hash);
-
-        assert!(hash.contains("argon2"))
     }
 }

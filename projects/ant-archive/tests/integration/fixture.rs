@@ -16,13 +16,10 @@ use ant_library::{
 use ant_library_test::{
     axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
-use base64ct::{Base64, Encoding};
-use sha2::{Digest, Sha256};
 use tokio::{net::TcpListener, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
 const TEST_KEK_ID: &str = "kek-test";
-const TEST_CLIENT_ID: &str = "client-test";
 pub const TEST_BUCKET_ID: &str = "b-testbucket";
 pub const TEST_PUBLIC_BUCKET_ID: &str = "b-testpublic";
 pub const TEST_INTERNAL_BUCKET_ID: &str = "b-testinternal";
@@ -128,23 +125,23 @@ impl Fixture {
 }
 
 async fn seed_db(db: &AntArchiveDb) {
-    let token_hash = Base64::encode_string(&Sha256::digest(TEST_BEARER_TOKEN.as_bytes()));
-
     db.register_kek(TEST_KEK_ID).await.unwrap();
+
     // host_id matches the Consul node name so resolve_storage_nodes can find it.
     db.register_storage_node("sn-test", CONSUL_NODE_NAME)
         .await
         .unwrap();
-    db.create_client(TEST_CLIENT_ID, "test-client", &token_hash)
+    let client_id = db
+        .create_client("test-client", &TEST_BEARER_TOKEN)
         .await
         .unwrap();
-    db.create_bucket(TEST_BUCKET_ID, TEST_CLIENT_ID, true, "private")
+    db.create_bucket(TEST_BUCKET_ID, &client_id, true, "private")
         .await
         .unwrap();
-    db.create_bucket(TEST_PUBLIC_BUCKET_ID, TEST_CLIENT_ID, false, "public")
+    db.create_bucket(TEST_PUBLIC_BUCKET_ID, &client_id, false, "public")
         .await
         .unwrap();
-    db.create_bucket(TEST_INTERNAL_BUCKET_ID, TEST_CLIENT_ID, false, "internal")
+    db.create_bucket(TEST_INTERNAL_BUCKET_ID, &client_id, false, "internal")
         .await
         .unwrap();
 }

@@ -51,21 +51,25 @@ fn load_kek() -> Result<[u8; 32], AntArchiveError> {
     })
 }
 
-fn encrypt_blob(
+fn encrypt_object(
     kek: &[u8; 32],
     plaintext: &[u8],
 ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), AntArchiveError> {
     let mut dek = [0u8; 32];
     OsRng.fill_bytes(&mut dek);
 
-    let blob_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let object_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let dek_key = Key::<Aes256Gcm>::from_slice(&dek);
-    let blob_cipher = Aes256Gcm::new(dek_key);
-    let ciphertext = blob_cipher.encrypt(&blob_nonce, plaintext).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("blob encryption failed: {e}")))
-    })?;
+    let object_cipher = Aes256Gcm::new(dek_key);
+    let ciphertext = object_cipher
+        .encrypt(&object_nonce, plaintext)
+        .map_err(|e| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "object encryption failed: {e}"
+            )))
+        })?;
 
-    let mut stored_bytes = blob_nonce.to_vec();
+    let mut stored_bytes = object_nonce.to_vec();
     stored_bytes.extend_from_slice(&ciphertext);
 
     let dek_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -78,7 +82,7 @@ fn encrypt_blob(
     Ok((encrypted_dek, dek_nonce.to_vec(), stored_bytes))
 }
 
-fn decrypt_blob(
+fn decrypt_object(
     kek: &[u8; 32],
     encrypted_dek: &[u8],
     dek_nonce_bytes: &[u8],
@@ -97,7 +101,7 @@ fn decrypt_blob(
             stored_bytes.len()
         ))));
     }
-    let (blob_nonce_bytes, ciphertext) = stored_bytes.split_at(12);
+    let (object_nonce_bytes, ciphertext) = stored_bytes.split_at(12);
 
     let dek_len = dek.len();
     let dek_arr: [u8; 32] = dek.try_into().map_err(|_| {
@@ -106,12 +110,16 @@ fn decrypt_blob(
         )))
     })?;
     let dek_key = Key::<Aes256Gcm>::from_slice(&dek_arr);
-    let blob_cipher = Aes256Gcm::new(dek_key);
-    let blob_nonce = Nonce::from_slice(blob_nonce_bytes);
+    let object_cipher = Aes256Gcm::new(dek_key);
+    let object_nonce = Nonce::from_slice(object_nonce_bytes);
 
-    blob_cipher.decrypt(blob_nonce, ciphertext).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("blob decryption failed: {e}")))
-    })
+    object_cipher
+        .decrypt(object_nonce, ciphertext)
+        .map_err(|e| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "object decryption failed: {e}"
+            )))
+        })
 }
 
 fn validate_key(key: &str) -> Result<(), AntArchiveError> {
@@ -133,7 +141,7 @@ fn compute_checksum(bytes: &[u8]) -> String {
     base16ct::lower::encode_string(&hash)
 }
 
-async fn put_blob(
+async fn put_object(
     State(state): State<AntArchiveState>,
     Path((bucket_id, key)): Path<(String, String)>,
     auth: BearerClaims,
@@ -145,10 +153,10 @@ async fn put_blob(
         .db
         .get_bucket(&bucket_id)
         .await?
-        .ok_or_else(|| AntArchiveError::NotFound(format!("bucket {bucket_id}")))?;
+        .ok_or_else(|| AntArchiveError::BucketNotFound(bucket_id.clone()))?;
 
     if bucket.client_id != auth.client_id {
-        return Err(AntArchiveError::NotFound(format!("bucket {bucket_id}")));
+        return Err(AntArchiveError::BucketNotFound(bucket_id.clone()));
     }
 
     let plaintext = body
@@ -163,7 +171,7 @@ async fn put_blob(
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active KEK version")))
     })?;
 
-    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_blob(&load_kek()?, &plaintext)?;
+    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
@@ -171,9 +179,9 @@ async fn put_blob(
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active storage nodes found")))
     })?;
 
-    let blob_id = state
+    let object_id = state
         .db
-        .upsert_blob(
+        .upsert_object(
             &bucket_id,
             &kek_id,
             &key,
@@ -183,17 +191,17 @@ async fn put_blob(
         )
         .await?;
 
-    storage_node.put(&blob_id, stored_bytes).await?;
+    storage_node.put(&object_id, stored_bytes).await?;
 
     state
         .db
-        .upsert_placement(&blob_id, &storage_node.node_id, &blob_id, &checksum)
+        .upsert_placement(&object_id, &storage_node.node_id, &object_id, &checksum)
         .await?;
 
     Ok(StatusCode::CREATED)
 }
 
-async fn get_blob(
+async fn get_object(
     State(state): State<AntArchiveState>,
     Path((bucket_id, key)): Path<(String, String)>,
     maybe_auth: Option<BearerClaims>,
@@ -204,17 +212,17 @@ async fn get_blob(
         .db
         .get_bucket(&bucket_id)
         .await?
-        .ok_or_else(|| AntArchiveError::NotFound(format!("bucket {bucket_id}")))?;
+        .ok_or_else(|| AntArchiveError::BucketNotFound(bucket_id.clone()))?;
 
     match bucket.read_policy.as_str() {
         "public" => {}
         "internal" => {
             if maybe_auth.is_none() {
-                return Err(AntArchiveError::Unauthorized(None));
+                return Err(AntArchiveError::BucketNotFound(bucket_id.clone()));
             }
         }
         "private" => {
-            let not_found = || AntArchiveError::NotFound(format!("{bucket_id}/{key}"));
+            let not_found = || AntArchiveError::ObjectNotFound(key.clone());
             let auth = maybe_auth.ok_or_else(&not_found)?;
             if bucket.client_id != auth.client_id {
                 return Err(not_found());
@@ -227,15 +235,15 @@ async fn get_blob(
         }
     }
 
-    let blob = state
+    let object = state
         .db
-        .get_blob(&bucket_id, &key)
+        .get_object(&bucket_id, &key)
         .await?
-        .ok_or_else(|| AntArchiveError::NotFound(format!("{bucket_id}/{key}")))?;
+        .ok_or_else(|| AntArchiveError::ObjectNotFound(key))?;
 
-    let placements = state.db.get_placements(&blob.blob_id).await?;
+    let placements = state.db.get_placements(&object.object_id).await?;
     let placement = placements.first().ok_or_else(|| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no placements for blob")))
+        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no placements for object")))
     })?;
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
@@ -254,16 +262,16 @@ async fn get_blob(
         .await?
         .ok_or_else(|| {
             AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-                "blob '{}' missing from storage node '{}'",
+                "object '{}' missing from storage node '{}'",
                 placement.storage_key,
                 placement.storage_node_id
             )))
         })?;
 
-    let plaintext = decrypt_blob(
+    let plaintext = decrypt_object(
         &load_kek()?,
-        &blob.encrypted_dek,
-        &blob.dek_nonce,
+        &object.encrypted_dek,
+        &object.dek_nonce,
         &stored_bytes,
     )?;
 
@@ -274,7 +282,7 @@ async fn get_blob(
         .context("failed to build response")?)
 }
 
-async fn delete_blob(
+async fn delete_object(
     State(state): State<AntArchiveState>,
     Path((bucket_id, key)): Path<(String, String)>,
     auth: BearerClaims,
@@ -285,20 +293,20 @@ async fn delete_blob(
         .db
         .get_bucket(&bucket_id)
         .await?
-        .ok_or_else(|| AntArchiveError::NotFound(format!("bucket {bucket_id}")))?;
+        .ok_or_else(|| AntArchiveError::BucketNotFound(bucket_id.clone()))?;
 
     if bucket.client_id != auth.client_id {
-        return Err(AntArchiveError::NotFound(format!("bucket {bucket_id}")));
+        return Err(AntArchiveError::BucketNotFound(bucket_id.clone()));
     }
 
-    let blob = state
+    let object = state
         .db
-        .get_blob(&bucket_id, &key)
+        .get_object(&bucket_id, &key)
         .await?
-        .ok_or_else(|| AntArchiveError::NotFound(format!("{bucket_id}/{key}")))?;
+        .ok_or_else(|| AntArchiveError::ObjectNotFound(key.clone()))?;
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
-    let placements = state.db.get_placements(&blob.blob_id).await?;
+    let placements = state.db.get_placements(&object.object_id).await?;
     for placement in &placements {
         if let Some(storage_node) = storage_nodes
             .iter()
@@ -308,7 +316,7 @@ async fn delete_blob(
         }
     }
 
-    state.db.soft_delete_blob(&bucket_id, &key).await?;
+    state.db.soft_delete_object(&bucket_id, &key).await?;
 
     Ok(StatusCode::OK)
 }
@@ -317,9 +325,9 @@ pub fn make_routes(state: AntArchiveState) -> Router {
     use ant_library::routes::Routes;
 
     Routes::new()
-        .put("/{bucket_id}/{*key}", put(put_blob))
-        .get("/{bucket_id}/{*key}", get(get_blob))
-        .delete("/{bucket_id}/{*key}", delete(delete_blob))
+        .put("/{bucket_id}/{*key}", put(put_object))
+        .get("/{bucket_id}/{*key}", get(get_object))
+        .delete("/{bucket_id}/{*key}", delete(delete_object))
         .build()
         .with_state(state)
         .layer(

@@ -1,1 +1,1 @@
-pub mod blobs;
+pub mod objects;

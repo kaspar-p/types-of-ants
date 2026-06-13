@@ -7,13 +7,7 @@ mod dev;
 
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(clap::Subcommand)]
-enum Commands {
+enum Cli {
     Build(build::BuildCmd),
     Dev(dev::DevCmd),
 }
@@ -28,14 +22,13 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    match cli.command {
-        Some(Commands::Build(cmd)) => {
+    match cli {
+        Cli::Build(cmd) => {
             build::build(cmd).await;
         }
-        Some(Commands::Dev(cmd)) => {
+        Cli::Dev(cmd) => {
             dev::dev(cmd).await?;
         }
-        None => {}
     }
 
     Ok(())
