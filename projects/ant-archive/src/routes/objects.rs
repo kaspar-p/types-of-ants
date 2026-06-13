@@ -340,6 +340,6 @@ pub fn make_routes(state: AntArchiveState) -> Router {
                     ant_library::middleware::print_request_response,
                 )))
                 .layer(DefaultBodyLimit::disable())
-                .layer(RequestBodyLimitLayer::new(250 * 1024 * 1024)),
+                .layer(RequestBodyLimitLayer::new(1024 * 1024 * 1024)),
         )
 }

@@ -4,6 +4,8 @@ use ant_library::{host_architecture::HostArchitecture, services::Services};
 use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRevisionRequest};
 use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
+use async_compression::tokio::write::GzipEncoder;
+use async_tempfile::TempFile;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};
 use clap::ArgAction;
@@ -14,7 +16,7 @@ use git2::{Commit, Repository};
 use serde_json::json;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::complete::complete_projects;
 
@@ -75,12 +77,12 @@ pub async fn build(cmd: BuildCmd) {
         None
     };
 
-    let arches: HashSet<HostArchitecture> = services
-        .hosts
-        .iter()
-        .filter(|(_, host)| !host.ineligible_for_deployments())
-        .map(|(_, host)| host.architecture.clone())
-        .collect();
+    let arches: HashSet<HostArchitecture> = [
+        HostArchitecture::Aarch64,
+        HostArchitecture::ArmV7,
+        HostArchitecture::X86_64,
+    ]
+    .into();
 
     let git = GitState::new().unwrap();
     let project_src = git.root.join("projects").join(&cmd.project);
@@ -159,6 +161,7 @@ fn format_datetime(t: git2::Time) -> String {
     )
 }
 
+#[tracing::instrument(skip(cmd, revision))]
 async fn build_arch<'a>(
     cmd: BuildCmd,
     arch: &'a HostArchitecture,
@@ -181,14 +184,18 @@ async fn build_arch<'a>(
                 &cmd.project,
                 &arch,
                 &version,
-                &deployment_file.path(),
+                &deployment_file.file_path(),
             )
             .await
             .context("register artifact")?;
 
+        info!("... closing artifact.");
+
+        deployment_file.close()?;
+
         info!("... artifact registered.");
     } else {
-        let (_, path) = deployment_file.keep()?;
+        let path = deployment_file.keep();
         info!("artifact available: {}", path.display());
     }
 
@@ -219,7 +226,7 @@ impl GitState {
 async fn build_artifact<'a>(
     cmd: &'a BuildCmd,
     arch: &'a HostArchitecture,
-) -> Result<(NamedTempFile, String), anyhow::Error> {
+) -> Result<(TempFile, String), anyhow::Error> {
     let git = GitState::new()?;
 
     let version = format!("{}-{}-{}", git.head_number, git.head_datetime, git.head_sha);
@@ -246,6 +253,10 @@ async fn build_artifact<'a>(
     tokio::fs::create_dir_all(&build_output_dir)
         .await
         .context("creating build dir")?;
+
+    if !std::fs::exists(project_src.join("Makefile"))? {
+        return Err(anyhow::anyhow!("No Makefile in {}", project_src.display()));
+    }
 
     {
         let exit = tokio::process::Command::new("make")
@@ -329,9 +340,29 @@ async fn build_artifact<'a>(
         {
             let build_context_tar = tempfile::NamedTempFile::new()?;
             let mut tar_builder = tar::Builder::new(&build_context_tar);
-            tar_builder
-                .append_dir_all(".", &project_src)
-                .context("add dockerfile to build context tar")?;
+            {
+                let walker = ignore::WalkBuilder::new(&project_src).build();
+
+                for result in walker {
+                    let entry = result?;
+                    let path = entry.path();
+
+                    // Skip explicitly ignored paths or errors
+                    if !path.exists() {
+                        warn!("Ignoring {}", path.display());
+                        continue;
+                    }
+
+                    if path.is_file() {
+                        info!("Adding {}", path.display());
+                        let relative_path = pathdiff::diff_paths(path, &project_src).unwrap();
+                        tar_builder.append_path_with_name(path, relative_path)?;
+                    } else if path.is_dir() {
+                    } else {
+                        warn!("Ignoring {}", path.display());
+                    }
+                }
+            }
             tar_builder.finish().context("write build context tar")?;
 
             let mut contents = Vec::new();
@@ -345,12 +376,12 @@ async fn build_artifact<'a>(
             const SIZE_MAX: usize = 1000 * 1000 * 1000; // 1gb
             if contents.len() > SIZE_MAX {
                 return Err(anyhow::Error::msg(format!(
-                    "Docker image is {}, exceeding the limit.",
+                    "Docker image tarball is {}, exceeding the limit.",
                     humansize::format_size(contents.len(), humansize::DECIMAL)
                 )));
             } else {
                 info!(
-                    "Docker image is {} bytes",
+                    "Docker image tarball is {} bytes",
                     humansize::format_size(contents.len(), humansize::DECIMAL)
                 );
             }
@@ -398,17 +429,28 @@ async fn build_artifact<'a>(
         }
     }
 
-    // Create manifest
+    // Create manifest.json
     {
         let mut manifest =
             tokio::fs::File::create_new(tmp_packaging_dir.path().join("manifest.json"))
                 .await
-                .context("creating manifest")?;
+                .context("creating manifest.json")?;
         let content = serde_json::to_string(&json!({ "commit_number": git.head_number }))?;
         manifest
             .write_all(content.as_bytes())
             .await
-            .context("writing manifest")?;
+            .context("writing manifest.json")?;
+    }
+
+    // Create VERSION
+    {
+        let mut manifest = tokio::fs::File::create_new(tmp_packaging_dir.path().join("VERSION"))
+            .await
+            .context("creating VERSION")?;
+        manifest
+            .write_all(version.as_bytes())
+            .await
+            .context("writing VERSION")?;
     }
 
     // Copy run.sh
@@ -461,26 +503,32 @@ async fn build_artifact<'a>(
             .await
             .context("creating registry")?;
 
-        let deployment_file_name = format!("{}.{}.{}.tar.gz", cmd.project, arch.as_str(), version);
+        info!("... building deployment file");
 
-        info!("... building deployment file: {deployment_file_name}");
-
-        let deployment_file_path = registry_dir.join(deployment_file_name);
-        let mut deployment_file =
-            NamedTempFile::new_in(&registry_dir).context("creating deployment file")?;
+        let deployment_file = async_tempfile::TempFile::builder()
+            .dir(&registry_dir)
+            .prefix("depl")
+            .create()
+            .await?;
 
         {
-            let mut tar =
-                tar::Builder::new(GzEncoder::new(&mut deployment_file, Compression::best()));
-            tar.append_dir_all(".", tmp_packaging_dir.path())
-                .context("appending packaging to tar")?;
-            tar.finish().context("building tar")?;
+            let path = deployment_file.file_path().to_owned();
+            let file = std::fs::File::create(&path)?;
+
+            let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+            let mut tar = tar::Builder::new(encoder);
+
+            tar.append_dir_all(".", tmp_packaging_dir.path())?;
+            tar.finish()?;
+
+            let encoder = tar.into_inner()?;
+            encoder.finish()?;
         }
 
         info!(
             "... deployment file size: {}",
             humansize::format_size(
-                std::fs::metadata(&deployment_file_path)
+                std::fs::metadata(&deployment_file.file_path())
                     .context("reading deployment file")?
                     .len(),
                 humansize::DECIMAL

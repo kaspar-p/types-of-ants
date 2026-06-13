@@ -6,7 +6,7 @@ use crate::{
 
 use super::err::AntOnTheWebError;
 use ant_data_farm::{
-    users::{make_password_hash, User, UserId},
+    users::{User, UserId},
     verifications::VerificationResult,
     AntDataFarmClient,
 };
@@ -78,7 +78,7 @@ async fn send_email_verification_code(
     let dist = rand::distr::Alphanumeric;
 
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
-    let otp_hash = make_password_hash(&otp)?;
+    let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
 
     info!("Starting email verification for {user_id} on {email} with {otp}");
     let verification = dao
@@ -181,7 +181,7 @@ async fn send_phone_verification_code(
     let dist = rand::distr::Alphanumeric;
 
     let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
-    let otp_hash = make_password_hash(&otp)?;
+    let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
 
     info!("Starting phone number verification for {user_id} on {phone_number} with {otp}");
     let verification = dao

@@ -169,6 +169,7 @@ async fn register_artifact(
     let temp_dir = tempdir_in(&global_tmp_dir)?;
     let temp_file_path = temp_dir.path().join("input.tar.gz");
     let mut temp_file = File::create_new(&temp_file_path)?;
+
     {
         let mut field = multipart
             .next_field()
@@ -199,12 +200,10 @@ async fn register_artifact(
     );
 
     {
-        let temp_file = File::open(&temp_file_path)?;
         let gz = GzDecoder::new(&temp_file);
         let mut archive = Archive::new(gz);
 
         let mut anthill_file_found = false;
-        // let mut service_file_found = false;
 
         for entry in archive.entries()? {
             let mut entry = entry?;
@@ -257,10 +256,6 @@ async fn register_artifact(
                     }
                 }
             }
-
-            // if file_name == format!("{}.service", &project_id).as_str() {
-            //     service_file_found = true;
-            // }
         }
 
         if !anthill_file_found {
@@ -268,23 +263,13 @@ async fn register_artifact(
                 "Project configuration file 'anthill.json' must be included in deployment tarball.",
             ));
         }
-
-        // if !service_file_found {
-        //     return Err(AntZookeeperError::validation_msg(
-        //         format!(
-        //             "Service file '{}.service' must be included in deployment tarball.",
-        //             &project_id
-        //         )
-        //         .as_str(),
-        //     ));
-        // }
     }
 
     // Write the file to final location
     let filepath = dir.join(artifact_file_name(&project_id, arch.0.as_ref(), &version.0));
     {
         info!("Writing tarball to [{}]", filepath.display());
-        std::fs::copy(&temp_file_path, &filepath)?;
+        tokio::fs::copy(&temp_dir.path().join("input.tar.gz"), &filepath).await?;
     }
 
     // let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;

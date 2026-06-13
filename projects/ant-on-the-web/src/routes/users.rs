@@ -11,7 +11,7 @@ use crate::{
     state::{ApiRoutes, ApiState, InnerApiState},
     two_factor::VerificationReceipt,
 };
-use ant_data_farm::users::{verify_password_hash, User, UserId};
+use ant_data_farm::users::{User, UserId};
 use ant_library::routes::Routes;
 use axum::{
     extract::{Path, State},
@@ -238,7 +238,7 @@ async fn login(
         Ok(Some(user)) => user,
     };
 
-    if !verify_password_hash(
+    if !ant_library::crypto::verify_password_hash(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )? {

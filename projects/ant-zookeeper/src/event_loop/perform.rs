@@ -1,3 +1,4 @@
+use ant_library::host_architecture::HostArchitecture;
 use tracing::info;
 
 use crate::{

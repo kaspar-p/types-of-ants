@@ -21,7 +21,10 @@ async fn main() -> Result<(), anyhow::Error> {
         endpoint: "localhost:3235".to_string(),
     });
 
-    for service_id in services.list_service_ids() {
+    let mut service_ids = services.list_service_ids();
+    service_ids.sort();
+
+    for service_id in service_ids {
         let hosts: Vec<(&str, &ServiceInstance)> = services.list_hosts_with_service(&service_id);
 
         let beta_hg_id = if hosts.iter().any(|(_, s)| matches!(s.env, ServiceEnv::Beta)) {

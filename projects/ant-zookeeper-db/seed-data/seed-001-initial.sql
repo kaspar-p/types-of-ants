@@ -53,6 +53,9 @@ values
   ('ant-sawmill', true),
   ('ant-just-checking-in', true),
   ('ant-printing-press', true),
+  ('ant-archive', true),
+  ('ant-archive-storage', true),
+  ('ant-archive-db', true),
   ('nextcloud-webdav', false)
 ;
 

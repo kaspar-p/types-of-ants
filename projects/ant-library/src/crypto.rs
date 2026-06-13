@@ -12,7 +12,7 @@ pub fn make_token_hash(token: &str) -> String {
 }
 
 pub fn make_password_hash(password: &str) -> Result<String, anyhow::Error> {
-    let salt = SaltString::generate(&mut OsRng);
+    let salt = SaltString::generate(&mut rsa::rand_core::OsRng);
     let argon2 = Argon2::default();
 
     // Step 1: Hash the password using the salt

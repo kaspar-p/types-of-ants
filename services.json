@@ -186,6 +186,10 @@
         {
           "env": "prod",
           "project": "ant-backing-it-up-db"
+        },
+        {
+          "env": "prod",
+          "project": "ant-archive-storage"
         }
       ]
     },
@@ -223,6 +227,10 @@
         {
           "env": "prod",
           "project": "ant-just-checking-in"
+        },
+        {
+          "env": "prod",
+          "project": "ant-archive"
         }
       ]
     },
@@ -268,6 +276,10 @@
         {
           "env": "prod",
           "project": "ant-printing-press"
+        },
+        {
+          "env": "prod",
+          "project": "ant-archive-storage"
         }
       ]
     },
@@ -305,6 +317,10 @@
         {
           "env": "prod",
           "project": "ant-monitor-fe"
+        },
+        {
+          "env": "prod",
+          "project": "ant-archive-db"
         }
       ]
     },
@@ -344,6 +360,10 @@
         {
           "env": "prod",
           "project": "ant-fs"
+        },
+        {
+          "env": "prod",
+          "project": "ant-archive-storage"
         }
       ]
     },
@@ -351,6 +371,10 @@
       "auto_deployable": false,
       "architecture": "x86",
       "services": [
+        {
+          "env": "prod",
+          "project": "nextcloud-webdav"
+        },
         {
           "env": "prod",
           "project": "ant-fs"

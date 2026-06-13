@@ -1,0 +1,8 @@
+{
+  "project": "ant-zookeeper-fe",
+  "description": "the typesofants deployment frontend",
+  "build": "makefile",
+  "ports": {
+    "primary": 3000
+  }
+}

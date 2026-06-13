@@ -210,7 +210,7 @@ pub fn make_routes(root: PathBuf) -> Result<Router, anyhow::Error> {
                     ant_library::middleware::print_request_response,
                 )))
                 .layer(DefaultBodyLimit::disable())
-                .layer(RequestBodyLimitLayer::new(250 * 1024 * 1024)),
+                .layer(RequestBodyLimitLayer::new(1024 * 1024 * 1024)),
         );
 
     return Ok(app);
