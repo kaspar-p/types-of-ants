@@ -129,34 +129,34 @@ fn validate_secret_exists(
     for environment in ["beta", "prod"] {
         if secret.is_host_specific() {
             for host_id in host_ids.iter() {
-                if !exists(host_specific_secret_file_path(
+                let secret_file = host_specific_secret_file_path(
                     &state.root_dir,
                     environment,
                     secret.name(),
                     &host_id,
-                ))? {
+                );
+                if !exists(&secret_file)? {
                     return Err(AntZookeeperError::validation_msg(
                         format!(
-                            "Secret '{}' is not present in '{}' for '{}'.",
+                            "Secret '{}' is not present in '{}' for '{}' at: {}",
                             secret.name(),
                             environment,
-                            host_id
+                            host_id,
+                            secret_file.display()
                         )
                         .as_str(),
                     ));
                 }
             }
         } else {
-            if !exists(secret_file_path(
-                &state.root_dir,
-                environment,
-                secret.name(),
-            ))? {
+            let secret_file = secret_file_path(&state.root_dir, environment, secret.name());
+            if !exists(&secret_file)? {
                 return Err(AntZookeeperError::validation_msg(
                     format!(
-                        "Secret '{}' is not present in '{}'.",
+                        "Secret '{}' is not present in '{}' at: {}",
                         secret.name(),
-                        environment
+                        environment,
+                        secret_file.display()
                     )
                     .as_str(),
                 ));
@@ -249,6 +249,7 @@ async fn register_artifact(
     );
 
     {
+        std::io::Seek::seek(&mut temp_file, std::io::SeekFrom::Start(0))?;
         let gz = GzDecoder::new(&temp_file);
         let mut archive = Archive::new(gz);
 

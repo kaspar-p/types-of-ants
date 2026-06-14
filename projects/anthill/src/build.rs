@@ -4,17 +4,14 @@ use ant_library::{host_architecture::HostArchitecture, services::Services};
 use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRevisionRequest};
 use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
-use async_compression::tokio::write::GzipEncoder;
 use async_tempfile::TempFile;
 use bollard::body_full;
 use chrono::{Datelike, Timelike};
 use clap::ArgAction;
 use clap_complete::engine::ArgValueCompleter;
-use flate2::{write::GzEncoder, Compression};
 use futures::StreamExt;
 use git2::{Commit, Repository};
 use serde_json::json;
-use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{error, info, warn};
 
@@ -188,8 +185,6 @@ async fn build_arch<'a>(
             )
             .await
             .context("register artifact")?;
-
-        info!("... closing artifact.");
 
         deployment_file.close()?;
 

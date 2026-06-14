@@ -17,16 +17,16 @@ values
 insert into host
   (host_id, architecture_id)
 values
-  ('antworker000.hosts.typesofants.org', 'armv7'),
-  ('antworker001.hosts.typesofants.org', 'aarch64'),
-  ('antworker002.hosts.typesofants.org', 'aarch64'),
-  ('antworker003.hosts.typesofants.org', 'aarch64'),
-  ('antworker004.hosts.typesofants.org', 'aarch64'),
-  ('antworker005.hosts.typesofants.org', 'aarch64'),
-  ('antworker006.hosts.typesofants.org', 'aarch64'),
-  ('antworker007.hosts.typesofants.org', 'aarch64'),
-  ('hisbaan01.hosts.typesofants.org', 'x86_64'),
-  ('greg01.hosts.typesofants.org', 'x86_64')
+  ('antworker000', 'armv7'),
+  ('antworker001', 'aarch64'),
+  ('antworker002', 'aarch64'),
+  ('antworker003', 'aarch64'),
+  ('antworker004', 'aarch64'),
+  ('antworker005', 'aarch64'),
+  ('antworker006', 'aarch64'),
+  ('antworker007', 'aarch64'),
+  ('hisbaan01', 'x86_64'),
+  ('greg01', 'x86_64')
 ;
 
 insert into project
@@ -63,41 +63,41 @@ values
 --   (project_id, deployment_version)
 -- values
 --   -- PROD 000
---   ('ant-host-agent', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-data-farm', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-who-tweets', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-backing-it-up-db', 'antworker000.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-host-agent', 'antworker000', 'prod', 'live'),
+--   ('ant-data-farm', 'antworker000', 'prod', 'live'),
+--   ('ant-who-tweets', 'antworker000', 'prod', 'live'),
+--   ('ant-backing-it-up-db', 'antworker000', 'prod', 'live'),
   
 --   -- PROD 001
---   ('ant-host-agent', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-backing-it-up', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-gateway', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-looking-pretty', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-on-the-web', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-naming-domains', 'antworker001.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-host-agent', 'antworker001', 'prod', 'live'),
+--   ('ant-backing-it-up', 'antworker001', 'prod', 'live'),
+--   ('ant-gateway', 'antworker001', 'prod', 'live'),
+--   ('ant-looking-pretty', 'antworker001', 'prod', 'live'),
+--   ('ant-on-the-web', 'antworker001', 'prod', 'live'),
+--   ('ant-naming-domains', 'antworker001', 'prod', 'live'),
   
 --   -- PROD 003
---   ('ant-host-agent', 'antworker003.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-backing-it-up-db', 'antworker003.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-host-agent', 'antworker003', 'prod', 'live'),
+--   ('ant-backing-it-up-db', 'antworker003', 'prod', 'live'),
   
 --   -- PROD 004
---   ('ant-host-agent', 'antworker004.hosts.typesofants.org', 'prod', 'live'),
---   ('ant-fs', 'antworker004.hosts.typesofants.org', 'prod', 'live'),
+--   ('ant-host-agent', 'antworker004', 'prod', 'live'),
+--   ('ant-fs', 'antworker004', 'prod', 'live'),
   
 --   -- PROD other
 --   ('ant-fs', 'ant.hisbaan.com', 'prod', 'live'),
 --   ('nextcloud-webdav', 'ant.flower.beer', 'prod', 'live'),
 
 --   -- BETA
---   ('ant-host-agent', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-backing-it-up-db', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-backing-it-up', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-looking-pretty', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-on-the-web', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-data-farm', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-gateway', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-naming-domains', 'antworker002.hosts.typesofants.org', 'beta', 'live'),
---   ('ant-fs', 'antworker002.hosts.typesofants.org', 'beta', 'live')
+--   ('ant-host-agent', 'antworker002', 'beta', 'live'),
+--   ('ant-backing-it-up-db', 'antworker002', 'beta', 'live'),
+--   ('ant-backing-it-up', 'antworker002', 'beta', 'live'),
+--   ('ant-looking-pretty', 'antworker002', 'beta', 'live'),
+--   ('ant-on-the-web', 'antworker002', 'beta', 'live'),
+--   ('ant-data-farm', 'antworker002', 'beta', 'live'),
+--   ('ant-gateway', 'antworker002', 'beta', 'live'),
+--   ('ant-naming-domains', 'antworker002', 'beta', 'live'),
+--   ('ant-fs', 'antworker002', 'beta', 'live')
 -- ;
 
 commit;

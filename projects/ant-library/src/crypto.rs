@@ -1,7 +1,4 @@
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
-};
+use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use base64ct::{Base64, Encoding};
 use sha2::Digest;
 use tracing::{debug, info};

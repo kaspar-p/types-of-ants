@@ -20,7 +20,7 @@ tower-http = { version = "0.6.6", features = [
 ] }
 tracing = { version = "0.1.41", features = ["max_level_debug"] }
 dotenv = "0.15.0"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 base16ct = { version = "0.3.0", features = ["alloc"] }
 aes-gcm = { version = "0.10", features = ["std"] }
 rand = "0.8"

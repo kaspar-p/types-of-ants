@@ -20,7 +20,7 @@
     }
   },
   "hosts": {
-    "antworker000.hosts.typesofants.org": {
+    "antworker000": {
       "inactive": true,
       "auto_deployable": true,
       "architecture": "raspbian",
@@ -32,21 +32,21 @@
         {
           "env": "prod",
           "project": "ant-data-farm",
-          "inactive-replaced-by": "antworker006.hosts.typesofants.org"
+          "inactive-replaced-by": "antworker006"
         },
         {
           "env": "prod",
           "project": "ant-who-tweets",
-          "inactive-replaced-by": "antworker005.hosts.typesofants.org"
+          "inactive-replaced-by": "antworker005"
         },
         {
           "env": "prod",
           "project": "ant-backing-it-up-db",
-          "inactive-replaced-by": "antworker003.hosts.typesofants.org"
+          "inactive-replaced-by": "antworker003"
         }
       ]
     },
-    "antworker001.hosts.typesofants.org": {
+    "antworker001": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -95,7 +95,7 @@
         }
       ]
     },
-    "antworker002.hosts.typesofants.org": {
+    "antworker002": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -156,7 +156,7 @@
         }
       ]
     },
-    "antworker003.hosts.typesofants.org": {
+    "antworker003": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -193,7 +193,7 @@
         }
       ]
     },
-    "antworker004.hosts.typesofants.org": {
+    "antworker004": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -234,7 +234,7 @@
         }
       ]
     },
-    "antworker005.hosts.typesofants.org": {
+    "antworker005": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -283,7 +283,7 @@
         }
       ]
     },
-    "antworker006.hosts.typesofants.org": {
+    "antworker006": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -324,7 +324,7 @@
         }
       ]
     },
-    "antworker007.hosts.typesofants.org": {
+    "antworker007": {
       "auto_deployable": true,
       "architecture": "arm",
       "services": [
@@ -353,7 +353,7 @@
         }
       ]
     },
-    "hisbaan01.hosts.typesofants.org": {
+    "hisbaan01": {
       "auto_deployable": false,
       "architecture": "x86",
       "services": [
@@ -367,7 +367,7 @@
         }
       ]
     },
-    "greg01.hosts.typesofants.org": {
+    "greg01": {
       "auto_deployable": false,
       "architecture": "x86",
       "services": [

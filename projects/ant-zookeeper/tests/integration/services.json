@@ -1,6 +1,6 @@
 {
   "hosts": {
-    "antworker001.hosts.typesofants.org": {
+    "antworker001": {
       "architecture": "arm",
       "auto_deployable": true,
       "services": [
@@ -13,7 +13,7 @@
         }
       ]
     },
-    "antworker002.hosts.typesofants.org": {
+    "antworker002": {
       "architecture": "arm",
       "auto_deployable": true,
       "services": [

@@ -4,10 +4,8 @@ use crate::host_architecture::HostArchitecture;
 use axum_extra::headers::Header;
 use http::{HeaderName, HeaderValue};
 
-#[deprecated]
 static X_ANT_PROJECT_HEADER: HeaderName = http::HeaderName::from_static("x-ant-project");
 
-#[deprecated]
 pub struct XAntProjectHeader(pub Option<String>);
 
 impl Header for XAntProjectHeader {

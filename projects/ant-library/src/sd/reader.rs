@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
