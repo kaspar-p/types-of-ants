@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use ant_library::host_architecture::HostArchitecture;
+use anthill_manifest::AnthillSecret;
 
 pub(crate) fn artifact_persist_dir(root_dir: &PathBuf) -> PathBuf {
     root_dir.join("artifacts-db")
@@ -29,6 +30,20 @@ pub(crate) fn project_envs_file_name(project: &str, environment: &str) -> String
 
 pub(crate) fn global_envs_file_name(environment: &str) -> String {
     format!("{environment}.build.cfg")
+}
+
+pub(crate) fn host_specific_secret_file_path(
+    root_dir: &PathBuf,
+    environment: &str,
+    secret_name: &str,
+    host: &str,
+) -> PathBuf {
+    root_dir
+        .join("secrets-db")
+        .join(environment)
+        .join("hosts")
+        .join(host)
+        .join(secret_file_name(secret_name))
 }
 
 pub(crate) fn secret_file_path(

@@ -20,14 +20,16 @@ use tracing::info;
 
 use crate::{
     fs::{
-        artifact_persist_dir, envs_persist_dir, global_envs_file_name, project_envs_file_name,
-        secret_file_name, secret_file_path, services_file_name, services_persist_dir,
+        artifact_persist_dir, envs_persist_dir, global_envs_file_name,
+        host_specific_secret_file_path, project_envs_file_name, secret_file_name, secret_file_path,
+        services_file_name, services_persist_dir,
     },
     state::AntZookeeperState,
 };
 
 async fn inject_secrets(
     state: &AntZookeeperState,
+    host: &str,
     dest: &PathBuf,
     environment: &str,
 ) -> Result<(), anyhow::Error> {
@@ -42,8 +44,14 @@ async fn inject_secrets(
     }
 
     for secret in manifest.secrets {
-        let src_file = secret_file_path(&state.root_dir, environment, &secret);
-        let dest_file = project_secrets_dir.join(secret_file_name(&secret));
+        let dest_file = project_secrets_dir.join(secret_file_name(&secret.name()));
+
+        let src_file = if secret.is_host_specific() {
+            host_specific_secret_file_path(&state.root_dir, environment, secret.name(), host)
+        } else {
+            secret_file_path(&state.root_dir, environment, secret.name())
+        };
+
         info!(
             "Copying secret: [{}] -> [{}]",
             src_file.display(),
@@ -191,6 +199,11 @@ async fn inject_env_file(
     Ok(())
 }
 
+async fn inject_version_file(dest: &PathBuf, version: &str) -> Result<(), anyhow::Error> {
+    tokio::fs::write(dest.join("VERSION"), &version).await?;
+    Ok(())
+}
+
 pub async fn replicate_artifact_step(
     state: &AntZookeeperState,
     revision: &str,
@@ -247,8 +260,11 @@ pub async fn replicate_artifact_step(
                 &host_group.environment,
             )
             .await?;
-            inject_secrets(state, &unpack_dir_path, &host_group.environment).await?;
-            tokio::fs::write(unpack_dir_path.join("VERSION"), &version).await?;
+
+            inject_secrets(state, host, &unpack_dir_path, &host_group.environment).await?;
+
+            inject_version_file(&unpack_dir_path, &version).await?;
+
             render_docker_compose(
                 state,
                 service_instance,

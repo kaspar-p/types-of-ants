@@ -3,6 +3,8 @@ use std::{collections::HashMap, fs::File, io::Read, path::Path, str::FromStr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::AnthillSecret::{Expanded, Simple};
+
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AnthillManifest {
     pub project: String,
@@ -44,7 +46,33 @@ pub struct AnthillManifest {
     /// { "secrets": ["name"] }
     /// ```
     #[serde(default)]
-    pub secrets: Vec<String>,
+    pub secrets: Vec<AnthillSecret>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum AnthillSecret {
+    Simple(String),
+    Expanded {
+        name: String,
+        host_specific: Option<bool>,
+    },
+}
+
+impl AnthillSecret {
+    pub fn name(&self) -> &str {
+        match self {
+            Simple(name) => name,
+            Expanded { name, .. } => name,
+        }
+    }
+
+    pub fn is_host_specific(&self) -> bool {
+        match self {
+            Simple(_) => false,
+            Expanded { host_specific, .. } => host_specific.unwrap_or(false),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]

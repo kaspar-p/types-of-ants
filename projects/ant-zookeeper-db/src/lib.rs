@@ -1817,4 +1817,19 @@ impl AntZooStorageClient {
 
         Ok(host)
     }
+
+    pub async fn list_hosts(&self) -> Result<Vec<String>, anyhow::Error> {
+        let hosts = self
+            .db
+            .get()
+            .await?
+            .query("select host_id from host", &[])
+            .await
+            .with_context(|| format!("{}", function_name!()))?
+            .into_iter()
+            .map(|row| -> String { row.get("host_id") })
+            .collect();
+
+        Ok(hosts)
+    }
 }

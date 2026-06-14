@@ -7,6 +7,9 @@
     "metrics": 3254
   },
   "secrets": [
-    "ant_archive_storage_auth"
+    {
+      "name": "ant_archive_storage_auth",
+      "host_specific": true
+    }
   ]
 }

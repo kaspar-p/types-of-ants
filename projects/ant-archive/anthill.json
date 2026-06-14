@@ -11,6 +11,8 @@
     "ant_archive_db_db",
     "ant_archive_db_user",
     "ant_archive_db_password",
-    "ant_archive_storage_client_password"
+    {
+      "name": "ant_archive_storage_client_auths"
+    }
   ]
 }

@@ -8,7 +8,7 @@ use ant_library::headers::{
     XAntArchitectureHeader, XAntProjectHeader, XAntRevisionHeader, XAntVersionHeader,
 };
 use ant_library::routes::Routes;
-use anthill_manifest::AnthillManifest;
+use anthill_manifest::{AnthillManifest, AnthillSecret};
 use axum::debug_handler;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
@@ -28,8 +28,8 @@ use tracing::{info, warn};
 
 use crate::event_loop::transition::{is_deployment_complete, DeploymentEvent, Event};
 use crate::fs::{
-    artifact_file_name, artifact_persist_dir, envs_persist_dir, project_envs_file_name,
-    secret_file_path,
+    artifact_file_name, artifact_persist_dir, envs_persist_dir, host_specific_secret_file_path,
+    project_envs_file_name, secret_file_path,
 };
 use crate::{err::AntZookeeperError, state::AntZookeeperState};
 
@@ -120,6 +120,53 @@ WantedBy=multi-user.target
     )
 }
 
+fn validate_secret_exists(
+    state: &AntZookeeperState,
+    secret: &AnthillSecret,
+    host_ids: &Vec<String>,
+) -> Result<(), AntZookeeperError> {
+    // TODO better way to get environments
+    for environment in ["beta", "prod"] {
+        if secret.is_host_specific() {
+            for host_id in host_ids.iter() {
+                if !exists(host_specific_secret_file_path(
+                    &state.root_dir,
+                    environment,
+                    secret.name(),
+                    &host_id,
+                ))? {
+                    return Err(AntZookeeperError::validation_msg(
+                        format!(
+                            "Secret '{}' is not present in '{}' for '{}'.",
+                            secret.name(),
+                            environment,
+                            host_id
+                        )
+                        .as_str(),
+                    ));
+                }
+            }
+        } else {
+            if !exists(secret_file_path(
+                &state.root_dir,
+                environment,
+                secret.name(),
+            ))? {
+                return Err(AntZookeeperError::validation_msg(
+                    format!(
+                        "Secret '{}' is not present in '{}'.",
+                        secret.name(),
+                        environment
+                    )
+                    .as_str(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// An API to ingest a new build artifact, a new built version of a service for a given platform.
 #[debug_handler]
 async fn register_artifact(
@@ -194,6 +241,8 @@ async fn register_artifact(
         info!("Finished writing to [{}]...", temp_file_path.display());
     }
 
+    let host_ids = state.db.list_hosts().await?;
+
     info!(
         "Validating file contents of [{}]...",
         temp_file_path.display()
@@ -245,15 +294,7 @@ async fn register_artifact(
                 info!("Read manifest: {:?}", manifest);
 
                 for secret in manifest.secrets {
-                    // TODO better way to get environments
-                    for environment in ["beta", "prod"] {
-                        if !exists(secret_file_path(&state.root_dir, environment, &secret))? {
-                            return Err(AntZookeeperError::validation_msg(
-                                format!("Secret '{}' is not present in '{}'.", secret, environment)
-                                    .as_str(),
-                            ));
-                        }
-                    }
+                    validate_secret_exists(&state, &secret, &host_ids)?;
                 }
             }
         }
