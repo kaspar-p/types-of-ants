@@ -5,12 +5,15 @@ mod build;
 mod complete;
 mod curl;
 mod dev;
+mod procs;
+mod run;
 
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
 enum Cli {
     Build(build::BuildCmd),
     Dev(dev::DevCmd),
+    Run(run::RunCmd),
     Curl(curl::CurlCmd),
 }
 
@@ -30,6 +33,9 @@ async fn main() -> Result<()> {
         }
         Cli::Dev(cmd) => {
             dev::dev(cmd).await?;
+        }
+        Cli::Run(cmd) => {
+            run::run(cmd).await?;
         }
         Cli::Curl(cmd) => {
             curl::curl(cmd).await?;
