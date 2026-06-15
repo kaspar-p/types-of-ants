@@ -27,6 +27,8 @@ pub async fn curl(cmd: CurlCmd) -> Result<(), anyhow::Error> {
 
     let url = format!("http://{}:{}{}", address, port, path);
 
+    println!("Calling: {url}");
+
     let status = tokio::process::Command::new("curl")
         .arg(&url)
         .args(&cmd.args)
@@ -76,10 +78,9 @@ async fn resolve(service: &str, env: &str) -> Result<(String, u16), anyhow::Erro
         .parse()?;
 
     let sd = ServiceDiscovery::new(consul_port);
-    let endpoint = sd
-        .resolve(service)
-        .await
-        .ok_or_else(|| anyhow::anyhow!("service '{service}' not found in {env} Consul — {not_running_hint}"))?;
+    let endpoint = sd.resolve(service).await.ok_or_else(|| {
+        anyhow::anyhow!("service '{service}' not found in {env} Consul — {not_running_hint}")
+    })?;
 
     Ok((endpoint.address, endpoint.port))
 }

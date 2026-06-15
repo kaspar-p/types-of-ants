@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::Read, path::Path, str::FromStr};
+use std::{collections::HashMap, fs::File, io::Read, path::Path};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -214,7 +214,7 @@ pub enum AnthillArchetype {
 
         /// Username used to connect to the database.
         username_secret_name: String,
-        
+
         /// Password used to connect to the database.
         password_secret_name: String,
     },

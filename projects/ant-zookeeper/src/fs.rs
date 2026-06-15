@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use ant_library::host_architecture::HostArchitecture;
-use anthill_manifest::AnthillSecret;
 
 pub(crate) fn artifact_persist_dir(root_dir: &PathBuf) -> PathBuf {
     root_dir.join("artifacts-db")

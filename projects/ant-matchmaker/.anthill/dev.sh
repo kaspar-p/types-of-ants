@@ -21,9 +21,11 @@ elif [[ "$NODE_VARIANT" == "client" ]]; then
   echo "Starting prod-connected client agent (port ${ANT_MATCHMAKER_CLIENT_HTTP_PORT})..."
   export TYPESOFANTS_SECRET_DIR="$repository_root/projects/ant-zookeeper/dev-fs/dev-fs/secrets-db/prod"
   export ANT_MATCHMAKER_HTTP_PORT="$ANT_MATCHMAKER_CLIENT_HTTP_PORT"
-  export ANT_MATCHMAKER_GOSSIP_PORT="$ANT_MATCHMAKER_CLIENT_GOSSIP_PORT"
-  export ANT_MATCHMAKER_SERVER_PORT="$ANT_MATCHMAKER_CLIENT_SERVER_PORT"
-  export ANT_MATCHMAKER_SERVER_FLAGS="-node=$(hostname)"
+  export ANT_MATCHMAKER_GOSSIP_PORT="9991"
+  export ANT_MATCHMAKER_SERVER_PORT="9992"
+  ANT_MATCHMAKER_SERVER_FLAGS="-node=$(hostname)"
+  export ANT_MATCHMAKER_SERVER_FLAGS
+
   PERSIST_DIR="$(dirname "$PERSIST_DIR")/consul-data-client"
   export PERSIST_DIR
 
