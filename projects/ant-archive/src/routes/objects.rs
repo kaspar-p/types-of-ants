@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
@@ -22,19 +24,56 @@ use crate::{
     storage_client::AntArchiveStorageNodeClient,
 };
 
+/// Expects a file that's newline delimited lines that look like:
+///     {hostname}:{username}:{password}
+/// where each are templated, for example:
+///     myhost:user1:pass1
+///
+/// Returns a hashmap mapping from hostname to (username, password)
+fn get_client_credentials() -> Result<HashMap<String, (String, String)>, anyhow::Error> {
+    let content = ant_library::secret::load_secret("ant_archive_storage_client_auths")?;
+
+    let mut map = HashMap::new();
+    for (i, line) in content.split("/").enumerate() {
+        let mut line_content = line.split(":");
+
+        let hostname = line_content
+            .next()
+            .ok_or(anyhow::Error::msg(format!("Line {i} had no hostname")))?;
+        let username = line_content
+            .next()
+            .ok_or(anyhow::Error::msg(format!("Line {i} had no username")))?;
+        let password = line_content
+            .next()
+            .ok_or(anyhow::Error::msg(format!("Line {i} had no passowrd")))?;
+
+        map.insert(
+            hostname.to_string(),
+            (username.to_string(), password.to_string()),
+        );
+    }
+
+    Ok(map)
+}
+
 async fn resolve_storage_nodes(
     state: &AntArchiveState,
 ) -> Result<Vec<AntArchiveStorageNodeClient>, AntArchiveError> {
-    let password = ant_library::secret::load_secret("ant_archive_storage_client_password")?;
+    let creds = get_client_credentials()?;
     let endpoints = state.sd.resolve_all("ant-archive-storage").await;
+
     let mut clients = Vec::new();
     for ep in &endpoints {
+        let (username, password) = creds.get(&ep.node).ok_or(anyhow::Error::msg(format!(
+            "No credentials for node: {}",
+            ep.node
+        )))?;
         if let Some(node_id) = state.db.get_storage_node_by_node_name(&ep.node).await? {
             clients.push(AntArchiveStorageNodeClient::new(
                 node_id,
                 format!("http://{}:{}", ep.address, ep.port),
-                "user",
-                &password,
+                username,
+                password,
             ));
         }
     }

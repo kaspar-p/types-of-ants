@@ -27,14 +27,18 @@ pub async fn curl(cmd: CurlCmd) -> Result<(), anyhow::Error> {
 
     let url = format!("http://{}:{}{}", address, port, path);
 
-    println!("Calling: {url}");
+    eprintln!("Calling: {url}");
 
     let status = tokio::process::Command::new("curl")
         .arg(&url)
+        .arg("--no-progress-meter")
+        .arg("--fail-with-body")
         .args(&cmd.args)
         .status()
         .await
         .context("failed to spawn curl")?;
+
+    eprintln!("{status}");
 
     std::process::exit(status.code().unwrap_or(1));
 }

@@ -14,7 +14,7 @@ set +o allexport
 source "$(deploy_env_filepath "$deploy_env")"
 set -o allexport
 
-consul_res="$(ssh2ant 004 "curl http://localhost:3245/v1/catalog/service/ant-archive-db")"
+consul_res="$(curl http://localhost:9990/v1/catalog/service/ant-archive-db)"
 ip="$(echo "$consul_res" | jq -r '.[0].Address')"
 port="$(echo "$consul_res" | jq -r '.[0].ServicePort')"
 
