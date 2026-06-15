@@ -17,6 +17,16 @@ if [[ "$NODE_VARIANT" == "single" || "$NODE_VARIANT" == "node:1/1" ]]; then
   export ANT_MATCHMAKER_SERVER_FLAGS="-server -node=local-node1 -bootstrap-expect=1"
   export ANT_MATCHMAKER_RETRY_JOIN_FLAGS=""
 
+elif [[ "$NODE_VARIANT" == "client" ]]; then
+  echo "Starting prod-connected client agent (port ${ANT_MATCHMAKER_CLIENT_HTTP_PORT})..."
+  export TYPESOFANTS_SECRET_DIR="$repository_root/projects/ant-zookeeper/dev-fs/dev-fs/secrets-db/prod"
+  export ANT_MATCHMAKER_HTTP_PORT="$ANT_MATCHMAKER_CLIENT_HTTP_PORT"
+  export ANT_MATCHMAKER_GOSSIP_PORT="$ANT_MATCHMAKER_CLIENT_GOSSIP_PORT"
+  export ANT_MATCHMAKER_SERVER_PORT="$ANT_MATCHMAKER_CLIENT_SERVER_PORT"
+  export ANT_MATCHMAKER_SERVER_FLAGS="-node=$(hostname)"
+  PERSIST_DIR="$(dirname "$PERSIST_DIR")/consul-data-client"
+  export PERSIST_DIR
+
 elif [[ "$NODE_VARIANT" == "node:1/3" ]]; then
   echo "Starting 3-node cluster: node 1 of 3"
   export ANT_MATCHMAKER_SERVER_FLAGS="-server -node=local-node1 -bootstrap-expect=3"
@@ -43,7 +53,7 @@ elif [[ "$NODE_VARIANT" == "node:3/3" ]]; then
   export PERSIST_DIR
 
 else
-  echo "Usage: ah dev ant-matchmaker [single | node:1/1 | node:1/3 | node:2/3 | node:3/3]"
+  echo "Usage: ah dev ant-matchmaker [client | single | node:1/1 | node:1/3 | node:2/3 | node:3/3]"
   exit 1
 fi
 

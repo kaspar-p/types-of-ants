@@ -3,6 +3,7 @@ use clap::{CommandFactory, Parser};
 
 mod build;
 mod complete;
+mod curl;
 mod dev;
 
 #[derive(clap::Parser)]
@@ -10,6 +11,7 @@ mod dev;
 enum Cli {
     Build(build::BuildCmd),
     Dev(dev::DevCmd),
+    Curl(curl::CurlCmd),
 }
 
 #[tokio::main(flavor = "local")]
@@ -28,6 +30,9 @@ async fn main() -> Result<()> {
         }
         Cli::Dev(cmd) => {
             dev::dev(cmd).await?;
+        }
+        Cli::Curl(cmd) => {
+            curl::curl(cmd).await?;
         }
     }
 

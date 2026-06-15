@@ -15,6 +15,8 @@ pub struct AnthillManifest {
     #[serde(default)]
     pub build_parallelism: AnthillBuildParallelism,
 
+    /// Project-type specific configuration.
+    /// For example, databases have connection credentials (dbname + pw + user)
     pub archetype: Option<AnthillArchetype>,
 
     pub deployment: Option<DeploymentOptions>,
@@ -206,23 +208,32 @@ pub enum AnthillBuild {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub enum AnthillArchetype {
     #[serde(rename = "postgres")]
-    Postgres,
+    Postgres {
+        /// Database name used to connect to the database.
+        database_secret_name: String,
+
+        /// Username used to connect to the database.
+        username_secret_name: String,
+        
+        /// Password used to connect to the database.
+        password_secret_name: String,
+    },
 
     #[serde(rename = "webservice")]
     Webservice,
 }
 
-impl FromStr for AnthillArchetype {
-    type Err = String;
+// impl FromStr for AnthillArchetype {
+//     type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "postgres" => Ok(AnthillArchetype::Postgres),
-            "webservice" => Ok(AnthillArchetype::Webservice),
-            s => Err(format!("No such archetype: {s}")),
-        }
-    }
-}
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         match s.to_lowercase().as_str() {
+//             "postgres" => Ok(AnthillArchetype::Postgres),
+//             "webservice" => Ok(AnthillArchetype::Webservice),
+//             s => Err(format!("No such archetype: {s}")),
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DeploymentOptions {

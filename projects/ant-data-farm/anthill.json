@@ -1,8 +1,13 @@
 {
+  "$schema": "../../schemas/anthill_schema.json",
   "project": "ant-data-farm",
   "description": "the typesofants database",
   "build": "docker",
-  "archetype": "postgres",
+  "archetype": {
+    "postgres": {
+      "password_secret_name": ""
+    }
+  },
   "ports": {
     "primary": 7000
   },
