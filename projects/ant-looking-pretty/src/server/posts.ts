@@ -219,7 +219,16 @@ export const webAction = async (
 ) => await constructPost(posts.webAction, inputData);
 export const favorite = async (
   inputData: z.infer<typeof posts.favorite.inputDataSchema>,
-) => await constructPost(posts.favorite, inputData);
+) => {
+  const res = await constructPost(posts.favorite, inputData);
+  if (res.__status === 200) {
+    res.favoritedAt =
+      typeof res.favoritedAt === "number"
+        ? res.favoritedAt
+        : Math.floor(new Date(res.favoritedAt).getTime() / 1000);
+  }
+  return res;
+};
 export const unfavorite = async (
   inputData: z.infer<typeof posts.unfavorite.inputDataSchema>,
 ) => await constructPost(posts.unfavorite, inputData);

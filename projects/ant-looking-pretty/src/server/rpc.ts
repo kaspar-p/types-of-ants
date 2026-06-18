@@ -34,7 +34,7 @@ export type AntOnTheWebResponse = { __status: 200 } & (
   | { __type: "PasswordResetResponse" }
   | { __type: "SubscribeNewsletterResponse" }
   | { __type: "WebActionResponse" }
-  | { __type: "FavoriteAntResponse"; favoritedAt: string }
+  | { __type: "FavoriteAntResponse"; favoritedAt: string | number }
   | { __type: "UnfavoriteAntResponse" }
 );
 

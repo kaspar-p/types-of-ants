@@ -102,12 +102,9 @@ export function AntText(props: AntTextProps) {
                       break;
                     }
                     case 200: {
-                      ant.favoritedAt = formatDatetime(
-                        new Date(res.favoritedAt),
-                      );
                       setAnt({
                         ...ant,
-                        favoritedAt: formatDatetime(new Date(res.favoritedAt)),
+                        favoritedAt: res.favoritedAt,
                       });
                       break;
                     }
@@ -139,7 +136,7 @@ export function AntText(props: AntTextProps) {
             liked && ant.favoritedAt ? (
               <div className="flex flex-row gap-x-1">
                 {/* <AntHeart liked={liked} enableHover={false} /> */}
-                favorited at {formatDatetime(new Date(ant.favoritedAt))}
+                favorited at {formatDatetime(new Date(ant.favoritedAt * 1000))}
               </div>
             ) : (
               <div>not your favorite {":("}</div>

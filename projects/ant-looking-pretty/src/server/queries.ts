@@ -28,7 +28,14 @@ const releasedAntSchema = z.object({
   antName: z.string(),
   createdAt: z.string(),
   createdByUsername: z.string(),
-  favoritedAt: z.string().nullable(),
+  favoritedAt: z
+    .union([z.number(), z.string()])
+    .nullable()
+    .transform((v) => {
+      if (v === null) return null;
+      if (typeof v === "number") return v;
+      return Math.floor(new Date(v).getTime() / 1000);
+    }),
   release: z.object({
     createdAt: z.string(),
     createdBy: z.string(),

@@ -130,7 +130,7 @@ pub struct ReleasedAnt {
     pub created_by_username: String,
     pub release: Release,
 
-    /// If the user is logged in, this is Some(bool), else None
+    #[serde(with = "chrono::serde::ts_seconds_option")]
     pub favorited_at: Option<DateTime<Utc>>,
 }
 
@@ -472,6 +472,7 @@ pub struct FavoriteAntRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FavoriteAntResponse {
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub favorited_at: DateTime<Utc>,
 }
 

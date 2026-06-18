@@ -62,6 +62,30 @@ async fn ants_total_matches_ants_released() {
 async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_in() {
     let (fixture, cookie) = TestFixture::with_auth(FixtureOptions::new()).await;
 
+    let ant_id = {
+        let res = fixture
+            .client
+            .get("/api/ants/released-ants?page=0")
+            .header("Cookie", &cookie)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: ReleasedAntsResponse = res.json().await;
+        body.ants.first().unwrap().ant_id.clone()
+    };
+
+    {
+        let res = fixture
+            .client
+            .post("/api/ants/favorite")
+            .header("Cookie", &cookie)
+            .json(&FavoriteAntRequest { ant_id: ant_id.clone() })
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // After favoriting, released-ants should return favoritedAt as a Unix timestamp (number).
     {
         let res = fixture
             .client
@@ -70,6 +94,20 @@ async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_i
             .send()
             .await;
         assert_eq!(res.status(), StatusCode::OK);
+
+        let raw: serde_json::Value = res.json().await;
+        let favorited_ant = raw["ants"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["antId"] == ant_id.to_string())
+            .unwrap();
+
+        assert!(
+            favorited_ant["favoritedAt"].is_number(),
+            "favoritedAt in released-ants must be a Unix timestamp (number) — got: {}",
+            favorited_ant["favoritedAt"]
+        );
     }
 }
 
@@ -224,7 +262,13 @@ async fn ants_favorite_returns_200_idempotently() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let body: FavoriteAntResponse = res.json().await;
+        let raw: serde_json::Value = res.json().await;
+        assert!(
+            raw["favoritedAt"].is_number(),
+            "favoritedAt must be a Unix timestamp (number), not a string — got: {}",
+            raw["favoritedAt"]
+        );
+        let body: FavoriteAntResponse = serde_json::from_value(raw).unwrap();
 
         body.favorited_at
     };
@@ -243,7 +287,13 @@ async fn ants_favorite_returns_200_idempotently() {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        let body: FavoriteAntResponse = res.json().await;
+        let raw: serde_json::Value = res.json().await;
+        assert!(
+            raw["favoritedAt"].is_number(),
+            "favoritedAt must be a Unix timestamp (number), not a string — got: {}",
+            raw["favoritedAt"]
+        );
+        let body: FavoriteAntResponse = serde_json::from_value(raw).unwrap();
 
         body.favorited_at
     };
