@@ -2,7 +2,7 @@
 
 import { Heart, Info } from "lucide-react";
 import { ReleasedAnt } from "@/server/queries";
-import { MouseEventHandler, useEffect, useState } from "react";
+import { MouseEventHandler, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 import { favorite, unfavorite } from "@/server/posts";
 import { useRouter } from "next/navigation";
@@ -17,11 +17,7 @@ const ICON_SIZE = 14;
 export function AntText(props: AntTextProps) {
   const displayIcon = true;
 
-  const [ant, setAnt] = useState<ReleasedAnt | undefined>(undefined);
-
-  useEffect(() => {
-    setAnt(props.ant);
-  }, []);
+  const [ant, setAnt] = useState<ReleasedAnt>(props.ant);
 
   const { push } = useRouter();
 
