@@ -20,7 +20,9 @@ tower-http = { version = "0.6.6", features = [
 tracing = { version = "0.1.41", features = ["max_level_debug"] }
 dotenv = "0.15.0"
 futures = "0.3.31"
+http-body-util = "0.1"
 tokio-util = { version = "0.7.16", features = ["io"] }
+aes-gcm = { version = "0.10", features = ["std"] }
 sha2 = "0.10.9"
 base64ct = { version = "1.8.0", features = ["alloc"] }
 base16ct = { version = "0.3.0", features = ["alloc"] }

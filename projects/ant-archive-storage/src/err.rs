@@ -8,6 +8,7 @@ pub enum AntArchiveStorageError {
     AccessDenied,
     NotFound(String),
     RangeNotSatisfiable,
+    BadRequest(String),
 }
 
 impl IntoResponse for AntArchiveStorageError {
@@ -26,6 +27,9 @@ impl IntoResponse for AntArchiveStorageError {
             }
             AntArchiveStorageError::RangeNotSatisfiable => {
                 (StatusCode::RANGE_NOT_SATISFIABLE, "Range not satisfiable.").into_response()
+            }
+            AntArchiveStorageError::BadRequest(msg) => {
+                (StatusCode::BAD_REQUEST, msg).into_response()
             }
         }
     }

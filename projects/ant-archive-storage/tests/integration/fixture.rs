@@ -4,8 +4,14 @@ use std::{
     path::PathBuf,
 };
 
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Key,
+};
 use ant_archive_storage::{build_metric_layer, make_routes, AntArchiveStorageState};
 use ant_library_test::axum_test_client::TestClient;
+
+const TEST_TEK: [u8; 32] = [42u8; 32];
 
 pub struct TestFixture {
     pub root: PathBuf,
@@ -16,6 +22,33 @@ pub struct TestFixture {
 impl Drop for TestFixture {
     fn drop(&mut self) {
         remove_dir_all(self.root.clone()).unwrap();
+    }
+}
+
+impl TestFixture {
+    /// Wraps `content` as the outer blob that the ant-archive router sends to storage.
+    ///
+    /// Mirrors the router's upload path: produces a fake inner (nonce || content || tag,
+    /// length >= 28) then AES-GCM-encrypts it with TEST_TEK to form the outer blob.
+    ///
+    /// Returns (outer_bytes, "X-Ant-Tek" header value).
+    pub fn make_outer_blob(&self, content: &[u8]) -> (Vec<u8>, String) {
+        // Fake inner: 12-byte nonce prefix + content + 16-byte tag suffix.
+        // Guarantees len(inner) = 28 + content.len() >= 28.
+        let mut inner = vec![0u8; 12];
+        inner.extend_from_slice(content);
+        inner.extend_from_slice(&[0u8; 16]);
+
+        let key = Key::<Aes256Gcm>::from_slice(&TEST_TEK);
+        let cipher = Aes256Gcm::new(key);
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let ciphertext = cipher.encrypt(&nonce, inner.as_slice()).unwrap();
+
+        let mut outer = nonce.to_vec();
+        outer.extend(ciphertext);
+
+        let tek_header = base16ct::lower::encode_string(&TEST_TEK);
+        (outer, tek_header)
     }
 }
 

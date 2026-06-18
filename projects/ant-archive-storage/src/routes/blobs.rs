@@ -3,6 +3,7 @@ use crate::{
     err::AntArchiveStorageError,
     state::AntArchiveStorageState,
 };
+use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Key, Nonce};
 use ant_library::routes::Routes;
 use anyhow::Context;
 use axum::{
@@ -19,14 +20,14 @@ use axum_extra::{
 };
 use axum_prometheus::PrometheusMetricLayer;
 use base64ct::{Base64, Encoding};
-use futures::TryStreamExt;
 use http::{header, StatusCode};
+use http_body_util::BodyExt;
 use sha2::{Digest, Sha256};
 use std::io::ErrorKind;
 use std::{path::Path as FsPath, path::PathBuf};
 use subtle::ConstantTimeEq;
 use tokio::io::AsyncReadExt;
-use tokio_util::io::{ReaderStream, StreamReader};
+use tokio_util::io::ReaderStream;
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};
 use tracing::info;
@@ -99,9 +100,43 @@ async fn put_blob(
     TypedHeader(auth): TypedHeader<Authorization<Basic>>,
     State(state): State<AntArchiveStorageState>,
     Path(storage_key): Path<String>,
+    headers: HeaderMap,
     body: Body,
 ) -> Result<impl IntoResponse, AntArchiveStorageError> {
     authenticate(&auth)?;
+
+    let tek_hex = headers
+        .get("x-ant-tek")
+        .ok_or_else(|| AntArchiveStorageError::BadRequest("X-Ant-Tek header missing".to_string()))?
+        .to_str()
+        .map_err(|_| AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid UTF-8".to_string()))?;
+
+    let mut tek = [0u8; 32];
+    base16ct::lower::decode(tek_hex, &mut tek)
+        .map_err(|_| AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid hex".to_string()))?;
+
+    let outer = body
+        .collect()
+        .await
+        .context("Failed to read request body")?
+        .to_bytes()
+        .to_vec();
+
+    // Decrypt outer with TEK to validate the inner blob in memory; discard both after.
+    if outer.len() < 12 {
+        return Err(AntArchiveStorageError::BadRequest(
+            "outer blob too short to contain TEK nonce".to_string(),
+        ));
+    }
+    let (tek_nonce_bytes, outer_ciphertext) = outer.split_at(12);
+    let tek_key = Key::<Aes256Gcm>::from_slice(&tek);
+    let tek_cipher = Aes256Gcm::new(tek_key);
+    let tek_nonce = Nonce::from_slice(tek_nonce_bytes);
+    {
+        tek_cipher
+            .decrypt(tek_nonce, outer_ciphertext)
+            .map_err(|_| AntArchiveStorageError::BadRequest("TEK decryption failed".to_string()))?;
+    }
 
     let dest = blob_path(&state.root, &storage_key);
     info!("PUT blob: {storage_key}");
@@ -116,8 +151,7 @@ async fn put_blob(
     let tmp_path = tmp.path().to_path_buf();
 
     // On error, tmp drops and auto-deletes the file.
-    let stream = body.into_data_stream().map_err(std::io::Error::other);
-    BlobHandle::write(&tmp_path, StreamReader::new(stream)).await?;
+    BlobHandle::write(&tmp_path, outer.as_slice()).await?;
 
     let new_size = BlobHandle::size(&tmp_path).await?;
 

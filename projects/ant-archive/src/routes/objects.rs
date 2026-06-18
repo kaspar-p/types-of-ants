@@ -5,6 +5,7 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::Context;
+use hkdf::Hkdf;
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Path, State},
@@ -90,8 +91,28 @@ fn load_kek() -> Result<[u8; 32], AntArchiveError> {
     })
 }
 
+fn load_tek_master() -> Result<[u8; 32], AntArchiveError> {
+    let bytes = ant_library::secret::load_secret_binary("ant_archive_tek_master")?;
+    let len = bytes.len();
+    bytes.try_into().map_err(|_| {
+        AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            "ant_archive_tek_master must be exactly 32 bytes, got {len}"
+        )))
+    })
+}
+
+fn derive_tek(tek_master: &[u8; 32], object_id: &str) -> Result<[u8; 32], AntArchiveError> {
+    let hkdf = Hkdf::<Sha256>::new(None, tek_master);
+    let mut tek = [0u8; 32];
+    hkdf.expand(object_id.as_bytes(), &mut tek).map_err(|e| {
+        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("TEK derivation failed: {e}")))
+    })?;
+    Ok(tek)
+}
+
 fn encrypt_object(
     kek: &[u8; 32],
+    tek: &[u8; 32],
     plaintext: &[u8],
 ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), AntArchiveError> {
     let mut dek = [0u8; 32];
@@ -108,8 +129,8 @@ fn encrypt_object(
             )))
         })?;
 
-    let mut stored_bytes = object_nonce.to_vec();
-    stored_bytes.extend_from_slice(&ciphertext);
+    let mut inner = object_nonce.to_vec();
+    inner.extend_from_slice(&ciphertext);
 
     let dek_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let kek_key = Key::<Aes256Gcm>::from_slice(kek);
@@ -118,29 +139,58 @@ fn encrypt_object(
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("DEK encryption failed: {e}")))
     })?;
 
+    let tek_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let tek_key = Key::<Aes256Gcm>::from_slice(tek);
+    let tek_cipher = Aes256Gcm::new(tek_key);
+    let outer_ciphertext = tek_cipher.encrypt(&tek_nonce, inner.as_ref()).map_err(|e| {
+        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("TEK encryption failed: {e}")))
+    })?;
+
+    let mut stored_bytes = tek_nonce.to_vec();
+    stored_bytes.extend_from_slice(&outer_ciphertext);
+
     Ok((encrypted_dek, dek_nonce.to_vec(), stored_bytes))
 }
 
 fn decrypt_object(
     kek: &[u8; 32],
+    tek: &[u8; 32],
     encrypted_dek: &[u8],
     dek_nonce_bytes: &[u8],
     stored_bytes: &[u8],
 ) -> Result<Vec<u8>, AntArchiveError> {
+    if stored_bytes.len() < 12 {
+        return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            "stored bytes too short to contain TEK nonce: {} bytes",
+            stored_bytes.len()
+        ))));
+    }
+    let (tek_nonce_bytes, outer_ciphertext) = stored_bytes.split_at(12);
+    let tek_key = Key::<Aes256Gcm>::from_slice(tek);
+    let tek_cipher = Aes256Gcm::new(tek_key);
+    let tek_nonce = Nonce::from_slice(tek_nonce_bytes);
+    let inner = tek_cipher
+        .decrypt(tek_nonce, outer_ciphertext)
+        .map_err(|e| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "TEK decryption failed: {e}"
+            )))
+        })?;
+
+    if inner.len() < 12 {
+        return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            "inner blob too short to contain nonce: {} bytes",
+            inner.len()
+        ))));
+    }
+    let (object_nonce_bytes, ciphertext) = inner.split_at(12);
+
     let kek_key = Key::<Aes256Gcm>::from_slice(kek);
     let kek_cipher = Aes256Gcm::new(kek_key);
     let dek_nonce = Nonce::from_slice(dek_nonce_bytes);
     let dek = kek_cipher.decrypt(dek_nonce, encrypted_dek).map_err(|e| {
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("DEK decryption failed: {e}")))
     })?;
-
-    if stored_bytes.len() < 12 {
-        return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-            "stored bytes too short to contain nonce: {} bytes",
-            stored_bytes.len()
-        ))));
-    }
-    let (object_nonce_bytes, ciphertext) = stored_bytes.split_at(12);
 
     let dek_len = dek.len();
     let dek_arr: [u8; 32] = dek.try_into().map_err(|_| {
@@ -210,8 +260,7 @@ async fn put_object(
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active KEK version")))
     })?;
 
-    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &plaintext)?;
-    let checksum = compute_checksum(&stored_bytes);
+    let tek_master = load_tek_master()?;
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
     let storage_node = storage_nodes.first().ok_or_else(|| {
@@ -225,12 +274,29 @@ async fn put_object(
             &kek_id,
             &key,
             plaintext_len,
+            // placeholders — overwritten below once object_id is known
+            &[],
+            &[],
+        )
+        .await?;
+
+    let tek = derive_tek(&tek_master, &object_id)?;
+    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &tek, &plaintext)?;
+    let checksum = compute_checksum(&stored_bytes);
+
+    state
+        .db
+        .upsert_object(
+            &bucket_id,
+            &kek_id,
+            &key,
+            plaintext_len,
             &encrypted_dek,
             &dek_nonce,
         )
         .await?;
 
-    storage_node.put(&object_id, stored_bytes).await?;
+    storage_node.put(&object_id, &tek, stored_bytes).await?;
 
     state
         .db
@@ -307,8 +373,12 @@ async fn get_object(
             )))
         })?;
 
+    let tek_master = load_tek_master()?;
+    let tek = derive_tek(&tek_master, &object.object_id)?;
+
     let plaintext = decrypt_object(
         &load_kek()?,
+        &tek,
         &object.encrypted_dek,
         &object.dek_nonce,
         &stored_bytes,

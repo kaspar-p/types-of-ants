@@ -23,6 +23,7 @@ dotenv = "0.15.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 base16ct = { version = "0.3.0", features = ["alloc"] }
 aes-gcm = { version = "0.10", features = ["std"] }
+hkdf = "0.12"
 rand = "0.8"
 sha2 = "0.10.9"
 http-body-util = "0.1"

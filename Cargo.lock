@@ -147,6 +147,7 @@ dependencies = [
  "axum-extra",
  "base16ct",
  "dotenv",
+ "hkdf",
  "http 1.4.0",
  "http-body-util",
  "rand 0.8.6",
@@ -174,6 +175,7 @@ dependencies = [
 name = "ant-archive-storage"
 version = "1.0.0"
 dependencies = [
+ "aes-gcm",
  "ant-library",
  "ant-library-test",
  "anyhow",
@@ -186,6 +188,7 @@ dependencies = [
  "dotenv",
  "futures",
  "http 1.4.0",
+ "http-body-util",
  "metrics-exporter-prometheus",
  "num_enum",
  "sha2 0.10.9",
