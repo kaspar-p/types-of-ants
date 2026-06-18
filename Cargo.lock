@@ -3655,9 +3655,9 @@ dependencies = [
 
 [[package]]
 name = "mailjet-rs"
-version = "0.3.0"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e6fb560b2147db712a82b7abe88288da99448cfafc093fcccce9b4761b0958"
+checksum = "9a25a055d9c699e5883b5dc32bcd90a01cb083a4a444f8e629ec2a6666665298"
 dependencies = [
  "base64 0.13.1",
  "http-auth-basic",
@@ -5616,7 +5616,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
