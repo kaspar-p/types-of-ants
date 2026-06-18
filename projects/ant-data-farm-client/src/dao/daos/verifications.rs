@@ -281,7 +281,7 @@ impl VerificationsDao {
 
         info!("comparing attempt to {otp} for {verification_id}");
 
-        if verify_password_hash(&attempt, &otp)? {
+        if verify_password_hash(&attempt, &otp).await? {
             info!("otp attempt succeeded, marking {verification_id} as verified");
             let row = t
                 .query_one(

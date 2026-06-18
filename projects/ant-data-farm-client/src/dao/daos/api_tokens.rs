@@ -19,7 +19,7 @@ impl ApiTokensDao {
         user_id: &UserId,
         api_token: &str,
     ) -> Result<(), anyhow::Error> {
-        let token_hash = make_password_hash(api_token)?;
+        let token_hash = make_password_hash(api_token).await?;
 
         self.pool
             .get()
@@ -59,7 +59,7 @@ impl ApiTokensDao {
         info!("Matched {} user(s)...", users.len());
 
         for user in users {
-            if verify_password_hash(api_token, user.get("api_token_hash"))? {
+            if verify_password_hash(api_token, user.get("api_token_hash")).await? {
                 info!("Verified hash successfully for user {}", username);
                 return Ok(Some(user.get("user_id")));
             } else {

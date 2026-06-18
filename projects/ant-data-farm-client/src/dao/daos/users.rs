@@ -167,7 +167,7 @@ impl UsersDao {
         let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
-        let password_hash = ant_library::crypto::make_password_hash(&password)?;
+        let password_hash = ant_library::crypto::make_password_hash(&password).await?;
 
         let role_id: Uuid = t
             .query(
@@ -243,7 +243,7 @@ impl UsersDao {
         new_password: &str,
     ) -> Result<(), anyhow::Error> {
         let con = self.pool.get().await?;
-        let password_hash = ant_library::crypto::make_password_hash(&new_password)?;
+        let password_hash = ant_library::crypto::make_password_hash(new_password).await?;
 
         con.query_one(
             "

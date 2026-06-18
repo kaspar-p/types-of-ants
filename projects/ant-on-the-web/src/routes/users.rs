@@ -241,7 +241,8 @@ async fn login(
     if !ant_library::crypto::verify_password_hash(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
-    )? {
+    )
+    .await? {
         info!("Password invalid");
         return Err(AntOnTheWebError::AccessDenied(None));
     }

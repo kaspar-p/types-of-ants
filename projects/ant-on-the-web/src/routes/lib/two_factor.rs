@@ -80,7 +80,7 @@ async fn send_email_verification_code(
         + &rand::distr::Alphanumeric
             .sample_string(&mut RandAdapter(rng), 5)
             .to_lowercase();
-    let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
+    let otp_hash = ant_library::crypto::make_password_hash(&otp).await?;
 
     info!("Starting email verification for {user_id} on {email} with {otp}");
     let verification = dao
@@ -184,7 +184,7 @@ async fn send_phone_verification_code(
         + &rand::distr::Alphanumeric
             .sample_string(&mut RandAdapter(rng), 5)
             .to_lowercase();
-    let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
+    let otp_hash = ant_library::crypto::make_password_hash(&otp).await?;
 
     info!("Starting phone number verification for {user_id} on {phone_number} with {otp}");
     let verification = dao
