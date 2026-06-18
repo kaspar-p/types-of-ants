@@ -883,21 +883,30 @@ async fn signup_request(
 }
 
 pub fn routes() -> ApiRoutes {
-    Routes::new()
+    let log = axum::middleware::from_fn(ant_library::middleware::print_request_response);
+    let redact = axum::middleware::from_fn(ant_library::middleware::redaction);
+
+    let public = Routes::new()
         .post("/subscribe-newsletter", post(subscribe_email))
         .post("/phone-number", post(add_phone_number))
         .post("/email", post(add_email))
-        .post("/password-reset-code", post(password_reset_code))
-        .post("/password-reset-secret", post(password_reset_secret))
-        .post("/password", post(password))
-        .post("/login", post(login))
         .post("/logout", post(logout))
-        .post("/signup", post(signup_request))
-        .post(
-            "/verification-attempt",
-            post(two_factor_verification_attempt),
-        )
         .get("/user", get(get_user_by_name))
         .post("/username", post(change_username))
         .get("/user/{user_name}", get(get_user_by_name))
+        .layer(log.clone());
+
+    // redaction() is outermost (runs first) so it sets the extension before
+    // print_request_response reads it.
+    let sensitive = Routes::new()
+        .post("/login", post(login))
+        .post("/signup", post(signup_request))
+        .post("/verification-attempt", post(two_factor_verification_attempt))
+        .post("/password", post(password))
+        .post("/password-reset-code", post(password_reset_code))
+        .post("/password-reset-secret", post(password_reset_secret))
+        .layer(log)
+        .layer(redact);
+
+    public.merge_routes(sensitive)
 }

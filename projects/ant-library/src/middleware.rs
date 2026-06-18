@@ -51,11 +51,11 @@ pub fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Ful
         .unwrap()
 }
 
+const MAX_BODY_LOG_BYTES: usize = 64 * 1024;
+
 async fn buffer_and_print<B>(
     direction: &str,
     body: B,
-    redact: bool,
-    ignore: bool,
 ) -> Result<Bytes, (StatusCode, String)>
 where
     B: axum::body::HttpBody<Data = Bytes>,
@@ -71,7 +71,7 @@ where
         }
     };
 
-    if !ignore && !redact && bytes.len() > 0 && bytes.len() < 1024 {
+    if bytes.len() > 0 && bytes.len() < 1024 {
         if let Ok(body) = std::str::from_utf8(&bytes) {
             tracing::debug!("{} body = {:?}", direction, body)
         }
@@ -81,52 +81,53 @@ where
 }
 
 /// Axum middleware for printing requests and responses.
-/// Should be used as a middleware layer for all types-of-ants web servers.
-/// Use `ignore_paths` to specify the paths which to REDACT the request and response.
+/// Routes with sensitive bodies (credentials, PII) should apply the
+/// `redaction()` middleware before this layer.
 pub async fn print_request_response(
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let too_large_to_print = req
+    let too_large = req
         .headers()
         .get(header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(0)
-        > 1024;
+        > MAX_BODY_LOG_BYTES;
 
-    if too_large_to_print {
-        return Ok(next.run(req).await);
-    }
-
-    let redact = req.uri().path().contains("/signup")
-        || req.uri().path().contains("/login")
-        || req.uri().path().contains("/verification-attempt");
-
-    let ignore = req.uri().path().contains("/deployment/iteration");
-
-    if req.extensions().get::<Redaction>().is_some() || redact {
+    if too_large || req.extensions().get::<Redaction>().is_some() {
         return Ok(next.run(req).await);
     }
 
     let (parts, body) = req.into_parts();
-    let bytes = buffer_and_print("request", body, redact, ignore).await?;
+    let bytes = buffer_and_print("request", body).await?;
     let request = Request::from_parts(parts, Body::from(bytes));
 
     let res = next.run(request).await;
 
     let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body, redact, ignore).await?;
+    let bytes = buffer_and_print("response", body).await?;
     let response = Response::from_parts(parts, Body::from(bytes));
 
     Ok(response)
 }
 
+// Marker type inserted into request extensions by `redaction()`.
+// `print_request_response` skips buffering when it finds this extension.
 #[derive(Clone)]
 struct Redaction;
 
-/// Mark a route's body as redacted — buffered but not logged (credentials, PII).
-/// Apply before request_response_logging() in the layer stack.
+/// Marks a route group's bodies as redacted so `print_request_response` skips logging them.
+///
+/// **Layer ordering is critical.** `redaction()` must be the *outermost* layer (added last)
+/// so it runs before `print_request_response` and inserts the extension in time:
+///
+/// ```rust,ignore
+/// Routes::new()
+///     .post("/login", post(login))
+///     .layer(print_request_response)  // inner — runs second, sees the extension
+///     .layer(redaction())             // outer — runs first, inserts the extension
+/// ```
 pub async fn redaction(mut req: Request<Body>, next: Next) -> Response {
     req.extensions_mut().insert(Redaction);
     next.run(req).await

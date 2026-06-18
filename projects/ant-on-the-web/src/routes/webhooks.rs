@@ -15,7 +15,12 @@ use crate::{err::AntOnTheWebError, state::ApiRoutes};
 const STRIPE_API_VERSION: &str = "2025-03-31.basil";
 
 pub fn routes() -> ApiRoutes {
-    Routes::new().post("/stripe", post(stripe_webhook))
+    Routes::new()
+        .post("/stripe", post(stripe_webhook))
+        .layer(axum::middleware::from_fn(
+            ant_library::middleware::print_request_response,
+        ))
+        .layer(axum::middleware::from_fn(ant_library::middleware::redaction))
 }
 
 async fn stripe_webhook(headers: HeaderMap, body: Bytes) -> Result<Response, AntOnTheWebError> {

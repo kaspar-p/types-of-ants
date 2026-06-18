@@ -96,24 +96,30 @@ pub fn make_routes(
         .allow_credentials(true)
         .allow_headers([header::CONTENT_TYPE]);
 
+    // Public routes: logging applied here.
+    // Sensitive routes (users, webhooks): carry their own logging + redaction layers
+    // with the correct ordering (redaction outermost so it runs before logging).
     let api_routes = Routes::new()
         .merge_routes(version::routes())
         .nest_routes("/ants", ants::routes())
         // .nest("/msg", routes::msg::router())
         .nest_routes("/api-tokens", api_tokens::routes())
-        .nest_routes("/users", users::routes())
         .nest_routes("/hosts", hosts::routes())
         .nest_routes("/web-actions", web_actions::routes())
-        .nest_routes("/webhooks", webhooks::routes())
         .nest_routes("/prints", prints::routes())
         // .nest("/tests", tests::router())
         // .nest("/metrics", metrics::router())
         // .nest("/deployments", deployments::router())
-        .build()
-        .with_state(state.clone())
-        .layer(ServiceBuilder::new().layer(axum::middleware::from_fn(
+        .layer(axum::middleware::from_fn(
             ant_library::middleware::print_request_response,
-        )));
+        ))
+        .merge_routes(
+            Routes::new()
+                .nest_routes("/users", users::routes())
+                .nest_routes("/webhooks", webhooks::routes()),
+        )
+        .build()
+        .with_state(state.clone());
 
     debug!("Initializing site routes...");
     let app = Router::new()

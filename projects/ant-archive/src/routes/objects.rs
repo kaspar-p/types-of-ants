@@ -92,11 +92,11 @@ fn load_kek() -> Result<[u8; 32], AntArchiveError> {
 }
 
 fn load_tek_master() -> Result<[u8; 32], AntArchiveError> {
-    let bytes = ant_library::secret::load_secret_binary("ant_archive_tek_master")?;
+    let bytes = ant_library::secret::load_secret_binary("ant_archive_tek")?;
     let len = bytes.len();
     bytes.try_into().map_err(|_| {
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-            "ant_archive_tek_master must be exactly 32 bytes, got {len}"
+            "tek must be exactly 32 bytes, got {len}"
         )))
     })
 }

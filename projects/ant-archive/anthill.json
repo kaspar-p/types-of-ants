@@ -8,6 +8,7 @@
   },
   "secrets": [
     "ant_archive_kek",
+    "ant_archive_tek",
     "ant_archive_db_db",
     "ant_archive_db_user",
     "ant_archive_db_password",

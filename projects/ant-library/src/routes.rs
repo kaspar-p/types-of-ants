@@ -80,6 +80,28 @@ where
         self.register(path, method_router)
     }
 
+    /// Apply a [`tower::Layer`] to all routes in this builder.
+    pub fn layer<L>(self, layer: L) -> Self
+    where
+        L: tower::Layer<axum::routing::Route> + Clone + Send + Sync + 'static,
+        L::Service: tower::Service<
+                axum::extract::Request,
+                Error = std::convert::Infallible,
+            > + Clone
+            + Send
+            + Sync
+            + 'static,
+        <L::Service as tower::Service<axum::extract::Request>>::Response:
+            axum::response::IntoResponse + 'static,
+        <L::Service as tower::Service<axum::extract::Request>>::Future: Send + 'static,
+    {
+        Self {
+            router: self.router.layer(layer),
+            descriptions: self.descriptions,
+            paths: self.paths,
+        }
+    }
+
     /// Consume the builder, attach a generated fallback, and return the
     /// finished [`Router`].
     pub fn build(self) -> Router<S> {
