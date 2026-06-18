@@ -256,7 +256,12 @@ impl AntsDao {
         return Ok(favorite_row.map(|r| r.get("favorited_at")));
     }
 
-    pub async fn favorite_ant(&self, user: &UserId, ant: &AntId) -> Result<DateTime<Utc>> {
+    pub async fn favorite_ant(
+        &self,
+        user: &UserId,
+        ant: &AntId,
+        at: DateTime<Utc>,
+    ) -> Result<DateTime<Utc>> {
         let mut con = self.pool.get().await?;
         let tx = con.transaction().await?;
 
@@ -264,12 +269,12 @@ impl AntsDao {
             .query_one(
                 "
         insert into favorite
-            (user_id, ant_id)
+            (user_id, ant_id, favorited_at)
         values
-            ($1, $2)
+            ($1, $2, $3)
         returning favorited_at
         ",
-                &[&user.0, &ant.0],
+                &[&user.0, &ant.0, &at],
             )
             .await?
             .get("favorited_at");
@@ -380,6 +385,20 @@ impl AntsDao {
             .get("cnt");
 
         Ok(count)
+    }
+
+    pub async fn get_random_released_name(&self) -> Result<Option<String>> {
+        let row = self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                "select ant_content from ant_release order by random() limit 1",
+                &[],
+            )
+            .await?;
+
+        Ok(row.map(|r| r.get("ant_content")))
     }
 
     pub async fn get_all_released(&self) -> Result<Vec<Ant>> {

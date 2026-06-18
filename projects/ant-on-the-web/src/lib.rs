@@ -8,6 +8,8 @@ use std::sync::Arc;
 use throttle::ThrottleExtractor;
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
+
+mod middleware;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLayer};
 use tower_http::{
     catch_panic::CatchPanicLayer,
@@ -81,7 +83,9 @@ pub fn make_routes(
 
     let throttling = Arc::new(
         GovernorConfigBuilder::default()
-            .period(std::time::Duration::from_millis(1000 / opts.tps as u64))
+            .period(std::time::Duration::from_millis(
+                (1000 / opts.tps as u64).max(1),
+            ))
             .burst_size(opts.tps)
             .use_headers()
             .key_extractor(ThrottleExtractor::new()) // Limit based on X-Real-IP Header
@@ -140,6 +144,10 @@ pub fn make_routes(
                 .layer(axum::middleware::from_fn_with_state(
                     state.clone(),
                     telemetry_cookie_middleware,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    middleware::x_ant_middleware,
                 )),
         );
 

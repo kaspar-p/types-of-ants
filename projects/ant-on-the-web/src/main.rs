@@ -1,6 +1,6 @@
 use ant_data_farm::AntDataFarmClient;
 use ant_library::{get_mode, sd::reader::ServiceDiscovery};
-use ant_library::rng::SystemRng;
+use ant_library::{clock::WallClock, rng::SystemRng};
 use ant_on_the_web::{email::MailjetEmailSender, sms::Sms, state::InnerApiState, ApiOptions};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tracing::debug;
@@ -35,6 +35,7 @@ async fn main() {
         email: Arc::new(MailjetEmailSender::new()),
 
         rng: Arc::new(SystemRng),
+        clock: Arc::new(WallClock),
     };
     let app =
         ant_on_the_web::make_routes(&state, ApiOptions { tps: 250 }).expect("route init failed");

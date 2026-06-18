@@ -478,7 +478,7 @@ pub struct FavoriteAntResponse {
 
 async fn favorite_ant(
     auth: AuthClaims,
-    State(InnerApiState { dao, .. }): ApiState,
+    State(InnerApiState { dao, clock, .. }): ApiState,
     Json(req): Json<FavoriteAntRequest>,
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let user = authenticate(&auth, &dao).await?;
@@ -492,7 +492,7 @@ async fn favorite_ant(
     let favorited_at: DateTime<Utc> =
         match dao.ants.is_favorite_ant(&user.user_id, &req.ant_id).await? {
             Some(time) => time,
-            None => dao.ants.favorite_ant(&user.user_id, &req.ant_id).await?,
+            None => dao.ants.favorite_ant(&user.user_id, &req.ant_id, clock.now()).await?,
         };
 
     Ok(AntOnTheWebResponse::FavoriteAntResponse(

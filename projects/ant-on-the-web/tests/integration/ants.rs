@@ -25,6 +25,16 @@ async fn ants_total_matches_ants_released() {
         .send()
         .await;
     assert_eq!(ants_res.status(), StatusCode::OK);
+    assert!(
+        !ants_res
+            .headers()
+            .get("x-ant")
+            .expect("x-ant header missing")
+            .to_str()
+            .unwrap()
+            .is_empty(),
+        "x-ant header must not be empty"
+    );
     let ants: ReleasedAntsResponse = ants_res.json().await;
 
     let total_res = fixture.client.get("/api/ants/total").send().await;
