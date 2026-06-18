@@ -101,10 +101,16 @@ fn load_tek_master() -> Result<[u8; 32], AntArchiveError> {
     })
 }
 
-fn derive_tek(tek_master: &[u8; 32], object_id: &str) -> Result<[u8; 32], AntArchiveError> {
+fn generate_tek_derivation_key(rng: &dyn ant_library::rng::Rng) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    rng.fill(&mut key);
+    key
+}
+
+fn derive_tek(tek_master: &[u8; 32], tek_derivation_key: &[u8]) -> Result<[u8; 32], AntArchiveError> {
     let hkdf = Hkdf::<Sha256>::new(None, tek_master);
     let mut tek = [0u8; 32];
-    hkdf.expand(object_id.as_bytes(), &mut tek).map_err(|e| {
+    hkdf.expand(tek_derivation_key, &mut tek).map_err(|e| {
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("TEK derivation failed: {e}")))
     })?;
     Ok(tek)
@@ -154,28 +160,35 @@ fn encrypt_object(
 
 fn decrypt_object(
     kek: &[u8; 32],
-    tek: &[u8; 32],
+    tek: Option<&[u8; 32]>,
     encrypted_dek: &[u8],
     dek_nonce_bytes: &[u8],
     stored_bytes: &[u8],
 ) -> Result<Vec<u8>, AntArchiveError> {
-    if stored_bytes.len() < 12 {
-        return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-            "stored bytes too short to contain TEK nonce: {} bytes",
-            stored_bytes.len()
-        ))));
-    }
-    let (tek_nonce_bytes, outer_ciphertext) = stored_bytes.split_at(12);
-    let tek_key = Key::<Aes256Gcm>::from_slice(tek);
-    let tek_cipher = Aes256Gcm::new(tek_key);
-    let tek_nonce = Nonce::from_slice(tek_nonce_bytes);
-    let inner = tek_cipher
-        .decrypt(tek_nonce, outer_ciphertext)
-        .map_err(|e| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-                "TEK decryption failed: {e}"
-            )))
-        })?;
+    // Pre-TEK objects (tek is None) have stored_bytes = inner blob directly.
+    // Post-TEK objects have stored_bytes = tek_nonce || AES-GCM(inner, tek).
+    let inner: Vec<u8> = match tek {
+        Some(tek) => {
+            if stored_bytes.len() < 12 {
+                return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                    "stored bytes too short to contain TEK nonce: {} bytes",
+                    stored_bytes.len()
+                ))));
+            }
+            let (tek_nonce_bytes, outer_ciphertext) = stored_bytes.split_at(12);
+            let tek_key = Key::<Aes256Gcm>::from_slice(tek);
+            let tek_cipher = Aes256Gcm::new(tek_key);
+            let tek_nonce = Nonce::from_slice(tek_nonce_bytes);
+            tek_cipher
+                .decrypt(tek_nonce, outer_ciphertext)
+                .map_err(|e| {
+                    AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                        "TEK decryption failed: {e}"
+                    )))
+                })?
+        }
+        None => stored_bytes.to_vec(),
+    };
 
     if inner.len() < 12 {
         return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
@@ -262,6 +275,26 @@ async fn put_object(
 
     let tek_master = load_tek_master()?;
 
+    // Reuse the existing tek_derivation_key on overwrites so a storage failure
+    // can never leave the DB pointing at a key that doesn't match the stored blob.
+    let tek_derivation_key: [u8; 32] = match state
+        .db
+        .get_object(&bucket_id, &key)
+        .await?
+        .and_then(|o| o.tek_derivation_key)
+    {
+        Some(existing) => existing.try_into().map_err(|_| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "stored tek_derivation_key has unexpected length"
+            )))
+        })?,
+        None => generate_tek_derivation_key(&*state.rng),
+    };
+
+    let tek = derive_tek(&tek_master, &tek_derivation_key)?;
+    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &tek, &plaintext)?;
+    let checksum = compute_checksum(&stored_bytes);
+
     let storage_nodes = resolve_storage_nodes(&state).await?;
     let storage_node = storage_nodes.first().ok_or_else(|| {
         AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active storage nodes found")))
@@ -274,25 +307,9 @@ async fn put_object(
             &kek_id,
             &key,
             plaintext_len,
-            // placeholders — overwritten below once object_id is known
-            &[],
-            &[],
-        )
-        .await?;
-
-    let tek = derive_tek(&tek_master, &object_id)?;
-    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &tek, &plaintext)?;
-    let checksum = compute_checksum(&stored_bytes);
-
-    state
-        .db
-        .upsert_object(
-            &bucket_id,
-            &kek_id,
-            &key,
-            plaintext_len,
             &encrypted_dek,
             &dek_nonce,
+            &tek_derivation_key,
         )
         .await?;
 
@@ -374,11 +391,15 @@ async fn get_object(
         })?;
 
     let tek_master = load_tek_master()?;
-    let tek = derive_tek(&tek_master, &object.object_id)?;
+    let maybe_tek = object
+        .tek_derivation_key
+        .as_deref()
+        .map(|k| derive_tek(&tek_master, k))
+        .transpose()?;
 
     let plaintext = decrypt_object(
         &load_kek()?,
-        &tek,
+        maybe_tek.as_ref(),
         &object.encrypted_dek,
         &object.dek_nonce,
         &stored_bytes,

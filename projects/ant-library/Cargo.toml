@@ -20,6 +20,8 @@ http = "1.3.1"
 http-body-util = "0.1.3"
 openssl = { version = "0.10.81", features = ["vendored"] }
 password-hash = "0.6.1"
+getrandom = "0.2"
+rand = "0.9"
 rand_core = "0.10.1"
 reqwest = { version = "0.12.25", default-features = false, features = [
   "json",

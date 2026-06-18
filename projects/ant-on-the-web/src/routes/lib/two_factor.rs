@@ -11,7 +11,8 @@ use ant_data_farm::{
     AntDataFarmClient,
 };
 use chrono::Duration;
-use rand::{distr::SampleString, rngs::StdRng};
+use ant_library::rng::{RandAdapter, Rng};
+use rand::distr::SampleString;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -71,13 +72,14 @@ pub async fn user_is_two_factor_verified(
 async fn send_email_verification_code(
     dao: &AntDataFarmClient,
     email_sender: &dyn EmailSender,
-    rng: &mut StdRng,
+    rng: &dyn Rng,
     user_id: &UserId,
     email: &str,
 ) -> Result<(), AntOnTheWebError> {
-    let dist = rand::distr::Alphanumeric;
-
-    let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
+    let otp = "ant-".to_string()
+        + &rand::distr::Alphanumeric
+            .sample_string(&mut RandAdapter(rng), 5)
+            .to_lowercase();
     let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
 
     info!("Starting email verification for {user_id} on {email} with {otp}");
@@ -120,7 +122,7 @@ with love,
 pub async fn resend_email_verification_code(
     dao: &AntDataFarmClient,
     email_sender: &dyn EmailSender,
-    rng: &mut StdRng,
+    rng: &dyn Rng,
     user_id: &UserId,
     email: &str,
 ) -> Result<(), AntOnTheWebError> {
@@ -174,13 +176,14 @@ pub async fn receive_email_verification_code(
 async fn send_phone_verification_code(
     dao: &AntDataFarmClient,
     sms: &dyn SmsSender,
-    rng: &mut StdRng,
+    rng: &dyn Rng,
     user_id: &UserId,
     phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {
-    let dist = rand::distr::Alphanumeric;
-
-    let otp = "ant-".to_string() + &dist.sample_string(rng, 5).to_lowercase();
+    let otp = "ant-".to_string()
+        + &rand::distr::Alphanumeric
+            .sample_string(&mut RandAdapter(rng), 5)
+            .to_lowercase();
     let otp_hash = ant_library::crypto::make_password_hash(&otp)?;
 
     info!("Starting phone number verification for {user_id} on {phone_number} with {otp}");
@@ -214,7 +217,7 @@ async fn send_phone_verification_code(
 pub async fn resend_phone_verification_code(
     dao: &AntDataFarmClient,
     sms: &dyn SmsSender,
-    rng: &mut StdRng,
+    rng: &dyn Rng,
     user_id: &UserId,
     phone_number: &str,
 ) -> Result<(), AntOnTheWebError> {

@@ -1,7 +1,7 @@
-use std::{env::set_var, path::PathBuf, sync::Arc};
+use std::{env::set_var, path::PathBuf, sync::{Arc, Mutex}};
 
 use ant_data_farm::AntDataFarmClient;
-use ant_library::{db::TypesOfAntsDatabase, sd::reader::ServiceDiscovery};
+use ant_library::{db::TypesOfAntsDatabase, rng::TestSeededRng, sd::reader::ServiceDiscovery};
 use ant_library_test::{
     axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
@@ -17,10 +17,8 @@ use ant_on_the_web::{
     ApiOptions,
 };
 use http::{header::SET_COOKIE, HeaderMap, StatusCode};
-use rand::SeedableRng;
 use serde_json::json;
 use serde_json_assert::assert_json_eq;
-use tokio::sync::Mutex;
 
 use crate::fixture_sms::first_otp;
 use crate::{fixture_email::TestEmailSender, fixture_sms::second_otp};
@@ -37,7 +35,7 @@ pub struct TestSmsSender {
 
 impl TestSmsSender {
     pub async fn all_msgs(&self) -> Vec<TestMsg> {
-        let msgs = self.msgs.lock().await;
+        let msgs = self.msgs.lock().unwrap();
 
         return msgs.iter().map(|m| m.clone()).collect::<Vec<TestMsg>>();
     }
@@ -46,7 +44,7 @@ impl TestSmsSender {
 #[async_trait::async_trait]
 impl SmsSender for TestSmsSender {
     async fn send_msg(&self, to_phone: &str, content: &str) -> Result<String, SmsError> {
-        let mut msgs = self.msgs.lock().await;
+        let mut msgs = self.msgs.lock().unwrap();
         msgs.push(TestMsg {
             to_phone: to_phone.to_string(),
             content: content.to_string(),
@@ -127,8 +125,7 @@ impl TestFixture {
             sms: Arc::new(sms),
             email: Arc::new(TestEmailSender::new()),
 
-            // Deterministic seed for testing.
-            rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_seed(opts.seed))),
+            rng: Arc::new(TestSeededRng::from_seed(opts.seed)),
         };
         let app = make_routes(
             &state,

@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use ant_archive_db::AntArchiveDb;
-use ant_library::sd::reader::ServiceDiscovery;
+use ant_library::{rng::SystemRng, sd::reader::ServiceDiscovery};
 use tracing::debug;
 
 #[tokio::main]
@@ -26,7 +26,7 @@ async fn main() {
         .await
         .expect("failed to connect to ant-archive-db");
 
-    let state = ant_archive::AntArchiveState::new(db, sd);
+    let state = ant_archive::AntArchiveState { db, sd, rng: Arc::new(SystemRng) };
 
     let app = ant_archive::make_routes(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

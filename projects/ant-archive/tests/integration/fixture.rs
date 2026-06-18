@@ -11,6 +11,7 @@ use ant_archive_storage::{
 };
 use ant_library::{
     db::TypesOfAntsDatabase as _,
+    rng::TestSeededRng,
     sd::{reader::ServiceDiscovery, writer::ServiceDiscoveryWriter},
 };
 use ant_library_test::{
@@ -108,7 +109,7 @@ impl Fixture {
         seed_db(&archive_db).await;
 
         let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-        let state = AntArchiveState::new(archive_db, sd);
+        let state = AntArchiveState { db: archive_db, sd, rng: Arc::new(TestSeededRng::new(42)) };
         let app = make_routes(state);
 
         Fixture {

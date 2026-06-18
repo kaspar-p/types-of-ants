@@ -465,12 +465,10 @@ async fn add_phone_number(
 
     // Send the SMS containing the one-time password
     if !already_added || (already_added && req.force_send) {
-        let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
-
         two_factor::resend_phone_verification_code(
             &dao,
             sms.as_ref(),
-            &mut rng,
+            rng.as_ref(),
             &user.user_id,
             &canonical_phone_number,
         )
@@ -553,11 +551,10 @@ async fn add_email(
 
     if !already_added || (already_added && req.force_send) {
         info!("Sending email verification code");
-        let mut rng = rng.lock().await;
         two_factor::resend_email_verification_code(
             &dao,
             email.as_ref(),
-            &mut rng,
+            rng.as_ref(),
             &user.user_id,
             &canonical_email,
         )
@@ -599,12 +596,10 @@ async fn password_reset_code(
     let user = dao.users.get_one_by_user_name(&req.username).await?;
     match user {
         Some(u) if u.phone_numbers.contains(&phone_number) => {
-            let mut rng: tokio::sync::MutexGuard<'_, rand::prelude::StdRng> = rng.lock().await;
-
             match two_factor::resend_phone_verification_code(
                 &dao,
                 sms.as_ref(),
-                &mut rng,
+                rng.as_ref(),
                 &u.user_id,
                 &phone_number,
             )

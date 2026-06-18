@@ -1,9 +1,8 @@
 use ant_data_farm::AntDataFarmClient;
 use ant_library::{get_mode, sd::reader::ServiceDiscovery};
+use ant_library::rng::SystemRng;
 use ant_on_the_web::{email::MailjetEmailSender, sms::Sms, state::InnerApiState, ApiOptions};
-use rand::SeedableRng;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
 use tracing::debug;
 
 #[tokio::main]
@@ -35,8 +34,7 @@ async fn main() {
         // Mailjet client for sending emails
         email: Arc::new(MailjetEmailSender::new()),
 
-        // Choose OS RNG to seed the std PRNG
-        rng: Arc::new(Mutex::new(rand::rngs::StdRng::from_rng(&mut rand::rng()))),
+        rng: Arc::new(SystemRng),
     };
     let app =
         ant_on_the_web::make_routes(&state, ApiOptions { tps: 250 }).expect("route init failed");

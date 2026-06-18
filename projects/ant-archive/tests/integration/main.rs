@@ -277,13 +277,15 @@ async fn delete_object_returns_200_success() {
         assert_eq!(res.status(), StatusCode::CREATED);
     }
 
-    let res = fixture
-        .client
-        .delete(&format!("/{}/to-delete", fixture.bucket_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .send()
-        .await;
-    assert_eq!(res.status(), StatusCode::OK);
+    {
+        let res = fixture
+            .client
+            .delete(&format!("/{}/to-delete", fixture.bucket_id))
+            .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
 }
 
 #[tokio::test]

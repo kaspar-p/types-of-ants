@@ -25,6 +25,7 @@ pub struct ArchiveObject {
     pub size_bytes: i64,
     pub encrypted_dek: Vec<u8>,
     pub dek_nonce: Vec<u8>,
+    pub tek_derivation_key: Option<Vec<u8>>,
 }
 
 pub struct ArchivePlacement {
@@ -140,7 +141,7 @@ impl AntArchiveDb {
             .await?
             .query_opt(
                 "
-                select object_id, kek_id, size_bytes, encrypted_dek, dek_nonce
+                select object_id, kek_id, size_bytes, encrypted_dek, dek_nonce, tek_derivation_key
                 from archive_object
                 where
                     bucket_id = $1 and
@@ -157,6 +158,7 @@ impl AntArchiveDb {
             size_bytes: r.get("size_bytes"),
             encrypted_dek: r.get("encrypted_dek"),
             dek_nonce: r.get("dek_nonce"),
+            tek_derivation_key: r.get("tek_derivation_key"),
         }))
     }
 
@@ -193,6 +195,7 @@ impl AntArchiveDb {
         size_bytes: i64,
         encrypted_dek: &[u8],
         dek_nonce: &[u8],
+        tek_derivation_key: &[u8],
     ) -> Result<String, anyhow::Error> {
         let object_id = self
             .pool
@@ -201,15 +204,16 @@ impl AntArchiveDb {
             .query_one(
                 "
                 insert into archive_object
-                   (bucket_id, kek_id, key, size_bytes, encrypted_dek, dek_nonce)
+                   (bucket_id, kek_id, key, size_bytes, encrypted_dek, dek_nonce, tek_derivation_key)
                 values
-                    ($1, $2, $3, $4, $5, $6)
+                    ($1, $2, $3, $4, $5, $6, $7)
                 on conflict (bucket_id, key)
                 do update set
                     kek_id = EXCLUDED.kek_id,
                     size_bytes = EXCLUDED.size_bytes,
                     encrypted_dek = EXCLUDED.encrypted_dek,
                     dek_nonce = EXCLUDED.dek_nonce,
+                    tek_derivation_key = EXCLUDED.tek_derivation_key,
                     updated_at = NOW(),
                     deleted_at = NULL
                 returning object_id
@@ -221,6 +225,7 @@ impl AntArchiveDb {
                     &size_bytes,
                     &encrypted_dek,
                     &dek_nonce,
+                    &tek_derivation_key,
                 ],
             )
             .await?

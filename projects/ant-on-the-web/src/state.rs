@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use std::{path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use ant_library::rng::Rng;
 
 use crate::clients::{email::EmailSender, sms::SmsSender};
 
@@ -20,7 +20,7 @@ pub struct InnerApiState {
     pub sms: Arc<dyn SmsSender>,
     pub email: Arc<dyn EmailSender>,
 
-    pub rng: Arc<Mutex<rand::rngs::StdRng>>,
+    pub rng: Arc<dyn Rng>,
 }
 
 pub type ApiState = State<InnerApiState>;

@@ -7,6 +7,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use http::StatusCode;
+use ant_library::rng::RandAdapter;
 use rand::distr::SampleString;
 use serde::{Deserialize, Serialize};
 
@@ -39,9 +40,7 @@ async fn grant_token(
     }
     let user = user.unwrap();
 
-    let dist = rand::distr::Alphanumeric;
-    let mut rng = rng.lock().await;
-    let token = dist.sample_string(&mut rng, 32);
+    let token = rand::distr::Alphanumeric.sample_string(&mut RandAdapter(&*rng), 32);
 
     dao.api_tokens
         .register_api_token(&user.user_id, &token)
