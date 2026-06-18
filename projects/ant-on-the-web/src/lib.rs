@@ -81,7 +81,7 @@ pub fn make_routes(
 
     let throttling = Arc::new(
         GovernorConfigBuilder::default()
-            .period(std::time::Duration::from_millis(1000))
+            .period(std::time::Duration::from_millis(1000 / opts.tps as u64))
             .burst_size(opts.tps)
             .use_headers()
             .key_extractor(ThrottleExtractor::new()) // Limit based on X-Real-IP Header
