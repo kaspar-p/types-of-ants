@@ -1,0 +1,23 @@
+services:
+  ext-ant-archive-storage:
+    image: typesofants/ant-archive-storage:aarch64-latest
+    platform: linux/arm64
+    container_name: ant-archive-storage
+
+    restart: always
+    environment:
+      TYPESOFANTS_SECRET_DIR: /run/secrets
+      PORT: 3253
+      METRICS_PORT: 3254
+      PERSIST_DIR: "/app/persist-dir"
+    ports:
+      - 3253:3253
+      - 3254:3254
+    volumes:
+      - "./dev-fs/ext:/app/persist-dir"
+    secrets:
+      - ant_archive_storage_auth
+
+secrets:
+  ant_archive_storage_auth:
+    file: "../../secrets/dev/ant_archive_storage_auth.secret"
