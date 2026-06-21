@@ -1,6 +1,7 @@
 use ant_library::sd::reader::ServiceDiscovery;
 use anyhow::Context;
 use clap_complete::engine::ArgValueCompleter;
+use tracing::{debug, info};
 
 use crate::complete::complete_projects;
 use crate::git::GitState;
@@ -27,18 +28,24 @@ pub async fn curl(cmd: CurlCmd) -> Result<(), anyhow::Error> {
 
     let url = format!("http://{}:{}{}", address, port, path);
 
-    eprintln!("Calling: {url}");
+    debug!("Calling: {url}");
 
-    let status = tokio::process::Command::new("curl")
+    let mut child = tokio::process::Command::new("curl")
         .arg(&url)
         .arg("--no-progress-meter")
         .arg("--fail-with-body")
         .args(&cmd.args)
-        .status()
-        .await
-        .context("failed to spawn curl")?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("failed to curl")?;
 
-    eprintln!("{status}");
+    let handles = ant_library::process::prefix_log(&service, &mut child).context("logs")?;
+
+    let status = child.wait().await.context("curl failed")?;
+    futures::future::join_all(handles).await;
+
+    info!("{status}");
 
     std::process::exit(status.code().unwrap_or(1));
 }

@@ -1,11 +1,8 @@
 use std::{path::PathBuf, time::Duration};
 
 use tempfile::TempDir;
-use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    task::JoinHandle,
-};
-use tracing::{debug, error, info};
+use tokio::task::JoinHandle;
+use tracing::{error, info};
 
 pub struct ConsulFixture {
     _consul: tokio::process::Child,
@@ -78,21 +75,8 @@ impl ConsulFixture {
 
         let mut consul = cmd.spawn().unwrap();
 
-        let stdout = consul.stdout.take().expect("failed to take stdout");
-        let stderr = consul.stderr.take().expect("failed to take stderr");
-        let mut stdout_reader = BufReader::new(stdout).lines();
-        let mut stderr_reader = BufReader::new(stderr).lines();
-
-        let stderr_task = tokio::spawn(async move {
-            while let Ok(Some(line)) = stderr_reader.next_line().await {
-                debug!("[consul stderr] {}", line);
-            }
-        });
-        let stdout_task = tokio::spawn(async move {
-            while let Ok(Some(line)) = stdout_reader.next_line().await {
-                debug!("[consul stdout] {}", line);
-            }
-        });
+        let handles = ant_library::process::prefix_log("consul", &mut consul)
+            .expect("failed to tail consul logs");
 
         const MAX_ATTEMPTS: i32 = 250;
 
@@ -113,7 +97,7 @@ impl ConsulFixture {
         Self {
             _consul: consul,
             _data_dir: data_dir,
-            handles: vec![stdout_task, stderr_task],
+            handles: handles,
             consul_port: http_port,
         }
     }

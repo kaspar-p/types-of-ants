@@ -377,6 +377,7 @@ name = "ant-library-test"
 version = "1.0.0"
 dependencies = [
  "ant-library",
+ "anyhow",
  "axum",
  "bytes",
  "http 1.4.0",

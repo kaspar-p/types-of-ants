@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }
+anyhow = "1.0.102"
 axum = "0.8.7"
 bytes = "1.11.0"
 http = "1.4.0"
