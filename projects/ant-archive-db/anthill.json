@@ -1,6 +1,6 @@
 {
   "project": "ant-archive-db",
-  "description": "the typesofants archive metadata and key database",
+  "description": "the typesofants archive metadata store",
   "build": "docker",
   "ports": {
     "primary": 3257

@@ -2,8 +2,8 @@ use ant_library::sd::reader::ServiceDiscovery;
 use anyhow::Context;
 use clap_complete::engine::ArgValueCompleter;
 
-use crate::build::GitState;
 use crate::complete::complete_projects;
+use crate::git::GitState;
 
 #[derive(clap::Args)]
 pub struct CurlCmd {

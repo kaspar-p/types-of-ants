@@ -5,7 +5,6 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::Context;
-use hkdf::Hkdf;
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Path, State},
@@ -13,6 +12,7 @@ use axum::{
     routing::{delete, get, put},
     Router,
 };
+use hkdf::Hkdf;
 use http::{header, StatusCode};
 use http_body_util::BodyExt;
 use rand::RngCore;
@@ -35,7 +35,7 @@ fn get_client_credentials() -> Result<HashMap<String, (String, String)>, anyhow:
     let content = ant_library::secret::load_secret("ant_archive_storage_client_auths")?;
 
     let mut map = HashMap::new();
-    for (i, line) in content.split("/").enumerate() {
+    for (i, line) in content.split("\n").enumerate() {
         let mut line_content = line.split(":");
 
         let hostname = line_content
@@ -46,7 +46,7 @@ fn get_client_credentials() -> Result<HashMap<String, (String, String)>, anyhow:
             .ok_or(anyhow::Error::msg(format!("Line {i} had no username")))?;
         let password = line_content
             .next()
-            .ok_or(anyhow::Error::msg(format!("Line {i} had no passowrd")))?;
+            .ok_or(anyhow::Error::msg(format!("Line {i} had no password")))?;
 
         map.insert(
             hostname.to_string(),
@@ -78,6 +78,7 @@ async fn resolve_storage_nodes(
             ));
         }
     }
+
     Ok(clients)
 }
 
@@ -107,7 +108,10 @@ fn generate_tek_derivation_key(rng: &dyn ant_library::rng::Rng) -> [u8; 32] {
     key
 }
 
-fn derive_tek(tek_master: &[u8; 32], tek_derivation_key: &[u8]) -> Result<[u8; 32], AntArchiveError> {
+fn derive_tek(
+    tek_master: &[u8; 32],
+    tek_derivation_key: &[u8],
+) -> Result<[u8; 32], AntArchiveError> {
     let hkdf = Hkdf::<Sha256>::new(None, tek_master);
     let mut tek = [0u8; 32];
     hkdf.expand(tek_derivation_key, &mut tek).map_err(|e| {
@@ -148,9 +152,13 @@ fn encrypt_object(
     let tek_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let tek_key = Key::<Aes256Gcm>::from_slice(tek);
     let tek_cipher = Aes256Gcm::new(tek_key);
-    let outer_ciphertext = tek_cipher.encrypt(&tek_nonce, inner.as_ref()).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("TEK encryption failed: {e}")))
-    })?;
+    let outer_ciphertext = tek_cipher
+        .encrypt(&tek_nonce, inner.as_ref())
+        .map_err(|e| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "TEK encryption failed: {e}"
+            )))
+        })?;
 
     let mut stored_bytes = tek_nonce.to_vec();
     stored_bytes.extend_from_slice(&outer_ciphertext);

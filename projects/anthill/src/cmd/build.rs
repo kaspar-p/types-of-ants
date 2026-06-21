@@ -1,21 +1,17 @@
-use std::{collections::HashSet, os::unix::fs::PermissionsExt, path::PathBuf, str::FromStr};
+use std::{collections::HashSet, os::unix::fs::PermissionsExt, str::FromStr};
 
 use ant_library::{host_architecture::HostArchitecture, services::Services};
-use ant_zookeeper::{client::AntZookeeperClientConfig, routes::service::UpsertRevisionRequest};
 use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
 use async_tempfile::TempFile;
 use bollard::body_full;
-use chrono::{Datelike, Timelike};
-use clap::ArgAction;
 use clap_complete::engine::ArgValueCompleter;
 use futures::StreamExt;
-use git2::{Commit, Repository};
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{error, info, warn};
 
-use crate::complete::complete_projects;
+use crate::{complete::complete_projects, git::GitState};
 
 pub fn find_up(filename: &str) -> std::path::PathBuf {
     let mut dir = std::env::current_dir().unwrap();
@@ -40,39 +36,25 @@ pub struct BuildCmd {
 
     #[arg(short, long, value_parser = HostArchitecture::from_str)]
     arch: Option<HostArchitecture>,
-
-    /// By default, deploy after building
-    #[clap(long = "no-deploy", action = ArgAction::SetFalse)]
-    deploy: bool,
-
-    /// Or choose --no-deploy to not deploy.
-    #[clap(long = "deploy", overrides_with = "deploy")]
-    _no_deploy: bool,
 }
 
-pub async fn build(cmd: BuildCmd) {
+impl BuildCmd {
+    pub fn new(project: String, arch: Option<HostArchitecture>) -> Self {
+        Self { project, arch }
+    }
+}
+
+pub struct DeploymentFile {
+    pub file: TempFile,
+    pub version: String,
+    pub arch: HostArchitecture,
+}
+
+pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
     let services: Services =
         serde_json::de::from_reader(std::fs::File::open(find_up("services.json")).unwrap())
             .unwrap();
     services.validate().expect("malformed services.json");
-
-    let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
-        tls: false,
-        endpoint: "localhost:3235".to_string(),
-    });
-
-    let revision = if cmd.deploy {
-        Some(
-            client
-                .upsert_revision(UpsertRevisionRequest {
-                    project: cmd.project.clone(),
-                })
-                .await
-                .unwrap(),
-        )
-    } else {
-        None
-    };
 
     let arches: HashSet<HostArchitecture> = [
         HostArchitecture::Aarch64,
@@ -81,7 +63,7 @@ pub async fn build(cmd: BuildCmd) {
     ]
     .into();
 
-    let git = GitState::new().unwrap();
+    let git = GitState::new().expect("failed to fetch git state");
     let project_src = git.root.join("projects").join(&cmd.project);
     let manifest = AnthillManifest::from_file(&project_src.join("anthill.json")).expect(&format!(
         "Project {} had no anthill.json in its root.",
@@ -90,27 +72,34 @@ pub async fn build(cmd: BuildCmd) {
 
     match manifest.build_parallelism {
         AnthillBuildParallelism::Serial => {
+            let mut files = vec![];
             for arch in arches {
-                let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
                 let cmd2 = cmd.clone();
+                let git2 = git.clone();
                 let proj = cmd2.project.clone();
-                build_arch(cmd2, &arch, revision.as_deref())
-                    .await
-                    .context(format!("building {} {}", proj, arch.as_str()))
-                    .expect("build failed");
+                files.push(
+                    build_arch(cmd2, &arch, &git2)
+                        .await
+                        .context(format!("building {} {}", proj, arch.as_str()))
+                        .expect("build failed"),
+                )
             }
+
+            return files;
         }
 
         AnthillBuildParallelism::Parallel => {
             let mut handles = Vec::new();
             for arch in arches {
-                let revision: Option<String> = revision.as_ref().map(|r| r.revision.clone());
+                let git2 = git.clone();
                 let cmd2 = cmd.clone();
                 let proj = cmd2.project.clone();
                 let handle = tokio::task::spawn_blocking(|| async move {
-                    build_arch(cmd2, &arch, revision.as_deref())
-                        .await
-                        .context(format!("building {} {}", proj, arch.as_str()))
+                    build_arch(cmd2, &arch, &git2).await.context(format!(
+                        "building {} {}",
+                        proj,
+                        arch.as_str()
+                    ))
                 });
                 handles.push(handle);
             }
@@ -122,110 +111,41 @@ pub async fn build(cmd: BuildCmd) {
                 .expect("task scheduling failed")
                 .into_iter();
 
-            futures::future::join_all(handles)
+            let files = futures::future::join_all(handles)
                 .await
                 .into_iter()
-                .collect::<Result<Vec<()>, _>>()
+                .collect::<Result<Vec<_>, _>>()
                 .expect("build failed");
+
+            files
         }
     }
 }
 
-fn commit_count(repo: &Repository) -> Result<i32, anyhow::Error> {
-    let mut revwalk = repo.revwalk()?;
-    revwalk.push_head()?;
-    Ok(revwalk.count() as i32)
-}
-
-fn get_head_commit_data<'a>(repo: &'a Repository) -> Result<Commit<'a>, anyhow::Error> {
-    let obj = repo.head()?.resolve()?.peel(git2::ObjectType::Commit)?;
-    let commit = obj
-        .into_commit()
-        .map_err(|_| git2::Error::from_str("Not a commit"))?;
-
-    Ok(commit)
-}
-
-fn format_datetime(t: git2::Time) -> String {
-    let d = chrono::DateTime::from_timestamp_secs(t.seconds()).expect("malformed datetime");
-    format!(
-        "{}-{}-{}-{}-{}",
-        d.year(),
-        d.month(),
-        d.day(),
-        d.hour(),
-        d.minute()
-    )
-}
-
-#[tracing::instrument(skip(cmd, revision))]
+#[tracing::instrument(skip(cmd, git))]
 async fn build_arch<'a>(
     cmd: BuildCmd,
     arch: &'a HostArchitecture,
-    revision: Option<&'a str>,
-) -> Result<(), anyhow::Error> {
+    git: &'a GitState,
+) -> Result<DeploymentFile, anyhow::Error> {
     info!("BUILDING [{}] for [{}]...", cmd.project, arch.as_str());
 
-    let (deployment_file, version) = build_artifact(&cmd, &arch).await.context("build failed")?;
+    let deployment_file = build_artifact(&cmd, &arch, &git)
+        .await
+        .context("build failed")?;
 
-    info!("... registering artifact");
-
-    if let Some(revision) = revision {
-        let client = ant_zookeeper::client::AntZookeeperClient::new(AntZookeeperClientConfig {
-            tls: false,
-            endpoint: "localhost:3235".to_string(),
-        });
-        client
-            .register_artifact(
-                &revision,
-                &cmd.project,
-                &arch,
-                &version,
-                &deployment_file.file_path(),
-            )
-            .await
-            .context("register artifact")?;
-
-        deployment_file.close()?;
-
-        info!("... artifact registered.");
-    } else {
-        let path = deployment_file.keep();
-        info!("artifact available: {}", path.display());
-    }
-
-    Ok(())
-}
-
-pub struct GitState {
-    pub root: PathBuf,
-    head_sha: String,
-    head_number: i32,
-    head_datetime: String,
-}
-
-impl GitState {
-    pub fn new() -> Result<Self, anyhow::Error> {
-        let repo = git2::Repository::discover(".")?;
-        let commit = get_head_commit_data(&repo)?;
-
-        Ok(Self {
-            root: repo.workdir().unwrap().to_path_buf(),
-            head_sha: commit.id().to_string().chars().take(8).collect(),
-            head_number: commit_count(&repo)?,
-            head_datetime: format_datetime(commit.time()),
-        })
-    }
+    Ok(DeploymentFile {
+        version: git.version(),
+        file: deployment_file,
+        arch: arch.clone(),
+    })
 }
 
 async fn build_artifact<'a>(
     cmd: &'a BuildCmd,
     arch: &'a HostArchitecture,
-) -> Result<(TempFile, String), anyhow::Error> {
-    let git = GitState::new()?;
-
-    let version = format!("{}-{}-{}", git.head_number, git.head_datetime, git.head_sha);
-
+    git: &'a GitState,
+) -> Result<TempFile, anyhow::Error> {
     let project_src = git.root.join("projects").join(&cmd.project);
     if !std::fs::exists(&project_src).expect("project src exists") {
         return Err(anyhow::Error::msg(format!(
@@ -329,7 +249,7 @@ async fn build_artifact<'a>(
 
         let docker = bollard::Docker::connect_with_defaults().context("connect to daemon")?;
 
-        let image_name = format!("{}:{}", cmd.project, version);
+        let image_name = format!("{}:{}", cmd.project, git.version());
 
         // Build Docker image
         {
@@ -443,7 +363,7 @@ async fn build_artifact<'a>(
             .await
             .context("creating VERSION")?;
         manifest
-            .write_all(version.as_bytes())
+            .write_all(git.version().as_bytes())
             .await
             .context("writing VERSION")?;
     }
@@ -533,5 +453,5 @@ async fn build_artifact<'a>(
         deployment_file
     };
 
-    Ok((deployment_file, version))
+    Ok(deployment_file)
 }

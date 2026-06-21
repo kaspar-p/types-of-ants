@@ -27,8 +27,6 @@ where
             .await
             .map_err(|e| AntArchiveError::Unauthorized(Some(e.into())))?;
 
-        println!("req auth: {}", auth.token());
-
         let state = AntArchiveState::from_ref(state);
         let client_id = state
             .db

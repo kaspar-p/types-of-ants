@@ -1,6 +1,6 @@
 {
   "project": "ant-archive",
-  "description": "the typesofants archive router — encryption, placement, and blob serving",
+  "description": "the typesofants archive router",
   "build": "makefile",
   "ports": {
     "primary": 3255,

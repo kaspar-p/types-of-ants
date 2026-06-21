@@ -1,20 +1,19 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 
-mod build;
+mod cmd;
 mod complete;
-mod curl;
-mod dev;
+mod git;
 mod procs;
-mod run;
 
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
 enum Cli {
-    Build(build::BuildCmd),
-    Dev(dev::DevCmd),
-    Run(run::RunCmd),
-    Curl(curl::CurlCmd),
+    Build(crate::cmd::build::BuildCmd),
+    Deploy(crate::cmd::deploy::DeployCmd),
+    Dev(crate::cmd::dev::DevCmd),
+    Run(crate::cmd::run::RunCmd),
+    Curl(crate::cmd::curl::CurlCmd),
 }
 
 #[tokio::main(flavor = "local")]
@@ -29,16 +28,19 @@ async fn main() -> Result<()> {
 
     match cli {
         Cli::Build(cmd) => {
-            build::build(cmd).await;
+            crate::cmd::build::build(cmd).await;
+        }
+        Cli::Deploy(cmd) => {
+            crate::cmd::deploy::deploy(cmd).await;
         }
         Cli::Dev(cmd) => {
-            dev::dev(cmd).await?;
+            crate::cmd::dev::dev(cmd).await?;
         }
         Cli::Run(cmd) => {
-            run::run(cmd).await?;
+            crate::cmd::run::run(cmd).await?;
         }
         Cli::Curl(cmd) => {
-            curl::curl(cmd).await?;
+            crate::cmd::curl::curl(cmd).await?;
         }
     }
 
