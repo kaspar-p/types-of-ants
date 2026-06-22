@@ -25,7 +25,12 @@ impl AntArchiveStorageNodeClient {
         }
     }
 
-    pub async fn put(&self, storage_key: &str, tek: &[u8], bytes: Vec<u8>) -> Result<(), anyhow::Error> {
+    pub async fn put(
+        &self,
+        storage_key: &str,
+        tek: &[u8],
+        bytes: Vec<u8>,
+    ) -> Result<(), anyhow::Error> {
         let tek_hex = base16ct::lower::encode_string(tek);
         let res = self
             .client

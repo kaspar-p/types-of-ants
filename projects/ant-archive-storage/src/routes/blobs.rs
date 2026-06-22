@@ -3,7 +3,10 @@ use crate::{
     err::AntArchiveStorageError,
     state::AntArchiveStorageState,
 };
-use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Key, Nonce};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
+};
 use ant_library::routes::Routes;
 use anyhow::Context;
 use axum::{
@@ -109,11 +112,14 @@ async fn put_blob(
         .get("x-ant-tek")
         .ok_or_else(|| AntArchiveStorageError::BadRequest("X-Ant-Tek header missing".to_string()))?
         .to_str()
-        .map_err(|_| AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid UTF-8".to_string()))?;
+        .map_err(|_| {
+            AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid UTF-8".to_string())
+        })?;
 
     let mut tek = [0u8; 32];
-    base16ct::lower::decode(tek_hex, &mut tek)
-        .map_err(|_| AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid hex".to_string()))?;
+    base16ct::lower::decode(tek_hex, &mut tek).map_err(|_| {
+        AntArchiveStorageError::BadRequest("X-Ant-Tek header is not valid hex".to_string())
+    })?;
 
     let outer = body
         .collect()

@@ -241,32 +241,58 @@ impl VerificationsDao {
         Ok(())
     }
 
+    /// The user_id comes from the weak-auth ATTEMPT, if it exists.
+    /// For password-reset 2fa there is not one, so None.
     async fn attempt_verification(
         &self,
         method: &str,
+        user_id: Option<&UserId>,
         identifier: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
         let mut con = self.pool.get().await?;
         let t = con.transaction().await?;
 
-        let verification = t
-            .query_opt(
-                "
-        select
-            verification_id, one_time_code
-        from
-            verification_attempt
-        where
-            verification_method = $1 and
-            unique_key = $2 and
-            is_cancelled = false and
-            is_verified = false and
-            now() <= created_at + (expiration_seconds * interval '1 second')
-        ",
-                &[&method, &identifier],
-            )
-            .await?;
+        let verification = match user_id.as_ref() {
+            None => {
+                t.query_opt(
+                    "
+                    select
+                        verification_id, one_time_code
+                    from
+                        verification_attempt
+                    where
+                        verification_method = $1 and
+                        unique_key = $2 and
+                        is_cancelled = false and
+                        is_verified = false and
+                        now() <= created_at + (expiration_seconds * interval '1 second')
+                    ",
+                    &[&method, &identifier],
+                )
+                .await?
+            }
+
+            Some(user_id) => {
+                t.query_opt(
+                    "
+                    select
+                        verification_id, one_time_code
+                    from
+                        verification_attempt
+                    where
+                        verification_method = $1 and
+                        unique_key = $2 and
+                        user_id = $3 and
+                        is_cancelled = false and
+                        is_verified = false and
+                        now() <= created_at + (expiration_seconds * interval '1 second')
+                    ",
+                    &[&method, &identifier, &user_id.0],
+                )
+                .await?
+            }
+        };
 
         let row = match verification {
             None => {
@@ -336,12 +362,16 @@ impl VerificationsDao {
     ///
     /// If the attempt does not match, returns `false` and the application should ask the user to retry.
     /// Also returns false if there was no verification that matched for those details, or might be expired.
+    ///
+    /// The `user_id` should be specified where there is a user token, like for adding a new phone number (strong)
+    /// or for initial signup (weak), but not required, since it has to support password reset flows.
     pub async fn attempt_phone_number_verification(
         &self,
+        user_id: Option<&UserId>,
         phone_number: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
-        self.attempt_verification("phone", phone_number, attempt)
+        self.attempt_verification("phone", user_id, phone_number, attempt)
             .await
     }
 
@@ -353,11 +383,16 @@ impl VerificationsDao {
     ///
     /// If the attempt does not match, returns `false` and the application should ask the user to retry.
     /// Also returns false if there was no verification that matched for those details, or might be expired.
+    ///
+    /// The `user_id` should be specified where there is a user token, like for adding a new email (strong)
+    /// or for initial signup (weak), but not required, since it has to support password reset flows.
     pub async fn attempt_email_verification(
         &self,
+        user_id: Option<&UserId>,
         email: &str,
         attempt: &str,
     ) -> Result<VerificationResult, anyhow::Error> {
-        self.attempt_verification("email", email, attempt).await
+        self.attempt_verification("email", user_id, email, attempt)
+            .await
     }
 }

@@ -242,7 +242,8 @@ async fn login(
         login_request.password.as_str(),
         &user.password_hash.as_str(),
     )
-    .await? {
+    .await?
+    {
         info!("Password invalid");
         return Err(AntOnTheWebError::AccessDenied(None));
     }
@@ -325,10 +326,22 @@ async fn two_factor_verification_attempt(
 
     let verification = match &req.method {
         VerificationSubmission::Phone { otp, .. } => {
-            two_factor::receive_phone_verification_code(&dao, &canonical, &otp).await?
+            two_factor::receive_phone_verification_code_for_user(
+                &dao,
+                &user.user_id,
+                &canonical,
+                &otp,
+            )
+            .await?
         }
         VerificationSubmission::Email { otp, .. } => {
-            two_factor::receive_email_verification_code(&dao, &canonical, &otp).await?
+            two_factor::receive_email_verification_code_for_user(
+                &dao,
+                &user.user_id,
+                &canonical,
+                &otp,
+            )
+            .await?
         }
     };
 
@@ -339,7 +352,14 @@ async fn two_factor_verification_attempt(
             )))
         }
 
-        VerificationReceipt::Success { user_id: _ } => {
+        VerificationReceipt::Success {
+            user_id: verification_user_id,
+        } => {
+            assert_eq!(
+                user.user_id, verification_user_id,
+                "Invariant: the 2fa attempt should have the requesting-user as receiving-user!"
+            );
+
             info!("Verification succeeded, user authenticated");
 
             // Add that contact method to the user since it's now verified
@@ -658,7 +678,9 @@ async fn password_reset_secret(
 ) -> Result<AntOnTheWebResponse, AntOnTheWebError> {
     let phone_number = canonicalize_phone_number(&req.phone_number)?;
 
-    match two_factor::receive_phone_verification_code(&dao, &phone_number, &req.otp).await? {
+    match two_factor::receive_phone_verification_code_for_anyone(&dao, &phone_number, &req.otp)
+        .await?
+    {
         VerificationReceipt::Failed => {
             return Err(AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::msg("Invalid code."),
@@ -902,7 +924,10 @@ pub fn routes() -> ApiRoutes {
     let sensitive = Routes::new()
         .post("/login", post(login))
         .post("/signup", post(signup_request))
-        .post("/verification-attempt", post(two_factor_verification_attempt))
+        .post(
+            "/verification-attempt",
+            post(two_factor_verification_attempt),
+        )
         .post("/password", post(password))
         .post("/password-reset-code", post(password_reset_code))
         .post("/password-reset-secret", post(password_reset_secret))

@@ -1,7 +1,13 @@
-use std::{env::set_var, path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    env::set_var,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use ant_data_farm::AntDataFarmClient;
-use ant_library::{clock::TestClock, db::TypesOfAntsDatabase, rng::TestSeededRng, sd::reader::ServiceDiscovery};
+use ant_library::{
+    clock::TestClock, db::TypesOfAntsDatabase, rng::TestSeededRng, sd::reader::ServiceDiscovery,
+};
 use ant_library_test::{
     axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };

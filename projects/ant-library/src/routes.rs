@@ -84,10 +84,8 @@ where
     pub fn layer<L>(self, layer: L) -> Self
     where
         L: tower::Layer<axum::routing::Route> + Clone + Send + Sync + 'static,
-        L::Service: tower::Service<
-                axum::extract::Request,
-                Error = std::convert::Infallible,
-            > + Clone
+        L::Service: tower::Service<axum::extract::Request, Error = std::convert::Infallible>
+            + Clone
             + Send
             + Sync
             + 'static,

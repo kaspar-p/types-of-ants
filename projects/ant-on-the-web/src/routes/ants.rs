@@ -492,7 +492,11 @@ async fn favorite_ant(
     let favorited_at: DateTime<Utc> =
         match dao.ants.is_favorite_ant(&user.user_id, &req.ant_id).await? {
             Some(time) => time,
-            None => dao.ants.favorite_ant(&user.user_id, &req.ant_id, clock.now()).await?,
+            None => {
+                dao.ants
+                    .favorite_ant(&user.user_id, &req.ant_id, clock.now())
+                    .await?
+            }
         };
 
     Ok(AntOnTheWebResponse::FavoriteAntResponse(

@@ -8,6 +8,7 @@ pub mod fixture_sms;
 pub mod hosts;
 pub mod password_reset;
 pub mod ping;
+pub mod security;
 pub mod throttle;
 pub mod two_factor;
 pub mod users;

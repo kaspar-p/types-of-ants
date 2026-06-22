@@ -1,3 +1,4 @@
+use ant_library::rng::RandAdapter;
 use ant_library::routes::Routes;
 use axum::{
     extract::State,
@@ -7,7 +8,6 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use http::StatusCode;
-use ant_library::rng::RandAdapter;
 use rand::distr::SampleString;
 use serde::{Deserialize, Serialize};
 

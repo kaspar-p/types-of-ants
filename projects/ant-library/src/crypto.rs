@@ -79,13 +79,19 @@ mod tests {
 
     #[tokio::test]
     async fn password_hashing_works() {
-        let hash = make_password_hash("super-secret-ant-password").await.unwrap();
+        let hash = make_password_hash("super-secret-ant-password")
+            .await
+            .unwrap();
         assert!(hash.contains("argon2"))
     }
 
     #[tokio::test]
     async fn roundtrip() {
-        let hash = make_password_hash("super-secret-ant-password").await.unwrap();
-        assert!(verify_password_hash("super-secret-ant-password", &hash).await.unwrap());
+        let hash = make_password_hash("super-secret-ant-password")
+            .await
+            .unwrap();
+        assert!(verify_password_hash("super-secret-ant-password", &hash)
+            .await
+            .unwrap());
     }
 }

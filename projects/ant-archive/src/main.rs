@@ -26,7 +26,11 @@ async fn main() {
         .await
         .expect("failed to connect to ant-archive-db");
 
-    let state = ant_archive::AntArchiveState { db, sd, rng: Arc::new(SystemRng) };
+    let state = ant_archive::AntArchiveState {
+        db,
+        sd,
+        rng: Arc::new(SystemRng),
+    };
 
     let app = ant_archive::make_routes(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

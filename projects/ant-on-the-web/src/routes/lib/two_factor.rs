@@ -10,8 +10,8 @@ use ant_data_farm::{
     verifications::VerificationResult,
     AntDataFarmClient,
 };
-use chrono::Duration;
 use ant_library::rng::{RandAdapter, Rng};
+use chrono::Duration;
 use rand::distr::SampleString;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -65,6 +65,11 @@ pub async fn user_is_two_factor_verified(
         verified,
         not_verified,
     });
+}
+
+pub enum VerificationReceipt {
+    Success { user_id: UserId },
+    Failed,
 }
 
 /// Send a verification code to a user's email address.
@@ -133,27 +138,33 @@ pub async fn resend_email_verification_code(
     return send_email_verification_code(dao, email_sender, rng, user_id, email).await;
 }
 
-/// Based on the received email verification request.
-/// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
-/// so that the user can "resend".
-///
-/// Returns true if the user is verified, false if not. The user may have more attempts or not,
-/// if the return value is false.
-///
-/// This is a dangerous function, use only when user is authenticated or similar requirements.
-pub async fn receive_email_verification_code(
+async fn receive_email_verification_code(
     dao: &AntDataFarmClient,
+    attemptor_user_id: Option<&UserId>,
     email: &str,
     otp_attempt: &str,
 ) -> Result<VerificationReceipt, anyhow::Error> {
     info!("Attempting to verify 2fa attempt");
     let verified = dao
         .verifications
-        .attempt_email_verification(&email, &otp_attempt)
+        .attempt_email_verification(attemptor_user_id, &email, &otp_attempt)
         .await?;
 
     match verified {
-        VerificationResult::Success { user_id } => Ok(VerificationReceipt::Success { user_id }),
+        VerificationResult::Success {
+            user_id: verified_user_id,
+        } => {
+            if let Some(user_id) = attemptor_user_id {
+                assert_eq!(
+                    *user_id, verified_user_id,
+                    "2fa attempt should have the same requesting-user as receiving-user!"
+                );
+            }
+
+            Ok(VerificationReceipt::Success {
+                user_id: verified_user_id,
+            })
+        }
         VerificationResult::NoVerificationFound => {
             info!("No such verification found");
             return Ok(VerificationReceipt::Failed);
@@ -169,6 +180,44 @@ pub async fn receive_email_verification_code(
             return Ok(VerificationReceipt::Failed);
         }
     }
+}
+
+/// Based on the received email verification request.
+/// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
+/// so that the user can "resend".
+///
+/// Returns true if the user is verified, false if not. The user may have more attempts or not,
+/// if the return value is false.
+///
+/// This is a dangerous function, use only when user is authenticated or similar requirements.
+///
+/// Should be used when there is a user token, e.g. initial signup (weak token) or adding new email
+/// to an existing account (strong token).
+pub async fn receive_email_verification_code_for_user(
+    dao: &AntDataFarmClient,
+    attemptor_user_id: &UserId,
+    email: &str,
+    otp_attempt: &str,
+) -> Result<VerificationReceipt, anyhow::Error> {
+    receive_email_verification_code(dao, Some(attemptor_user_id), email, otp_attempt).await
+}
+
+/// Based on the received email verification request.
+/// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
+/// so that the user can "resend".
+///
+/// Returns true if the user is verified, false if not. The user may have more attempts or not,
+/// if the return value is false.
+///
+/// This is a dangerous function, use only when user is authenticated or similar requirements.
+///
+/// Should ONLY be used for password reset, otherwise see [`receive_email_verification_code_for_user`].
+pub async fn receive_email_verification_code_for_anyone(
+    dao: &AntDataFarmClient,
+    email: &str,
+    otp_attempt: &str,
+) -> Result<VerificationReceipt, anyhow::Error> {
+    receive_email_verification_code(dao, None, email, otp_attempt).await
 }
 
 /// Send a verification message to the user's phone number.
@@ -228,11 +277,6 @@ pub async fn resend_phone_verification_code(
     return send_phone_verification_code(dao, sms, rng, user_id, phone_number).await;
 }
 
-pub enum VerificationReceipt {
-    Success { user_id: UserId },
-    Failed,
-}
-
 /// Based on the received phone verification request.
 /// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
 /// so that the user can "resend".
@@ -241,19 +285,33 @@ pub enum VerificationReceipt {
 /// if the return value is false.
 ///
 /// This is a dangerous function, use only when user is authenticated or similar requirements.
-pub async fn receive_phone_verification_code(
+async fn receive_phone_verification_code(
     dao: &AntDataFarmClient,
+    attemptor_user_id: Option<&UserId>,
     phone_number: &str,
     otp_attempt: &str,
 ) -> Result<VerificationReceipt, anyhow::Error> {
     info!("Attempting to verify 2fa attempt");
     let verified = dao
         .verifications
-        .attempt_phone_number_verification(&phone_number, &otp_attempt)
+        .attempt_phone_number_verification(attemptor_user_id, &phone_number, &otp_attempt)
         .await?;
 
     match verified {
-        VerificationResult::Success { user_id } => Ok(VerificationReceipt::Success { user_id }),
+        VerificationResult::Success {
+            user_id: verified_user_id,
+        } => {
+            if let Some(user_id) = attemptor_user_id {
+                assert_eq!(
+                    *user_id, verified_user_id,
+                    "2fa attempt should have the same requesting-user as receiving-user!"
+                );
+            }
+
+            Ok(VerificationReceipt::Success {
+                user_id: verified_user_id,
+            })
+        }
         VerificationResult::NoVerificationFound => {
             info!("No such verification found");
             return Ok(VerificationReceipt::Failed);
@@ -269,4 +327,37 @@ pub async fn receive_phone_verification_code(
             return Ok(VerificationReceipt::Failed);
         }
     }
+}
+
+/// Based on the received phone verification request.
+/// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
+/// so that the user can "resend".
+///
+/// Returns true if the user is verified, false if not. The user may have more attempts or not,
+/// if the return value is false.
+///
+/// This is a dangerous function, use only when user is authenticated or similar requirements.
+pub async fn receive_phone_verification_code_for_user(
+    dao: &AntDataFarmClient,
+    user_id: &UserId,
+    phone_number: &str,
+    otp_attempt: &str,
+) -> Result<VerificationReceipt, anyhow::Error> {
+    receive_phone_verification_code(dao, Some(user_id), phone_number, otp_attempt).await
+}
+
+/// Based on the received phone verification request.
+/// Ensures that if the user has attempted too many times, the attempt is marked as cancelled
+/// so that the user can "resend".
+///
+/// Returns true if the user is verified, false if not. The user may have more attempts or not,
+/// if the return value is false.
+///
+/// This is a dangerous function, use only when user is authenticated or similar requirements.
+pub async fn receive_phone_verification_code_for_anyone(
+    dao: &AntDataFarmClient,
+    phone_number: &str,
+    otp_attempt: &str,
+) -> Result<VerificationReceipt, anyhow::Error> {
+    receive_phone_verification_code(dao, None, phone_number, otp_attempt).await
 }

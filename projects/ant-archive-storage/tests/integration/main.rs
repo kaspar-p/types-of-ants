@@ -191,7 +191,11 @@ async fn put_blob_writes_encoding_v1_byte_on_disk() {
     let on_disk = std::fs::read(&path).expect("blob not found on disk");
 
     assert_eq!(on_disk[0], 1u8, "first byte must be encoding version 1");
-    assert_eq!(&on_disk[1..], outer.as_slice(), "remainder must be outer blob");
+    assert_eq!(
+        &on_disk[1..],
+        outer.as_slice(),
+        "remainder must be outer blob"
+    );
 }
 
 #[tokio::test]
@@ -500,7 +504,9 @@ async fn metrics_bytes_stored_increases_on_put() {
         res.text().await
     };
     assert!(
-        body.contains(&format!("ant_archive_storage_bytes_stored {expected_bytes}")),
+        body.contains(&format!(
+            "ant_archive_storage_bytes_stored {expected_bytes}"
+        )),
         "bytes gauge should be {expected_bytes} after storing outer blob: {body}"
     );
 }
@@ -584,7 +590,9 @@ async fn metrics_bytes_stored_adjusts_on_overwrite() {
         res.text().await
     };
     assert!(
-        body.contains(&format!("ant_archive_storage_bytes_stored {expected_bytes}")),
+        body.contains(&format!(
+            "ant_archive_storage_bytes_stored {expected_bytes}"
+        )),
         "bytes gauge should be {expected_bytes} after overwrite: {body}"
     );
 }

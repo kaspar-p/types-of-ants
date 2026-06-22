@@ -23,7 +23,9 @@ fn redacted_router() -> Router {
         .layer(axum::middleware::from_fn(
             ant_library::middleware::print_request_response,
         ))
-        .layer(axum::middleware::from_fn(ant_library::middleware::redaction))
+        .layer(axum::middleware::from_fn(
+            ant_library::middleware::redaction,
+        ))
 }
 
 #[tokio::test]

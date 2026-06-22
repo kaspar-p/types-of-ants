@@ -42,7 +42,9 @@ impl TestSeededRng {
         use rand::SeedableRng;
         let mut seed_bytes = [0u8; 32];
         seed_bytes[..8].copy_from_slice(&seed.to_le_bytes());
-        Self(std::sync::Mutex::new(rand::rngs::StdRng::from_seed(seed_bytes)))
+        Self(std::sync::Mutex::new(rand::rngs::StdRng::from_seed(
+            seed_bytes,
+        )))
     }
 
     pub fn from_seed(seed: [u8; 32]) -> Self {

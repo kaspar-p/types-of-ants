@@ -109,7 +109,11 @@ impl Fixture {
         seed_db(&archive_db).await;
 
         let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-        let state = AntArchiveState { db: archive_db, sd, rng: Arc::new(TestSeededRng::new(42)) };
+        let state = AntArchiveState {
+            db: archive_db,
+            sd,
+            rng: Arc::new(TestSeededRng::new(42)),
+        };
         let app = make_routes(state);
 
         Fixture {

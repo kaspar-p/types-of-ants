@@ -89,7 +89,9 @@ async fn ants_released_ants_returns_200_with_favorite_info_only_if_user_logged_i
             .client
             .post("/api/ants/favorite")
             .header("Cookie", &cookie)
-            .json(&FavoriteAntRequest { ant_id: ant_id.clone() })
+            .json(&FavoriteAntRequest {
+                ant_id: ant_id.clone(),
+            })
             .send()
             .await;
         assert_eq!(res.status(), StatusCode::OK);

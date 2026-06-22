@@ -53,10 +53,7 @@ pub fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Ful
 
 const MAX_BODY_LOG_BYTES: usize = 64 * 1024;
 
-async fn buffer_and_print<B>(
-    direction: &str,
-    body: B,
-) -> Result<Bytes, (StatusCode, String)>
+async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes, (StatusCode, String)>
 where
     B: axum::body::HttpBody<Data = Bytes>,
     B::Error: std::fmt::Display,
