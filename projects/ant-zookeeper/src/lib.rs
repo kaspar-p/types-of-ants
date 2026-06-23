@@ -16,6 +16,8 @@ pub mod dns;
 pub mod err;
 pub mod event_loop;
 mod fs;
+pub mod pipeline;
+pub mod pipeline_engine;
 pub mod routes;
 pub mod state;
 

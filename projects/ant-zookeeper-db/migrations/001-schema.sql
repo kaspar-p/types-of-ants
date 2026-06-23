@@ -269,6 +269,85 @@ create table project_secret (
   constraint fk_secret foreign key (secret_id) references secret(secret_id)
 );
 
+-- =============================================================================
+-- Pipeline Engine
+-- =============================================================================
+
+create table pipeline_engine_pipeline (
+  pipeline_id text primary key default ('pipe-' || random_string(12)),
+
+  project_id text not null, -- The project this pipeline deploys.
+  revision_id text not null, -- The revision being deployed. revision.revision_seq provides FIFO ordering.
+
+  state text not null default 'active', -- active | finished | cancelled
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  finished_at timestamp with time zone,
+
+  unique (revision_id),
+
+  foreign key (project_id) references project(project_id),
+  foreign key (revision_id) references revision(revision_id)
+);
+
+create table pipeline_engine_node (
+  node_id text primary key default ('node-' || random_string(12)),
+
+  pipeline_id text not null, -- The pipeline this node belongs to.
+
+  event text not null, -- JSON blob identifying this node. Opaque to the engine, deserialized by the application.
+  resource_key text, -- Opaque string for FIFO scheduling. NULL = no resource contention.
+
+  state text not null default 'pending',
+  -- pending: waiting for predecessors
+  -- executable: all predecessors done, ready to be claimed
+  -- in_progress: claimed by the tick loop, work happening
+  -- finished: work completed successfully
+  -- failed: work failed
+  -- cancelled: will never run, pipeline abandoned. Treated as done for FIFO/promotion.
+
+  started_at timestamp with time zone,
+  finished_at timestamp with time zone,
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+
+  unique (pipeline_id, event),
+
+  foreign key (pipeline_id) references pipeline_engine_pipeline(pipeline_id)
+);
+
+create table pipeline_engine_edge (
+  edge_id text primary key default ('edge-' || random_string(12)),
+
+  from_node_id text not null, -- Predecessor node. Must finish before to_node_id can run.
+  to_node_id text not null, -- Successor node.
+
+  created_at timestamp with time zone not null default now(),
+
+  unique (from_node_id, to_node_id),
+
+  foreign key (from_node_id) references pipeline_engine_node(node_id),
+  foreign key (to_node_id) references pipeline_engine_node(node_id)
+);
+
+create table pipeline_engine_job (
+  job_id text primary key default ('job-' || random_string(12)),
+
+  node_id text not null, -- The node this job is executing.
+
+  state text not null default 'running', -- running | succeeded | failed
+  error text, -- Error message if failed.
+  last_heartbeat_at timestamp with time zone not null default now(),
+
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  finished_at timestamp with time zone,
+
+  foreign key (node_id) references pipeline_engine_node(node_id)
+);
+
 insert into migration (migration_label) values
   ('bootstrap-schema')
 ;

@@ -59,6 +59,10 @@ pub struct Deployment {
 }
 
 impl AntZooStorageClient {
+    pub fn pool(&self) -> ConnectionPool {
+        self.db.clone()
+    }
+
     pub async fn register_project(
         &self,
         project: &str,
