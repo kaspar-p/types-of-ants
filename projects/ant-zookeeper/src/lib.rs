@@ -41,6 +41,7 @@ pub fn make_routes(s: AntZookeeperState) -> Result<Router, anyhow::Error> {
         .nest_routes("/deployment", routes::deployment::routes())
         .nest_routes("/service", routes::service::routes())
         .nest_routes("/cert", routes::cert::routes())
+        .nest_routes("/projects", routes::projects::routes())
         .build()
         .with_state(s)
         .layer(

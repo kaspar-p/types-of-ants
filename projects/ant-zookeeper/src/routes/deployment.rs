@@ -24,7 +24,15 @@ pub struct IteratePipelineResponse {}
 async fn iterate_pipeline(
     State(state): State<AntZookeeperState>,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
-    // Schedule any deployment jobs available
+    // New pipeline engine tick
+    let tick_handle = state
+        .engine
+        .tick(|_node| async { Ok(()) })
+        .await
+        .with_context(|| "Pipeline engine tick failure")?;
+    tick_handle.join().await.with_context(|| "Pipeline engine join failure")?;
+
+    // Legacy: Schedule any deployment jobs available
     drive_revisions(&state.db, 1)
         .await
         .with_context(|| "Pipeline orchestration failure")?;

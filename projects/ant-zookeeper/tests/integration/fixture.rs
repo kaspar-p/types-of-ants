@@ -268,6 +268,13 @@ impl Fixture {
         )
         .expect("bad test services.json");
 
+        let db = AntZooStorageClient::connect(&_guard.config).await.unwrap();
+        let engine = Arc::new(
+            ant_zookeeper::pipeline_engine::engine::PipelineEngine::new(db.pool())
+                .await
+                .unwrap(),
+        );
+
         let state = AntZookeeperState {
             dns: Arc::new(Mutex::new(TestDns::new())),
             rng: OsRng,
@@ -275,7 +282,8 @@ impl Fixture {
             acme_url: acme_lib::DirectoryUrl::LetsEncryptStaging,
             acme_contact_email: "integ-test@typesofants.org".to_string(),
             root_dir: root_dir,
-            db: AntZooStorageClient::connect(&_guard.config).await.unwrap(),
+            db,
+            engine,
             ant_host_agent_factory: Arc::new(Mutex::new(
                 TestAntHostAgentService::new(ant_host_agent_service)
                     .await

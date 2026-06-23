@@ -79,6 +79,8 @@ create table artifact (
   build_version text not null,
 
   local_path text not null, -- The local filesystem path to the artifact, where it was saved.
+  size_bytes bigint not null, -- Size of the artifact in bytes.
+  fingerprint text not null, -- SHA256 hash of the artifact content.
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),

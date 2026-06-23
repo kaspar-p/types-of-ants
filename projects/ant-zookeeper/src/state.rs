@@ -7,6 +7,7 @@ use ant_zookeeper_db::AntZooStorageClient;
 use tokio::sync::Mutex;
 
 use crate::dns::Dns;
+use crate::pipeline_engine::engine::PipelineEngine;
 
 #[derive(Clone)]
 pub struct AntZookeeperState {
@@ -15,6 +16,7 @@ pub struct AntZookeeperState {
     pub services: Arc<Services>,
 
     pub db: AntZooStorageClient,
+    pub engine: Arc<PipelineEngine>,
 
     pub dns: Arc<Mutex<dyn Dns>>,
     pub acme_contact_email: String,

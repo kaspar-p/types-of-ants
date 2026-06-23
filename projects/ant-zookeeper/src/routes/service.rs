@@ -314,6 +314,10 @@ async fn register_artifact(
         tokio::fs::copy(&temp_dir.path().join("input.tar.gz"), &filepath).await?;
     }
 
+    let file_metadata = tokio::fs::metadata(&filepath).await?;
+    let size_bytes = file_metadata.len() as i64;
+    let fingerprint = sha256::try_digest(&filepath)?;
+
     // let (revision_id, is_new) = state.db.upsert_revision(&version.0).await?;
 
     // {
@@ -399,6 +403,8 @@ async fn register_artifact(
                     arch.0.as_ref(),
                     &version.0,
                     &relative_path,
+                    size_bytes,
+                    &fingerprint,
                 )
                 .await?;
         }
@@ -416,15 +422,45 @@ async fn register_artifact(
 
         let versions = artifacts
             .iter()
-            .map(|(_, _, _, version)| version)
+            .map(|(_, _, _, version, _, _)| version)
             .collect::<HashSet<_>>();
         let all_on_same_version = versions.len() == 1;
 
         let should_revision_activate = all_on_same_version && all_architectures_present;
         if should_revision_activate {
             info!("Activating revision: {}", &revision.0);
-            // This signals the pipeline to continue!
             state.db.activate_revision(&revision.0).await?;
+
+            let hosts = state.services.list_hosts_with_service(&project_id);
+            let beta_hosts: Vec<String> = hosts
+                .iter()
+                .filter(|(_, s)| matches!(s.env, ant_library::services::ServiceEnv::Beta))
+                .map(|(h, _)| h.to_string())
+                .collect();
+            let prod_hosts: Vec<String> = hosts
+                .iter()
+                .filter(|(_, s)| matches!(s.env, ant_library::services::ServiceEnv::Prod))
+                .map(|(h, _)| h.to_string())
+                .collect();
+
+            let config = crate::pipeline::dag::ProjectConfig {
+                project_id: project_id.clone(),
+                has_database: false,
+                has_routes: false,
+                has_alerts: false,
+                has_log_rules: false,
+                beta_hosts,
+                prod_hosts,
+            };
+
+            let pipeline_id = crate::pipeline::dag::build_dag(
+                &state.engine,
+                &revision.0,
+                &config,
+            )
+            .await?;
+
+            info!("Created deployment pipeline: {pipeline_id}");
         } else {
             info!(
                 "Revision not active: {} versions registered, {} architectures missing",

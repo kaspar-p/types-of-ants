@@ -28,24 +28,29 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let services = Services::from_path(&find_up("services.json"))?;
 
+    let db = AntZooStorageClient::connect(&DatabaseConfig {
+        port: std::env::var("ANT_ZOOKEEPER_DB_PORT")
+            .context("ANT_ZOOKEEPER_DB_PORT")?
+            .parse()?,
+        database_name: ant_library::secret::load_secret("ant_zookeeper_db_db")?,
+        database_password: ant_library::secret::load_secret("ant_zookeeper_db_password")?,
+        database_user: ant_library::secret::load_secret("ant_zookeeper_db_user")?,
+        host: std::env::var("ANT_ZOOKEEPER_DB_HOST")
+            .context("ANT_ZOOKEEPER_DB_HOST")?
+            .parse()?,
+        migration_dirs: vec![],
+    })
+    .await?;
+
+    let engine = ant_zookeeper::pipeline_engine::engine::PipelineEngine::new(db.pool()).await?;
+
     let state = AntZookeeperState {
         root_dir,
 
         services: Arc::new(services),
 
-        db: AntZooStorageClient::connect(&DatabaseConfig {
-            port: std::env::var("ANT_ZOOKEEPER_DB_PORT")
-                .context("ANT_ZOOKEEPER_DB_PORT")?
-                .parse()?,
-            database_name: ant_library::secret::load_secret("ant_zookeeper_db_db")?,
-            database_password: ant_library::secret::load_secret("ant_zookeeper_db_password")?,
-            database_user: ant_library::secret::load_secret("ant_zookeeper_db_user")?,
-            host: std::env::var("ANT_ZOOKEEPER_DB_HOST")
-                .context("ANT_ZOOKEEPER_DB_HOST")?
-                .parse()?,
-            migration_dirs: vec![],
-        })
-        .await?,
+        db,
+        engine: Arc::new(engine),
 
         rng: OsRng,
 

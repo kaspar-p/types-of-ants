@@ -1039,6 +1039,64 @@ impl PipelineEngine {
         Ok(None)
     }
 
+    pub async fn nodes_layered(&self, pipeline_id: &str) -> Result<Vec<Vec<Node>>, anyhow::Error> {
+        let nodes = self.nodes(pipeline_id).await?;
+        let edges = self.edges(pipeline_id).await?;
+
+        use std::collections::{HashMap, HashSet};
+
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        let mut successors: HashMap<&str, Vec<&str>> = HashMap::new();
+
+        for node in &nodes {
+            in_degree.entry(node.node_id.as_str()).or_insert(0);
+            successors.entry(node.node_id.as_str()).or_insert_with(Vec::new);
+        }
+
+        for edge in &edges {
+            *in_degree.entry(edge.to_node_id.as_str()).or_insert(0) += 1;
+            successors
+                .entry(edge.from_node_id.as_str())
+                .or_insert_with(Vec::new)
+                .push(edge.to_node_id.as_str());
+        }
+
+        let mut layers: Vec<Vec<Node>> = vec![];
+        let mut current_layer: Vec<&str> = in_degree
+            .iter()
+            .filter(|(_, &deg)| deg == 0)
+            .map(|(&id, _)| id)
+            .collect();
+
+        let node_map: HashMap<&str, &Node> = nodes.iter().map(|n| (n.node_id.as_str(), n)).collect();
+        let mut placed: HashSet<&str> = HashSet::new();
+
+        while !current_layer.is_empty() {
+            layers.push(
+                current_layer
+                    .iter()
+                    .map(|id| node_map[id].clone())
+                    .collect(),
+            );
+
+            let mut next_layer: Vec<&str> = vec![];
+            for &id in &current_layer {
+                placed.insert(id);
+                for &succ in successors.get(id).unwrap_or(&vec![]) {
+                    let deg = in_degree.get_mut(succ).unwrap();
+                    *deg -= 1;
+                    if *deg == 0 {
+                        next_layer.push(succ);
+                    }
+                }
+            }
+
+            current_layer = next_layer;
+        }
+
+        Ok(layers)
+    }
+
     pub async fn edges(&self, pipeline_id: &str) -> Result<Vec<Edge>, anyhow::Error> {
         let con = self.db.get().await?;
 

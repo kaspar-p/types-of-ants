@@ -173,14 +173,14 @@ impl AntZooStorageClient {
     pub async fn list_artifacts_for_revision_id(
         &self,
         revision_id: &str,
-    ) -> Result<Vec<(String, String, HostArchitecture, String)>, anyhow::Error> {
+    ) -> Result<Vec<(String, String, HostArchitecture, String, i64, String)>, anyhow::Error> {
         let mut con = self.db.get().await?;
         let tx = con.transaction().await?;
 
         let rows = tx
             .query(
                 "
-            select artifact_id, project_id, architecture_id, build_version
+            select artifact_id, project_id, architecture_id, build_version, size_bytes, fingerprint
             from artifact
             where
                 artifact.revision_id = $1
@@ -198,6 +198,8 @@ impl AntZooStorageClient {
                     row.get("project_id"),
                     HostArchitecture::from_str(row.get("architecture_id"))?,
                     row.get("build_version"),
+                    row.get("size_bytes"),
+                    row.get("fingerprint"),
                 ))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -217,7 +219,7 @@ impl AntZooStorageClient {
             .filter(|arch| {
                 artifacts
                     .iter()
-                    .find(|(_, _, artifact_arch, _)| arch == artifact_arch)
+                    .find(|(_, _, artifact_arch, _, _, _)| arch == artifact_arch)
                     .is_none()
             })
             .collect::<Vec<_>>();
@@ -247,6 +249,8 @@ impl AntZooStorageClient {
         arch: Option<&HostArchitecture>,
         version: &str,
         path: &Path,
+        size_bytes: i64,
+        fingerprint: &str,
     ) -> Result<String, anyhow::Error> {
         let mut con = self.db.get().await?;
 
@@ -256,9 +260,9 @@ impl AntZooStorageClient {
             .query_one(
                 "
             insert into artifact
-                (revision_id, project_id, architecture_id, build_version, local_path)
+                (revision_id, project_id, architecture_id, build_version, local_path, size_bytes, fingerprint)
             values
-                ($1, $2, $3, $4, $5)
+                ($1, $2, $3, $4, $5, $6, $7)
             returning artifact_id
             ",
                 &[
@@ -270,6 +274,8 @@ impl AntZooStorageClient {
                         .as_os_str()
                         .to_str()
                         .expect(&format!("bad artifact path: {}", path.display())),
+                    &size_bytes,
+                    &fingerprint,
                 ],
             )
             .await

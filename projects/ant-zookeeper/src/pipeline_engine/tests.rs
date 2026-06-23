@@ -1053,6 +1053,85 @@ async fn pipeline_engine_edges_returns_dag_structure() {
 
 #[tokio::test]
 #[traced_test]
+async fn pipeline_engine_nodes_layered_returns_topological_columns() {
+    let f = Fixture::new().await;
+    let rev = f.db.create_revision("ant-on-the-web").await.unwrap();
+
+    // DAG: start → [m1, m2] → end
+    let p = f.engine.create_pipeline("ant-on-the-web", &rev).await.unwrap();
+    let start = f.engine.add_node(&p, nodes::synthetic("start")).await.unwrap();
+    let m1 = f.engine.add_node(&p, nodes::host_replicated("w1", "web")).await.unwrap();
+    let m2 = f.engine.add_node(&p, nodes::host_replicated("w2", "web")).await.unwrap();
+    let end = f.engine.add_node(&p, nodes::synthetic("end")).await.unwrap();
+    f.engine.add_edge(&start, &m1).await.unwrap();
+    f.engine.add_edge(&start, &m2).await.unwrap();
+    f.engine.add_edge(&m1, &end).await.unwrap();
+    f.engine.add_edge(&m2, &end).await.unwrap();
+    f.engine.seal(&p).await.unwrap();
+
+    let layers = f.engine.nodes_layered(&p).await.unwrap();
+
+    assert_eq!(layers.len(), 3);
+
+    // Layer 0: start (root, no predecessors)
+    assert_eq!(layers[0].len(), 1);
+    assert!(layers[0][0].event.contains("start"));
+
+    // Layer 1: m1, m2 (parallel, both depend only on start)
+    assert_eq!(layers[1].len(), 2);
+    let layer1_events: Vec<&str> = layers[1].iter().map(|n| n.event.as_str()).collect();
+    assert!(layer1_events.iter().any(|e| e.contains("w1")));
+    assert!(layer1_events.iter().any(|e| e.contains("w2")));
+
+    // Layer 2: end (depends on both m1 and m2)
+    assert_eq!(layers[2].len(), 1);
+    assert!(layers[2][0].event.contains("end"));
+}
+
+#[tokio::test]
+#[traced_test]
+async fn pipeline_engine_nodes_layered_sequential_chain() {
+    let f = Fixture::new().await;
+    let rev = f.db.create_revision("ant-on-the-web").await.unwrap();
+
+    // DAG: a → b → c → d
+    let p = f.engine.create_pipeline("ant-on-the-web", &rev).await.unwrap();
+    let a = f.engine.add_node(&p, NodeOptions {
+        event: serde_json::json!({"type": "a"}).to_string(),
+        mutates: None,
+    }).await.unwrap();
+    let b = f.engine.add_node(&p, NodeOptions {
+        event: serde_json::json!({"type": "b"}).to_string(),
+        mutates: None,
+    }).await.unwrap();
+    let c = f.engine.add_node(&p, NodeOptions {
+        event: serde_json::json!({"type": "c"}).to_string(),
+        mutates: None,
+    }).await.unwrap();
+    let d = f.engine.add_node(&p, NodeOptions {
+        event: serde_json::json!({"type": "d"}).to_string(),
+        mutates: None,
+    }).await.unwrap();
+    f.engine.add_edge(&a, &b).await.unwrap();
+    f.engine.add_edge(&b, &c).await.unwrap();
+    f.engine.add_edge(&c, &d).await.unwrap();
+    f.engine.seal(&p).await.unwrap();
+
+    let layers = f.engine.nodes_layered(&p).await.unwrap();
+
+    assert_eq!(layers.len(), 4);
+    assert_eq!(layers[0].len(), 1);
+    assert!(layers[0][0].event.contains("\"a\""));
+    assert_eq!(layers[1].len(), 1);
+    assert!(layers[1][0].event.contains("\"b\""));
+    assert_eq!(layers[2].len(), 1);
+    assert!(layers[2][0].event.contains("\"c\""));
+    assert_eq!(layers[3].len(), 1);
+    assert!(layers[3][0].event.contains("\"d\""));
+}
+
+#[tokio::test]
+#[traced_test]
 async fn pipeline_engine_active_pipelines_returns_in_progress() {
     let f = Fixture::new().await;
     let rev1 = f.db.create_revision("web").await.unwrap();
