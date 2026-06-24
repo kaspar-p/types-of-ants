@@ -26,10 +26,6 @@ pub struct AntZookeeperClientConfig {
     pub endpoint: String,
 }
 
-pub struct AntZookeeperClientError<E> {
-    error: E,
-}
-
 impl AntZookeeperClient {
     pub fn new(config: AntZookeeperClientConfig) -> Self {
         Self {
@@ -61,24 +57,23 @@ impl AntZookeeperClient {
             .request(method.clone(), &self.endpoint(path))
             .json(&req)
             .send()
-            .await?
-            .error_for_status();
+            .await?;
 
-        match res {
-            Ok(res) => {
-                let body = res.json::<Res>().await?;
-                return Ok(body);
-            }
-            Err(err) => {
-                error!(
-                    "Error sending {} {}: {}",
-                    method.as_str(),
-                    self.endpoint(path),
-                    err
-                );
-                return Err(err.into());
-            }
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            let msg = format!(
+                "{} {} failed with {}: {}",
+                method.as_str(),
+                self.endpoint(path),
+                status,
+                body
+            );
+            error!("{}", msg);
+            return Err(anyhow::Error::msg(msg));
         }
+
+        Ok(res.json::<Res>().await?)
     }
 
     pub async fn get_host_group(
@@ -155,15 +150,21 @@ impl AntZookeeperClient {
             .header("x-ant-version", version)
             .multipart(req)
             .send()
-            .await?
-            .error_for_status();
+            .await?;
 
-        match res {
-            Ok(_) => Ok(()),
-            Err(err) => {
-                error!("Error sending POST {}: {}", self.endpoint(path), err);
-                return Err(err.into());
-            }
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            let msg = format!(
+                "POST {} failed with {}: {}",
+                self.endpoint(path),
+                status,
+                body
+            );
+            error!("{}", msg);
+            return Err(anyhow::Error::msg(msg));
         }
+
+        Ok(())
     }
 }

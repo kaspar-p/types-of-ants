@@ -56,12 +56,17 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
             .unwrap();
     services.validate().expect("malformed services.json");
 
-    let arches: HashSet<HostArchitecture> = [
-        HostArchitecture::Aarch64,
-        HostArchitecture::ArmV7,
-        HostArchitecture::X86_64,
-    ]
-    .into();
+    let arches: HashSet<HostArchitecture> = if let Some(arch) = cmd.arch.as_ref() {
+        [arch.clone()].into()
+    } else {
+        services
+            .hosts
+            .values()
+            .filter(|h| !h.ineligible_for_deployments())
+            .filter(|h| h.services.iter().any(|s| s.project == cmd.project))
+            .map(|h| h.architecture.clone())
+            .collect()
+    };
 
     let git = GitState::new().expect("failed to fetch git state");
     let project_src = git.root.join("projects").join(&cmd.project);
