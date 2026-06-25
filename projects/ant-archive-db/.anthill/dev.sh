@@ -8,12 +8,25 @@ export SECRETS_DIR="$repository_root/secrets/dev"
 export VERSION="dev"
 export PERSIST_DIR="$repository_root/projects/ant-archive-db/database-files"
 
-mo "${repository_root}/projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > "/tmp/ant-archive-db.compose.yaml"
+reset=false
+for arg in "$@"; do
+  if [[ "$arg" == "--reset" ]]; then
+    reset=true
+  fi
+done
 
-docker-compose \
-  --project-directory "${repository_root}" \
-  --file /tmp/ant-archive-db.compose.yaml \
+if [[ "$reset" == true ]]; then
+  echo "Wiping $PERSIST_DIR..."
+  rm -rf "$PERSIST_DIR"
+fi
+
+# Write rendered compose to repo root so relative build contexts (./projects/...) resolve correctly.
+cd "${repository_root}"
+mo "projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > compose.dev.ant-archive-db.yaml
+
+podman compose \
+  --file compose.dev.ant-archive-db.yaml \
   up \
   --build \
   --force-recreate \
-  ant-archive-db "${@:2}"
+  ant-archive-db

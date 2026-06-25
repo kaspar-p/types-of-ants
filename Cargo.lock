@@ -146,6 +146,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "base16ct",
+ "base64ct",
  "dotenv",
  "hkdf",
  "http 1.4.0",

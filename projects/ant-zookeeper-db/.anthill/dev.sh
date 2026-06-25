@@ -22,10 +22,10 @@ fi
 
 # Write the rendered file into the repo root so relative build contexts resolve correctly.
 cd "${repository_root}"
-mo "projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > compose.dev.yaml
+mo "projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > compose.dev.ant-zookeeper-db.yaml
 
 podman compose \
-  --file compose.dev.yaml \
+  --file compose.dev.ant-zookeeper-db.yaml \
   up \
   --build \
   --force-recreate \

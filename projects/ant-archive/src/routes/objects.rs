@@ -12,6 +12,7 @@ use axum::{
     routing::{delete, get, put},
     Router,
 };
+use base64ct::{Base64, Encoding};
 use hkdf::Hkdf;
 use http::{header, StatusCode};
 use http_body_util::BodyExt;
@@ -82,14 +83,31 @@ async fn resolve_storage_nodes(
     Ok(clients)
 }
 
-fn load_kek() -> Result<[u8; 32], AntArchiveError> {
-    let bytes = ant_library::secret::load_secret_binary("ant_archive_kek")?;
-    let len = bytes.len();
-    bytes.try_into().map_err(|_| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-            "ant_archive_kek must be exactly 32 bytes, got {len}"
-        )))
-    })
+fn load_kek(kek_id: &str) -> Result<[u8; 32], AntArchiveError> {
+    // ant_archive_kek contains one entry per line: "{kek_id}:{base64(32 bytes)}"
+    let content = ant_library::secret::load_secret("ant_archive_kek")?;
+    for line in content.lines() {
+        let Some((id, b64)) = line.split_once(':') else {
+            continue;
+        };
+        if id != kek_id {
+            continue;
+        }
+        let bytes = Base64::decode_vec(b64).map_err(|e| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "ant_archive_kek entry for '{kek_id}' is not valid base64: {e}"
+            )))
+        })?;
+        let len = bytes.len();
+        return bytes.try_into().map_err(|_| {
+            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                "ant_archive_kek entry for '{kek_id}' must be exactly 32 bytes, got {len}"
+            )))
+        });
+    }
+    Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+        "ant_archive_kek has no entry for kek_id '{kek_id}'"
+    ))))
 }
 
 fn load_tek_master() -> Result<[u8; 32], AntArchiveError> {
@@ -300,7 +318,7 @@ async fn put_object(
     };
 
     let tek = derive_tek(&tek_master, &tek_derivation_key)?;
-    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek()?, &tek, &plaintext)?;
+    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek(&kek_id)?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
@@ -406,7 +424,7 @@ async fn get_object(
         .transpose()?;
 
     let plaintext = decrypt_object(
-        &load_kek()?,
+        &load_kek(&object.kek_id)?,
         maybe_tek.as_ref(),
         &object.encrypted_dek,
         &object.dek_nonce,
