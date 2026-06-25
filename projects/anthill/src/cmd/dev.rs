@@ -22,7 +22,28 @@ pub async fn dev(cmd: DevCmd) -> Result<(), anyhow::Error> {
     let manifest = AnthillManifest::from_file(&project_dir.join("anthill.json"))
         .context(format!("no anthill.json for project {}", cmd.project))?;
 
-    let build_cfg = repo_root.join("secrets").join("dev").join("build.cfg");
+    let secrets_dev_dir = repo_root.join("secrets").join("dev");
+    let missing: Vec<_> = manifest
+        .secrets
+        .iter()
+        .map(|s| secrets_dev_dir.join(format!("{}.secret", s.name())))
+        .filter(|p| !p.exists())
+        .collect();
+    if !missing.is_empty() {
+        let list = missing
+            .iter()
+            .map(|p| format!("  {}", p.display()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        anyhow::bail!(
+            "{} requires dev secrets that don't exist yet:\n{}\n\nCreate them once before running `ah dev {}`.",
+            cmd.project,
+            list,
+            cmd.project
+        );
+    }
+
+    let build_cfg = secrets_dev_dir.join("build.cfg");
     let mut env = ant_library::env::env_vars_to_map(&build_cfg)
         .context("failed to read secrets/dev/build.cfg")?;
 

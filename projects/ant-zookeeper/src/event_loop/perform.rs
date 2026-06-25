@@ -42,7 +42,7 @@ pub(crate) async fn host_artifact_replicated(
                 .await?
                 .unwrap();
 
-            replicate_artifact_step(&state, &revision, &host_group, &host).await?;
+            replicate_artifact_step(&state, &revision, &host_group.project, &host_group.environment, &host).await?;
 
             Ok(JobCompletion::Finished(()))
         }

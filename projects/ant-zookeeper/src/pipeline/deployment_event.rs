@@ -6,14 +6,17 @@ pub enum DeploymentEvent {
     ArtifactReplication {
         host_id: String,
         service_id: String,
+        environment: String,
     },
     HostDeployment {
         host_id: String,
         service_id: String,
+        environment: String,
     },
     DeploymentVerification {
         host_id: String,
         service_id: String,
+        environment: String,
     },
     RouteUpdate {
         environment: String,

@@ -5,5 +5,10 @@
   "ports": {
     "primary": 3234
   },
-  "secrets": []
+  "secrets": [
+    "ant_db_monitoring_password",
+    "ant_zookeeper_db_db",
+    "ant_zookeeper_db_user",
+    "ant_zookeeper_db_password"
+  ]
 }

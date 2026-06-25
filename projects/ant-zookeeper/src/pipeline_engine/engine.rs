@@ -31,6 +31,7 @@ pub struct Edge {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     pub node_id: String,
+    pub revision_id: String,
     pub event: String,
     pub state: String,
     pub resource_key: Option<String>,
@@ -564,14 +565,16 @@ impl PipelineEngine {
             .query(
                 "
                 select
-                    node_id,
-                    event,
-                    state,
-                    resource_key
-                from pipeline_engine_node
+                    n.node_id,
+                    p.revision_id,
+                    n.event,
+                    n.state,
+                    n.resource_key
+                from pipeline_engine_node n
+                    join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
                 where
-                    pipeline_id = $1
-                order by created_at
+                    n.pipeline_id = $1
+                order by n.created_at
                 ",
                 &[&pipeline_id],
             )
@@ -582,6 +585,7 @@ impl PipelineEngine {
             .iter()
             .map(|row| Node {
                 node_id: row.get("node_id"),
+                revision_id: row.get("revision_id"),
                 event: row.get("event"),
                 state: row.get("state"),
                 resource_key: row.get("resource_key"),
@@ -608,6 +612,7 @@ impl PipelineEngine {
                 "
                 select
                     n.node_id,
+                    p.revision_id,
                     n.event,
                     n.state,
                     n.resource_key
@@ -654,6 +659,7 @@ impl PipelineEngine {
             .iter()
             .map(|row| Node {
                 node_id: row.get("node_id"),
+                revision_id: row.get("revision_id"),
                 event: row.get("event"),
                 state: row.get("state"),
                 resource_key: row.get("resource_key"),
@@ -960,12 +966,15 @@ impl PipelineEngine {
                     "
                     select
                         pred.node_id,
+                        p.revision_id,
                         pred.event,
                         pred.state,
                         pred.resource_key
                     from pipeline_engine_edge e
                         join pipeline_engine_node pred
                             on e.from_node_id = pred.node_id
+                        join pipeline_engine_pipeline p
+                            on pred.pipeline_id = p.pipeline_id
                     where
                         e.to_node_id = $1
                         and pred.state not in ('finished', 'cancelled')
@@ -977,6 +986,7 @@ impl PipelineEngine {
                 .iter()
                 .map(|r| Node {
                     node_id: r.get("node_id"),
+                    revision_id: r.get("revision_id"),
                     event: r.get("event"),
                     state: r.get("state"),
                     resource_key: r.get("resource_key"),
@@ -1027,6 +1037,7 @@ impl PipelineEngine {
                 return Ok(Some(BlockReason::ResourceContention {
                     blocking_node: Node {
                         node_id: blocker_row.get("node_id"),
+                        revision_id: blocker_row.get("revision_id"),
                         event: blocker_row.get("event"),
                         state: blocker_row.get("state"),
                         resource_key: blocker_row.get("resource_key"),

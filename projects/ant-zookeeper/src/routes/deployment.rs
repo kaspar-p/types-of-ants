@@ -14,6 +14,7 @@ use crate::{
         perform::JobCompletion,
         transition::{self, DeploymentEvent},
     },
+    pipeline::dispatch::{dispatch, DeploymentContext},
     state::AntZookeeperState,
 };
 
@@ -25,9 +26,14 @@ async fn iterate_pipeline(
     State(state): State<AntZookeeperState>,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
     // New pipeline engine tick
+    let state_for_dispatch = state.clone();
     let tick_handle = state
         .engine
-        .tick(|_node| async { Ok(()) })
+        .tick(move |node| {
+            let state = state_for_dispatch.clone();
+            let context = DeploymentContext { revision_id: node.revision_id.clone() };
+            async move { dispatch(state, node, context).await }
+        })
         .await
         .with_context(|| "Pipeline engine tick failure")?;
     tick_handle.join().await.with_context(|| "Pipeline engine join failure")?;

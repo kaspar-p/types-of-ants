@@ -6,7 +6,6 @@ use std::{
 
 use ant_host_agent::client::AntHostAgentClientConfig;
 use ant_library::services::ServiceInstance;
-use ant_zookeeper_db::HostGroup;
 use anthill_manifest::AnthillManifest;
 use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -207,23 +206,23 @@ async fn inject_version_file(dest: &PathBuf, version: &str) -> Result<(), anyhow
 pub async fn replicate_artifact_step(
     state: &AntZookeeperState,
     revision: &str,
-    host_group: &HostGroup,
+    project: &str,
+    environment: &str,
     host: &str,
 ) -> Result<(), anyhow::Error> {
     let (_, host_arch) = state.db.get_host(&host).await?.expect("host exists");
 
     let (_, version, artifact_relative_path) = state
         .db
-        .get_artifact_by_revision(&revision, &host_group.project, Some(&host_arch))
+        .get_artifact_by_revision(&revision, project, Some(&host_arch))
         .await?
         .unwrap();
 
     let service_instance = state
         .services
-        .service_instance(&host_group.project, host)
+        .service_instance(project, host)
         .ok_or(anyhow::Error::msg(format!(
-            "cannot deploy to a [{host}] that doesn't have service [{}] defined in services.json!",
-            host_group.project
+            "cannot deploy to a [{host}] that doesn't have service [{project}] defined in services.json!"
         )))?;
 
     let artifact_path = artifact_persist_dir(&state.root_dir).join(artifact_relative_path);
@@ -255,13 +254,13 @@ pub async fn replicate_artifact_step(
                 service_instance,
                 &manifest,
                 &unpack_dir_path,
-                &host_group.project,
+                &project,
                 &version,
-                &host_group.environment,
+                &environment,
             )
             .await?;
 
-            inject_secrets(state, host, &unpack_dir_path, &host_group.environment).await?;
+            inject_secrets(state, host, &unpack_dir_path, &environment).await?;
 
             inject_version_file(&unpack_dir_path, &version).await?;
 
@@ -270,9 +269,9 @@ pub async fn replicate_artifact_step(
                 service_instance,
                 &manifest,
                 &unpack_dir_path,
-                &host_group.project,
+                &project,
                 &version,
-                &host_group.environment,
+                &environment,
             )
             .await?;
 
@@ -295,7 +294,7 @@ pub async fn replicate_artifact_step(
 
         create_dir_all(services_persist_dir(&state.root_dir)).await?;
         let service_file_path = services_persist_dir(&state.root_dir).join(services_file_name(
-            &host_group.project,
+            &project,
             Some(&host_arch),
             &version,
         ));
@@ -323,13 +322,13 @@ pub async fn replicate_artifact_step(
 
     info!("Replicating service file to: {host}");
     ant_host_agent
-        .register_service(&host_group.project, &version, service_file)
+        .register_service(&project, &version, service_file)
         .await?;
 
     info!("Installing service file file to: {host}");
     ant_host_agent
         .install_service(ant_host_agent::routes::service::InstallServiceRequest {
-            service_id: host_group.project.clone(),
+            service_id: project.to_string(),
             version: version.to_string(),
         })
         .await?;

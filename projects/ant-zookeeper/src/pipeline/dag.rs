@@ -203,6 +203,7 @@ async fn build_env_dag(
                         DeploymentEvent::ArtifactReplication {
                             host_id: host.clone(),
                             service_id: config.project_id.clone(),
+                            environment: environment.to_string(),
                         },
                         resource.clone(),
                     ),
@@ -216,6 +217,7 @@ async fn build_env_dag(
                         DeploymentEvent::HostDeployment {
                             host_id: host.clone(),
                             service_id: config.project_id.clone(),
+                            environment: environment.to_string(),
                         },
                         resource.clone(),
                     ),
@@ -229,6 +231,7 @@ async fn build_env_dag(
                         DeploymentEvent::DeploymentVerification {
                             host_id: host.clone(),
                             service_id: config.project_id.clone(),
+                            environment: environment.to_string(),
                         },
                         resource,
                     ),

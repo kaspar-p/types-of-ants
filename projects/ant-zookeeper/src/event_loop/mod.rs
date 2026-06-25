@@ -7,9 +7,9 @@ use crate::event_loop::transition::{
     after, is_deployment_complete, is_doable, transition, DeploymentEvent, Event, Node,
 };
 
-mod deploy;
+pub(crate) mod deploy;
 pub mod perform;
-mod replicate;
+pub(crate) mod replicate;
 pub mod transition;
 
 pub async fn drive_revisions(
