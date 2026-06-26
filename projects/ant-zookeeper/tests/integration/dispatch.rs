@@ -2,8 +2,8 @@ use std::fs::{self, File};
 use std::io::Write;
 
 use ant_zookeeper::{
-    pipeline::dispatch::{dispatch, DeploymentContext},
-    pipeline_engine::engine::Node,
+    pipeline::dispatch::dispatch,
+    pipeline_engine::engine::{Dispatch, DispatchDirection, Node},
     routes::service::{UpsertRevisionRequest, UpsertRevisionResponse},
 };
 use http::StatusCode;
@@ -46,7 +46,7 @@ async fn upsert_revision(fixture: &Fixture) -> String {
     res.json::<UpsertRevisionResponse>().await.revision
 }
 
-fn artifact_replication_node(revision_id: &str, host_id: &str, version: &str) -> (Node, DeploymentContext) {
+fn artifact_replication_dispatch(revision_id: &str, host_id: &str, version: &str) -> Dispatch {
     let event = serde_json::json!({
         "type": "artifact_replication",
         "host_id": host_id,
@@ -60,10 +60,11 @@ fn artifact_replication_node(revision_id: &str, host_id: &str, version: &str) ->
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: revision_id.to_string(),
-    };
-    (node, context)
+        node,
+    }
 }
 
 #[test]
@@ -96,11 +97,9 @@ async fn dispatch_artifact_replication_registers_and_installs_service() {
     // antworker001 has arch aarch64 in the seed data
     upload_artifact(&fixture, &revision_id, "aarch64", "v1").await;
 
-    let (node, context) = artifact_replication_node(&revision_id, "antworker001", "v1");
+    let d = artifact_replication_dispatch(&revision_id, "antworker001", "v1");
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 
     assert!(
         fixture
@@ -139,13 +138,13 @@ async fn dispatch_deployment_verification_returns_ok() {
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    let d = Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: "rev-test".to_string(),
+        node,
     };
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 }
 
 #[test]
@@ -164,13 +163,13 @@ async fn dispatch_route_update_returns_ok() {
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    let d = Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: "rev-test".to_string(),
+        node,
     };
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 }
 
 #[test]
@@ -190,13 +189,13 @@ async fn dispatch_alert_configuration_returns_ok() {
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    let d = Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: "rev-test".to_string(),
+        node,
     };
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 }
 
 #[test]
@@ -216,13 +215,13 @@ async fn dispatch_log_rule_configuration_returns_ok() {
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    let d = Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: "rev-test".to_string(),
+        node,
     };
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 }
 
 #[test]
@@ -242,11 +241,11 @@ async fn dispatch_database_migration_returns_ok() {
         state: "executable".to_string(),
         resource_key: None,
     };
-    let context = DeploymentContext {
+    let d = Dispatch {
+        direction: DispatchDirection::Deploy,
         revision_id: "rev-test".to_string(),
+        node,
     };
 
-    dispatch(fixture.state.clone(), node, context)
-        .await
-        .unwrap();
+    dispatch(fixture.state.clone(), d).await.unwrap();
 }

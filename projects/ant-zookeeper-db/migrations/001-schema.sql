@@ -281,7 +281,7 @@ create table pipeline_engine_pipeline (
   project_id text not null, -- The project this pipeline deploys.
   revision_id text not null, -- The revision being deployed. revision.revision_seq provides FIFO ordering.
 
-  state text not null default 'active', -- active | finished | cancelled
+  state text not null default 'active', -- active | finished | cancelled | unwinding | unwound
 
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -300,6 +300,8 @@ create table pipeline_engine_node (
 
   event text not null, -- JSON blob identifying this node. Opaque to the engine, deserialized by the application.
   resource_key text, -- Opaque string for FIFO scheduling. NULL = no resource contention.
+  is_unwind_boundary boolean not null default false, -- If true, backward unwind walk stops here (does not include this node).
+  unwind_on_failure boolean not null default true, -- If true, terminal failure of this node triggers automatic pipeline unwind.
 
   state text not null default 'pending',
   -- pending: waiting for predecessors
@@ -308,6 +310,8 @@ create table pipeline_engine_node (
   -- finished: work completed successfully
   -- failed: work failed
   -- cancelled: will never run, pipeline abandoned. Treated as done for FIFO/promotion.
+  -- unwound: unwind completed successfully (terminal)
+  -- unwind_failed: unwind handler failed, terminal, requires operator intervention
 
   started_at timestamp with time zone,
   finished_at timestamp with time zone,
@@ -349,6 +353,35 @@ create table pipeline_engine_job (
 
   foreign key (node_id) references pipeline_engine_node(node_id)
 );
+
+create table pipeline_engine_node_event (
+  event_id text primary key default ('nevt-' || random_string(12)),
+
+  node_id text not null,
+  to_state text not null,
+  reason text not null, -- seal, promote, claim, succeed, fail, cancel, retry, release_stale, unwind
+
+  event_seq serial not null,
+  created_at timestamp with time zone not null default now(),
+
+  foreign key (node_id) references pipeline_engine_node(node_id)
+);
+
+create index idx_node_event_node_id on pipeline_engine_node_event (node_id, event_seq);
+
+create table pipeline_engine_pipeline_event (
+  event_id text primary key default ('pevt-' || random_string(12)),
+
+  pipeline_id text not null,
+  to_state text not null,
+  reason text not null, -- finish, cancel, unwind
+
+  created_at timestamp with time zone not null default now(),
+
+  foreign key (pipeline_id) references pipeline_engine_pipeline(pipeline_id)
+);
+
+create index idx_pipeline_event_pipeline_id on pipeline_engine_pipeline_event (pipeline_id, created_at);
 
 insert into migration (migration_label) values
   ('bootstrap-schema')

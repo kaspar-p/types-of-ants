@@ -7,7 +7,7 @@ use ant_library::host_architecture::HostArchitecture;
 use ant_zookeeper::{
     event_loop::transition::{DeploymentEvent, Event as E},
     routes::{
-        deployment::RetryJobRequest,
+        deployment::RetryRequest,
         pipeline::{
             AddHostToHostGroupRequest, CreateHostGroupRequest, CreateHostGroupResponse,
             PutPipelineRequest, PutPipelineStage,
@@ -33,8 +33,9 @@ async fn deployment_retry_returns_400_if_no_such_job() {
     let fixture = Fixture::new(function_name!()).await;
 
     {
-        let req = RetryJobRequest {
-            job_id: "some job".to_string(),
+        let req = RetryRequest {
+            job_id: Some("some job".to_string()),
+            node_id: None,
         };
         let res = fixture
             .client

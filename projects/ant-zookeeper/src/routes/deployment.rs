@@ -14,7 +14,7 @@ use crate::{
         perform::JobCompletion,
         transition::{self, DeploymentEvent},
     },
-    pipeline::dispatch::{dispatch, DeploymentContext},
+    pipeline::dispatch::dispatch,
     state::AntZookeeperState,
 };
 
@@ -29,14 +29,16 @@ async fn iterate_pipeline(
     let state_for_dispatch = state.clone();
     let tick_handle = state
         .engine
-        .tick(move |node| {
+        .tick(move |d| {
             let state = state_for_dispatch.clone();
-            let context = DeploymentContext { revision_id: node.revision_id.clone() };
-            async move { dispatch(state, node, context).await }
+            async move { dispatch(state, d).await }
         })
         .await
         .with_context(|| "Pipeline engine tick failure")?;
-    tick_handle.join().await.with_context(|| "Pipeline engine join failure")?;
+    tick_handle
+        .join()
+        .await
+        .with_context(|| "Pipeline engine join failure")?;
 
     // Legacy: Schedule any deployment jobs available
     drive_revisions(&state.db, 1)
@@ -145,36 +147,57 @@ async fn iterate_pipeline(
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RetryJobRequest {
-    pub job_id: String,
+pub struct RetryRequest {
+    pub job_id: Option<String>,
+    pub node_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RetryJobResponse {
+pub struct RetryResponse {
     pub retried_at: DateTime<Utc>,
 }
 
 async fn retry_job(
     State(state): State<AntZookeeperState>,
-    Json(req): Json<RetryJobRequest>,
+    Json(req): Json<RetryRequest>,
 ) -> Result<impl IntoResponse, AntZookeeperError> {
-    match state.db.get_deployment_job(&req.job_id).await? {
+    // New pipeline engine: retry by node_id
+    if let Some(node_id) = &req.node_id {
+        state
+            .engine
+            .retry(node_id)
+            .await
+            .map_err(|e| AntZookeeperError::ValidationError(e.to_string()))?;
+        return Ok((
+            StatusCode::OK,
+            Json(RetryResponse {
+                retried_at: Utc::now(),
+            }),
+        ));
+    }
+
+    // Legacy system: retry by job_id
+    let job_id = req.job_id.as_deref().ok_or_else(|| {
+        AntZookeeperError::ValidationError("either job_id or node_id is required".to_string())
+    })?;
+
+    match state.db.get_deployment_job(job_id).await? {
         None => {
-            return Err(AntZookeeperError::ResourceNotFound(req.job_id));
+            return Err(AntZookeeperError::ResourceNotFound(job_id.to_string()));
         }
         Some((_, is_success, is_retryable, updated_at, _, _)) => {
             if is_success {
                 return Err(AntZookeeperError::ValidationError(format!(
                     "Job {} has already been completed and cannot be retried.",
-                    req.job_id
+                    job_id
                 )));
             }
 
             if is_retryable {
                 return Ok((
                     StatusCode::OK,
-                    Json(RetryJobResponse {
+                    Json(RetryResponse {
                         retried_at: updated_at,
                     }),
                 ));
@@ -182,17 +205,14 @@ async fn retry_job(
         }
     }
 
-    let updated_at = state
-        .db
-        .set_deployment_job_retryable(&req.job_id, true)
-        .await?;
+    let updated_at = state.db.set_deployment_job_retryable(job_id, true).await?;
 
-    return Ok((
+    Ok((
         StatusCode::OK,
-        Json(RetryJobResponse {
+        Json(RetryResponse {
             retried_at: updated_at,
         }),
-    ));
+    ))
 }
 
 pub fn routes() -> Routes<AntZookeeperState> {

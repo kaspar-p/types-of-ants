@@ -1,7 +1,7 @@
 use crate::pipeline::deployment_event::DeploymentEvent;
 use crate::pipeline::resource_key::{DeploymentResource, Identifier};
 use crate::pipeline_engine::engine::PipelineEngine;
-use crate::pipeline_engine::node::NodeOptions;
+use crate::pipeline_engine::node::{NodeOptions, NodeSpec};
 
 pub struct ProjectConfig {
     pub project_id: String,
@@ -17,10 +17,22 @@ fn id(s: &str) -> Identifier {
     Identifier::new(s).unwrap()
 }
 
-fn node(event: DeploymentEvent, resource: Option<DeploymentResource>) -> NodeOptions {
-    NodeOptions {
+fn node(
+    event: DeploymentEvent,
+    resource: Option<DeploymentResource>,
+    options: NodeOptions,
+) -> NodeSpec {
+    NodeSpec {
         event: serde_json::to_string(&event).unwrap(),
         mutates: resource.map(|r| r.to_string()),
+        options,
+    }
+}
+
+fn no_unwind() -> NodeOptions {
+    NodeOptions {
+        unwind_on_failure: false,
+        ..NodeOptions::default()
     }
 }
 
@@ -54,29 +66,62 @@ fn wave_layout(hosts: &[String]) -> Vec<Vec<&String>> {
     }
 }
 
-
 pub async fn build_dag(
     engine: &PipelineEngine,
     revision_id: &str,
     config: &ProjectConfig,
 ) -> Result<String, anyhow::Error> {
-    let pipeline_id = engine.create_pipeline(&config.project_id, revision_id).await?;
+    let pipeline_id = engine
+        .create_pipeline(&config.project_id, revision_id)
+        .await?;
 
     let mut beta_terminal_nodes = vec![];
 
     if !config.beta_hosts.is_empty() {
-        beta_terminal_nodes =
-            build_env_dag(engine, &pipeline_id, config, "beta", &config.beta_hosts, vec![]).await?;
+        beta_terminal_nodes = build_env_dag(
+            engine,
+            &pipeline_id,
+            config,
+            "beta",
+            &config.beta_hosts,
+            vec![],
+        )
+        .await?;
     }
 
     if !config.prod_hosts.is_empty() {
+        let prod_predecessors = if beta_terminal_nodes.is_empty() {
+            vec![]
+        } else {
+            let gate = engine
+                .add_node(
+                    &pipeline_id,
+                    node(
+                        DeploymentEvent::EnvironmentGate {
+                            from: "beta".to_string(),
+                            to: "prod".to_string(),
+                        },
+                        None,
+                        NodeOptions {
+                            is_unwind_boundary: true,
+                            unwind_on_failure: false,
+                        },
+                    ),
+                )
+                .await?;
+            for prev in &beta_terminal_nodes {
+                engine.add_edge(prev, &gate).await?;
+            }
+            vec![gate]
+        };
+
         build_env_dag(
             engine,
             &pipeline_id,
             config,
             "prod",
             &config.prod_hosts,
-            beta_terminal_nodes,
+            prod_predecessors,
         )
         .await?;
     }
@@ -107,6 +152,7 @@ async fn build_env_dag(
                     Some(DeploymentResource::GatewayRouting {
                         environment: id(environment),
                     }),
+                    no_unwind(),
                 ),
             )
             .await?;
@@ -128,6 +174,7 @@ async fn build_env_dag(
                     Some(DeploymentResource::AlertRules {
                         service_id: id(&config.project_id),
                     }),
+                    no_unwind(),
                 ),
             )
             .await?;
@@ -152,6 +199,7 @@ async fn build_env_dag(
                             host_id: id(host),
                             service_id: id(&config.project_id),
                         }),
+                        no_unwind(),
                     ),
                 )
                 .await?;
@@ -176,6 +224,7 @@ async fn build_env_dag(
                         service_id: id(&config.project_id),
                         environment: id(environment),
                     }),
+                    no_unwind(),
                 ),
             )
             .await?;
@@ -206,6 +255,7 @@ async fn build_env_dag(
                             environment: environment.to_string(),
                         },
                         resource.clone(),
+                        no_unwind(),
                     ),
                 )
                 .await?;
@@ -220,6 +270,7 @@ async fn build_env_dag(
                             environment: environment.to_string(),
                         },
                         resource.clone(),
+                        NodeOptions::default(),
                     ),
                 )
                 .await?;
@@ -234,6 +285,7 @@ async fn build_env_dag(
                             environment: environment.to_string(),
                         },
                         resource,
+                        NodeOptions::default(),
                     ),
                 )
                 .await?;
@@ -272,7 +324,11 @@ mod tests {
             let guard = TestDatabase::new("ant-zookeeper-db").await;
             let db = AntZooStorageClient::connect(&guard.config).await.unwrap();
             let engine = PipelineEngine::new(db.pool()).await.unwrap();
-            Fixture { engine, db, _guard: guard }
+            Fixture {
+                engine,
+                db,
+                _guard: guard,
+            }
         }
     }
 
@@ -305,9 +361,10 @@ mod tests {
         let edges = f.engine.edges(&pipeline_id).await.unwrap();
 
         // Beta: 1 host × 3 nodes = 3
+        // Gate: 1
         // Prod: 3 hosts in waves [1, 2] × 3 nodes = 9
-        // Total: 12 nodes
-        assert_eq!(nodes.len(), 12);
+        // Total: 13 nodes
+        assert_eq!(nodes.len(), 13);
 
         // Beta triplet is a chain
         let beta_events: Vec<_> = events(&nodes)
@@ -336,15 +393,24 @@ mod tests {
         // Edges: beta has 2 internal + prod wave structure
         assert!(edges.len() > 0);
 
-        // Beta verify → prod wave 1 replicate (sequential environments)
-        let beta_verify_id = nodes.iter().find(|n| {
-            n.event.contains("deployment_verification") && n.event.contains("w2")
-        }).unwrap();
-        let prod_first_replicate = nodes.iter().find(|n| {
-            n.event.contains("artifact_replication") && n.event.contains("w1")
-        }).unwrap();
+        // Beta verify → gate → prod wave 1 replicate (sequential environments)
+        let beta_verify_id = nodes
+            .iter()
+            .find(|n| n.event.contains("deployment_verification") && n.event.contains("w2"))
+            .unwrap();
+        let gate_id = nodes
+            .iter()
+            .find(|n| n.event.contains("environment_gate"))
+            .unwrap();
+        let prod_first_replicate = nodes
+            .iter()
+            .find(|n| n.event.contains("artifact_replication") && n.event.contains("w1"))
+            .unwrap();
         assert!(edges.iter().any(|e| {
-            e.from_node_id == beta_verify_id.node_id && e.to_node_id == prod_first_replicate.node_id
+            e.from_node_id == beta_verify_id.node_id && e.to_node_id == gate_id.node_id
+        }));
+        assert!(edges.iter().any(|e| {
+            e.from_node_id == gate_id.node_id && e.to_node_id == prod_first_replicate.node_id
         }));
     }
 
@@ -379,12 +445,14 @@ mod tests {
         assert_eq!(migrations.len(), 2);
 
         // Migration should come before host deployment in each env
-        let beta_migration = nodes.iter().find(|n| {
-            n.event.contains("database_migration") && n.event.contains("beta")
-        }).unwrap();
-        let beta_replicate = nodes.iter().find(|n| {
-            n.event.contains("artifact_replication") && n.event.contains("w2")
-        }).unwrap();
+        let beta_migration = nodes
+            .iter()
+            .find(|n| n.event.contains("database_migration") && n.event.contains("beta"))
+            .unwrap();
+        let beta_replicate = nodes
+            .iter()
+            .find(|n| n.event.contains("artifact_replication") && n.event.contains("w2"))
+            .unwrap();
         assert!(edges.iter().any(|e| {
             e.from_node_id == beta_migration.node_id && e.to_node_id == beta_replicate.node_id
         }));
@@ -414,21 +482,24 @@ mod tests {
 
         // Per env: route_update → alert_config → log_rule_config → db_migration → host triplet
         // Beta: 4 config + 3 host = 7
+        // Gate: 1
         // Prod: 4 config + 3 host = 7
-        // Total: 14
-        assert_eq!(nodes.len(), 14);
+        // Total: 15
+        assert_eq!(nodes.len(), 15);
 
         // Verify serial ordering in beta: route → alerts → log_rules → migration → replicate
-        let beta_route = nodes.iter().find(|n| {
-            n.event.contains("route_update") && n.event.contains("beta")
-        }).unwrap();
-        let alerts = nodes.iter().find(|n| {
-            n.event.contains("alert_configuration")
-        }).unwrap();
+        let beta_route = nodes
+            .iter()
+            .find(|n| n.event.contains("route_update") && n.event.contains("beta"))
+            .unwrap();
+        let alerts = nodes
+            .iter()
+            .find(|n| n.event.contains("alert_configuration"))
+            .unwrap();
 
-        assert!(edges.iter().any(|e| {
-            e.from_node_id == beta_route.node_id && e.to_node_id == alerts.node_id
-        }));
+        assert!(edges
+            .iter()
+            .any(|e| { e.from_node_id == beta_route.node_id && e.to_node_id == alerts.node_id }));
     }
 
     #[tokio::test]
@@ -455,8 +526,10 @@ mod tests {
         assert_eq!(nodes.len(), 4);
 
         // First node should be route update (root after seal)
-        let route_node = nodes.iter().find(|n| n.event.contains("route_update")).unwrap();
+        let route_node = nodes
+            .iter()
+            .find(|n| n.event.contains("route_update"))
+            .unwrap();
         assert_eq!(route_node.state, "executable");
     }
 }
-

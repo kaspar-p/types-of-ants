@@ -33,4 +33,8 @@ pub enum DeploymentEvent {
         service_id: String,
         environment: String,
     },
+    EnvironmentGate {
+        from: String,
+        to: String,
+    },
 }

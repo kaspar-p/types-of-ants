@@ -318,7 +318,8 @@ async fn put_object(
     };
 
     let tek = derive_tek(&tek_master, &tek_derivation_key)?;
-    let (encrypted_dek, dek_nonce, stored_bytes) = encrypt_object(&load_kek(&kek_id)?, &tek, &plaintext)?;
+    let (encrypted_dek, dek_nonce, stored_bytes) =
+        encrypt_object(&load_kek(&kek_id)?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
     let storage_nodes = resolve_storage_nodes(&state).await?;

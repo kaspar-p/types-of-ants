@@ -4,15 +4,13 @@ use std::sync::Arc;
 use ant_library::db::TypesOfAntsDatabase;
 use ant_library_test::db::TestDatabase;
 use ant_zookeeper::pipeline_engine::engine::PipelineEngine;
-use ant_zookeeper::pipeline_engine::node::NodeOptions;
+use ant_zookeeper::pipeline_engine::node::{NodeOptions, NodeSpec};
 use ant_zookeeper_db::AntZooStorageClient;
 use tokio::sync::Barrier;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     let run_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let output_dir = format!("stress-runs/{run_id}");
@@ -51,7 +49,6 @@ async fn main() {
     }
 }
 
-
 async fn run_scenario_concurrent_fifo(
     engine: &PipelineEngine,
     db: &AntZooStorageClient,
@@ -63,26 +60,34 @@ async fn run_scenario_concurrent_fifo(
 
     let resource = format!("fifo-resource-{iter}");
 
-    let p1 = engine.create_pipeline("ant-on-the-web", &rev1).await.unwrap();
+    let p1 = engine
+        .create_pipeline("ant-on-the-web", &rev1)
+        .await
+        .unwrap();
     engine
         .add_node(
             &p1,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "work", "iter": iter, "rev": 1}).to_string(),
                 mutates: Some(resource.clone()),
+                options: NodeOptions::default(),
             },
         )
         .await
         .unwrap();
     engine.seal(&p1).await.unwrap();
 
-    let p2 = engine.create_pipeline("ant-on-the-web", &rev2).await.unwrap();
+    let p2 = engine
+        .create_pipeline("ant-on-the-web", &rev2)
+        .await
+        .unwrap();
     engine
         .add_node(
             &p2,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "work", "iter": iter, "rev": 2}).to_string(),
                 mutates: Some(resource),
+                options: NodeOptions::default(),
             },
         )
         .await
@@ -158,17 +163,21 @@ async fn run_scenario_fan_in(
     dispatches: &Arc<AtomicU32>,
 ) {
     let rev = db.create_revision("ant-on-the-web").await.unwrap();
-    let p = engine.create_pipeline("ant-on-the-web", &rev).await.unwrap();
+    let p = engine
+        .create_pipeline("ant-on-the-web", &rev)
+        .await
+        .unwrap();
 
     let mut preds = vec![];
     for i in 0..8 {
         let n = engine
             .add_node(
                 &p,
-                NodeOptions {
+                NodeSpec {
                     event: serde_json::json!({"type": "fan_in_pred", "iter": iter, "i": i})
                         .to_string(),
                     mutates: None,
+                    options: NodeOptions::default(),
                 },
             )
             .await
@@ -179,9 +188,10 @@ async fn run_scenario_fan_in(
     let join = engine
         .add_node(
             &p,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "fan_in_join", "iter": iter}).to_string(),
                 mutates: None,
+                options: NodeOptions::default(),
             },
         )
         .await
@@ -211,16 +221,14 @@ async fn run_scenario_fan_in(
     tick_handle.join().await.unwrap();
 
     // Join node should be promotable after next tick
-    let tick_handle = engine
-        .tick(move |_| {
-            async move { Ok(()) }
-        })
-        .await
-        .unwrap();
+    let tick_handle = engine.tick(move |_| async move { Ok(()) }).await.unwrap();
     tick_handle.join().await.unwrap();
 
     let nodes = engine.nodes(&p).await.unwrap();
-    let join_node = nodes.iter().find(|n| n.event.contains("fan_in_join")).unwrap();
+    let join_node = nodes
+        .iter()
+        .find(|n| n.event.contains("fan_in_join"))
+        .unwrap();
     assert!(
         join_node.state == "finished",
         "iter={iter}: fan-in join not finished, state={}",
@@ -237,13 +245,17 @@ async fn run_scenario_mixed_resources(
     let rev1 = db.create_revision("ant-on-the-web").await.unwrap();
     let rev2 = db.create_revision("ant-gateway").await.unwrap();
 
-    let p1 = engine.create_pipeline("ant-on-the-web", &rev1).await.unwrap();
+    let p1 = engine
+        .create_pipeline("ant-on-the-web", &rev1)
+        .await
+        .unwrap();
     let a = engine
         .add_node(
             &p1,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "mixed_a", "iter": iter}).to_string(),
                 mutates: Some(format!("res-a-{iter}")),
+                options: NodeOptions::default(),
             },
         )
         .await
@@ -251,9 +263,10 @@ async fn run_scenario_mixed_resources(
     let b = engine
         .add_node(
             &p1,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "mixed_b", "iter": iter}).to_string(),
                 mutates: Some(format!("res-b-{iter}")),
+                options: NodeOptions::default(),
             },
         )
         .await
@@ -264,9 +277,10 @@ async fn run_scenario_mixed_resources(
     engine
         .add_node(
             &p2,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "mixed_c", "iter": iter}).to_string(),
                 mutates: Some(format!("res-a-{iter}")),
+                options: NodeOptions::default(),
             },
         )
         .await
@@ -274,9 +288,10 @@ async fn run_scenario_mixed_resources(
     engine
         .add_node(
             &p2,
-            NodeOptions {
+            NodeSpec {
                 event: serde_json::json!({"type": "mixed_d", "iter": iter}).to_string(),
                 mutates: Some(format!("res-b-{iter}")),
+                options: NodeOptions::default(),
             },
         )
         .await

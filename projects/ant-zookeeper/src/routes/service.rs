@@ -453,12 +453,8 @@ async fn register_artifact(
                 prod_hosts,
             };
 
-            let pipeline_id = crate::pipeline::dag::build_dag(
-                &state.engine,
-                &revision.0,
-                &config,
-            )
-            .await?;
+            let pipeline_id =
+                crate::pipeline::dag::build_dag(&state.engine, &revision.0, &config).await?;
 
             info!("Created deployment pipeline: {pipeline_id}");
         } else {
