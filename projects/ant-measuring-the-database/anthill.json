@@ -2,6 +2,7 @@
   "project": "ant-measuring-the-database",
   "description": "the typesofants database metrics exporter",
   "build": "makefile",
+  "cluster": "global_infrastructure",
   "ports": {
     "primary": 3244
   },

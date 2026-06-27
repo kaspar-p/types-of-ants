@@ -1,5 +1,5 @@
 use ant_library::headers::{XAntServiceIdHeader, XAntVersionHeader};
-use anthill_manifest::{AnthillManifest, AnthillManifestError};
+use anthill_manifest::{AnthillCluster, AnthillManifest, AnthillManifestError};
 use anyhow::Context;
 use flate2::read::GzDecoder;
 use handlebars::{no_escape, Handlebars};
@@ -225,14 +225,29 @@ async fn enable_service(
     }
 
     if healthy {
-        state
-            .sd
-            .register_local_service(
-                &req.service_id,
-                manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0),
-            )
-            .await
-            .context("register service to ant-matchmaker service")?;
+        match manifest.cluster {
+            AnthillCluster::GlobalInfrastructure => {
+                state
+                    .infra_sd
+                    .register_local_service(
+                        &req.service_id,
+                        manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0),
+                    )
+                    .await
+                    .context("register service to ant-matchmaker-infra service")?;
+            }
+
+            AnthillCluster::IsolatedEnvironment => {
+                state
+                    .sd
+                    .register_local_service(
+                        &req.service_id,
+                        manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0),
+                    )
+                    .await
+                    .context("register service to ant-matchmaker service")?;
+            }
+        }
     } else {
         error!("Failed to wait for Consul's health, skipping registration!");
     }

@@ -123,13 +123,18 @@ WantedBy=multi-user.target
 
 fn validate_secret_exists(
     state: &AntZookeeperState,
+    service_id: &str,
     secret: &AnthillSecret,
-    host_ids: &Vec<String>,
 ) -> Result<(), AntZookeeperError> {
-    // TODO better way to get environments
-    for environment in ["beta", "prod"] {
+    let hosts = state.services.list_hosts_with_service(service_id);
+    let environments = hosts
+        .iter()
+        .map(|(_, s)| s.env.to_string())
+        .collect::<HashSet<_>>();
+
+    for environment in &environments {
         if secret.is_host_specific() {
-            for host_id in host_ids.iter() {
+            for (host_id, _) in hosts.iter() {
                 let secret_file = host_specific_secret_file_path(
                     &state.root_dir,
                     environment,
@@ -242,8 +247,6 @@ async fn register_artifact(
         info!("Finished writing to [{}]...", temp_file_path.display());
     }
 
-    let host_ids = state.db.list_hosts().await?;
-
     info!(
         "Validating file contents of [{}]...",
         temp_file_path.display()
@@ -296,7 +299,7 @@ async fn register_artifact(
                 info!("Read manifest: {:?}", manifest);
 
                 for secret in manifest.secrets {
-                    validate_secret_exists(&state, &secret, &host_ids)?;
+                    validate_secret_exists(&state, &project_id, &secret)?;
                 }
             }
         }

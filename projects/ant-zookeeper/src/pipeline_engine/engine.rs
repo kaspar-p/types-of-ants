@@ -1,5 +1,6 @@
 use ant_library::db::ConnectionPool;
 use anyhow::Context;
+use serde::{Deserialize, Serialize};
 use stdext::function_name;
 use tracing::{error, info, info_span, warn, Instrument};
 
@@ -76,7 +77,7 @@ pub struct Edge {
     pub to_node_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
     pub node_id: String,
     pub revision_id: String,
@@ -85,7 +86,7 @@ pub struct Node {
     pub resource_key: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockReason {
     /// Node is not in 'executable' state (e.g. pending, failed, in_progress).
     /// If pending, includes the unfinished predecessors blocking promotion.
@@ -97,6 +98,7 @@ pub enum BlockReason {
     ResourceContention {
         blocking_node: Node,
         blocking_revision: String,
+        blocking_pipeline: String,
     },
 }
 
@@ -434,7 +436,7 @@ impl PipelineEngine {
 
         macro_rules! check_invariant {
             ($query:expr, $msg:expr) => {{
-                let rows = con.query($query, &[]).await?;
+                let rows = con.query($query, &[]).await.context($msg)?;
                 if !rows.is_empty() {
                     let columns: Vec<&str> = rows[0].columns().iter().map(|c| c.name()).collect();
                     let violations: Vec<Vec<String>> = rows
@@ -458,155 +460,256 @@ impl PipelineEngine {
         }
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-             where n.state = 'executable'
-               and exists (
-                 select 1 from pipeline_engine_edge e
-                   join pipeline_engine_node pred on e.from_node_id = pred.node_id
-                 where e.to_node_id = n.node_id
-                   and pred.state not in ('finished', 'cancelled')
-               )",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.state = 'executable' and
+                p.state in ('active', 'unwinding') and
+                exists (
+                    select 1 from pipeline_engine_edge e
+                        join pipeline_engine_node pred on e.from_node_id = pred.node_id
+                    where
+                        e.to_node_id = n.node_id and
+                        pred.state not in ('finished', 'cancelled')
+                )
+            ",
             "invariant #1: executable node with unfinished predecessor"
         );
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-             where n.state = 'in_progress'
-               and (select count(*) from pipeline_engine_job j
-                    where j.node_id = n.node_id and j.state = 'running') != 1",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.state = 'in_progress' and
+                p.state in ('active', 'unwinding') and
+                (
+                    select count(*)
+                    from pipeline_engine_job j
+                    where
+                        j.node_id = n.node_id and j.state = 'running'
+                ) != 1
+            ",
             "invariant #3: in_progress node without exactly one running job"
         );
 
         check_invariant!(
-            "select node_id from pipeline_engine_job
-             where state = 'running'
-             group by node_id having count(*) > 1",
+            "
+            select j.node_id
+            from pipeline_engine_job j
+                join pipeline_engine_node n on n.node_id = j.node_id
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                j.state = 'running' and
+                p.state in ('active', 'unwinding')
+            group by j.node_id having count(*) > 1
+            ",
             "invariant #7: multiple running jobs for same node"
         );
 
         check_invariant!(
-            "select j.job_id from pipeline_engine_job j
-               join pipeline_engine_node n on j.node_id = n.node_id
-             where j.state = 'running' and n.state != 'in_progress'",
+            "
+            select j.job_id
+            from pipeline_engine_job j
+                join pipeline_engine_node n on j.node_id = n.node_id
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                j.state = 'running' and
+                n.state != 'in_progress' and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #8: running job on non-in_progress node"
         );
 
         check_invariant!(
-            "select j.job_id from pipeline_engine_job j
+            "
+            select j.job_id
+            from pipeline_engine_job j
                join pipeline_engine_node n on j.node_id = n.node_id
-             where n.state = 'pending' and j.state = 'running'",
+               join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.state = 'pending' and
+                j.state = 'running' and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #10: running job for pending node"
         );
 
         check_invariant!(
-            "select p.pipeline_id from pipeline_engine_pipeline p
-             where p.state in ('finished', 'unwound')
-               and exists (
-                 select 1 from pipeline_engine_node n
-                 where n.pipeline_id = p.pipeline_id
-                   and n.state not in ('finished', 'cancelled', 'unwound', 'unwind_failed')
-               )",
+            "
+            select p.pipeline_id
+            from pipeline_engine_pipeline p
+            where
+                p.state in ('finished', 'unwound') and
+                exists (
+                    select 1 from pipeline_engine_node n
+                    where
+                        n.pipeline_id = p.pipeline_id and
+                        n.state not in ('finished', 'cancelled', 'unwound', 'unwind_failed')
+                )
+            ",
             "invariant #11: terminal pipeline with non-terminal nodes"
         );
 
-        check_invariant!(
-            "select p.pipeline_id from pipeline_engine_pipeline p
-             where p.state = 'cancelled'
-               and exists (
-                 select 1 from pipeline_engine_node n
-                 where n.pipeline_id = p.pipeline_id
-                   and n.state in ('executable', 'in_progress')
-               )",
-            "invariant #13: cancelled pipeline with executable/in_progress nodes"
-        );
+        // -- Once we cancel a pipeline for good, we ignore it from invariants
+        //
+        // check_invariant!(
+        //     "
+        //     select p.pipeline_id
+        //     from pipeline_engine_pipeline p
+        //     where p.state = 'cancelled'
+        //        and exists (
+        //          select 1 from pipeline_engine_node n
+        //          where n.pipeline_id = p.pipeline_id
+        //            and n.state in ('executable', 'in_progress')
+        //        )",
+        //     "invariant #13: cancelled pipeline with executable/in_progress nodes"
+        // );
 
         check_invariant!(
-            "select resource_key from pipeline_engine_node
-             where state = 'in_progress' and resource_key is not null
-             group by resource_key having count(*) > 1",
+            "
+            select n.resource_key
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.state = 'in_progress' and
+                n.resource_key is not null and
+                p.state in ('active', 'unwinding')
+            group by n.resource_key having count(*) > 1
+            ",
             "invariant #14: multiple in_progress nodes on same resource"
         );
 
         check_invariant!(
-            "select e.edge_id from pipeline_engine_edge e
-               join pipeline_engine_node n1 on e.from_node_id = n1.node_id
-               join pipeline_engine_node n2 on e.to_node_id = n2.node_id
-             where n1.pipeline_id != n2.pipeline_id",
+            "
+            select e.edge_id
+            from pipeline_engine_edge e
+                join pipeline_engine_node n1 on e.from_node_id = n1.node_id
+                join pipeline_engine_node n2 on e.to_node_id = n2.node_id
+                join pipeline_engine_pipeline p on p.pipeline_id = n1.pipeline_id
+            where
+                n1.pipeline_id != n2.pipeline_id and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #17: edge crosses pipeline boundary"
         );
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-             where n.state = 'executable'
-               and exists (
-                 select 1 from pipeline_engine_edge e
-                   join pipeline_engine_node pred on e.from_node_id = pred.node_id
-                 where e.to_node_id = n.node_id
-                   and pred.state in ('pending', 'executable', 'in_progress', 'failed')
-               )",
+            "select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.state = 'executable' and
+                p.state in ('active', 'unwinding') and
+                exists (
+                    select 1 from pipeline_engine_edge e
+                        join pipeline_engine_node pred on e.from_node_id = pred.node_id
+                    where
+                        e.to_node_id = n.node_id and
+                        pred.state in ('pending', 'executable', 'in_progress', 'failed')
+                )
+            ",
             "invariant #20: executable node with non-terminal predecessor"
         );
 
         check_invariant!(
-            "select node_id from pipeline_engine_node
-             where started_at is not null
-               and state in ('pending', 'executable')",
+            "select node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.started_at is not null and
+                n.state in ('pending', 'executable') and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #21: started_at set on pending/executable node"
         );
 
         check_invariant!(
-            "select node_id from pipeline_engine_node
-             where finished_at is not null
-               and state in ('pending', 'executable', 'in_progress')",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.finished_at is not null and
+                n.state in ('pending', 'executable', 'in_progress') and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #22: finished_at set on non-terminal node"
         );
 
         check_invariant!(
-            "select node_id from pipeline_engine_node
-             where finished_at is not null
-               and started_at is not null
-               and finished_at < started_at",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on p.pipeline_id = n.pipeline_id
+            where
+                n.finished_at is not null and
+                n.started_at is not null and
+                n.finished_at < started_at and
+                p.state in ('active', 'unwinding')
+            ",
             "invariant #23: finished_at < started_at"
         );
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-               join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
-             where p.state = 'unwinding'
-               and n.state = 'executable'",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
+            where
+                p.state = 'unwinding' and
+                n.state = 'executable'
+            ",
             "invariant #25: executable node in unwinding pipeline"
         );
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-               join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
-             where n.state in ('unwound', 'unwind_failed')
-               and p.state not in ('unwinding', 'unwound', 'cancelled')",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
+            where
+                n.state in ('unwound', 'unwind_failed') and
+                p.state not in ('unwinding', 'unwound', 'cancelled')
+            ",
             "invariant #26: unwound/unwind_failed node in non-unwinding pipeline"
         );
 
         check_invariant!(
-            "select n.node_id from pipeline_engine_node n
-               join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
-             where p.state = 'unwinding'
-               and n.state = 'unwound'
-               and exists (
-                 select 1 from pipeline_engine_edge e
-                   join pipeline_engine_node succ on e.to_node_id = succ.node_id
-                 where e.from_node_id = n.node_id
-                   and succ.pipeline_id = n.pipeline_id
-                   and succ.is_unwind_boundary = false
-                   and succ.state in ('finished', 'failed')
-               )",
+            "
+            select n.node_id
+            from pipeline_engine_node n
+                join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
+            where
+                p.state = 'unwinding' and
+                n.state = 'unwound' and
+                exists (
+                    select 1 from pipeline_engine_edge e
+                        join pipeline_engine_node successor on e.to_node_id = successor.node_id
+                    where
+                        e.from_node_id = n.node_id and
+                        successor.pipeline_id = n.pipeline_id and
+                        successor.is_unwind_boundary = false and
+                        successor.state in ('finished', 'failed')
+                )
+            ",
             "invariant #27: unwound node with non-unwound successor in scope (reverse order violated)");
 
         check_invariant!(
-            "with ordered_events as (
+            "
+            with ordered_events as (
                 select
-                    node_id,
-                    to_state,
-                    lag(to_state) over (partition by node_id order by event_seq) as from_state
-                from pipeline_engine_node_event
+                    e.node_id,
+                    e.to_state,
+                    lag(e.to_state) over (partition by e.node_id order by e.event_seq) as from_state
+                from pipeline_engine_node_event e
+                    join pipeline_engine_node n on e.node_id = n.node_id
+                    join pipeline_engine_pipeline p on n.pipeline_id = p.pipeline_id
+                where
+                    p.state in ('active', 'unwinding')
             )
             select node_id from ordered_events
             where from_state is not null
@@ -633,14 +736,19 @@ impl PipelineEngine {
         );
 
         check_invariant!(
-            "select p.pipeline_id from pipeline_engine_pipeline p
-             where p.state = 'unwinding'
-               and not exists (
-                 select 1 from pipeline_engine_node n
-                 where n.pipeline_id = p.pipeline_id
-                   and n.unwind_on_failure = true
-                   and n.state in ('failed', 'unwound', 'unwind_failed', 'in_progress')
-               )",
+            "
+            select p.pipeline_id
+            from pipeline_engine_pipeline p
+            where
+                p.state = 'unwinding' and
+                not exists (
+                    select 1 from pipeline_engine_node n
+                    where
+                        n.pipeline_id = p.pipeline_id
+                        and n.unwind_on_failure = true
+                        and n.state in ('failed', 'unwound', 'unwind_failed', 'in_progress')
+                )
+            ",
             "invariant #31: unwinding pipeline with no unwind_on_failure node that triggered it"
         );
 
@@ -1407,7 +1515,8 @@ impl PipelineEngine {
                         older.event,
                         older.state,
                         older.resource_key,
-                        older_p.revision_id
+                        older_p.revision_id,
+                        older_p.pipeline_id
                     from pipeline_engine_node older
                         join pipeline_engine_pipeline older_p
                             on older.pipeline_id = older_p.pipeline_id
@@ -1439,6 +1548,7 @@ impl PipelineEngine {
                         state: blocker_row.get("state"),
                         resource_key: blocker_row.get("resource_key"),
                     },
+                    blocking_pipeline: blocker_row.get("pipeline_id"),
                     blocking_revision: blocker_row.get("revision_id"),
                 }));
             }
@@ -1446,6 +1556,11 @@ impl PipelineEngine {
 
         Ok(None)
     }
+
+    // /// Completely, irreversibly, abort a pipeline for good. Releases locks for resources and stops the propagation.
+    // pub async fn abort_pipeline(&self, pipeline_id: &str) -> Result<(), anyhow::Error> {
+    //     //
+    // }
 
     /// Return nodes grouped by topological layer (BFS from roots). Layer 0 = roots, layer N = nodes whose longest path from a root is N edges.
     pub async fn nodes_layered(&self, pipeline_id: &str) -> Result<Vec<Vec<Node>>, anyhow::Error> {

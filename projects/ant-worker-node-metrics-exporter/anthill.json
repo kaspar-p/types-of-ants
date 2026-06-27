@@ -2,6 +2,7 @@
   "project": "ant-worker-node-metrics-exporter",
   "description": "the typesofants per-host metrics exporter",
   "build": "makefile",
+  "cluster": "global_infrastructure",
   "ports": {
     "metrics": 3241
   }

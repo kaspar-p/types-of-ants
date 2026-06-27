@@ -1,3 +1,5 @@
+use ant_library::services::ServiceEnv;
+
 use crate::pipeline::deployment_event::DeploymentEvent;
 use crate::pipeline::resource_key::{DeploymentResource, Identifier};
 use crate::pipeline_engine::engine::PipelineEngine;
@@ -36,7 +38,9 @@ fn no_unwind() -> NodeOptions {
     }
 }
 
-fn wave_layout(hosts: &[String]) -> Vec<Vec<&String>> {
+/// Returns a vector-of-vectors of the IDs passed in, e.g.
+/// [[1], [2, 3], [4, 5, 6]] for IDs 1 through 6.
+fn wave_layout(ids: &[String]) -> Vec<Vec<&String>> {
     let sizes = [1, 2, 4];
     let mut waves = vec![];
     let mut cursor = 0;
@@ -51,13 +55,13 @@ fn wave_layout(hosts: &[String]) -> Vec<Vec<&String>> {
 
         let mut wave = vec![];
         for _ in 0..chunk_size {
-            if cursor >= hosts.len() {
+            if cursor >= ids.len() {
                 if !wave.is_empty() {
                     waves.push(wave);
                 }
                 return waves;
             }
-            wave.push(&hosts[cursor]);
+            wave.push(&ids[cursor]);
             cursor += 1;
         }
 
@@ -82,7 +86,7 @@ pub async fn build_dag(
             engine,
             &pipeline_id,
             config,
-            "beta",
+            ServiceEnv::Beta,
             &config.beta_hosts,
             vec![],
         )
@@ -98,8 +102,8 @@ pub async fn build_dag(
                     &pipeline_id,
                     node(
                         DeploymentEvent::EnvironmentGate {
-                            from: "beta".to_string(),
-                            to: "prod".to_string(),
+                            from: ServiceEnv::Beta.to_string(),
+                            to: ServiceEnv::Prod.to_string(),
                         },
                         None,
                         NodeOptions {
@@ -119,7 +123,7 @@ pub async fn build_dag(
             engine,
             &pipeline_id,
             config,
-            "prod",
+            ServiceEnv::Prod,
             &config.prod_hosts,
             prod_predecessors,
         )
@@ -131,11 +135,80 @@ pub async fn build_dag(
     Ok(pipeline_id)
 }
 
+/// Returns Vec of Node IDs
+async fn host_triplet(
+    engine: &PipelineEngine,
+    pipeline_id: &str,
+    host: &String,
+    config: &ProjectConfig,
+    environment: &ServiceEnv,
+
+    unwind_on_failure: bool,
+) -> Result<[String; 3], anyhow::Error> {
+    let resource = Some(DeploymentResource::HostService {
+        host_id: id(host),
+        service_id: id(&config.project_id),
+    });
+
+    let replicate = engine
+        .add_node(
+            pipeline_id,
+            node(
+                DeploymentEvent::ArtifactReplication {
+                    host_id: host.clone(),
+                    service_id: config.project_id.clone(),
+                    environment: environment.to_string(),
+                },
+                resource.clone(),
+                no_unwind(),
+            ),
+        )
+        .await?;
+
+    let deploy = engine
+        .add_node(
+            pipeline_id,
+            node(
+                DeploymentEvent::HostDeployment {
+                    host_id: host.clone(),
+                    service_id: config.project_id.clone(),
+                    environment: environment.to_string(),
+                },
+                resource.clone(),
+                NodeOptions {
+                    unwind_on_failure,
+                    ..Default::default()
+                },
+            ),
+        )
+        .await?;
+
+    let verify = engine
+        .add_node(
+            pipeline_id,
+            node(
+                DeploymentEvent::DeploymentVerification {
+                    host_id: host.clone(),
+                    service_id: config.project_id.clone(),
+                    environment: environment.to_string(),
+                },
+                resource,
+                NodeOptions {
+                    unwind_on_failure,
+                    ..Default::default()
+                },
+            ),
+        )
+        .await?;
+
+    Ok([replicate, deploy, verify])
+}
+
 async fn build_env_dag(
     engine: &PipelineEngine,
     pipeline_id: &str,
     config: &ProjectConfig,
-    environment: &str,
+    environment: ServiceEnv,
     hosts: &[String],
     previous_node_ids: Vec<String>,
 ) -> Result<Vec<String>, anyhow::Error> {
@@ -150,7 +223,7 @@ async fn build_env_dag(
                         environment: environment.to_string(),
                     },
                     Some(DeploymentResource::GatewayRouting {
-                        environment: id(environment),
+                        environment: id(&environment.to_string()),
                     }),
                     no_unwind(),
                 ),
@@ -222,7 +295,7 @@ async fn build_env_dag(
                     },
                     Some(DeploymentResource::DatabaseMigration {
                         service_id: id(&config.project_id),
-                        environment: id(environment),
+                        environment: id(&environment.to_string()),
                     }),
                     no_unwind(),
                 ),
@@ -234,61 +307,26 @@ async fn build_env_dag(
         chain_tip = vec![n];
     }
 
-    let waves = wave_layout(hosts);
+    let (waves, unwind_on_failure) = if config.project_id == "ant-host-agent" {
+        // We have ZERO wave layout here, and we also don't mark the nodes as "unwind_on_failure" since we have messy deploys.
+        (vec![hosts.iter().map(|h| h).collect()], false)
+    } else {
+        (wave_layout(hosts), true)
+    };
 
     for wave in waves {
         let mut wave_terminal_nodes = vec![];
 
         for host in wave {
-            let resource = Some(DeploymentResource::HostService {
-                host_id: id(host),
-                service_id: id(&config.project_id),
-            });
-
-            let replicate = engine
-                .add_node(
-                    pipeline_id,
-                    node(
-                        DeploymentEvent::ArtifactReplication {
-                            host_id: host.clone(),
-                            service_id: config.project_id.clone(),
-                            environment: environment.to_string(),
-                        },
-                        resource.clone(),
-                        no_unwind(),
-                    ),
-                )
-                .await?;
-
-            let deploy = engine
-                .add_node(
-                    pipeline_id,
-                    node(
-                        DeploymentEvent::HostDeployment {
-                            host_id: host.clone(),
-                            service_id: config.project_id.clone(),
-                            environment: environment.to_string(),
-                        },
-                        resource.clone(),
-                        NodeOptions::default(),
-                    ),
-                )
-                .await?;
-
-            let verify = engine
-                .add_node(
-                    pipeline_id,
-                    node(
-                        DeploymentEvent::DeploymentVerification {
-                            host_id: host.clone(),
-                            service_id: config.project_id.clone(),
-                            environment: environment.to_string(),
-                        },
-                        resource,
-                        NodeOptions::default(),
-                    ),
-                )
-                .await?;
+            let [replicate, deploy, verify] = host_triplet(
+                engine,
+                pipeline_id,
+                host,
+                config,
+                &environment,
+                unwind_on_failure,
+            )
+            .await?;
 
             for prev in &chain_tip {
                 engine.add_edge(prev, &replicate).await?;

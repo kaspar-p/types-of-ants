@@ -15,6 +15,9 @@ pub struct AnthillManifest {
     #[serde(default)]
     pub build_parallelism: AnthillBuildParallelism,
 
+    #[serde(default)]
+    pub cluster: AnthillCluster,
+
     /// Project-type specific configuration.
     /// For example, databases have connection credentials (dbname + pw + user)
     pub archetype: Option<AnthillArchetype>,
@@ -49,6 +52,26 @@ pub struct AnthillManifest {
     /// ```
     #[serde(default)]
     pub secrets: Vec<AnthillSecret>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub enum AnthillCluster {
+    /// GlobalInfrastructure projects are projects that EACH host has and are connected to eachother, and have no preprod environments.
+    /// User-facing projects SHOULD NOT communicate with these projects.
+    /// All GlobalInfrastructure projects are registered with a global service store.
+    #[serde(rename = "global_infrastructure")]
+    GlobalInfrastructure,
+
+    /// IsolatedEnvironment is the default.
+    /// Services are registered per-environment, meaning preproduction/beta services cannot find production services.
+    #[serde(rename = "isolated_environment")]
+    IsolatedEnvironment,
+}
+
+impl Default for AnthillCluster {
+    fn default() -> Self {
+        Self::IsolatedEnvironment
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]

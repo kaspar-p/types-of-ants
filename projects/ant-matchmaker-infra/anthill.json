@@ -1,0 +1,16 @@
+{
+  "project": "ant-matchmaker-infra",
+  "description": "the typesofants infrastructure service discovery mechanism",
+  "build": "makefile",
+  "cluster": "daemon_set",
+  "ports": {
+    "primary": 3258,
+    "metrics": {
+      "port": 3258,
+      "path": "/v1/agent/metrics?format=prometheus"
+    }
+  },
+  "secrets": [
+    "infra_consul_gossip_encryption_key"
+  ]
+}

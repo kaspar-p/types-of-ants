@@ -16,6 +16,12 @@ async fn main() {
                 .parse()
                 .expect("ANT_MATCHMAKER_HTTP_PORT was not u16"),
         )),
+        infra_sd: Arc::new(ServiceDiscoveryWriter::new(
+            dotenv::var("ANT_MATCHMAKER_INFRA_HTTP_PORT")
+                .expect("No ANT_MATCHMAKER_INFRA_HTTP_PORT variable.")
+                .parse()
+                .expect("ANT_MATCHMAKER_INFRA_HTTP_PORT was not u16"),
+        )),
         archive_root_dir: PathBuf::from(
             dotenv::var("PERSIST_DIR").expect("No PERSIST_DIR variable."),
         )

@@ -12,6 +12,10 @@ path = "src/bin/init_pipelines.rs"
 name = "stresstest"
 path = "src/bin/stresstest.rs"
 
+[[bin]]
+name = "whyblocked"
+path = "src/bin/whyblocked.rs"
+
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.99"

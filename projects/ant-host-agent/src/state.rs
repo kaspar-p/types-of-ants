@@ -5,6 +5,7 @@ use ant_library::sd::writer::ServiceDiscoveryWriter;
 #[derive(Debug, Clone)]
 pub struct AntHostAgentState {
     pub sd: Arc<ServiceDiscoveryWriter>,
+    pub infra_sd: Arc<ServiceDiscoveryWriter>,
 
     /// Where to save temporary files or find deployment archive files, as the input.
     ///

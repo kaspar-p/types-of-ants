@@ -2,6 +2,7 @@
   "project": "ant-host-agent",
   "description": "the typesofants host agent",
   "build": "makefile",
+  "cluster": "global_infrastructure",
   "secrets": [],
   "ports": {
     "primary": 3232,

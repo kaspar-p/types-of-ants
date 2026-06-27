@@ -75,6 +75,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-backing-it-up"
         },
         {
@@ -116,10 +123,17 @@
           "project": "ant-worker-node-metrics-exporter"
         },
         {
-          "env": "prod",
+          "env": "beta",
           "project": "ant-matchmaker",
           "additional_vars": {
-            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+            "ANT_MATCHMAKER_SERVER_FLAGS": "-server -bootstrap-expect=1"
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": ""
           }
         },
         {
@@ -185,6 +199,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-backing-it-up-db"
         },
         {
@@ -218,6 +239,13 @@
           "project": "ant-matchmaker",
           "additional_vars": {
             "ANT_MATCHMAKER_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": "-server -bootstrap-expect=3"
           }
         },
         {
@@ -259,6 +287,13 @@
           "project": "ant-matchmaker",
           "additional_vars": {
             "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": "-server -bootstrap-expect=3"
           }
         },
         {
@@ -312,6 +347,13 @@
         },
         {
           "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        },
+        {
+          "env": "prod",
           "project": "ant-data-farm"
         },
         {
@@ -345,6 +387,13 @@
           "project": "ant-matchmaker",
           "additional_vars": {
             "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": ""
           }
         },
         {

@@ -1,13 +1,14 @@
 use std::{collections::HashSet, os::unix::fs::PermissionsExt, str::FromStr};
 
-use ant_library::{host_architecture::HostArchitecture, services::Services};
+use ant_library::{
+    host_architecture::HostArchitecture, manifest_file::ManifestFile, services::Services,
+};
 use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
 use async_tempfile::TempFile;
 use bollard::body_full;
 use clap_complete::engine::ArgValueCompleter;
 use futures::StreamExt;
-use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{error, info, warn};
 
@@ -67,6 +68,10 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
             .map(|h| h.architecture.clone())
             .collect()
     };
+
+    if arches.is_empty() {
+        panic!("No architectures found for project, is it in services.json?");
+    }
 
     let git = GitState::new().expect("failed to fetch git state");
     let project_src = git.root.join("projects").join(&cmd.project);
@@ -355,7 +360,10 @@ async fn build_artifact<'a>(
             tokio::fs::File::create_new(tmp_packaging_dir.path().join("manifest.json"))
                 .await
                 .context("creating manifest.json")?;
-        let content = serde_json::to_string(&json!({ "commit_number": git.head_number }))?;
+        let content = ManifestFile {
+            commit_number: git.head_number.to_string(),
+        };
+        let content = serde_json::to_string(&content)?;
         manifest
             .write_all(content.as_bytes())
             .await

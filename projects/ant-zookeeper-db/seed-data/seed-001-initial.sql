@@ -49,6 +49,7 @@ values
   ('ant-monitor', true),
   ('ant-monitor-fe', true),
   ('ant-matchmaker', true),
+  ('ant-matchmaker-infra', true),
   ('ant-lumberjack', true),
   ('ant-sawmill', true),
   ('ant-just-checking-in', true),

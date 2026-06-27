@@ -103,6 +103,15 @@ pub enum ServiceEnv {
     Prod,
 }
 
+impl ToString for ServiceEnv {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Beta => "beta".to_string(),
+            Self::Prod => "prod".to_string(),
+        }
+    }
+}
+
 impl Services {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         for (_, v) in &self.hosts {
