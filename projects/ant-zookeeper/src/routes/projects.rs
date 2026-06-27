@@ -1,9 +1,5 @@
 use ant_library::routes::Routes;
-use axum::{
-    extract::{Query, State},
-    routing::get,
-    Json,
-};
+use axum::{extract::State, routing::get, Json};
 use chrono::{DateTime, Utc};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};

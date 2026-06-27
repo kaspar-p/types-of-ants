@@ -7,6 +7,7 @@ use std::{fs::File, io::Write};
 use ant_library::headers::{
     XAntArchitectureHeader, XAntProjectHeader, XAntRevisionHeader, XAntVersionHeader,
 };
+use ant_library::host_architecture::HostArchitecture;
 use ant_library::routes::Routes;
 use anthill_manifest::{AnthillManifest, AnthillSecret};
 use axum::debug_handler;
@@ -412,14 +413,22 @@ async fn register_artifact(
 
     // Determine if the revision (with this new artifact) is now activated/immutable
     {
-        let artifacts = state.db.list_artifacts_for_revision_id(&revision.0).await?;
+        let required_service_arches = state.services.list_architectures_for_service(&project_id);
 
-        let missing_architectures = state
+        let registered_global_arches: HashSet<HostArchitecture> = state
             .db
-            .missing_architectures_for_revision(&revision.0)
-            .await?;
-        let all_architectures_present = missing_architectures.is_empty();
+            .registered_architectures_for_revision(&revision.0)
+            .await?
+            .into_iter()
+            .collect();
 
+        let missing_service_arches = required_service_arches
+            .difference(&registered_global_arches)
+            .collect::<Vec<_>>();
+
+        let all_architectures_present = missing_service_arches.is_empty();
+
+        let artifacts = state.db.list_artifacts_for_revision_id(&revision.0).await?;
         let versions = artifacts
             .iter()
             .map(|(_, _, _, version, _, _)| version)
@@ -459,9 +468,7 @@ async fn register_artifact(
             info!("Created deployment pipeline: {pipeline_id}");
         } else {
             info!(
-                "Revision not active: {} versions registered, {} architectures missing",
-                versions.len(),
-                missing_architectures.len()
+                "Revision not active: registered {versions:?}, requires {required_service_arches:?}, has {registered_global_arches:?}, missing architectures: {missing_service_arches:?}",
             );
         }
     }

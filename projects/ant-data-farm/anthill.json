@@ -5,7 +5,9 @@
   "build": "docker",
   "archetype": {
     "postgres": {
-      "password_secret_name": ""
+      "database_secret_name": "ant_data_farm_db",
+      "username_secret_name": "ant_data_farm_user",
+      "password_secret_name": "ant_data_farm_password"
     }
   },
   "ports": {

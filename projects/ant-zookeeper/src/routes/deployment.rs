@@ -179,7 +179,7 @@ async fn retry_job(
 
     // Legacy system: retry by job_id
     let job_id = req.job_id.as_deref().ok_or_else(|| {
-        AntZookeeperError::ValidationError("either job_id or node_id is required".to_string())
+        AntZookeeperError::ValidationError("either jobId or nodeId is required".to_string())
     })?;
 
     match state.db.get_deployment_job(job_id).await? {

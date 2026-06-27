@@ -478,7 +478,6 @@ mod tests {
 
         let nodes = f.engine.nodes(&pipeline_id).await.unwrap();
         let edges = f.engine.edges(&pipeline_id).await.unwrap();
-        let node_events = events(&nodes);
 
         // Per env: route_update → alert_config → log_rule_config → db_migration → host triplet
         // Beta: 4 config + 3 host = 7

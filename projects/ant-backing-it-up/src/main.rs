@@ -1,9 +1,7 @@
 use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use ant_backing_it_up::{
-    state::AntBackingItUpState,
-    storage_client::{AntBackingItUpStorageClient, DatabaseParams},
-    BackupRequest,
+    state::AntBackingItUpState, storage_client::AntBackingItUpStorageClient, BackupRequest,
 };
 use ant_fs_client::{AntFsClient, AntFsHostPorts};
 use ant_library::sd::reader::ServiceDiscovery;

@@ -207,6 +207,14 @@ impl AntZooStorageClient {
         Ok(artifacts)
     }
 
+    pub async fn registered_architectures_for_revision(
+        &self,
+        revision_id: &str,
+    ) -> Result<Vec<HostArchitecture>, anyhow::Error> {
+        let artifacts = self.list_artifacts_for_revision_id(&revision_id).await?;
+        Ok(artifacts.into_iter().map(|(_, _, a, _, _, _)| a).collect())
+    }
+
     pub async fn missing_architectures_for_revision(
         &self,
         revision_id: &str,

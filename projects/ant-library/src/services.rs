@@ -184,6 +184,25 @@ impl Services {
         return None;
     }
 
+    pub fn list_architectures_for_service<'a>(
+        &'a self,
+        service_id: &str,
+    ) -> HashSet<HostArchitecture> {
+        let arches: HashSet<HostArchitecture> = self
+            .list_hosts_with_service(service_id)
+            .into_iter()
+            .map(|(h, _)| {
+                self.hosts
+                    .get(h)
+                    .expect(&format!("can't find host bloc for host {service_id}"))
+                    .architecture
+                    .clone()
+            })
+            .collect();
+
+        arches.into_iter().collect()
+    }
+
     pub fn list_hosts_with_service<'a>(
         &'a self,
         service_id: &str,
