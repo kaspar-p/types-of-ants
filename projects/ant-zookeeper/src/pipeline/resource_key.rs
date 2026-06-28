@@ -59,6 +59,7 @@ pub enum DeploymentResource {
     },
     /// Database schema migration for a service in an environment.
     DatabaseMigration {
+        host: Identifier,
         service_id: Identifier,
         environment: Identifier,
     },
@@ -82,8 +83,9 @@ impl Display for DeploymentResource {
             } => write!(f, "host_service:{host_id}:{service_id}"),
             DeploymentResource::DatabaseMigration {
                 service_id,
+                host,
                 environment,
-            } => write!(f, "database_migration:{service_id}:{environment}"),
+            } => write!(f, "database_migration:{service_id}:{host}:{environment}"),
             DeploymentResource::GatewayRouting { environment } => {
                 write!(f, "gateway_routing:{environment}")
             }
@@ -129,7 +131,8 @@ impl FromStr for DeploymentResource {
                 }
                 Ok(DeploymentResource::DatabaseMigration {
                     service_id: Identifier::new(fields[0])?,
-                    environment: Identifier::new(fields[1])?,
+                    host: Identifier::new(fields[1])?,
+                    environment: Identifier::new(fields[2])?,
                 })
             }
             "gateway_routing" => Ok(DeploymentResource::GatewayRouting {
@@ -170,6 +173,7 @@ mod tests {
             },
             DeploymentResource::DatabaseMigration {
                 service_id: id("ant-on-the-web-users-db"),
+                host: id("antworker002"),
                 environment: id("beta"),
             },
             DeploymentResource::GatewayRouting {

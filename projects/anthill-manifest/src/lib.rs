@@ -240,10 +240,19 @@ pub enum AnthillArchetype {
 
         /// Password used to connect to the database.
         password_secret_name: String,
+
+        /// The directory containing migration .sql and .sh files, will be applied to the database pre-deployment, for each environment.
+        /// Defaults to "migration"
+        #[serde(default = "default_migration_dir")]
+        migration_dir: String,
     },
 
     #[serde(rename = "webservice")]
     Webservice,
+}
+
+fn default_migration_dir() -> String {
+    "migration".to_string()
 }
 
 // impl FromStr for AnthillArchetype {

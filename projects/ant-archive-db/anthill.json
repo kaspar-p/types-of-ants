@@ -2,6 +2,13 @@
   "project": "ant-archive-db",
   "description": "the typesofants archive metadata store",
   "build": "docker",
+  "archetype": {
+    "postgres": {
+      "database_secret_name": "ant_archive_db_db",
+      "username_secret_name": "ant_archive_db_user",
+      "password_secret_name": "ant_archive_db_password"
+    }
+  },
   "ports": {
     "primary": 3257
   },

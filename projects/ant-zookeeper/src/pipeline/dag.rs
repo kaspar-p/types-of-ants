@@ -284,29 +284,6 @@ async fn build_env_dag(
         chain_tip = log_rule_nodes;
     }
 
-    if config.has_database {
-        let n = engine
-            .add_node(
-                pipeline_id,
-                node(
-                    DeploymentEvent::DatabaseMigration {
-                        service_id: config.project_id.clone(),
-                        environment: environment.to_string(),
-                    },
-                    Some(DeploymentResource::DatabaseMigration {
-                        service_id: id(&config.project_id),
-                        environment: id(&environment.to_string()),
-                    }),
-                    no_unwind(),
-                ),
-            )
-            .await?;
-        for prev in &chain_tip {
-            engine.add_edge(prev, &n).await?;
-        }
-        chain_tip = vec![n];
-    }
-
     let (waves, unwind_on_failure) = if config.project_id == "ant-host-agent" {
         // We have ZERO wave layout here, and we also don't mark the nodes as "unwind_on_failure" since we have messy deploys.
         (vec![hosts.iter().map(|h| h).collect()], false)
@@ -335,6 +312,32 @@ async fn build_env_dag(
             engine.add_edge(&deploy, &verify).await?;
 
             wave_terminal_nodes.push(verify);
+
+            // For every host, apply the migrations
+            if config.has_database {
+                let n = engine
+                    .add_node(
+                        pipeline_id,
+                        node(
+                            DeploymentEvent::DatabaseMigration {
+                                service_id: config.project_id.clone(),
+                                // host: host.to_string(),
+                                environment: environment.to_string(),
+                            },
+                            Some(DeploymentResource::DatabaseMigration {
+                                service_id: id(&config.project_id),
+                                host: id(host),
+                                environment: id(&environment.to_string()),
+                            }),
+                            no_unwind(),
+                        ),
+                    )
+                    .await?;
+                for prev in &chain_tip {
+                    engine.add_edge(prev, &n).await?;
+                }
+                chain_tip = vec![n];
+            }
         }
 
         chain_tip = wave_terminal_nodes;

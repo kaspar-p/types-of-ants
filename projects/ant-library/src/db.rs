@@ -55,7 +55,7 @@ pub async fn database_connection(config: &DatabaseConfig) -> Result<ConnectionPo
 
     for migration_dir in &config.migration_dirs {
         let con = db.get().await?;
-        bootstrap(con, migration_dir).await?;
+        apply_migrations(con, migration_dir).await?;
     }
 
     Ok(db)
@@ -82,7 +82,7 @@ pub async fn database_connection_dynamic(
 
     for migration_dir in &config.migration_dirs {
         let con = db.get().await?;
-        bootstrap(con, migration_dir).await?;
+        apply_migrations(con, migration_dir).await?;
     }
 
     Ok(db)
@@ -94,7 +94,7 @@ pub trait TypesOfAntsDatabase: Sized {
 }
 
 /// Bootstrap the database with many migration files, ordered by their filenames within a directory.
-async fn bootstrap<'a>(
+pub async fn apply_migrations<'a>(
     db_con: PooledConnection<'a, PostgresManager>,
     migration_dir: &PathBuf,
 ) -> Result<(), anyhow::Error> {

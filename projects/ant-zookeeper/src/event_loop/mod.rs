@@ -8,6 +8,7 @@ use crate::event_loop::transition::{
 };
 
 pub(crate) mod deploy;
+pub(crate) mod migrate_db;
 pub mod perform;
 pub(crate) mod replicate;
 pub mod transition;

@@ -3,7 +3,7 @@ use std::{collections::HashSet, os::unix::fs::PermissionsExt, str::FromStr};
 use ant_library::{
     host_architecture::HostArchitecture, manifest_file::ManifestFile, services::Services,
 };
-use anthill_manifest::{AnthillBuild, AnthillBuildParallelism, AnthillManifest};
+use anthill_manifest::{AnthillArchetype, AnthillBuild, AnthillBuildParallelism, AnthillManifest};
 use anyhow::Context;
 use async_tempfile::TempFile;
 use bollard::body_full;
@@ -232,13 +232,11 @@ async fn build_artifact<'a>(
         tmp_packaging_dir
     };
 
-    // Handle Docker projects
-    if matches!(
-        AnthillManifest::from_file(&project_src.join("anthill.json"))
-            .context("read anthill.json")?
-            .build,
-        AnthillBuild::Docker
-    ) {
+    let anthill = AnthillManifest::from_file(&project_src.join("anthill.json"))
+        .context("read anthill.json")?;
+
+    // docker-image.tar: Copy image if the project is a Docker one.
+    if matches!(anthill.build, AnthillBuild::Docker) {
         info!("... creating docker image");
 
         let compose_file_path = git
@@ -354,7 +352,7 @@ async fn build_artifact<'a>(
         }
     }
 
-    // Create manifest.json
+    // manifest.json: Deprecated, old commit version.
     {
         let mut manifest =
             tokio::fs::File::create_new(tmp_packaging_dir.path().join("manifest.json"))
@@ -370,7 +368,7 @@ async fn build_artifact<'a>(
             .context("writing manifest.json")?;
     }
 
-    // Create VERSION
+    // VERSION: create client-side version file
     {
         let mut manifest = tokio::fs::File::create_new(tmp_packaging_dir.path().join("VERSION"))
             .await
@@ -381,7 +379,7 @@ async fn build_artifact<'a>(
             .context("writing VERSION")?;
     }
 
-    // Copy run.sh
+    // run.sh: Copy runtime file
     {
         let run_path = project_src.join(".anthill").join("run.sh");
         if std::fs::exists(&run_path)? {
@@ -396,6 +394,24 @@ async fn build_artifact<'a>(
                 .context("setting run.sh executable")?;
         } else {
             return Err(anyhow::Error::msg("Project needs run.sh"));
+        }
+    }
+
+    // .db-migrations: Copy database migrations if they are a db
+    {
+        match anthill.archetype {
+            Some(AnthillArchetype::Postgres { migration_dir, .. }) => {
+                let migrations_path = project_src.join(migration_dir);
+                if !std::fs::exists(migrations_path) {
+                    return Err(anyhow::anyhow!(
+                        "Migrations directory not found: {}",
+                        migrations_path.display()
+                    ));
+                }
+
+                tmp_packaging_dir.join(".db-migrations")
+            }
+            _ => {}
         }
     }
 
@@ -414,7 +430,7 @@ async fn build_artifact<'a>(
     //     }
     // }
 
-    // Copy anthill manifest
+    // anthill.json: Copy anthill manifest
     {
         tokio::fs::copy(
             project_src.join("anthill.json"),
