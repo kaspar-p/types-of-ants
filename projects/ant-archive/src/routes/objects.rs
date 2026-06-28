@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
@@ -20,68 +18,14 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};
+use tracing::info;
 
 use crate::{
-    auth::BearerClaims, err::AntArchiveError, state::AntArchiveState,
-    storage_client::AntArchiveStorageNodeClient,
+    auth::BearerClaims,
+    err::AntArchiveError,
+    placement::{self, resolve_storage_nodes},
+    state::AntArchiveState,
 };
-
-/// Expects a file that's newline delimited lines that look like:
-///     {hostname}:{username}:{password}
-/// where each are templated, for example:
-///     myhost:user1:pass1
-///
-/// Returns a hashmap mapping from hostname to (username, password)
-fn get_client_credentials() -> Result<HashMap<String, (String, String)>, anyhow::Error> {
-    let content = ant_library::secret::load_secret("ant_archive_storage_client_auths")?;
-
-    let mut map = HashMap::new();
-    for (i, line) in content.split("\n").enumerate() {
-        let mut line_content = line.split(":");
-
-        let hostname = line_content
-            .next()
-            .ok_or(anyhow::Error::msg(format!("Line {i} had no hostname")))?;
-        let username = line_content
-            .next()
-            .ok_or(anyhow::Error::msg(format!("Line {i} had no username")))?;
-        let password = line_content
-            .next()
-            .ok_or(anyhow::Error::msg(format!("Line {i} had no password")))?;
-
-        map.insert(
-            hostname.to_string(),
-            (username.to_string(), password.to_string()),
-        );
-    }
-
-    Ok(map)
-}
-
-async fn resolve_storage_nodes(
-    state: &AntArchiveState,
-) -> Result<Vec<AntArchiveStorageNodeClient>, AntArchiveError> {
-    let creds = get_client_credentials()?;
-    let endpoints = state.sd.resolve_all("ant-archive-storage").await;
-
-    let mut clients = Vec::new();
-    for ep in &endpoints {
-        let (username, password) = creds.get(&ep.node).ok_or(anyhow::Error::msg(format!(
-            "No credentials for node: {}",
-            ep.node
-        )))?;
-        if let Some(node_id) = state.db.get_storage_node_by_node_name(&ep.node).await? {
-            clients.push(AntArchiveStorageNodeClient::new(
-                node_id,
-                format!("http://{}:{}", ep.address, ep.port),
-                username,
-                password,
-            ));
-        }
-    }
-
-    Ok(clients)
-}
 
 fn load_kek(kek_id: &str) -> Result<[u8; 32], AntArchiveError> {
     // ant_archive_kek contains one entry per line: "{kek_id}:{base64(32 bytes)}"
@@ -322,10 +266,7 @@ async fn put_object(
         encrypt_object(&load_kek(&kek_id)?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
-    let storage_nodes = resolve_storage_nodes(&state).await?;
-    let storage_node = storage_nodes.first().ok_or_else(|| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active storage nodes found")))
-    })?;
+    let placements = placement::place_new_object(&state, stored_bytes.len() as i64).await?;
 
     let object_id = state
         .db
@@ -340,12 +281,31 @@ async fn put_object(
         )
         .await?;
 
-    storage_node.put(&object_id, &tek, stored_bytes).await?;
+    info!(
+        "Preparing to send {} bytes to {} nodes",
+        stored_bytes.len(),
+        placements.len()
+    );
+    let shared_bytes = bytes::Bytes::from(stored_bytes);
+    for placement in placements {
+        info!(
+            "[obj={}] Putting {} bytes to {}",
+            &object_id,
+            shared_bytes.len(),
+            placement.node.node_id,
+        );
 
-    state
-        .db
-        .upsert_placement(&object_id, &storage_node.node_id, &object_id, &checksum)
-        .await?;
+        placement
+            .node
+            .put(&object_id, &tek, shared_bytes.clone())
+            .await
+            .with_context(|| format!("{}.{:?}", placement.node.node_id, placement.role))?;
+
+        state
+            .db
+            .upsert_placement(&object_id, &placement.node.node_id, &object_id, &checksum)
+            .await?;
+    }
 
     Ok(StatusCode::CREATED)
 }

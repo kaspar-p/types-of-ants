@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod err;
+mod placement;
 mod routes;
 pub mod state;
 mod storage_client;

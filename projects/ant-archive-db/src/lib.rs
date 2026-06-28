@@ -99,6 +99,29 @@ impl AntArchiveDb {
         }))
     }
 
+    /// Returns (host_id, capacity_bytes)
+    pub async fn describe_storage_node(
+        &self,
+        storage_node_id: &str,
+    ) -> Result<Option<(String, i64)>, anyhow::Error> {
+        let row = self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                "
+                select host_id, capacity_bytes
+                from archive_storage_node
+                where
+                    storage_node_id = $1
+                ",
+                &[&storage_node_id],
+            )
+            .await?;
+
+        Ok(row.map(|r| (r.get("host_id"), r.get("capacity_bytes"))))
+    }
+
     pub async fn get_storage_node_by_node_name(
         &self,
         node_name: &str,
@@ -185,6 +208,27 @@ impl AntArchiveDb {
                 storage_key: r.get("storage_key"),
             })
             .collect())
+    }
+
+    pub async fn bytes_stored_on_node(&self, storage_node_id: &str) -> Result<i64, anyhow::Error> {
+        let bytes_stored = self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                "
+                select sum(o.size_bytes) as bytes_stored
+                from archive_object o
+                    join archive_object_placement p on o.object_id = p.object_id
+                where p.storage_node_id = $1
+            ",
+                &[&storage_node_id],
+            )
+            .await?
+            .map(|r| r.try_get("bytes_stored").unwrap_or(0))
+            .unwrap_or(0);
+
+        Ok(bytes_stored)
     }
 
     pub async fn upsert_object(
@@ -283,14 +327,19 @@ impl AntArchiveDb {
         &self,
         storage_node_id: &str,
         host_id: &str,
+        capacity_bytes: i64,
     ) -> Result<(), anyhow::Error> {
         self.pool
             .get()
             .await?
             .execute(
-                "INSERT INTO archive_storage_node (storage_node_id, host_id, is_active)
-                 VALUES ($1, $2, true)",
-                &[&storage_node_id, &host_id],
+                "
+                insert into archive_storage_node
+                    (storage_node_id, host_id, capacity_bytes, is_active)
+                values
+                    ($1, $2, $3, true)
+                ",
+                &[&storage_node_id, &host_id, &capacity_bytes],
             )
             .await?;
         Ok(())

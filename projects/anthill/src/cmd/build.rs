@@ -402,14 +402,12 @@ async fn build_artifact<'a>(
         match anthill.archetype {
             Some(AnthillArchetype::Postgres { migration_dir, .. }) => {
                 let migrations_path = project_src.join(migration_dir);
-                if !std::fs::exists(migrations_path) {
+                if !std::fs::exists(&migrations_path)? {
                     return Err(anyhow::anyhow!(
                         "Migrations directory not found: {}",
                         migrations_path.display()
                     ));
                 }
-
-                tmp_packaging_dir.join(".db-migrations")
             }
             _ => {}
         }
