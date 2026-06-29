@@ -170,8 +170,9 @@ dependencies = [
  "ant-library",
  "anyhow",
  "async-trait",
- "stdext",
+ "bb8",
  "thiserror 2.0.18",
+ "tokio-postgres",
  "tracing",
 ]
 

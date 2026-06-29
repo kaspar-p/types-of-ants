@@ -4,15 +4,14 @@ use ant_library::db::{
     database_connection, database_connection_dynamic, ConnectionPool, DatabaseConfig,
     DatabaseCredentialsConfig, TypesOfAntsDatabase,
 };
-use ant_library::sd::reader::ServiceDiscovery;
+use ant_library::sd::{pg::PoolError, reader::ServiceDiscovery};
 use async_trait::async_trait;
-use stdext::function_name;
 use tracing::debug;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AntArchiveDbError {
     #[error("connection pool failed: {0}")]
-    Connection(#[from] bb8::RunError<tokio_postgres::Error>),
+    Connection(#[from] bb8::RunError<PoolError>),
     #[error("query failed: {0}")]
     Query(#[from] tokio_postgres::Error),
 }
@@ -254,7 +253,8 @@ impl AntArchiveDb {
                    and o.deleted_at is null",
                 &[&storage_node_id],
             )
-            .await;
+            .await?
+            .get::<_, i64>("bytes_stored");
 
         Ok(bytes_stored)
     }
@@ -300,7 +300,8 @@ impl AntArchiveDb {
                     &tek_derivation_key,
                 ],
             )
-            .await;
+            .await?
+            .get("object_id");
 
         Ok(object_id)
     }
@@ -387,7 +388,8 @@ impl AntArchiveDb {
                 ",
                 &[&name, &token_hash],
             )
-            .await;
+            .await?
+            .get("client_id");
 
         Ok(client_id)
     }

@@ -10,11 +10,11 @@ pub mod fixture;
 
 #[tokio::test]
 #[traced_test]
-async fn put_blob_returns_400_missing_auth_header() {
+async fn put_blob_returns_401_missing_auth_header() {
     let fixture = test_router_no_auth(function_name!()).await;
 
     let res = fixture.client.put("/some-key").send().await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -33,11 +33,25 @@ async fn put_blob_returns_401_wrong_credentials() {
 
 #[tokio::test]
 #[traced_test]
-async fn get_blob_returns_400_missing_auth_header() {
+async fn put_blob_returns_401_wrong_auth_scheme() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .put("/some-key")
+        .header("Authorization", "Bearer some-token")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn get_blob_returns_401_missing_auth_header() {
     let fixture = test_router_no_auth(function_name!()).await;
 
     let res = fixture.client.get("/some-key").send().await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -49,6 +63,94 @@ async fn get_blob_returns_401_wrong_credentials() {
         .client
         .get("/some-key")
         .header("Authorization", "Basic dXNlcjp3cm9uZy1wYXNzd29yZA==")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn get_blob_returns_401_wrong_auth_scheme() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .get("/some-key")
+        .header("Authorization", "Bearer some-token")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_returns_401_missing_auth_header() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture.client.delete("/some-key").send().await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_returns_401_wrong_credentials() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .delete("/some-key")
+        .header("Authorization", "Basic dXNlcjp3cm9uZy1wYXNzd29yZA==")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_returns_401_wrong_auth_scheme() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .delete("/some-key")
+        .header("Authorization", "Bearer some-token")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn head_blob_returns_401_missing_auth_header() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture.client.head("/some-key").send().await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn head_blob_returns_401_wrong_credentials() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .head("/some-key")
+        .header("Authorization", "Basic dXNlcjp3cm9uZy1wYXNzd29yZA==")
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn head_blob_returns_401_wrong_auth_scheme() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .head("/some-key")
+        .header("Authorization", "Bearer some-token")
         .send()
         .await;
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);

@@ -11,7 +11,7 @@ use ant_library::routes::Routes;
 use anyhow::Context;
 use axum::{
     body::Body,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, State},
     http::HeaderMap,
     response::{IntoResponse, Response},
     routing::{delete, get, head, put},
@@ -21,6 +21,7 @@ use axum_extra::{
     headers::{authorization::Basic, Authorization},
     TypedHeader,
 };
+use http::request::Parts;
 use axum_prometheus::PrometheusMetricLayer;
 use base64ct::{Base64, Encoding};
 use http::{header, StatusCode};
@@ -41,6 +42,21 @@ pub fn blob_path(root: &FsPath, storage_key: &str) -> PathBuf {
     let digest = Sha256::digest(storage_key.as_bytes());
     let h = base16ct::lower::encode_string(&digest);
     root.join("blobs").join(&h[0..2]).join(&h[2..4]).join(&h)
+}
+
+struct BasicAuth(Authorization<Basic>);
+
+impl<S: Send + Sync> FromRequestParts<S> for BasicAuth {
+    type Rejection = AntArchiveStorageError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        Option::<TypedHeader<Authorization<Basic>>>::from_request_parts(parts, state)
+            .await
+            .ok()
+            .flatten()
+            .map(|TypedHeader(auth)| BasicAuth(auth))
+            .ok_or(AntArchiveStorageError::AccessDenied)
+    }
 }
 
 fn authenticate(auth: &Authorization<Basic>) -> Result<(), AntArchiveStorageError> {
@@ -100,7 +116,7 @@ fn parse_range(range_header: &str, size: u64) -> Option<(u64, u64)> {
 }
 
 async fn put_blob(
-    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    BasicAuth(auth): BasicAuth,
     State(state): State<AntArchiveStorageState>,
     Path(storage_key): Path<String>,
     headers: HeaderMap,
@@ -180,7 +196,7 @@ async fn put_blob(
 }
 
 async fn get_blob(
-    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    BasicAuth(auth): BasicAuth,
     State(state): State<AntArchiveStorageState>,
     Path(storage_key): Path<String>,
     headers: HeaderMap,
@@ -225,7 +241,7 @@ async fn get_blob(
 }
 
 async fn head_blob(
-    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    BasicAuth(auth): BasicAuth,
     State(state): State<AntArchiveStorageState>,
     Path(storage_key): Path<String>,
 ) -> Result<Response, AntArchiveStorageError> {
@@ -243,7 +259,7 @@ async fn head_blob(
 }
 
 async fn delete_blob(
-    TypedHeader(auth): TypedHeader<Authorization<Basic>>,
+    BasicAuth(auth): BasicAuth,
     State(state): State<AntArchiveStorageState>,
     Path(storage_key): Path<String>,
 ) -> Result<impl IntoResponse, AntArchiveStorageError> {
