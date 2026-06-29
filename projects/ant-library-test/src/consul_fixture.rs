@@ -109,7 +109,7 @@ impl ConsulFixture {
         {
             Ok(_) => true,
             Err(e) => {
-                error!("Failed to get Consul's health: {e}");
+                error!("ANT-ERR-046: Failed to get Consul's health: {e}");
                 false
             }
         }

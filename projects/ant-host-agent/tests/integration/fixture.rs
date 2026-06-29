@@ -41,6 +41,7 @@ impl TestFixture {
 
         let state = AntHostAgentState {
             sd: Arc::new(ServiceDiscoveryWriter::new(consul.port())),
+            infra_sd: Arc::new(ServiceDiscoveryWriter::new(consul.port())),
             archive_root_dir: archive_root_dir.clone(),
             install_root_dir: install_root_dir.clone(),
         };

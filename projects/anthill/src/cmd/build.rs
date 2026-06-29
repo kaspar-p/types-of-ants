@@ -208,7 +208,7 @@ async fn build_artifact<'a>(
             .context("make cmd failed")?;
 
         if !exit.success() {
-            tracing::error!("make failed");
+            tracing::error!("ANT-ERR-086: make failed");
             return Err(anyhow::Error::msg("make failed, see logs"));
         }
     }
@@ -272,7 +272,7 @@ async fn build_artifact<'a>(
 
                     // Skip explicitly ignored paths or errors
                     if !path.exists() {
-                        warn!("Ignoring {}", path.display());
+                        warn!("ANT-ERR-087: Ignoring {}", path.display());
                         continue;
                     }
 
@@ -282,7 +282,7 @@ async fn build_artifact<'a>(
                         tar_builder.append_path_with_name(path, relative_path)?;
                     } else if path.is_dir() {
                     } else {
-                        warn!("Ignoring {}", path.display());
+                        warn!("ANT-ERR-088: Ignoring {}", path.display());
                     }
                 }
             }
@@ -326,7 +326,7 @@ async fn build_artifact<'a>(
                     }
 
                     Err(e) => {
-                        error!("Error while building docker image: {}", e);
+                        error!("ANT-ERR-089: Error while building docker image: {}", e);
                         return Err(Into::<anyhow::Error>::into(e)).context("docker build failed");
                     }
                 }

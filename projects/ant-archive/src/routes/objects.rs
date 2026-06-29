@@ -18,11 +18,12 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     auth::BearerClaims,
     err::AntArchiveError,
+    headers::SelectStorageNode,
     placement::{self, resolve_storage_nodes},
     state::AntArchiveState,
 };
@@ -38,18 +39,18 @@ fn load_kek(kek_id: &str) -> Result<[u8; 32], AntArchiveError> {
             continue;
         }
         let bytes = Base64::decode_vec(b64).map_err(|e| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-091", Some(anyhow::anyhow!(
                 "ant_archive_kek entry for '{kek_id}' is not valid base64: {e}"
             )))
         })?;
         let len = bytes.len();
         return bytes.try_into().map_err(|_| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-092", Some(anyhow::anyhow!(
                 "ant_archive_kek entry for '{kek_id}' must be exactly 32 bytes, got {len}"
             )))
         });
     }
-    Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+    Err(AntArchiveError::InternalServerError("ANT-ERR-093", Some(anyhow::anyhow!(
         "ant_archive_kek has no entry for kek_id '{kek_id}'"
     ))))
 }
@@ -58,7 +59,7 @@ fn load_tek_master() -> Result<[u8; 32], AntArchiveError> {
     let bytes = ant_library::secret::load_secret_binary("ant_archive_tek")?;
     let len = bytes.len();
     bytes.try_into().map_err(|_| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+        AntArchiveError::InternalServerError("ANT-ERR-094", Some(anyhow::anyhow!(
             "tek must be exactly 32 bytes, got {len}"
         )))
     })
@@ -77,7 +78,7 @@ fn derive_tek(
     let hkdf = Hkdf::<Sha256>::new(None, tek_master);
     let mut tek = [0u8; 32];
     hkdf.expand(tek_derivation_key, &mut tek).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("TEK derivation failed: {e}")))
+        AntArchiveError::InternalServerError("ANT-ERR-095", Some(anyhow::anyhow!("TEK derivation failed: {e}")))
     })?;
     Ok(tek)
 }
@@ -96,7 +97,7 @@ fn encrypt_object(
     let ciphertext = object_cipher
         .encrypt(&object_nonce, plaintext)
         .map_err(|e| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-096", Some(anyhow::anyhow!(
                 "object encryption failed: {e}"
             )))
         })?;
@@ -108,7 +109,7 @@ fn encrypt_object(
     let kek_key = Key::<Aes256Gcm>::from_slice(kek);
     let kek_cipher = Aes256Gcm::new(kek_key);
     let encrypted_dek = kek_cipher.encrypt(&dek_nonce, dek.as_ref()).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("DEK encryption failed: {e}")))
+        AntArchiveError::InternalServerError("ANT-ERR-097", Some(anyhow::anyhow!("DEK encryption failed: {e}")))
     })?;
 
     let tek_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -117,7 +118,7 @@ fn encrypt_object(
     let outer_ciphertext = tek_cipher
         .encrypt(&tek_nonce, inner.as_ref())
         .map_err(|e| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-098", Some(anyhow::anyhow!(
                 "TEK encryption failed: {e}"
             )))
         })?;
@@ -140,7 +141,7 @@ fn decrypt_object(
     let inner: Vec<u8> = match tek {
         Some(tek) => {
             if stored_bytes.len() < 12 {
-                return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                return Err(AntArchiveError::InternalServerError("ANT-ERR-099", Some(anyhow::anyhow!(
                     "stored bytes too short to contain TEK nonce: {} bytes",
                     stored_bytes.len()
                 ))));
@@ -152,7 +153,7 @@ fn decrypt_object(
             tek_cipher
                 .decrypt(tek_nonce, outer_ciphertext)
                 .map_err(|e| {
-                    AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+                    AntArchiveError::InternalServerError("ANT-ERR-100", Some(anyhow::anyhow!(
                         "TEK decryption failed: {e}"
                     )))
                 })?
@@ -161,7 +162,7 @@ fn decrypt_object(
     };
 
     if inner.len() < 12 {
-        return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+        return Err(AntArchiveError::InternalServerError("ANT-ERR-101", Some(anyhow::anyhow!(
             "inner blob too short to contain nonce: {} bytes",
             inner.len()
         ))));
@@ -172,12 +173,12 @@ fn decrypt_object(
     let kek_cipher = Aes256Gcm::new(kek_key);
     let dek_nonce = Nonce::from_slice(dek_nonce_bytes);
     let dek = kek_cipher.decrypt(dek_nonce, encrypted_dek).map_err(|e| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("DEK decryption failed: {e}")))
+        AntArchiveError::InternalServerError("ANT-ERR-102", Some(anyhow::anyhow!("DEK decryption failed: {e}")))
     })?;
 
     let dek_len = dek.len();
     let dek_arr: [u8; 32] = dek.try_into().map_err(|_| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+        AntArchiveError::InternalServerError("ANT-ERR-103", Some(anyhow::anyhow!(
             "DEK wrong length: expected 32 bytes, got {dek_len}"
         )))
     })?;
@@ -188,7 +189,7 @@ fn decrypt_object(
     object_cipher
         .decrypt(object_nonce, ciphertext)
         .map_err(|e| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-104", Some(anyhow::anyhow!(
                 "object decryption failed: {e}"
             )))
         })
@@ -217,6 +218,7 @@ async fn put_object(
     State(state): State<AntArchiveState>,
     Path((bucket_id, key)): Path<(String, String)>,
     auth: BearerClaims,
+    select_node: Option<SelectStorageNode>,
     body: Body,
 ) -> Result<impl IntoResponse, AntArchiveError> {
     validate_key(&key)?;
@@ -240,7 +242,7 @@ async fn put_object(
     let plaintext_len = plaintext.len() as i64;
 
     let kek_id = state.db.get_active_kek_id().await?.ok_or_else(|| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no active KEK version")))
+        AntArchiveError::InternalServerError("ANT-ERR-105", Some(anyhow::anyhow!("no active KEK version")))
     })?;
 
     let tek_master = load_tek_master()?;
@@ -254,7 +256,7 @@ async fn put_object(
         .and_then(|o| o.tek_derivation_key)
     {
         Some(existing) => existing.try_into().map_err(|_| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            AntArchiveError::InternalServerError("ANT-ERR-106", Some(anyhow::anyhow!(
                 "stored tek_derivation_key has unexpected length"
             )))
         })?,
@@ -266,7 +268,8 @@ async fn put_object(
         encrypt_object(&load_kek(&kek_id)?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
-    let placements = placement::place_new_object(&state, stored_bytes.len() as i64).await?;
+    let placements =
+        placement::place_new_object(&state, plaintext_len, select_node.as_ref().map(|n| n.0.as_str())).await?;
 
     let object_id = state
         .db
@@ -287,7 +290,7 @@ async fn put_object(
         placements.len()
     );
     let shared_bytes = bytes::Bytes::from(stored_bytes);
-    for placement in placements {
+    for (idx, placement) in placements.iter().enumerate() {
         info!(
             "[obj={}] Putting {} bytes to {}",
             &object_id,
@@ -303,7 +306,7 @@ async fn put_object(
 
         state
             .db
-            .upsert_placement(&object_id, &placement.node.node_id, &object_id, &checksum)
+            .upsert_placement(&object_id, &placement.node.node_id, &object_id, &checksum, idx as i32)
             .await?;
     }
 
@@ -338,7 +341,7 @@ async fn get_object(
             }
         }
         _ => {
-            return Err(AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
+            return Err(AntArchiveError::InternalServerError("ANT-ERR-107", Some(anyhow::anyhow!(
                 "unknown read policy"
             ))))
         }
@@ -351,31 +354,46 @@ async fn get_object(
         .ok_or_else(|| AntArchiveError::ObjectNotFound(key))?;
 
     let placements = state.db.get_placements(&object.object_id).await?;
-    let placement = placements.first().ok_or_else(|| {
-        AntArchiveError::InternalServerError(Some(anyhow::anyhow!("no placements for object")))
-    })?;
+    if placements.is_empty() {
+        return Err(AntArchiveError::InternalServerError("ANT-ERR-108", Some(anyhow::anyhow!(
+            "no placements for object"
+        ))));
+    }
 
     let storage_nodes = resolve_storage_nodes(&state).await?;
-    let storage_node = storage_nodes
-        .iter()
-        .find(|n| n.node_id == placement.storage_node_id)
-        .ok_or_else(|| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-                "storage node '{}' not found in Consul",
-                placement.storage_node_id
-            )))
-        })?;
 
-    let stored_bytes = storage_node
-        .get(&placement.storage_key)
-        .await?
-        .ok_or_else(|| {
-            AntArchiveError::InternalServerError(Some(anyhow::anyhow!(
-                "object '{}' missing from storage node '{}'",
-                placement.storage_key,
-                placement.storage_node_id
-            )))
-        })?;
+    let mut stored_bytes_opt: Option<Vec<u8>> = None;
+    for placement in &placements {
+        let Some(storage_node) = storage_nodes.iter().find(|n| n.node_id == placement.storage_node_id) else {
+            continue;
+        };
+        let Some(bytes) = storage_node.get(&placement.storage_key).await? else {
+            error!(
+                node_id = %placement.storage_node_id,
+                storage_key = %placement.storage_key,
+                "ANT-ERR-002: blob missing from storage node: placement record exists but data does not"
+            );
+            continue;
+        };
+        if compute_checksum(&bytes) != placement.object_checksum {
+            error!(
+                node_id = %placement.storage_node_id,
+                storage_key = %placement.storage_key,
+                expected_checksum = %placement.object_checksum,
+                actual_checksum = %compute_checksum(&bytes),
+                "ANT-ERR-003: blob checksum mismatch: storage node returned corrupt or wrong data"
+            );
+            continue;
+        }
+        stored_bytes_opt = Some(bytes);
+        break;
+    }
+
+    let stored_bytes = stored_bytes_opt.ok_or_else(|| {
+        AntArchiveError::InternalServerError("ANT-ERR-109", Some(anyhow::anyhow!(
+            "object not readable from any placement"
+        )))
+    })?;
 
     let tek_master = load_tek_master()?;
     let maybe_tek = object
@@ -425,12 +443,13 @@ async fn delete_object(
     let storage_nodes = resolve_storage_nodes(&state).await?;
     let placements = state.db.get_placements(&object.object_id).await?;
     for placement in &placements {
-        if let Some(storage_node) = storage_nodes
+        let storage_node = storage_nodes
             .iter()
             .find(|n| n.node_id == placement.storage_node_id)
-        {
-            storage_node.delete(&placement.storage_key).await?;
-        }
+            .ok_or_else(|| AntArchiveError::InternalServerError("ANT-ERR-110", Some(anyhow::anyhow!(
+                "storage node '{}' for placement is unreachable", placement.storage_node_id
+            ))))?;
+        storage_node.delete(&placement.storage_key).await?;
     }
 
     state.db.soft_delete_object(&bucket_id, &key).await?;

@@ -6,6 +6,7 @@ use std::{
 };
 
 use ant_archive::{make_routes, AntArchiveDb, AntArchiveState};
+use ant_archive_db::ClientCapabilities;
 use ant_archive_storage::{
     build_metric_layer, make_routes as make_storage_routes, AntArchiveStorageState,
 };
@@ -78,6 +79,9 @@ pub struct Fixture {
     pub bucket_id: String,
     pub public_bucket_id: String,
     pub internal_bucket_id: String,
+    pub db: AntArchiveDb,
+    pub sd: Arc<ServiceDiscovery>,
+    pub consul_port: u16,
     _db: TestDatabase,
     _storage: StorageNode,
     _consul: ConsulFixture,
@@ -85,6 +89,10 @@ pub struct Fixture {
 
 impl Fixture {
     pub async fn new(name: &str) -> Self {
+        Self::new_with_capacity(name, 1024 * 1024 * 1024).await
+    }
+
+    pub async fn new_with_capacity(name: &str, capacity_bytes: i64) -> Self {
         unsafe {
             set_var(
                 "TYPESOFANTS_SECRET_DIR",
@@ -106,12 +114,12 @@ impl Fixture {
             .expect("failed to register storage node with Consul");
 
         let archive_db = AntArchiveDb::connect(&db.config).await.unwrap();
-        seed_db(&archive_db).await;
+        seed_db(&archive_db, capacity_bytes).await;
 
         let sd = Arc::new(ServiceDiscovery::new(consul.port()));
         let state = AntArchiveState {
-            db: archive_db,
-            sd,
+            db: archive_db.clone(),
+            sd: sd.clone(),
             rng: Arc::new(TestSeededRng::new(42)),
         };
         let app = make_routes(state);
@@ -122,6 +130,9 @@ impl Fixture {
             bucket_id: TEST_BUCKET_ID.to_string(),
             public_bucket_id: TEST_PUBLIC_BUCKET_ID.to_string(),
             internal_bucket_id: TEST_INTERNAL_BUCKET_ID.to_string(),
+            db: archive_db,
+            sd,
+            consul_port: consul.port(),
             _db: db,
             _storage: storage,
             _consul: consul,
@@ -129,17 +140,23 @@ impl Fixture {
     }
 }
 
-async fn seed_db(db: &AntArchiveDb) {
+async fn seed_db(db: &AntArchiveDb, capacity_bytes: i64) {
     db.register_kek(TEST_KEK_ID).await.unwrap();
 
     // host_id matches the Consul node name so resolve_storage_nodes can find it.
-    db.register_storage_node("sn-test", CONSUL_NODE_NAME, 1024 * 1024 * 1024)
+    db.register_storage_node("sn-test", CONSUL_NODE_NAME, capacity_bytes)
         .await
         .unwrap();
     let client_id = db
         .create_client("test-client", &TEST_BEARER_TOKEN)
         .await
         .unwrap();
+    db.set_client_capabilities(
+        &client_id,
+        &ClientCapabilities { can_select_storage_node: true },
+    )
+    .await
+    .unwrap();
     db.create_bucket(TEST_BUCKET_ID, &client_id, true, "private")
         .await
         .unwrap();

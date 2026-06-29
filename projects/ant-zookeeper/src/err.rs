@@ -3,10 +3,19 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error};
 
+fn default_error_id() -> &'static str {
+    ""
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AntZookeeperError {
-    InternalServerError(#[serde(skip)] Option<anyhow::Error>),
+    InternalServerError {
+        #[serde(skip, default = "default_error_id")]
+        id: &'static str,
+        #[serde(skip)]
+        err: Option<anyhow::Error>,
+    },
     ValidationError(String),
     ResourceNotFound(String),
 }
@@ -18,9 +27,9 @@ impl AntZookeeperError {
 
     pub fn json(self) -> (StatusCode, Json<Self>) {
         match self {
-            Self::InternalServerError(_) => {
-                error!("Error: {:?}", self);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(self));
+            Self::InternalServerError { id, err } => {
+                error!("ANT-ERR-070: {id}: {:?}", err);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(Self::InternalServerError { id, err }));
             }
             Self::ResourceNotFound(_) | Self::ValidationError(_) => {
                 debug!("Error: {:?}", self);
@@ -35,7 +44,7 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError(Some(err.into()))
+        Self::InternalServerError { id: "?", err: Some(err.into()) }
     }
 }
 

@@ -25,7 +25,7 @@ pub async fn x_ant_middleware(
             }
         }
         Ok(None) => {}
-        Err(e) => error!("x-ant: failed to fetch random ant: {e}"),
+        Err(e) => error!("ANT-ERR-049: x-ant: failed to fetch random ant: {e}"),
     }
 
     res

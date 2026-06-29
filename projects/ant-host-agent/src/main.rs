@@ -57,10 +57,10 @@ async fn main() {
 
     let (scan, slice) = tokio::try_join!(slice_handle, scan_handle).expect("join error");
     if let Err(scan) = scan {
-        error!("Failed to scan for existing typesofants services: {scan}");
+        error!("ANT-ERR-027: Failed to scan for existing typesofants services: {scan}");
     }
     if let Err(slice) = slice {
-        error!("Failed to ensure typesofants.slice exists: {slice}");
+        error!("ANT-ERR-028: Failed to ensure typesofants.slice exists: {slice}");
     }
 
     info!("Starting server...");

@@ -24,7 +24,7 @@ use tracing::{debug, error, info};
 
 fn bearer_authorization(auth: &Authorization<Basic>) -> Result<(), (StatusCode, String)> {
     let tokens = ant_library::secret::load_secret("ant_fs_users").map_err(|e| {
-        error!("Failed to read authorized users: {e}");
+        error!("ANT-ERR-018: Failed to read authorized users: {e}");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Internal server error, please retry.".to_string(),
@@ -75,7 +75,7 @@ async fn download(
                 format!("error: {} does not exist.\n", &path),
             ),
             _ => {
-                error!("Failed to open file: {err}");
+                error!("ANT-ERR-019: Failed to open file: {err}");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Internal server error, please retry.".to_string(),
@@ -112,7 +112,7 @@ async fn upload(
 async fn stream_body_to_file(full_path: &PathBuf, body: Body) -> Result<(), (StatusCode, String)> {
     if let Some(parent) = full_path.parent() {
         tokio::fs::create_dir_all(parent).await.map_err(|err| {
-            error!("Failed to create directories: {err}");
+            error!("ANT-ERR-020: Failed to create directories: {err}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error, please retry.".to_string(),
@@ -121,7 +121,7 @@ async fn stream_body_to_file(full_path: &PathBuf, body: Body) -> Result<(), (Sta
     }
 
     let mut file = tokio::fs::File::create(full_path).await.map_err(|err| {
-        error!("Failed to create file: {err}");
+        error!("ANT-ERR-021: Failed to create file: {err}");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Internal server error, please retry.".to_string(),
@@ -131,14 +131,14 @@ async fn stream_body_to_file(full_path: &PathBuf, body: Body) -> Result<(), (Sta
     let mut stream = body.into_data_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|err| {
-            error!("Failed to read request body: {err}");
+            error!("ANT-ERR-022: Failed to read request body: {err}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to read request body.".to_string(),
             )
         })?;
         file.write_all(&chunk).await.map_err(|err| {
-            error!("Failed to write file: {err}");
+            error!("ANT-ERR-023: Failed to write file: {err}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error, please retry.".to_string(),
@@ -147,7 +147,7 @@ async fn stream_body_to_file(full_path: &PathBuf, body: Body) -> Result<(), (Sta
     }
 
     file.flush().await.map_err(|err| {
-        error!("Failed to flush file: {err}");
+        error!("ANT-ERR-024: Failed to flush file: {err}");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Internal server error, please retry.".to_string(),
@@ -168,7 +168,7 @@ async fn delete(
     info!("Deleting {}...", &path);
 
     tokio::fs::remove_file(&full_path).await.map_err(|err| {
-        error!("Failed to delete file: {err}");
+        error!("ANT-ERR-025: Failed to delete file: {err}");
         match err.kind() {
             ErrorKind::NotFound => (
                 StatusCode::NOT_FOUND,

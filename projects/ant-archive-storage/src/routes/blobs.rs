@@ -193,7 +193,7 @@ async fn get_blob(
         .await
         .map_err(|e| match e.kind() {
             ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
-            _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
+            _ => AntArchiveStorageError::InternalServerError("ANT-ERR-111", Some(e.into())),
         })?;
 
     let mut handle = BlobHandle::open(file).await?;
@@ -258,7 +258,7 @@ async fn delete_blob(
         .await
         .map_err(|e| match e.kind() {
             ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
-            _ => AntArchiveStorageError::InternalServerError(Some(e.into())),
+            _ => AntArchiveStorageError::InternalServerError("ANT-ERR-112", Some(e.into())),
         })?;
 
     state.adjust_bytes(-(size as i64));

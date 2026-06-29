@@ -69,7 +69,7 @@ impl AntZookeeperClient {
                 status,
                 body
             );
-            error!("{}", msg);
+            error!("ANT-ERR-067: {}", msg);
             return Err(anyhow::Error::msg(msg));
         }
 
@@ -161,7 +161,7 @@ impl AntZookeeperClient {
                 status,
                 body
             );
-            error!("{}", msg);
+            error!("ANT-ERR-068: {}", msg);
             return Err(anyhow::Error::msg(msg));
         }
 

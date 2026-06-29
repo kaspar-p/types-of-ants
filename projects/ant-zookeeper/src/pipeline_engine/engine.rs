@@ -135,7 +135,7 @@ impl JobHandle {
 
         if updated == 0 {
             tx.rollback().await?;
-            warn!(job_id = %self.job_id, "succeed called on non-running job, ignoring");
+            warn!(job_id = %self.job_id, "ANT-ERR-071: succeed called on non-running job, ignoring");
             return Ok(());
         }
 
@@ -344,7 +344,7 @@ impl JobHandle {
 
         if updated == 0 {
             tx.rollback().await?;
-            warn!(job_id = %self.job_id, "fail called on non-running job, ignoring");
+            warn!(job_id = %self.job_id, "ANT-ERR-072: fail called on non-running job, ignoring");
             return Ok(());
         }
 
@@ -418,7 +418,7 @@ impl TickHandle {
         let results = futures::future::join_all(self.tasks.into_iter().map(
             |(node_id, job_id, handle)| async move {
                 handle.await.map_err(|e| {
-                    error!(node_id = %node_id, job_id = %job_id, "task panic: {e:?}");
+                    error!(node_id = %node_id, job_id = %job_id, "ANT-ERR-073: task panic: {e:?}");
                     anyhow::anyhow!("task panic for node={node_id} job={job_id}: {e:?}")
                 })
             },
@@ -1219,7 +1219,7 @@ impl PipelineEngine {
                     loop {
                         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                         if let Err(e) = heartbeat_handle.heartbeat().await {
-                            error!("heartbeat failed: {e:?}");
+                            error!("ANT-ERR-074: heartbeat failed: {e:?}");
                         }
                     }
                 });
@@ -1233,21 +1233,21 @@ impl PipelineEngine {
                     Ok(Ok(())) => {
                         info!("job succeeded");
                         if let Err(e) = handle.succeed().await {
-                            error!("failed to record success: {e:?}");
+                            error!("ANT-ERR-075: failed to record success: {e:?}");
                         }
                     }
                     Ok(Err(e)) => {
                         let err_msg = format!("{e:?}");
-                        error!("job failed: {err_msg}");
+                        error!("ANT-ERR-076: job failed: {err_msg}");
                         if let Err(e) = handle.fail(&err_msg).await {
-                            error!("failed to record failure: {e:?}");
+                            error!("ANT-ERR-077: failed to record failure: {e:?}");
                         }
                     }
                     Err(e) => {
                         let err_msg = format!("task panic: {e:?}");
-                        error!("{err_msg}");
+                        error!("ANT-ERR-078: {err_msg}");
                         if let Err(e) = handle.fail(&err_msg).await {
-                            error!("failed to record panic: {e:?}");
+                            error!("ANT-ERR-079: failed to record panic: {e:?}");
                         }
                     }
                 }
@@ -1319,7 +1319,7 @@ impl PipelineEngine {
 
         if !released_nodes.is_empty() {
             warn!(
-                "released {} nodes with stale heartbeats",
+                "ANT-ERR-080: released {} nodes with stale heartbeats",
                 released_nodes.len()
             );
         }

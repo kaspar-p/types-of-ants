@@ -57,7 +57,7 @@ impl SmsSender for Sms {
                     return Err(SmsError::BadPhoneNumber);
                 }
                 _ => {
-                    error!("sending sms failed: {}", e);
+                    error!("ANT-ERR-048: sending sms failed: {}", e);
                     return Err(SmsError::InternalServerError(anyhow::anyhow!(e)));
                 }
             },

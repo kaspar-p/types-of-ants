@@ -170,6 +170,8 @@ dependencies = [
  "ant-library",
  "anyhow",
  "async-trait",
+ "stdext",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

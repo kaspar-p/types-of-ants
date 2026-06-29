@@ -627,8 +627,8 @@ async fn password_reset_code(
             .await
             {
                 Ok(_) => Ok(()),
-                Err(AntOnTheWebError::InternalServerError(s)) => {
-                    Err(AntOnTheWebError::InternalServerError(s))
+                Err(AntOnTheWebError::InternalServerError { id, err }) => {
+                    Err(AntOnTheWebError::InternalServerError { id, err })
                 }
                 Err(e) => {
                     debug!(

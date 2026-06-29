@@ -3,7 +3,7 @@ use hyper::StatusCode;
 use tracing::{debug, error};
 
 pub enum AntHostAgentError {
-    InternalServerError(Option<anyhow::Error>),
+    InternalServerError(&'static str, Option<anyhow::Error>),
     ValidationError {
         msg: String,
         e: Option<anyhow::Error>,
@@ -31,7 +31,7 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError(Some(err.into()))
+        Self::InternalServerError("?", Some(err.into()))
     }
 }
 
@@ -45,8 +45,8 @@ impl IntoResponse for AntHostAgentError {
 impl Into<(StatusCode, String)> for AntHostAgentError {
     fn into(self) -> (StatusCode, String) {
         match self {
-            AntHostAgentError::InternalServerError(e) => {
-                error!("AntHostAgentError::InternalServerError: {:?}", e);
+            AntHostAgentError::InternalServerError(id, e) => {
+                error!("ANT-ERR-026: {id}: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong, please retry.".to_string(),

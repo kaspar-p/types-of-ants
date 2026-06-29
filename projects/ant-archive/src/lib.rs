@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod err;
+pub mod headers;
 mod placement;
 mod routes;
 pub mod state;

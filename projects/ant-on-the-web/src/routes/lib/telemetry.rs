@@ -46,7 +46,7 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError(None);
+                return AntOnTheWebError::InternalServerError { id: "ANT-ERR-118", err: None };
             })?;
 
         let telemetry = match cookies.get(TELEMETRY_COOKIE_NAME) {
@@ -76,7 +76,7 @@ pub async fn telemetry_cookie_middleware(
         .await
         .map_err(|e| {
             error!("error finding user during telemetry: {e:?}");
-            return AntOnTheWebError::InternalServerError(None).into_response();
+            return AntOnTheWebError::InternalServerError { id: "ANT-ERR-119", err: None }.into_response();
         });
 
     let uri = req.uri().to_string().clone();

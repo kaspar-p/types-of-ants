@@ -80,7 +80,7 @@ impl ServiceDiscovery {
             .await?;
         if nodes.index <= 0 {
             error!(
-                "Hashicorp documentation insists that a returned index will always be greater \
+                "ANT-ERR-042: Hashicorp documentation insists that a returned index will always be greater \
                  than zero, got: {}",
                 nodes.index
             );
@@ -141,7 +141,7 @@ impl ServiceDiscovery {
         )
         .await
         {
-            error!("Failed to fetch [{service}] endpoints, but ignoring error: {e}")
+            error!("ANT-ERR-043: Failed to fetch [{service}] endpoints, but ignoring error: {e}")
         }
 
         info!("Spawning background worker...");
@@ -166,7 +166,7 @@ impl ServiceDiscovery {
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
                     Err(e) => {
-                        error!("Failed to fetch [{}] endpoints: {e}", service2);
+                        error!("ANT-ERR-044: Failed to fetch [{}] endpoints: {e}", service2);
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
                 }

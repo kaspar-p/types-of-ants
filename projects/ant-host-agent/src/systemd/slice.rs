@@ -69,11 +69,11 @@ pub async fn ensure_slice(state: AntHostAgentState) -> Result<(), anyhow::Error>
         Err(zbus::Error::MethodError(name, _, _))
             if name == "org.freedesktop.systemd1.NoSuchUnit" =>
         {
-            warn!("No such unit file: {}", slices_path.display());
+            warn!("ANT-ERR-037: No such unit file: {}", slices_path.display());
         }
         Err(e) => {
             error!(
-                "Failed to enable unit file: {}, {}",
+                "ANT-ERR-038: Failed to enable unit file: {}, {}",
                 slices_path.display(),
                 e
             );

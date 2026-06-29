@@ -61,11 +61,20 @@ impl ValidationError {
     }
 }
 
+fn default_error_id() -> &'static str {
+    ""
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", tag = "__type")]
 pub enum AntOnTheWebError {
     AccessDenied(#[serde(skip)] Option<String>),
-    InternalServerError(#[serde(skip)] Option<anyhow::Error>),
+    InternalServerError {
+        #[serde(skip, default = "default_error_id")]
+        id: &'static str,
+        #[serde(skip)]
+        err: Option<anyhow::Error>,
+    },
     ValidationError(ValidationError),
     ConflictError {
         msg: &'static str,
@@ -82,11 +91,11 @@ pub enum AntOnTheWebError {
 impl IntoResponse for AntOnTheWebError {
     fn into_response(self) -> Response {
         match self {
-            AntOnTheWebError::InternalServerError(e) => {
-                error!("AntOnTheWebError::InternalServerError: {:?}", e);
+            AntOnTheWebError::InternalServerError { id, err: e } => {
+                error!("ANT-ERR-056: {id}: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(AntOnTheWebError::InternalServerError(None)),
+                    Json(AntOnTheWebError::InternalServerError { id: "ANT-ERR-124", err: None }),
                 )
                     .into_response()
             }
@@ -162,6 +171,6 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError(Some(err.into()))
+        Self::InternalServerError { id: "?", err: Some(err.into()) }
     }
 }

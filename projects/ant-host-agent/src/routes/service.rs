@@ -205,7 +205,7 @@ async fn enable_service(
             return Ok((StatusCode::UNPROCESSABLE_ENTITY, "Service failed to start."));
         }
         Err(SystemdUnitError::UnrecognizedState(loaded, active)) => {
-            return Err(AntHostAgentError::InternalServerError(Some(
+            return Err(AntHostAgentError::InternalServerError("ANT-ERR-114", Some(
                 anyhow::Error::msg(format!(
                     "Unrecognized state, loaded: {loaded}, active: {active}"
                 )),
@@ -353,7 +353,7 @@ async fn install_service(
             )
             .as_str(),
         ),
-        _ => AntHostAgentError::InternalServerError(Some(e.into())),
+        _ => AntHostAgentError::InternalServerError("ANT-ERR-115", Some(e.into())),
     })?;
 
     let versioned_install_dir = {
@@ -624,7 +624,7 @@ async fn get_service(
             version: contents.trim().to_string(),
         }),
         Err(e) if e.kind() == ErrorKind::NotFound => None,
-        Err(e) => return Err(AntHostAgentError::InternalServerError(Some(e.into()))),
+        Err(e) => return Err(AntHostAgentError::InternalServerError("ANT-ERR-116", Some(e.into()))),
     };
 
     Ok(Json(GetServiceResponse { service }))

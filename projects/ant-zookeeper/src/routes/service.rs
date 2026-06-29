@@ -228,7 +228,7 @@ async fn register_artifact(
             .next_field()
             .await
             .map_err(|e| {
-                warn!("No field in multipart: {e}");
+                warn!("ANT-ERR-084: No field in multipart: {e}");
                 AntZookeeperError::validation_msg("No field found in multipart request!")
             })?
             .ok_or(AntZookeeperError::validation_msg(
@@ -288,7 +288,7 @@ async fn register_artifact(
                 let manifest =
                     serde_json::from_str::<AnthillManifest>(&manifest_buf).map_err(|e| {
                         warn!(
-                            "Failed to read manifest: {}, {e}",
+                            "ANT-ERR-085: Failed to read manifest: {}, {e}",
                             temp_file_path.join(&file_name).display()
                         );
                         AntZookeeperError::validation_msg(

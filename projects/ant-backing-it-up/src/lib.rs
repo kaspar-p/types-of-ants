@@ -41,7 +41,7 @@ async fn list_backups(
     State(AntBackingItUpState { db, .. }): State<AntBackingItUpState>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let backups = db.get_all_backups().await.map_err(|e| {
-        error!("db: {e}");
+        error!("ANT-ERR-006: db: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -83,7 +83,7 @@ async fn post_backup(
             password: ant_library::secret::load_secret("ant_data_farm_password").unwrap(),
         },
         p => {
-            warn!("Unsupported project {p}");
+            warn!("ANT-ERR-007: Unsupported project {p}");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
@@ -117,21 +117,21 @@ async fn post_backup(
     info!("Executing backup: {}", cmd.to_command_string());
 
     let out = cmd.output().map_err(|e| {
-        error!("pg_dump execution: {e}");
+        error!("ANT-ERR-008: pg_dump execution: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
     let stdout = String::from_utf8(out.stdout).map_err(|e| {
-        error!("stdout not utf8: {e}");
+        error!("ANT-ERR-009: stdout not utf8: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let stderr = String::from_utf8(out.stderr).map_err(|e| {
-        error!("stdout not utf8: {e}");
+        error!("ANT-ERR-010: stdout not utf8: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
     if !out.status.success() {
-        error!("pg_dump failed.\nstdout: {}\nstderr: {}", stdout, stderr);
+        error!("ANT-ERR-011: pg_dump failed.\nstdout: {}\nstderr: {}", stdout, stderr);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
@@ -201,7 +201,7 @@ async fn post_backup(
     )
     .await
     .map_err(|e| {
-        error!("db query failed: {e}");
+        error!("ANT-ERR-012: db query failed: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

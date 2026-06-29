@@ -76,7 +76,7 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
             .is_none()
         {
             warn!(
-                "Service {unit_name} install dir {} does not have install root as ancestor: {}",
+                "ANT-ERR-035: Service {unit_name} install dir {} does not have install root as ancestor: {}",
                 install_dir.display(),
                 state.install_root_dir.display()
             );
@@ -107,7 +107,7 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
                 info!("Found typesofants service: {service_id}");
                 let port = manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0);
                 if let Err(e) = state.sd.register_local_service(service_id, port).await {
-                    warn!("Failed to register {service_id} with Consul on startup: {e}");
+                    warn!("ANT-ERR-036: Failed to register {service_id} with Consul on startup: {e}");
                 }
                 registered.push(service_id.to_string());
             }

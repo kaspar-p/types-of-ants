@@ -39,7 +39,7 @@ impl ServiceDiscoveryWriter {
         {
             Ok(_) => true,
             Err(e) => {
-                error!("ant-matchmaker consul endpoint not healthy: {e}");
+                error!("ANT-ERR-045: ant-matchmaker consul endpoint not healthy: {e}");
                 false
             }
         }

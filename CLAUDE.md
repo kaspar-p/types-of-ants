@@ -30,6 +30,8 @@ call it `Job`. If it's a Pipeline, call it `Pipeline`. The type IS the thing.
 Never use `// --- Section Title ---` style dividers. If code needs grouping,
 use modules or ordering. Comments should explain why, not act as headings.
 
+Don't use ligatures in comments, keep it ASCII.
+
 ## Lint suppression
 
 Never use `#[allow(...)]`. Fix the underlying issue instead.

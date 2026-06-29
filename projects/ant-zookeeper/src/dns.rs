@@ -56,7 +56,7 @@ impl Dns for CloudFlareDns {
             .iter()
             .find(|record| record.content == val)
         {
-            warn!("Identical record already present, short-circuiting: {identical_record:?}");
+            warn!("ANT-ERR-069: Identical record already present, short-circuiting: {identical_record:?}");
             return Ok(identical_record.clone());
         }
 

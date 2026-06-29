@@ -98,7 +98,7 @@ impl AntFsClient {
         match response.error_for_status() {
             Ok(_res) => Ok(()),
             Err(e) => {
-                error!("Failed to put ant-fs file {e}");
+                error!("ANT-ERR-015: Failed to put ant-fs file {e}");
                 Err(e.into())
             }
         }
@@ -116,7 +116,7 @@ impl AntFsClient {
         match response.error_for_status() {
             Ok(_res) => Ok(()),
             Err(e) => {
-                error!("Failed to put ant-fs file {e}");
+                error!("ANT-ERR-016: Failed to put ant-fs file {e}");
                 Err(e.into())
             }
         }
@@ -135,7 +135,7 @@ impl AntFsClient {
             StatusCode::NOT_FOUND => return Ok(None),
             _ => {
                 let e = response.error_for_status().unwrap_err();
-                error!("Failed to put ant-fs file {e}");
+                error!("ANT-ERR-017: Failed to put ant-fs file {e}");
                 return Err(e.into());
             }
         };

@@ -4,7 +4,7 @@ use tracing::{error, warn};
 
 #[derive(Debug)]
 pub enum AntArchiveStorageError {
-    InternalServerError(Option<anyhow::Error>),
+    InternalServerError(&'static str, Option<anyhow::Error>),
     AccessDenied,
     NotFound(String),
     RangeNotSatisfiable,
@@ -14,8 +14,8 @@ pub enum AntArchiveStorageError {
 impl IntoResponse for AntArchiveStorageError {
     fn into_response(self) -> Response {
         match self {
-            AntArchiveStorageError::InternalServerError(e) => {
-                error!("AntArchiveStorageError::InternalServerError: {:?}", e);
+            AntArchiveStorageError::InternalServerError(id, e) => {
+                error!("ANT-ERR-004: {id}: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error.").into_response()
             }
             AntArchiveStorageError::AccessDenied => {
@@ -40,6 +40,6 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError(Some(err.into()))
+        Self::InternalServerError("?", Some(err.into()))
     }
 }

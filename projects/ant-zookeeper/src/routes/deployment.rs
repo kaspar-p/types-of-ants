@@ -61,7 +61,7 @@ async fn iterate_pipeline(
             let is_success = match perform_fn {
                 None => {
                     error!(
-                        "Deployment job rev={} event={} has no perform, but ignoring...",
+                        "ANT-ERR-081: Deployment job rev={} event={} has no perform, but ignoring...",
                         event.0,
                         event.1.to_string()
                     );
@@ -104,11 +104,11 @@ async fn iterate_pipeline(
                             Some(true)
                         }
                         Ok(Err(e)) => {
-                            error!("Handler Error: {:?}", e);
+                            error!("ANT-ERR-082: Handler Error: {:?}", e);
                             Some(false)
                         }
                         Err(e) => {
-                            error!("Orchestration Error: {:?}", e);
+                            error!("ANT-ERR-083: Orchestration Error: {:?}", e);
                             Some(false)
                         }
                     };

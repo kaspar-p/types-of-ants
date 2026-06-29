@@ -3,6 +3,7 @@ use reqwest::{Client, StatusCode};
 #[derive(Clone)]
 pub struct AntArchiveStorageNodeClient {
     pub node_id: String,
+    pub host_id: String,
     client: Client,
     base_url: String,
     username: String,
@@ -12,12 +13,14 @@ pub struct AntArchiveStorageNodeClient {
 impl AntArchiveStorageNodeClient {
     pub fn new(
         node_id: impl Into<String>,
+        host_id: impl Into<String>,
         base_url: impl Into<String>,
         username: impl Into<String>,
         password: impl Into<String>,
     ) -> Self {
         Self {
             node_id: node_id.into(),
+            host_id: host_id.into(),
             client: Client::new(),
             base_url: base_url.into(),
             username: username.into(),

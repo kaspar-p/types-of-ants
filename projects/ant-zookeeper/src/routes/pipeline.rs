@@ -321,9 +321,10 @@ async fn get_pipeline(
                 })
             }
             t => {
-                return Err(AntZookeeperError::InternalServerError(Some(
-                    anyhow::Error::msg(format!("Unknown stage format: {t}")),
-                )))
+                return Err(AntZookeeperError::InternalServerError {
+                    id: "ANT-ERR-126",
+                    err: Some(anyhow::Error::msg(format!("Unknown stage format: {t}"))),
+                })
             }
         }
     }

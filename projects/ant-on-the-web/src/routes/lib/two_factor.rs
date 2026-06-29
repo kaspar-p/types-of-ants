@@ -112,7 +112,7 @@ with love,
         .send_email(email, subject, content)
         .await
         .map_err(|e| match e {
-            EmailError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
+            EmailError::InternalServerError(e) => AntOnTheWebError::InternalServerError { id: "ANT-ERR-120", err: Some(e) },
         })?;
 
     dao.verifications
@@ -251,7 +251,7 @@ async fn send_phone_verification_code(
             SmsError::BadPhoneNumber => AntOnTheWebError::ValidationError(ValidationError::one(
                 ValidationMessage::new("phone", "Phone number cannot receive messages"),
             )),
-            SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError(Some(e)),
+            SmsError::InternalServerError(e) => AntOnTheWebError::InternalServerError { id: "ANT-ERR-121", err: Some(e) },
         })?;
 
     dao.verifications

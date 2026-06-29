@@ -39,7 +39,7 @@ pub async fn spawn_and_wait(
 
     if let Some(sd) = consul {
         if let Err(e) = sd.deregister_local_service(&manifest.project).await {
-            tracing::warn!("Failed to deregister {} from Consul: {e}", manifest.project);
+            tracing::warn!("ANT-ERR-090: Failed to deregister {} from Consul: {e}", manifest.project);
         }
     }
 

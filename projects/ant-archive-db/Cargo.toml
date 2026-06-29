@@ -7,4 +7,8 @@ edition = "2021"
 ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.99"
 async-trait = "0.1"
+bb8 = "0.9"
+stdext = "0.3.3"
+thiserror = "2"
+tokio-postgres = "0.7"
 tracing = { version = "0.1.41", features = ["max_level_debug"] }

@@ -6,11 +6,24 @@ use ant_library::db::{
 };
 use ant_library::sd::reader::ServiceDiscovery;
 use async_trait::async_trait;
+use stdext::function_name;
 use tracing::debug;
+
+#[derive(Debug, thiserror::Error)]
+pub enum AntArchiveDbError {
+    #[error("connection pool failed: {0}")]
+    Connection(#[from] bb8::RunError<tokio_postgres::Error>),
+    #[error("query failed: {0}")]
+    Query(#[from] tokio_postgres::Error),
+}
 
 #[derive(Clone)]
 pub struct AntArchiveDb {
     pool: ConnectionPool,
+}
+
+pub struct ClientCapabilities {
+    pub can_select_storage_node: bool,
 }
 
 pub struct ArchiveBucket {
@@ -31,6 +44,7 @@ pub struct ArchiveObject {
 pub struct ArchivePlacement {
     pub storage_node_id: String,
     pub storage_key: String,
+    pub object_checksum: String,
 }
 
 #[async_trait]
@@ -61,7 +75,7 @@ impl AntArchiveDb {
         Ok(Self { pool })
     }
 
-    pub async fn authenticate_bearer(&self, token: &str) -> Result<Option<String>, anyhow::Error> {
+    pub async fn authenticate_bearer(&self, token: &str) -> Result<Option<(String, ClientCapabilities)>, AntArchiveDbError> {
         let hash = ant_library::crypto::make_token_hash(token);
 
         let row = self
@@ -69,18 +83,33 @@ impl AntArchiveDb {
             .get()
             .await?
             .query_opt(
-                "SELECT client_id FROM archive_client WHERE token_hash = $1",
+                "SELECT client_id, capability_can_select_storage_node FROM archive_client WHERE token_hash = $1",
                 &[&hash],
             )
             .await?;
 
-        Ok(row.map(|r| r.get("client_id")))
+        Ok(row.map(|r| (
+            r.get("client_id"),
+            ClientCapabilities { can_select_storage_node: r.get("capability_can_select_storage_node") },
+        )))
+    }
+
+    pub async fn set_client_capabilities(&self, client_id: &str, capabilities: &ClientCapabilities) -> Result<(), AntArchiveDbError> {
+        self.pool
+            .get()
+            .await?
+            .execute(
+                "UPDATE archive_client SET capability_can_select_storage_node = $2 WHERE client_id = $1",
+                &[&client_id, &capabilities.can_select_storage_node],
+            )
+            .await?;
+        Ok(())
     }
 
     pub async fn get_bucket(
         &self,
         bucket_id: &str,
-    ) -> Result<Option<ArchiveBucket>, anyhow::Error> {
+    ) -> Result<Option<ArchiveBucket>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
@@ -103,7 +132,7 @@ impl AntArchiveDb {
     pub async fn describe_storage_node(
         &self,
         storage_node_id: &str,
-    ) -> Result<Option<(String, i64)>, anyhow::Error> {
+    ) -> Result<Option<(String, i64)>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
@@ -125,7 +154,7 @@ impl AntArchiveDb {
     pub async fn get_storage_node_by_node_name(
         &self,
         node_name: &str,
-    ) -> Result<Option<String>, anyhow::Error> {
+    ) -> Result<Option<String>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
@@ -139,7 +168,7 @@ impl AntArchiveDb {
         Ok(row.map(|r| r.get("storage_node_id")))
     }
 
-    pub async fn get_active_kek_id(&self) -> Result<Option<String>, anyhow::Error> {
+    pub async fn get_active_kek_id(&self) -> Result<Option<String>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
@@ -157,7 +186,7 @@ impl AntArchiveDb {
         &self,
         bucket_id: &str,
         key: &str,
-    ) -> Result<Option<ArchiveObject>, anyhow::Error> {
+    ) -> Result<Option<ArchiveObject>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
@@ -188,15 +217,16 @@ impl AntArchiveDb {
     pub async fn get_placements(
         &self,
         object_id: &str,
-    ) -> Result<Vec<ArchivePlacement>, anyhow::Error> {
+    ) -> Result<Vec<ArchivePlacement>, AntArchiveDbError> {
         let rows = self
             .pool
             .get()
             .await?
             .query(
-                "SELECT storage_node_id, storage_key
+                "SELECT storage_node_id, storage_key, object_checksum
                  FROM archive_object_placement
-                 WHERE object_id = $1",
+                 WHERE object_id = $1
+                 ORDER BY idx ASC",
                 &[&object_id],
             )
             .await?;
@@ -206,27 +236,25 @@ impl AntArchiveDb {
             .map(|r| ArchivePlacement {
                 storage_node_id: r.get("storage_node_id"),
                 storage_key: r.get("storage_key"),
+                object_checksum: r.get("object_checksum"),
             })
             .collect())
     }
 
-    pub async fn bytes_stored_on_node(&self, storage_node_id: &str) -> Result<i64, anyhow::Error> {
+    pub async fn bytes_stored_on_node(&self, storage_node_id: &str) -> Result<i64, AntArchiveDbError> {
         let bytes_stored = self
             .pool
             .get()
             .await?
-            .query_opt(
-                "
-                select sum(o.size_bytes) as bytes_stored
-                from archive_object o
-                    join archive_object_placement p on o.object_id = p.object_id
-                where p.storage_node_id = $1
-            ",
+            .query_one(
+                "select coalesce(sum(o.size_bytes), 0)::bigint as bytes_stored
+                 from archive_object o
+                     join archive_object_placement p on o.object_id = p.object_id
+                 where p.storage_node_id = $1
+                   and o.deleted_at is null",
                 &[&storage_node_id],
             )
-            .await?
-            .map(|r| r.try_get("bytes_stored").unwrap_or(0))
-            .unwrap_or(0);
+            .await;
 
         Ok(bytes_stored)
     }
@@ -240,7 +268,7 @@ impl AntArchiveDb {
         encrypted_dek: &[u8],
         dek_nonce: &[u8],
         tek_derivation_key: &[u8],
-    ) -> Result<String, anyhow::Error> {
+    ) -> Result<String, AntArchiveDbError> {
         let object_id = self
             .pool
             .get()
@@ -272,8 +300,7 @@ impl AntArchiveDb {
                     &tek_derivation_key,
                 ],
             )
-            .await?
-            .get("object_id");
+            .await;
 
         Ok(object_id)
     }
@@ -284,29 +311,27 @@ impl AntArchiveDb {
         storage_node_id: &str,
         storage_key: &str,
         checksum: &str,
-    ) -> Result<(), anyhow::Error> {
+        idx: i32,
+    ) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
             .await?
             .execute(
-                "
-                insert into archive_object_placement
+                "insert into archive_object_placement
                    (object_id, storage_node_id, idx, role, storage_key, object_checksum)
-                values
-                    ($1, $2, 0, 'replica', $3, $4)
-                on conflict (object_id, idx)
-                do update set
+                values ($1, $2, $3, 'replica', $4, $5)
+                on conflict (object_id, idx) do update set
+                    storage_node_id = EXCLUDED.storage_node_id,
                     storage_key = EXCLUDED.storage_key,
-                    object_checksum = EXCLUDED.object_checksum
-                ",
-                &[&object_id, &storage_node_id, &storage_key, &checksum],
+                    object_checksum = EXCLUDED.object_checksum",
+                &[&object_id, &storage_node_id, &idx, &storage_key, &checksum],
             )
             .await?;
 
         Ok(())
     }
 
-    pub async fn register_kek(&self, kek_id: &str) -> Result<(), anyhow::Error> {
+    pub async fn register_kek(&self, kek_id: &str) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
             .await?
@@ -328,7 +353,7 @@ impl AntArchiveDb {
         storage_node_id: &str,
         host_id: &str,
         capacity_bytes: i64,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
             .await?
@@ -345,7 +370,7 @@ impl AntArchiveDb {
         Ok(())
     }
 
-    pub async fn create_client(&self, name: &str, token: &str) -> Result<String, anyhow::Error> {
+    pub async fn create_client(&self, name: &str, token: &str) -> Result<String, AntArchiveDbError> {
         let token_hash = ant_library::crypto::make_token_hash(token);
 
         let client_id = self
@@ -362,8 +387,7 @@ impl AntArchiveDb {
                 ",
                 &[&name, &token_hash],
             )
-            .await?
-            .get("client_id");
+            .await;
 
         Ok(client_id)
     }
@@ -374,7 +398,7 @@ impl AntArchiveDb {
         client_id: &str,
         is_default: bool,
         read_policy: &str,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
             .await?
@@ -391,7 +415,7 @@ impl AntArchiveDb {
         &self,
         bucket_id: &str,
         key: &str,
-    ) -> Result<bool, anyhow::Error> {
+    ) -> Result<bool, AntArchiveDbError> {
         let count = self
             .pool
             .get()

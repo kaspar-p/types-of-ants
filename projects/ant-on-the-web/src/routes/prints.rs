@@ -29,9 +29,9 @@ async fn print_message(
     let endpoint =
         sd.resolve("ant-printing-press")
             .await
-            .ok_or(AntOnTheWebError::InternalServerError(Some(
+            .ok_or(AntOnTheWebError::InternalServerError { id: "ANT-ERR-122", err: Some(
                 anyhow::Error::msg("no endpoint found for ant-printing-press"),
-            )))?;
+            ) })?;
 
     client
         .post(format!(

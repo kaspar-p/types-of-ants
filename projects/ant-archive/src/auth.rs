@@ -5,10 +5,13 @@ use axum_extra::{
 };
 use http::request::Parts;
 
+use ant_archive_db::ClientCapabilities;
+
 use crate::{err::AntArchiveError, state::AntArchiveState};
 
 pub struct BearerClaims {
     pub client_id: String,
+    pub capabilities: ClientCapabilities,
 }
 
 /// Required auth — fails with 401 if no valid bearer token is present.
@@ -28,14 +31,14 @@ where
             .map_err(|e| AntArchiveError::Unauthorized(Some(e.into())))?;
 
         let state = AntArchiveState::from_ref(state);
-        let client_id = state
+        let (client_id, capabilities) = state
             .db
             .authenticate_bearer(auth.token())
             .await
             .map_err(AntArchiveError::from)?
             .ok_or(AntArchiveError::Unauthorized(None))?;
 
-        Ok(BearerClaims { client_id })
+        Ok(BearerClaims { client_id, capabilities })
     }
 }
 
@@ -57,23 +60,19 @@ where
         let maybe_header =
             Option::<TypedHeader<Authorization<Bearer>>>::from_request_parts(parts, state)
                 .await
-                .map_err(AntArchiveError::from)?;
+                .map_err(|e| AntArchiveError::from(anyhow::anyhow!("{e}")))?;
 
         let Some(TypedHeader(auth)) = maybe_header else {
             return Ok(None);
         };
 
-        println!("opt auth: {}", auth.token());
-
         let state = AntArchiveState::from_ref(state);
-        let maybe_client_id = state
+        let maybe_result = state
             .db
             .authenticate_bearer(auth.token())
             .await
             .map_err(AntArchiveError::from)?;
 
-        println!("opt auth: {:?}", maybe_client_id);
-
-        Ok(maybe_client_id.map(|client_id| BearerClaims { client_id }))
+        Ok(maybe_result.map(|(client_id, capabilities)| BearerClaims { client_id, capabilities }))
     }
 }

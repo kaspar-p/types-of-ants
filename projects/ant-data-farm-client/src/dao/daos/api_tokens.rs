@@ -63,7 +63,7 @@ impl ApiTokensDao {
                 info!("Verified hash successfully for user {}", username);
                 return Ok(Some(user.get("user_id")));
             } else {
-                warn!("Hash was not valid for user {username}!");
+                warn!("ANT-ERR-014: Hash was not valid for user {username}!");
             }
         }
 

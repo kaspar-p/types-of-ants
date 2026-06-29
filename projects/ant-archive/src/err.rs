@@ -4,18 +4,19 @@ use tracing::error;
 
 #[derive(Debug)]
 pub enum AntArchiveError {
-    InternalServerError(Option<anyhow::Error>),
+    InternalServerError(&'static str, Option<anyhow::Error>),
     Unauthorized(Option<anyhow::Error>),
     BucketNotFound(String),
     ObjectNotFound(String),
     BadRequest(String),
+    InsufficientStorage,
 }
 
 impl IntoResponse for AntArchiveError {
     fn into_response(self) -> Response {
         match self {
-            AntArchiveError::InternalServerError(e) => {
-                error!("AntArchiveError::InternalServerError: {:?}", e);
+            AntArchiveError::InternalServerError(id, e) => {
+                error!("ANT-ERR-001: {id}: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error.").into_response()
             }
             AntArchiveError::Unauthorized(e) => {
@@ -31,15 +32,25 @@ impl IntoResponse for AntArchiveError {
                 (StatusCode::NOT_FOUND, format!("object {key} not found")).into_response()
             }
             AntArchiveError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
+            AntArchiveError::InsufficientStorage => {
+                (StatusCode::INSUFFICIENT_STORAGE, "Insufficient storage capacity.").into_response()
+            }
         }
     }
 }
 
-impl<E> From<E> for AntArchiveError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self::InternalServerError(Some(err.into()))
+impl From<anyhow::Error> for AntArchiveError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::InternalServerError("?", Some(err))
+    }
+}
+
+impl From<ant_archive_db::AntArchiveDbError> for AntArchiveError {
+    fn from(e: ant_archive_db::AntArchiveDbError) -> Self {
+        let code = match &e {
+            ant_archive_db::AntArchiveDbError::Connection(_) => "ANT-ERR-129",
+            ant_archive_db::AntArchiveDbError::Query(_) => "ANT-ERR-130",
+        };
+        Self::InternalServerError(code, Some(e.into()))
     }
 }

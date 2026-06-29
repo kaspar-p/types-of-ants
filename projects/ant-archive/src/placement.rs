@@ -51,6 +51,7 @@ pub async fn resolve_storage_nodes(
         if let Some(node_id) = state.db.get_storage_node_by_node_name(&ep.node).await? {
             clients.push(AntArchiveStorageNodeClient::new(
                 node_id,
+                ep.node.clone(),
                 format!("http://{}:{}", ep.address, ep.port),
                 username,
                 password,
@@ -81,6 +82,7 @@ pub(crate) enum ErrorCorrectionRole {
 pub(crate) async fn place_new_object(
     state: &AntArchiveState,
     new_object_size_bytes: i64,
+    required_node: Option<&str>,
 ) -> Result<Vec<Placement>, AntArchiveError> {
     let storage_nodes = resolve_storage_nodes(&state).await?;
 
@@ -98,13 +100,40 @@ pub(crate) async fn place_new_object(
         }
     }
 
-    let placements = available_nodes
-        .choose_multiple(&mut OsRng, 3)
-        .map(|node| Placement {
-            node: node.clone(),
+    let mut placements = vec![];
+
+    if let Some(req) = required_node {
+        let pos = available_nodes
+            .iter()
+            .position(|n| n.node_id == req || n.host_id == req)
+            .ok_or_else(|| {
+                AntArchiveError::BadRequest(format!(
+                    "required storage node '{req}' not found or has no capacity"
+                ))
+            })?;
+        let required = available_nodes.remove(pos);
+        placements.push(Placement {
+            node: required,
             role: PlacementRole::Replication,
-        })
-        .collect::<Vec<_>>();
+        });
+        for node in available_nodes.choose_multiple(&mut OsRng, 2) {
+            placements.push(Placement {
+                node: node.clone(),
+                role: PlacementRole::Replication,
+            });
+        }
+    } else {
+        for node in available_nodes.choose_multiple(&mut OsRng, 3) {
+            placements.push(Placement {
+                node: node.clone(),
+                role: PlacementRole::Replication,
+            });
+        }
+    }
+
+    if placements.is_empty() {
+        return Err(AntArchiveError::InsufficientStorage);
+    }
 
     Ok(placements)
 }
