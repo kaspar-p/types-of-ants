@@ -12,10 +12,11 @@ pub mod fixture;
 #[traced_test]
 async fn put_object_returns_401_missing_bearer_token() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/my-key", fixture.bucket_id))
+        .put(&format!("/o/{}/my-key", ids.private_id))
         .body(b"data".as_slice())
         .send()
         .await;
@@ -26,10 +27,11 @@ async fn put_object_returns_401_missing_bearer_token() {
 #[traced_test]
 async fn put_object_returns_401_invalid_bearer_token() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/my-key", fixture.bucket_id))
+        .put(&format!("/o/{}/my-key", ids.private_id))
         .header("Authorization", "Bearer wrong-token")
         .body(b"data".as_slice())
         .send()
@@ -44,7 +46,7 @@ async fn put_object_returns_404_bucket_not_found() {
 
     let res = fixture
         .client
-        .put("/b-nonexistent/my-key")
+        .put("/o/b-nonexistent/my-key")
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"data".as_slice())
         .send()
@@ -56,10 +58,11 @@ async fn put_object_returns_404_bucket_not_found() {
 #[traced_test]
 async fn put_object_returns_201_success() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/my-key", fixture.bucket_id))
+        .put(&format!("/o/{}/my-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"hello world".as_slice())
         .send()
@@ -71,10 +74,11 @@ async fn put_object_returns_201_success() {
 #[traced_test]
 async fn put_object_returns_201_nested_key() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/schemas/anthill.toml", fixture.bucket_id))
+        .put(&format!("/o/{}/schemas/anthill.toml", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"schema content".as_slice())
         .send()
@@ -86,10 +90,11 @@ async fn put_object_returns_201_nested_key() {
 #[traced_test]
 async fn get_object_returns_404_missing_key() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .get(&format!("/{}/never-written", fixture.bucket_id))
+        .get(&format!("/o/{}/never-written", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -100,12 +105,13 @@ async fn get_object_returns_404_missing_key() {
 #[traced_test]
 async fn get_object_returns_200_round_trip() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let payload = b"the quick brown fox";
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/round-trip", fixture.bucket_id))
+            .put(&format!("/o/{}/round-trip", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(payload.as_slice())
             .send()
@@ -116,7 +122,7 @@ async fn get_object_returns_200_round_trip() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/round-trip", fixture.bucket_id))
+            .get(&format!("/o/{}/round-trip", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -129,12 +135,13 @@ async fn get_object_returns_200_round_trip() {
 #[traced_test]
 async fn get_object_returns_200_nested_key_round_trip() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let payload = b"nested object";
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/a/b/c/file.bin", fixture.bucket_id))
+            .put(&format!("/o/{}/a/b/c/file.bin", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(payload.as_slice())
             .send()
@@ -145,7 +152,7 @@ async fn get_object_returns_200_nested_key_round_trip() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/a/b/c/file.bin", fixture.bucket_id))
+            .get(&format!("/o/{}/a/b/c/file.bin", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -158,12 +165,13 @@ async fn get_object_returns_200_nested_key_round_trip() {
 #[traced_test]
 async fn get_object_returns_200_public_bucket_no_auth() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let payload = b"public data";
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/pub-key", fixture.public_bucket_id))
+            .put(&format!("/o/{}/pub-key", ids.public_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(payload.as_slice())
             .send()
@@ -174,7 +182,7 @@ async fn get_object_returns_200_public_bucket_no_auth() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/pub-key", fixture.public_bucket_id))
+            .get(&format!("/o/{}/pub-key", ids.public_id))
             .send()
             .await;
         assert_eq!(res.status(), StatusCode::OK);
@@ -186,12 +194,13 @@ async fn get_object_returns_200_public_bucket_no_auth() {
 #[traced_test]
 async fn get_object_returns_200_internal_bucket_with_valid_token() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let payload = b"internal data";
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/int-key", fixture.internal_bucket_id))
+            .put(&format!("/o/{}/int-key", ids.internal_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(payload.as_slice())
             .send()
@@ -202,7 +211,7 @@ async fn get_object_returns_200_internal_bucket_with_valid_token() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/int-key", fixture.internal_bucket_id))
+            .get(&format!("/o/{}/int-key", ids.internal_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -214,11 +223,12 @@ async fn get_object_returns_200_internal_bucket_with_valid_token() {
 #[traced_test]
 async fn get_object_returns_401_internal_bucket_no_auth() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/int-key", fixture.internal_bucket_id))
+            .put(&format!("/o/{}/int-key", ids.internal_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(b"data".as_slice())
             .send()
@@ -229,7 +239,7 @@ async fn get_object_returns_401_internal_bucket_no_auth() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/int-key", fixture.internal_bucket_id))
+            .get(&format!("/o/{}/int-key", ids.internal_id))
             .send()
             .await;
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
@@ -240,11 +250,12 @@ async fn get_object_returns_401_internal_bucket_no_auth() {
 #[traced_test]
 async fn get_object_returns_404_private_bucket_no_auth() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/priv-key", fixture.bucket_id))
+            .put(&format!("/o/{}/priv-key", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(b"data".as_slice())
             .send()
@@ -256,7 +267,7 @@ async fn get_object_returns_404_private_bucket_no_auth() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/priv-key", fixture.bucket_id))
+            .get(&format!("/o/{}/priv-key", ids.private_id))
             .send()
             .await;
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
@@ -267,11 +278,12 @@ async fn get_object_returns_404_private_bucket_no_auth() {
 #[traced_test]
 async fn delete_object_returns_200_success() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/to-delete", fixture.bucket_id))
+            .put(&format!("/o/{}/to-delete", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(b"ephemeral".as_slice())
             .send()
@@ -282,7 +294,7 @@ async fn delete_object_returns_200_success() {
     {
         let res = fixture
             .client
-            .delete(&format!("/{}/to-delete", fixture.bucket_id))
+            .delete(&format!("/o/{}/to-delete", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -294,10 +306,11 @@ async fn delete_object_returns_200_success() {
 #[traced_test]
 async fn delete_object_returns_404_missing_key() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .delete(&format!("/{}/nonexistent", fixture.bucket_id))
+        .delete(&format!("/o/{}/nonexistent", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -308,11 +321,12 @@ async fn delete_object_returns_404_missing_key() {
 #[traced_test]
 async fn get_object_returns_404_after_delete() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/transient", fixture.bucket_id))
+            .put(&format!("/o/{}/transient", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(b"bye".as_slice())
             .send()
@@ -323,7 +337,7 @@ async fn get_object_returns_404_after_delete() {
     {
         let res = fixture
             .client
-            .delete(&format!("/{}/transient", fixture.bucket_id))
+            .delete(&format!("/o/{}/transient", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -333,7 +347,7 @@ async fn get_object_returns_404_after_delete() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/transient", fixture.bucket_id))
+            .get(&format!("/o/{}/transient", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -345,13 +359,14 @@ async fn get_object_returns_404_after_delete() {
 #[traced_test]
 async fn put_object_returns_201_overwrites_existing() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let original = b"original content";
     let updated = b"updated content";
 
     {
         let res = fixture
             .client
-            .put(&format!("/{}/overwrite-key", fixture.bucket_id))
+            .put(&format!("/o/{}/overwrite-key", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(original.as_slice())
             .send()
@@ -362,7 +377,7 @@ async fn put_object_returns_201_overwrites_existing() {
     {
         let res = fixture
             .client
-            .put(&format!("/{}/overwrite-key", fixture.bucket_id))
+            .put(&format!("/o/{}/overwrite-key", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .body(updated.as_slice())
             .send()
@@ -373,7 +388,7 @@ async fn put_object_returns_201_overwrites_existing() {
     {
         let res = fixture
             .client
-            .get(&format!("/{}/overwrite-key", fixture.bucket_id))
+            .get(&format!("/o/{}/overwrite-key", ids.private_id))
             .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
             .send()
             .await;
@@ -386,10 +401,11 @@ async fn put_object_returns_201_overwrites_existing() {
 #[traced_test]
 async fn put_object_returns_507_when_no_nodes_have_capacity() {
     let fixture = Fixture::new_with_capacity(function_name!(), 0).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/any-key", fixture.bucket_id))
+        .put(&format!("/o/{}/any-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"hello".as_slice())
         .send()
@@ -402,10 +418,11 @@ async fn put_object_returns_507_when_no_nodes_have_capacity() {
 #[traced_test]
 async fn upsert_placement_stores_all_replicas() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/placement-test", fixture.bucket_id))
+        .put(&format!("/o/{}/placement-test", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"data".as_slice())
         .send()
@@ -414,7 +431,7 @@ async fn upsert_placement_stores_all_replicas() {
 
     let obj = fixture
         .db
-        .get_object(&fixture.bucket_id, "placement-test")
+        .get_object(&ids.private_id, "placement-test")
         .await
         .unwrap()
         .unwrap();
@@ -433,10 +450,11 @@ async fn upsert_placement_stores_all_replicas() {
 #[traced_test]
 async fn put_object_capacity_check_uses_consistent_size_units() {
     let fixture = Fixture::new_with_capacity(function_name!(), 120).await;
+    let ids = fixture.bucket_ids().await;
 
     let res1 = fixture
         .client
-        .put(&format!("/{}/obj-a", fixture.bucket_id))
+        .put(&format!("/o/{}/obj-a", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"12345678901234567890123456789012345678901234567890".as_slice())
         .send()
@@ -445,7 +463,7 @@ async fn put_object_capacity_check_uses_consistent_size_units() {
 
     let res2 = fixture
         .client
-        .put(&format!("/{}/obj-b", fixture.bucket_id))
+        .put(&format!("/o/{}/obj-b", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"12345678901234567890123456789012345678901234567890".as_slice())
         .send()
@@ -454,7 +472,7 @@ async fn put_object_capacity_check_uses_consistent_size_units() {
 
     let get_res = fixture
         .client
-        .get(&format!("/{}/obj-b", fixture.bucket_id))
+        .get(&format!("/o/{}/obj-b", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -465,10 +483,11 @@ async fn put_object_capacity_check_uses_consistent_size_units() {
 #[traced_test]
 async fn bytes_stored_excludes_soft_deleted_objects() {
     let fixture = Fixture::new_with_capacity(function_name!(), 55).await;
+    let ids = fixture.bucket_ids().await;
 
     let res1 = fixture
         .client
-        .put(&format!("/{}/obj-to-delete", fixture.bucket_id))
+        .put(&format!("/o/{}/obj-to-delete", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"12345678901234567890123456789012345678901234567890".as_slice())
         .send()
@@ -477,7 +496,7 @@ async fn bytes_stored_excludes_soft_deleted_objects() {
 
     let del = fixture
         .client
-        .delete(&format!("/{}/obj-to-delete", fixture.bucket_id))
+        .delete(&format!("/o/{}/obj-to-delete", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -485,7 +504,7 @@ async fn bytes_stored_excludes_soft_deleted_objects() {
 
     let res2 = fixture
         .client
-        .put(&format!("/{}/new-obj", fixture.bucket_id))
+        .put(&format!("/o/{}/new-obj", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"0123456789".as_slice())
         .send()
@@ -494,7 +513,7 @@ async fn bytes_stored_excludes_soft_deleted_objects() {
 
     let get_res = fixture
         .client
-        .get(&format!("/{}/new-obj", fixture.bucket_id))
+        .get(&format!("/o/{}/new-obj", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -506,10 +525,11 @@ async fn bytes_stored_excludes_soft_deleted_objects() {
 #[traced_test]
 async fn delete_object_returns_500_when_storage_node_unreachable() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/to-leak", fixture.bucket_id))
+        .put(&format!("/o/{}/to-leak", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(b"sensitive data".as_slice())
         .send()
@@ -525,7 +545,7 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
 
     let del = fixture
         .client
-        .delete(&format!("/{}/to-leak", fixture.bucket_id))
+        .delete(&format!("/o/{}/to-leak", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -537,11 +557,12 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
 #[traced_test]
 async fn get_object_returns_200_with_replica_failover() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
     let payload = b"failover-payload";
 
     let res = fixture
         .client
-        .put(&format!("/{}/failover-key", fixture.bucket_id))
+        .put(&format!("/o/{}/failover-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .body(payload.as_slice())
         .send()
@@ -550,7 +571,7 @@ async fn get_object_returns_200_with_replica_failover() {
 
     let obj = fixture
         .db
-        .get_object(&fixture.bucket_id, "failover-key")
+        .get_object(&ids.private_id, "failover-key")
         .await
         .unwrap()
         .unwrap();
@@ -575,7 +596,7 @@ async fn get_object_returns_200_with_replica_failover() {
 
     let res = fixture
         .client
-        .get(&format!("/{}/failover-key", fixture.bucket_id))
+        .get(&format!("/o/{}/failover-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .send()
         .await;
@@ -587,10 +608,11 @@ async fn get_object_returns_200_with_replica_failover() {
 #[traced_test]
 async fn put_object_returns_400_when_required_node_unknown() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/any-key", fixture.bucket_id))
+        .put(&format!("/o/{}/any-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .header("X-Ant-Capability-Can-Select-Storage-Node", "nonexistent-node")
         .body(b"data".as_slice())
@@ -603,10 +625,11 @@ async fn put_object_returns_400_when_required_node_unknown() {
 #[traced_test]
 async fn put_object_places_on_requested_node() {
     let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/{}/pinned-key", fixture.bucket_id))
+        .put(&format!("/o/{}/pinned-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
         .header("X-Ant-Capability-Can-Select-Storage-Node", "sn-test")
         .body(b"data".as_slice())
@@ -616,10 +639,33 @@ async fn put_object_places_on_requested_node() {
 
     let obj = fixture
         .db
-        .get_object(&fixture.bucket_id, "pinned-key")
+        .get_object(&ids.private_id, "pinned-key")
         .await
         .unwrap()
         .unwrap();
     let placements = fixture.db.get_placements(&obj.object_id).await.unwrap();
     assert!(placements.iter().any(|p| p.storage_node_id == "sn-test"));
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_buckets_returns_401_missing_bearer_token() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    let res = fixture.client.get("/buckets").send().await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_buckets_returns_200_with_client_buckets() {
+    let fixture = Fixture::new(function_name!()).await;
+
+    let ids = fixture.bucket_ids().await;
+    assert!(!ids.private_id.is_empty());
+    assert!(!ids.internal_id.is_empty());
+    assert!(!ids.public_id.is_empty());
+    assert_ne!(ids.private_id, ids.internal_id);
+    assert_ne!(ids.private_id, ids.public_id);
+    assert_ne!(ids.internal_id, ids.public_id);
 }

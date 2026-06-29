@@ -5,6 +5,8 @@ use std::{
     sync::Arc,
 };
 
+use serde::Deserialize;
+
 use ant_archive::{make_routes, AntArchiveDb, AntArchiveState};
 use ant_archive_db::ClientCapabilities;
 use ant_archive_storage::{
@@ -22,9 +24,34 @@ use tokio::{net::TcpListener, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
 const TEST_KEK_ID: &str = "kek-test";
-pub const TEST_BUCKET_ID: &str = "b-testbucket";
-pub const TEST_PUBLIC_BUCKET_ID: &str = "b-testpublic";
-pub const TEST_INTERNAL_BUCKET_ID: &str = "b-testinternal";
+const TEST_BUCKET_ID: &str = "b-testbucket";
+const TEST_PUBLIC_BUCKET_ID: &str = "b-testpublic";
+const TEST_INTERNAL_BUCKET_ID: &str = "b-testinternal";
+
+pub struct BucketIds {
+    pub private_id: String,
+    pub public_id: String,
+    pub internal_id: String,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum Visibility {
+    Public,
+    Internal,
+    Private,
+}
+
+#[derive(Deserialize)]
+struct Bucket {
+    bucket_id: String,
+    visibility: Visibility,
+}
+
+#[derive(Deserialize)]
+struct BucketList {
+    buckets: Vec<Bucket>,
+}
 
 // The Consul node name used by ConsulFixture.
 const CONSUL_NODE_NAME: &str = "test-node1";
@@ -76,9 +103,6 @@ impl StorageNode {
 pub struct Fixture {
     pub client: TestClient,
     pub bearer_token: String,
-    pub bucket_id: String,
-    pub public_bucket_id: String,
-    pub internal_bucket_id: String,
     pub db: AntArchiveDb,
     pub sd: Arc<ServiceDiscovery>,
     pub consul_port: u16,
@@ -90,6 +114,31 @@ pub struct Fixture {
 impl Fixture {
     pub async fn new(name: &str) -> Self {
         Self::new_with_capacity(name, 1024 * 1024 * 1024).await
+    }
+
+    pub async fn bucket_ids(&self) -> BucketIds {
+        let body: BucketList = self
+            .client
+            .get("/buckets")
+            .header("Authorization", &format!("Bearer {}", self.bearer_token))
+            .send()
+            .await
+            .json()
+            .await;
+
+        let find = |v: Visibility| {
+            body.buckets
+                .iter()
+                .find(|b| b.visibility == v)
+                .map(|b| b.bucket_id.clone())
+                .unwrap_or_else(|| panic!("no {:?} bucket found", stringify!(v)))
+        };
+
+        BucketIds {
+            private_id: find(Visibility::Private),
+            public_id: find(Visibility::Public),
+            internal_id: find(Visibility::Internal),
+        }
     }
 
     pub async fn new_with_capacity(name: &str, capacity_bytes: i64) -> Self {
@@ -127,9 +176,6 @@ impl Fixture {
         Fixture {
             client: TestClient::new(app).await,
             bearer_token: TEST_BEARER_TOKEN.to_string(),
-            bucket_id: TEST_BUCKET_ID.to_string(),
-            public_bucket_id: TEST_PUBLIC_BUCKET_ID.to_string(),
-            internal_bucket_id: TEST_INTERNAL_BUCKET_ID.to_string(),
             db: archive_db,
             sd,
             consul_port: consul.port(),

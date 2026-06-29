@@ -22,7 +22,7 @@ test can't be made to fail, fix the testing infrastructure first.
 
 ## Naming
 
-Never suffix types with `Info`, `Data`, `Details`, or `Object`. If it's a Job,
+Never suffix types with `Info`, `Data`, `Details`, `Item`, or `Object`. If it's a Job,
 call it `Job`. If it's a Pipeline, call it `Pipeline`. The type IS the thing.
 
 ## Comments

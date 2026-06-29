@@ -126,7 +126,7 @@ where
     // axum rejects.
     fn register(mut self, path: &'static str, method_router: MethodRouter<S>) -> Self {
         let is_catch_all = path.contains("{*");
-        if is_catch_all || self.paths.contains(path) {
+        if is_catch_all || path == "/" || self.paths.contains(path) {
             self.router = self.router.route(path, method_router);
         } else {
             use axum_extra::routing::RouterExt;

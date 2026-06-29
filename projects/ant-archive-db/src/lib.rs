@@ -413,6 +413,31 @@ impl AntArchiveDb {
         Ok(())
     }
 
+    pub async fn list_buckets_for_client(
+        &self,
+        client_id: &str,
+    ) -> Result<Vec<ArchiveBucket>, AntArchiveDbError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "SELECT bucket_id, client_id, read_policy::text
+                 FROM archive_bucket WHERE client_id = $1 ORDER BY bucket_id ASC",
+                &[&client_id],
+            )
+            .await?;
+
+        Ok(rows
+            .iter()
+            .map(|r| ArchiveBucket {
+                bucket_id: r.get("bucket_id"),
+                client_id: r.get("client_id"),
+                read_policy: r.get("read_policy"),
+            })
+            .collect())
+    }
+
     pub async fn soft_delete_object(
         &self,
         bucket_id: &str,
