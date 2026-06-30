@@ -190,7 +190,7 @@ async fn seed_db(db: &AntArchiveDb, capacity_bytes: i64) {
     db.register_kek(TEST_KEK_ID).await.unwrap();
 
     // host_id matches the Consul node name so resolve_storage_nodes can find it.
-    db.register_storage_node("sn-test", CONSUL_NODE_NAME, capacity_bytes)
+    db.register_storage_node("sn-test", CONSUL_NODE_NAME, capacity_bytes, "http")
         .await
         .unwrap();
     let client_id = db
@@ -199,7 +199,9 @@ async fn seed_db(db: &AntArchiveDb, capacity_bytes: i64) {
         .unwrap();
     db.set_client_capabilities(
         &client_id,
-        &ClientCapabilities { can_select_storage_node: true },
+        &ClientCapabilities {
+            can_select_storage_node: true,
+        },
     )
     .await
     .unwrap();

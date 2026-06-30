@@ -48,11 +48,11 @@ pub async fn resolve_storage_nodes(
             "No credentials for node: {}",
             ep.node
         )))?;
-        if let Some(node_id) = state.db.get_storage_node_by_node_name(&ep.node).await? {
+        if let Some((node_id, protocol)) = state.db.get_storage_node_by_node_name(&ep.node).await? {
             clients.push(AntArchiveStorageNodeClient::new(
                 node_id,
                 ep.node.clone(),
-                format!("http://{}:{}", ep.address, ep.port),
+                format!("{protocol}://{}:{}", ep.address, ep.port),
                 username,
                 password,
             ));

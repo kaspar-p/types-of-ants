@@ -61,8 +61,6 @@ impl ServiceDiscovery {
         service: &str,
         index: Option<u64>,
     ) -> Result<u64, ConsulError> {
-        info!("Fetching remote endpoints of [{}]", service);
-
         let nodes = consul
             .get_service_nodes(
                 GetServiceNodesRequest {

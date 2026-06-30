@@ -74,7 +74,10 @@ impl AntArchiveDb {
         Ok(Self { pool })
     }
 
-    pub async fn authenticate_bearer(&self, token: &str) -> Result<Option<(String, ClientCapabilities)>, AntArchiveDbError> {
+    pub async fn authenticate_bearer(
+        &self,
+        token: &str,
+    ) -> Result<Option<(String, ClientCapabilities)>, AntArchiveDbError> {
         let hash = ant_library::crypto::make_token_hash(token);
 
         let row = self
@@ -87,13 +90,21 @@ impl AntArchiveDb {
             )
             .await?;
 
-        Ok(row.map(|r| (
-            r.get("client_id"),
-            ClientCapabilities { can_select_storage_node: r.get("capability_can_select_storage_node") },
-        )))
+        Ok(row.map(|r| {
+            (
+                r.get("client_id"),
+                ClientCapabilities {
+                    can_select_storage_node: r.get("capability_can_select_storage_node"),
+                },
+            )
+        }))
     }
 
-    pub async fn set_client_capabilities(&self, client_id: &str, capabilities: &ClientCapabilities) -> Result<(), AntArchiveDbError> {
+    pub async fn set_client_capabilities(
+        &self,
+        client_id: &str,
+        capabilities: &ClientCapabilities,
+    ) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
             .await?
@@ -150,21 +161,28 @@ impl AntArchiveDb {
         Ok(row.map(|r| (r.get("host_id"), r.get("capacity_bytes"))))
     }
 
+    /// Returns (node_id, protocol)
+    /// where protocol is like 'http' or 'https' or something.
     pub async fn get_storage_node_by_node_name(
         &self,
         node_name: &str,
-    ) -> Result<Option<String>, AntArchiveDbError> {
+    ) -> Result<Option<(String, String)>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
             .await?
             .query_opt(
-                "SELECT storage_node_id FROM archive_storage_node
-                 WHERE host_id = $1 AND is_active = true",
+                "
+                select storage_node_id, protocol
+                from archive_storage_node
+                where
+                    host_id = $1 and
+                    is_active = true
+                ",
                 &[&node_name],
             )
             .await?;
-        Ok(row.map(|r| r.get("storage_node_id")))
+        Ok(row.map(|r| (r.get("storage_node_id"), r.get("protocol"))))
     }
 
     pub async fn get_active_kek_id(&self) -> Result<Option<String>, AntArchiveDbError> {
@@ -240,7 +258,10 @@ impl AntArchiveDb {
             .collect())
     }
 
-    pub async fn bytes_stored_on_node(&self, storage_node_id: &str) -> Result<i64, AntArchiveDbError> {
+    pub async fn bytes_stored_on_node(
+        &self,
+        storage_node_id: &str,
+    ) -> Result<i64, AntArchiveDbError> {
         let bytes_stored = self
             .pool
             .get()
@@ -354,6 +375,7 @@ impl AntArchiveDb {
         storage_node_id: &str,
         host_id: &str,
         capacity_bytes: i64,
+        protocol: &str,
     ) -> Result<(), AntArchiveDbError> {
         self.pool
             .get()
@@ -361,17 +383,21 @@ impl AntArchiveDb {
             .execute(
                 "
                 insert into archive_storage_node
-                    (storage_node_id, host_id, capacity_bytes, is_active)
+                    (storage_node_id, host_id, capacity_bytes, protocol, is_active)
                 values
-                    ($1, $2, $3, true)
+                    ($1, $2, $3, $4, true)
                 ",
-                &[&storage_node_id, &host_id, &capacity_bytes],
+                &[&storage_node_id, &host_id, &capacity_bytes, &protocol],
             )
             .await?;
         Ok(())
     }
 
-    pub async fn create_client(&self, name: &str, token: &str) -> Result<String, AntArchiveDbError> {
+    pub async fn create_client(
+        &self,
+        name: &str,
+        token: &str,
+    ) -> Result<String, AntArchiveDbError> {
         let token_hash = ant_library::crypto::make_token_hash(token);
 
         let client_id = self
