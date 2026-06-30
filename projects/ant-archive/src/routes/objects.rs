@@ -418,13 +418,15 @@ async fn get_object(
     let storage_nodes = resolve_storage_nodes(&state).await?;
 
     let mut stored_bytes_opt: Option<Vec<u8>> = None;
-    for placement in &placements {
+    for (idx, placement) in placements.iter().enumerate() {
         let Some(storage_node) = storage_nodes
             .iter()
             .find(|n| n.node_id == placement.storage_node_id)
         else {
             continue;
         };
+
+        info!("Reading object: idx={idx} node={}", storage_node.node_id);
         let Some(bytes) = storage_node.get(&placement.storage_key).await? else {
             error!(
                 node_id = %placement.storage_node_id,
@@ -433,6 +435,7 @@ async fn get_object(
             );
             continue;
         };
+
         if compute_checksum(&bytes) != placement.object_checksum {
             error!(
                 node_id = %placement.storage_node_id,
