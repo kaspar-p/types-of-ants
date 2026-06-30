@@ -426,7 +426,10 @@ async fn get_object(
             continue;
         };
 
-        info!("Reading object: idx={idx} node={}", storage_node.node_id);
+        info!(
+            "Reading object: idx={idx} node={} host={}",
+            storage_node.node_id, storage_node.host_id
+        );
         let Some(bytes) = storage_node.get(&placement.storage_key).await? else {
             error!(
                 node_id = %placement.storage_node_id,
