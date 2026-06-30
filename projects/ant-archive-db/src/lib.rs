@@ -34,6 +34,7 @@ pub struct ArchiveBucket {
 pub struct ArchiveObject {
     pub object_id: String,
     pub kek_id: String,
+    pub kek_alias: Option<String>,
     pub size_bytes: i64,
     pub encrypted_dek: Vec<u8>,
     pub dek_nonce: Vec<u8>,
@@ -185,18 +186,27 @@ impl AntArchiveDb {
         Ok(row.map(|r| (r.get("storage_node_id"), r.get("protocol"))))
     }
 
-    pub async fn get_active_kek_id(&self) -> Result<Option<String>, AntArchiveDbError> {
+    /// Returns (kek_id, alias) where alias is the human-readable string
+    pub async fn get_active_kek(
+        &self,
+    ) -> Result<Option<(String, Option<String>)>, AntArchiveDbError> {
         let row = self
             .pool
             .get()
             .await?
             .query_opt(
-                "SELECT kek_id FROM archive_kek_version WHERE is_active = true LIMIT 1",
+                "
+                select kek_id, alias
+                from archive_kek_version
+                where
+                    is_active = true
+                order by created_at desc
+                limit 1",
                 &[],
             )
             .await?;
 
-        Ok(row.map(|r| r.get("kek_id")))
+        Ok(row.map(|r| (r.get("kek_id"), r.get("alias"))))
     }
 
     pub async fn get_object(
@@ -210,12 +220,13 @@ impl AntArchiveDb {
             .await?
             .query_opt(
                 "
-                select object_id, kek_id, size_bytes, encrypted_dek, dek_nonce, tek_derivation_key
-                from archive_object
+                select object_id, o.kek_id, k.alias, size_bytes, encrypted_dek, dek_nonce, tek_derivation_key
+                from archive_object o
+                    join archive_kek_version k on o.kek_id = k.kek_id
                 where
-                    bucket_id = $1 and
-                    key = $2 and
-                    deleted_at is null
+                    o.bucket_id = $1 and
+                    o.key = $2 and
+                    o.deleted_at is null
                 ",
                 &[&bucket_id, &key],
             )
@@ -224,6 +235,7 @@ impl AntArchiveDb {
         Ok(row.map(|r| ArchiveObject {
             object_id: r.get("object_id"),
             kek_id: r.get("kek_id"),
+            kek_alias: r.get("alias"),
             size_bytes: r.get("size_bytes"),
             encrypted_dek: r.get("encrypted_dek"),
             dek_nonce: r.get("dek_nonce"),
@@ -353,21 +365,25 @@ impl AntArchiveDb {
         Ok(())
     }
 
-    pub async fn register_kek(&self, kek_id: &str) -> Result<(), AntArchiveDbError> {
-        self.pool
+    pub async fn register_kek(&self, alias: &str) -> Result<String, AntArchiveDbError> {
+        let kek_id = self
+            .pool
             .get()
             .await?
-            .execute(
+            .query_one(
                 "
                 insert into archive_kek_version
-                    (kek_id, is_active)
+                    (alias, is_active)
                 values
                     ($1, true)
+                returning kek_id
                 ",
-                &[&kek_id],
+                &[&alias],
             )
-            .await?;
-        Ok(())
+            .await?
+            .get("kek_id");
+
+        Ok(kek_id)
     }
 
     pub async fn register_storage_node(

@@ -23,7 +23,6 @@ use ant_library_test::{
 use tokio::{net::TcpListener, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
-const TEST_KEK_ID: &str = "kek-test";
 const TEST_BUCKET_ID: &str = "b-testbucket";
 const TEST_PUBLIC_BUCKET_ID: &str = "b-testpublic";
 const TEST_INTERNAL_BUCKET_ID: &str = "b-testinternal";
@@ -187,7 +186,7 @@ impl Fixture {
 }
 
 async fn seed_db(db: &AntArchiveDb, capacity_bytes: i64) {
-    db.register_kek(TEST_KEK_ID).await.unwrap();
+    db.register_kek("default").await.unwrap();
 
     // host_id matches the Consul node name so resolve_storage_nodes can find it.
     db.register_storage_node("sn-test", CONSUL_NODE_NAME, capacity_bytes, "http")
