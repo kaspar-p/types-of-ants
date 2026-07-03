@@ -37,6 +37,15 @@ fn secret_name_no_extension(name: &str) -> String {
     return name.to_string();
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SecretError {
+    #[error("Failed to get secret: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Secret not found at any of: {candidates:?}")]
+    SecretNotFound { candidates: Vec<PathBuf> },
+}
+
 /// Return the filepath to a secret, useful if you don't want to read the secret content but you still
 /// need to refer to the secret. For example, ant-host-agent needs this to replicate secrets down to
 /// the deployed services.
@@ -47,12 +56,12 @@ fn find_secret(secret: &str, secret_dir: Option<PathBuf>) -> Vec<PathBuf> {
         )
     });
 
-    let path = vec![
+    let paths = vec![
         secret_dir.join(secret_name(secret)),
         secret_dir.join(secret_name_no_extension(secret)),
     ];
 
-    path
+    paths
 }
 
 /// Load a secret from the secret directory wherever it's configured. It must be the case that
@@ -67,7 +76,7 @@ fn find_secret(secret: &str, secret_dir: Option<PathBuf>) -> Vec<PathBuf> {
 /// let secret_key: Vec<u8> = load_secret("my-secret_key")
 /// ```
 /// will read the file $TYPESOFANTS_SECRET_DIR/secret_key.secret
-pub fn load_secret_binary(secret: &str) -> Result<Vec<u8>, anyhow::Error> {
+pub fn load_secret_binary(secret: &str) -> Result<Vec<u8>, SecretError> {
     let paths = find_secret(secret, None);
 
     for path in &paths {
@@ -76,19 +85,10 @@ pub fn load_secret_binary(secret: &str) -> Result<Vec<u8>, anyhow::Error> {
         }
 
         debug!("Reading secret: {}", path.display());
-        let secret_content = std::fs::read(&path)
-            .map_err(|e| anyhow::Error::from(e).context(path.to_str().unwrap().to_string()))?;
+        let secret_content = std::fs::read(&path)?;
 
         return Ok(secret_content);
     }
 
-    let candidates = paths
-        .iter()
-        .map(|p| p.to_str().unwrap())
-        .collect::<Vec<&str>>()
-        .join(", ");
-
-    return Err(anyhow::anyhow!(
-        "No secret found at candidates: {candidates}"
-    ));
+    return Err(SecretError::SecretNotFound { candidates: paths });
 }
