@@ -21,9 +21,9 @@ use axum_extra::{
     headers::{authorization::Basic, Authorization},
     TypedHeader,
 };
-use http::request::Parts;
 use axum_prometheus::PrometheusMetricLayer;
 use base64ct::{Base64, Encoding};
+use http::request::Parts;
 use http::{header, StatusCode};
 use http_body_util::BodyExt;
 use sha2::{Digest, Sha256};

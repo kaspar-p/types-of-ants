@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use rand::{rngs::OsRng, seq::SliceRandom};
+use tracing::{debug, info, warn};
 
 use crate::{storage_client::AntArchiveStorageNodeClient, AntArchiveError, AntArchiveState};
 
@@ -56,35 +57,47 @@ pub async fn resolve_storage_nodes(
                 username,
                 password,
             ));
+        } else {
+            warn!(
+                "Failed to associate [{}] with any host_id of a storage node!",
+                ep.node
+            )
         }
     }
 
     Ok(clients)
 }
 
+#[derive(Clone)]
 pub(crate) struct Placement {
     pub node: AntArchiveStorageNodeClient,
     pub role: PlacementRole,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum PlacementRole {
     Replication,
     ErrorCorrection(ErrorCorrectionRole),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ErrorCorrectionRole {
     Data,
     Parity,
 }
 
-pub(crate) async fn place_new_object(
+#[tracing::instrument(skip(state))]
+async fn calculate_placement(
     state: &AntArchiveState,
+    num_placements_to_find: usize,
+
     new_object_size_bytes: i64,
     required_node: Option<&str>,
+    disqualified: &[String],
 ) -> Result<Vec<Placement>, AntArchiveError> {
     let storage_nodes = resolve_storage_nodes(&state).await?;
+
+    let mut placements = vec![];
 
     let mut available_nodes = vec![];
     for node in storage_nodes {
@@ -95,35 +108,27 @@ pub(crate) async fn place_new_object(
             .expect("storage node not found");
         let bytes_stored = state.db.bytes_stored_on_node(&node.node_id).await?;
 
+        if let Some(req) = &required_node {
+            if *req == node.host_id || *req == node.node_id {
+                info!("Forcing the use of {} {}", node.host_id, node.node_id);
+                placements.push(Placement {
+                    node: node,
+                    role: PlacementRole::Replication,
+                });
+                continue;
+            }
+        }
+
         if bytes_stored + new_object_size_bytes <= capacity_bytes {
             available_nodes.push(node);
         }
     }
 
-    let mut placements = vec![];
-
-    if let Some(req) = required_node {
-        let pos = available_nodes
-            .iter()
-            .position(|n| n.node_id == req || n.host_id == req)
-            .ok_or_else(|| {
-                AntArchiveError::BadRequest(format!(
-                    "required storage node '{req}' not found or has no capacity"
-                ))
-            })?;
-        let required = available_nodes.remove(pos);
-        placements.push(Placement {
-            node: required,
-            role: PlacementRole::Replication,
-        });
-        for node in available_nodes.choose_multiple(&mut OsRng, 2) {
-            placements.push(Placement {
-                node: node.clone(),
-                role: PlacementRole::Replication,
-            });
-        }
-    } else {
-        for node in available_nodes.choose_multiple(&mut OsRng, 3) {
+    // Choose 3, but placements might have required_node in it already.
+    let to_choose = num_placements_to_find - placements.len();
+    if to_choose > 0 {
+        info!("Choosing {to_choose} placements randomly...");
+        for node in available_nodes.choose_multiple(&mut OsRng, to_choose) {
             placements.push(Placement {
                 node: node.clone(),
                 role: PlacementRole::Replication,
@@ -136,4 +141,36 @@ pub(crate) async fn place_new_object(
     }
 
     Ok(placements)
+}
+
+pub(crate) const NUM_REPLICATION: usize = 3;
+
+#[tracing::instrument(skip(state))]
+pub(crate) async fn place_new_object(
+    state: &AntArchiveState,
+    new_object_size_bytes: i64,
+    required_node: Option<&str>,
+) -> Result<Vec<Placement>, AntArchiveError> {
+    return calculate_placement(
+        state,
+        NUM_REPLICATION,
+        new_object_size_bytes,
+        required_node,
+        &[],
+    )
+    .await;
+}
+
+/// If replication fails to a node, we want to find a replacement that excludes that node
+#[tracing::instrument(skip(state))]
+pub(crate) async fn find_replacement(
+    state: &AntArchiveState,
+    new_object_size_bytes: i64,
+    disqualified: &[String],
+) -> Result<Placement, AntArchiveError> {
+    info!("Finding replacement!");
+    let placement = calculate_placement(state, 1, new_object_size_bytes, None, disqualified)
+        .await?
+        .remove(0);
+    return Ok(placement);
 }

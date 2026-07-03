@@ -89,7 +89,10 @@ async fn try_api_token_authentication(
         .await
         .map_err(|e| {
             error!("Attempting API Token validation failed: {e}");
-            AntOnTheWebError::InternalServerError { id: "ANT-ERR-117", err: Some(e) }
+            AntOnTheWebError::InternalServerError {
+                id: "ANT-ERR-117",
+                err: Some(e),
+            }
         })?;
 
     match user {
@@ -139,7 +142,10 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError { id: "ANT-ERR-118", err: None };
+                return AntOnTheWebError::InternalServerError {
+                    id: "ANT-ERR-118",
+                    err: None,
+                };
             })?;
 
         let cookie = match cookies.get(AUTH_COOKIE_NAME) {
@@ -178,7 +184,10 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to parse cookies: {:?}", e);
-                return AntOnTheWebError::InternalServerError { id: "ANT-ERR-118", err: None };
+                return AntOnTheWebError::InternalServerError {
+                    id: "ANT-ERR-118",
+                    err: None,
+                };
             })?;
 
         let cookie = cookies

@@ -64,10 +64,11 @@ fn handle_throttling_error(err: &GovernorError) -> Response<axum::body::Body> {
             wait_time: _,
             headers: _,
         } => (StatusCode::TOO_MANY_REQUESTS, "Throttling limit reached.").into_response(),
-        err => {
-            AntOnTheWebError::InternalServerError { id: "ANT-ERR-123", err: Some(anyhow::Error::msg(format!("{:?}", err))) }
-                .into_response()
+        err => AntOnTheWebError::InternalServerError {
+            id: "ANT-ERR-123",
+            err: Some(anyhow::Error::msg(format!("{:?}", err))),
         }
+        .into_response(),
     }
 }
 

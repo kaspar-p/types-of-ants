@@ -1,0 +1,10 @@
+{
+  "Datacenter": "typesofants",
+  "Node": "alex01",
+  "Address": "ext-ant-archive-storage.alexycn.ca",
+  "Service": {
+    "ID": "ant-archive-storage-on-alex01",
+    "Service": "ant-archive-storage",
+    "Port": 3253
+  }
+}

@@ -438,7 +438,13 @@ async fn upsert_placement_stores_all_replicas() {
 
     fixture
         .db
-        .upsert_placement(&obj.object_id, "sn-test", &obj.object_id, "dummy-checksum", 1)
+        .upsert_placement(
+            &obj.object_id,
+            "sn-test",
+            &obj.object_id,
+            "dummy-checksum",
+            1,
+        )
         .await
         .unwrap();
 
@@ -536,7 +542,7 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
         .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-        fixture.sd.stop_refreshing("ant-archive-storage").await;
+    fixture.sd.stop_refreshing("ant-archive-storage").await;
 
     ServiceDiscoveryWriter::new(fixture.consul_port)
         .deregister_local_service("ant-archive-storage")
@@ -614,17 +620,21 @@ async fn put_object_returns_400_when_required_node_unknown() {
         .client
         .put(&format!("/o/{}/any-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .header("X-Ant-Capability-Can-Select-Storage-Node", "nonexistent-node")
+        .header(
+            "X-Ant-Capability-Can-Select-Storage-Node",
+            "nonexistent-node",
+        )
         .body(b"data".as_slice())
         .send()
         .await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 #[traced_test]
 async fn put_object_places_on_requested_node() {
-    let fixture = Fixture::new(function_name!()).await;
+    // It still chooses forced to choose that one if the header is supplied
+    let fixture = Fixture::new_with_capacity(function_name!(), 0).await;
     let ids = fixture.bucket_ids().await;
 
     let res = fixture

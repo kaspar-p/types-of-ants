@@ -29,7 +29,10 @@ impl AntZookeeperError {
         match self {
             Self::InternalServerError { id, err } => {
                 error!("ANT-ERR-070: {id}: {:?}", err);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(Self::InternalServerError { id, err }));
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(Self::InternalServerError { id, err }),
+                );
             }
             Self::ResourceNotFound(_) | Self::ValidationError(_) => {
                 debug!("Error: {:?}", self);
@@ -44,7 +47,10 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError { id: "?", err: Some(err.into()) }
+        Self::InternalServerError {
+            id: "?",
+            err: Some(err.into()),
+        }
     }
 }
 

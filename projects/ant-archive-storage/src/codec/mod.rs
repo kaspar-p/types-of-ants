@@ -19,7 +19,9 @@ impl From<CodecError> for AntArchiveStorageError {
     fn from(e: CodecError) -> Self {
         match e {
             CodecError::NotFound(s) => AntArchiveStorageError::NotFound(s),
-            CodecError::Internal(e) => AntArchiveStorageError::InternalServerError("ANT-ERR-113", Some(e)),
+            CodecError::Internal(e) => {
+                AntArchiveStorageError::InternalServerError("ANT-ERR-113", Some(e))
+            }
         }
     }
 }

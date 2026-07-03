@@ -131,7 +131,10 @@ async fn post_backup(
     })?;
 
     if !out.status.success() {
-        error!("ANT-ERR-011: pg_dump failed.\nstdout: {}\nstderr: {}", stdout, stderr);
+        error!(
+            "ANT-ERR-011: pg_dump failed.\nstdout: {}\nstderr: {}",
+            stdout, stderr
+        );
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 

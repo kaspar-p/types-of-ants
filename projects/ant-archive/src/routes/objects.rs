@@ -11,6 +11,7 @@ use axum::{
     Router,
 };
 use base64ct::{Base64, Encoding};
+use bytes::Bytes;
 use hkdf::Hkdf;
 use http::{header, StatusCode};
 use http_body_util::BodyExt;
@@ -18,13 +19,13 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::{
     auth::BearerClaims,
     err::AntArchiveError,
     headers::SelectStorageNode,
-    placement::{self, resolve_storage_nodes},
+    placement::{self, resolve_storage_nodes, Placement},
     state::AntArchiveState,
 };
 
@@ -251,6 +252,42 @@ fn compute_checksum(bytes: &[u8]) -> String {
     base16ct::lower::encode_string(&hash)
 }
 
+async fn try_place_object(
+    state: &AntArchiveState,
+    tek: &[u8; 32],
+    idx: i32,
+    object_id: &str,
+    shared_bytes: Bytes,
+    checksum: &str,
+    placement: &Placement,
+) -> Result<(), AntArchiveError> {
+    info!(
+        "[obj={}] Putting {} bytes to {}",
+        &object_id,
+        shared_bytes.len(),
+        placement.node.node_id,
+    );
+
+    placement
+        .node
+        .put(&object_id, tek, shared_bytes.clone())
+        .await
+        .with_context(|| format!("{}.{:?}", placement.node.node_id, placement.role))?;
+
+    state
+        .db
+        .upsert_placement(
+            &object_id,
+            &placement.node.node_id,
+            &object_id,
+            checksum,
+            idx as i32,
+        )
+        .await?;
+
+    Ok(())
+}
+
 async fn put_object(
     State(state): State<AntArchiveState>,
     Path((bucket_id, key)): Path<(String, String)>,
@@ -311,7 +348,7 @@ async fn put_object(
         encrypt_object(&load_kek(&kek_id, kek_alias.as_deref())?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
-    let placements = placement::place_new_object(
+    let placements: Vec<placement::Placement> = placement::place_new_object(
         &state,
         plaintext_len,
         select_node.as_ref().map(|n| n.0.as_str()),
@@ -337,30 +374,55 @@ async fn put_object(
         placements.len()
     );
     let shared_bytes = bytes::Bytes::from(stored_bytes);
-    for (idx, placement) in placements.iter().enumerate() {
-        info!(
-            "[obj={}] Putting {} bytes to {}",
+
+    // Node IDs that we should not choose as a replacement, if replicating to one fails.
+    // This is 1/ the failed node itself, + 2/ the other nodes. We don't want to choose the
+    // same one twice and end up with lower replication than we intended!
+    let disqualified_node_ids: Vec<String> =
+        placements.iter().map(|p| p.node.node_id.clone()).collect(); // pre-seed with the ones we chose.
+
+    let mut idx = 0;
+    let mut placement_queue = placements.clone();
+
+    while let Some(placement) = placement_queue.pop() {
+        match try_place_object(
+            &state,
+            &tek,
+            idx,
             &object_id,
-            shared_bytes.len(),
-            placement.node.node_id,
-        );
+            shared_bytes.clone(),
+            &checksum,
+            &placement,
+        )
+        .await
+        {
+            Ok(()) => {
+                idx += 1;
+            }
+            Err(e) => {
+                error!("ANT-ERR-127: Replication failed to storage node: {e:?}");
 
-        placement
-            .node
-            .put(&object_id, &tek, shared_bytes.clone())
-            .await
-            .with_context(|| format!("{}.{:?}", placement.node.node_id, placement.role))?;
+                let replacement = placement::find_replacement(
+                    &state,
+                    plaintext_len,
+                    disqualified_node_ids.as_slice(),
+                )
+                .await?;
+                info!(
+                    "Replacing with: {} {}",
+                    replacement.node.host_id, replacement.node.node_id
+                );
+                placement_queue.push(replacement);
+            }
+        }
+    }
 
-        state
-            .db
-            .upsert_placement(
-                &object_id,
-                &placement.node.node_id,
-                &object_id,
-                &checksum,
-                idx as i32,
-            )
-            .await?;
+    if idx == 0 {
+        warn!("Object [{object_id}] was never replicated, marking it as deleted...");
+        state.db.soft_delete_object(&bucket_id, &key).await?;
+        return Err(AntArchiveError::InsufficientStorage);
+    } else if idx < placements.len() as i32 {
+        warn!("object [{object_id}] was replicated only {idx} times...")
     }
 
     Ok(StatusCode::CREATED)

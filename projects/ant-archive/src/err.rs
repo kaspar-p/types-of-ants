@@ -32,9 +32,11 @@ impl IntoResponse for AntArchiveError {
                 (StatusCode::NOT_FOUND, format!("object {key} not found")).into_response()
             }
             AntArchiveError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
-            AntArchiveError::InsufficientStorage => {
-                (StatusCode::INSUFFICIENT_STORAGE, "Insufficient storage capacity.").into_response()
-            }
+            AntArchiveError::InsufficientStorage => (
+                StatusCode::INSUFFICIENT_STORAGE,
+                "Insufficient storage capacity.",
+            )
+                .into_response(),
         }
     }
 }

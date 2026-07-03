@@ -6,6 +6,7 @@ use axum_extra::{
 use http::request::Parts;
 
 use ant_archive_db::ClientCapabilities;
+use tracing::debug;
 
 use crate::{err::AntArchiveError, state::AntArchiveState};
 
@@ -38,7 +39,11 @@ where
             .map_err(AntArchiveError::from)?
             .ok_or(AntArchiveError::Unauthorized(None))?;
 
-        Ok(BearerClaims { client_id, capabilities })
+        debug!("Client {client_id} has capabilities {capabilities:?}");
+        Ok(BearerClaims {
+            client_id,
+            capabilities,
+        })
     }
 }
 
@@ -73,6 +78,9 @@ where
             .await
             .map_err(AntArchiveError::from)?;
 
-        Ok(maybe_result.map(|(client_id, capabilities)| BearerClaims { client_id, capabilities }))
+        Ok(maybe_result.map(|(client_id, capabilities)| BearerClaims {
+            client_id,
+            capabilities,
+        }))
     }
 }

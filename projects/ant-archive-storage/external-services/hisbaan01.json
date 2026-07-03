@@ -1,0 +1,10 @@
+{
+  "Datacenter": "typesofants",
+  "Node": "hisbaan01",
+  "Address": "ant-archive-storage.hisbaan.com",
+  "Service": {
+    "ID": "ant-archive-storage-on-hisbaan01",
+    "Service": "ant-archive-storage",
+    "Port": 443
+  }
+}

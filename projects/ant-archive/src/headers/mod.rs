@@ -18,7 +18,10 @@ where
 {
     type Rejection = AntArchiveError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Option<Self>, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
         let maybe_auth = Option::<BearerClaims>::from_request_parts(parts, state).await?;
         match maybe_auth {
             Some(auth) if auth.capabilities.can_select_storage_node => {}

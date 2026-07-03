@@ -1,9 +1,4 @@
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;

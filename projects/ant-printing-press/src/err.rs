@@ -25,7 +25,10 @@ impl IntoResponse for AntPrintingPressError {
                 error!("ANT-ERR-066: {id}: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(AntPrintingPressError::InternalServerError { id: "ANT-ERR-125", err: None }),
+                    Json(AntPrintingPressError::InternalServerError {
+                        id: "ANT-ERR-125",
+                        err: None,
+                    }),
                 )
                     .into_response()
             }
@@ -44,6 +47,9 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError { id: "?", err: Some(err.into()) }
+        Self::InternalServerError {
+            id: "?",
+            err: Some(err.into()),
+        }
     }
 }

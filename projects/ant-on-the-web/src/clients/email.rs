@@ -70,7 +70,10 @@ impl EmailSender for MailjetEmailSender {
         let sent = res.sent.first();
         match sent {
             None => {
-                error!("ANT-ERR-047: No sent response arrived from MailJet: {:?}", res);
+                error!(
+                    "ANT-ERR-047: No sent response arrived from MailJet: {:?}",
+                    res
+                );
                 return Err(EmailError::InternalServerError(anyhow::Error::msg(
                     "No sent response arrived from MailJet",
                 )));

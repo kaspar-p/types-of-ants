@@ -107,7 +107,9 @@ pub async fn find_active_services(state: AntHostAgentState) -> Result<(), anyhow
                 info!("Found typesofants service: {service_id}");
                 let port = manifest.ports.as_ref().and_then(|p| p.primary).unwrap_or(0);
                 if let Err(e) = state.sd.register_local_service(service_id, port).await {
-                    warn!("ANT-ERR-036: Failed to register {service_id} with Consul on startup: {e}");
+                    warn!(
+                        "ANT-ERR-036: Failed to register {service_id} with Consul on startup: {e}"
+                    );
                 }
                 registered.push(service_id.to_string());
             }

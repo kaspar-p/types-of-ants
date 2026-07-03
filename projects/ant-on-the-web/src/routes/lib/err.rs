@@ -95,7 +95,10 @@ impl IntoResponse for AntOnTheWebError {
                 error!("ANT-ERR-056: {id}: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(AntOnTheWebError::InternalServerError { id: "ANT-ERR-124", err: None }),
+                    Json(AntOnTheWebError::InternalServerError {
+                        id: "ANT-ERR-124",
+                        err: None,
+                    }),
                 )
                     .into_response()
             }
@@ -171,6 +174,9 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self::InternalServerError { id: "?", err: Some(err.into()) }
+        Self::InternalServerError {
+            id: "?",
+            err: Some(err.into()),
+        }
     }
 }

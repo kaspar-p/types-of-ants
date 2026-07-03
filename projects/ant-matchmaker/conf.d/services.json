@@ -1,22 +1,3 @@
 {
-  "services": [
-    {
-      "id": "ant-fs-greg01",
-      "name": "ant-fs",
-      "address": "ant.flower.beer",
-      "port": 443
-    },
-    {
-      "id": "ant-fs-hisbaan01",
-      "name": "ant-fs",
-      "address": "ant-fs.hisbaan.com",
-      "port": 443
-    },
-    {
-      "id": "ant-archive-storage-hisbaan01",
-      "name": "ant-archive-storage",
-      "address": "ant-archive-storage.hisbaan.com",
-      "port": 443
-    }
-  ]
+  "services": []
 }

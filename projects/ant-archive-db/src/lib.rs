@@ -21,6 +21,7 @@ pub struct AntArchiveDb {
     pool: ConnectionPool,
 }
 
+#[derive(Debug)]
 pub struct ClientCapabilities {
     pub can_select_storage_node: bool,
 }
