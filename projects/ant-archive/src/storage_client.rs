@@ -1,6 +1,6 @@
 use reqwest::{Client, StatusCode};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AntArchiveStorageNodeClient {
     pub node_id: String,
     pub host_id: String,

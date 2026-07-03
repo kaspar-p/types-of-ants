@@ -612,7 +612,7 @@ async fn get_object_returns_200_with_replica_failover() {
 
 #[tokio::test]
 #[traced_test]
-async fn put_object_returns_400_when_required_node_unknown() {
+async fn put_object_returns_200_when_required_node_unknown_with_valid_fallbacks() {
     let fixture = Fixture::new(function_name!()).await;
     let ids = fixture.bucket_ids().await;
 
@@ -627,7 +627,7 @@ async fn put_object_returns_400_when_required_node_unknown() {
         .body(b"data".as_slice())
         .send()
         .await;
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), StatusCode::CREATED);
 }
 
 #[tokio::test]

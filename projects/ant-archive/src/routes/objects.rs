@@ -348,12 +348,59 @@ async fn put_object(
         encrypt_object(&load_kek(&kek_id, kek_alias.as_deref())?, &tek, &plaintext)?;
     let checksum = compute_checksum(&stored_bytes);
 
-    let placements: Vec<placement::Placement> = placement::place_new_object(
-        &state,
-        plaintext_len,
-        select_node.as_ref().map(|n| n.0.as_str()),
-    )
-    .await?;
+    let placements = match state.db.get_object(&bucket_id, &key).await? {
+        Some(obj) => {
+            info!("Existing placements found for obj {}", obj.object_id);
+            let all_nodes: Vec<_> = resolve_storage_nodes(&state).await?.into_iter().collect();
+
+            let existing_placements = state.db.get_placements(&obj.object_id).await?;
+
+            let placements = existing_placements
+                .into_iter()
+                .map(|p| -> Result<Placement, AntArchiveError> {
+                    let node = all_nodes
+                        .iter()
+                        .find(|n| n.node_id == p.storage_node_id)
+                        .ok_or(AntArchiveError::InternalServerError(
+                            "ANT-ERR-132",
+                            Some(anyhow::Error::msg(format!(
+                                "object {} was placed on node {}, but that node didn't exist \
+                                in the resolved set.",
+                                obj.object_id, p.storage_node_id,
+                            ))),
+                        ))?;
+
+                    Ok(Placement {
+                        node: node.client.clone(),
+                        role: placement::PlacementRole::Replication,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            placements
+        }
+
+        None => {
+            let placements: Vec<placement::Placement> = placement::place_new_object(
+                &state,
+                &key,
+                plaintext_len,
+                select_node.as_ref().map(|n| n.0.as_str()),
+            )
+            .await?;
+
+            placements
+        }
+    };
+
+    info!(
+        "Decided to place at: {}",
+        placements
+            .iter()
+            .map(|p| format!("{} ({})", p.node.host_id, p.node.node_id))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     let object_id = state
         .db
@@ -404,6 +451,7 @@ async fn put_object(
 
                 let replacement = placement::find_replacement(
                     &state,
+                    &key,
                     plaintext_len,
                     disqualified_node_ids.as_slice(),
                 )
@@ -477,22 +525,25 @@ async fn get_object(
         ));
     }
 
-    let storage_nodes = resolve_storage_nodes(&state).await?;
+    let storage_nodes = resolve_storage_nodes(&state)
+        .await?
+        .into_iter()
+        .collect::<Vec<_>>();
 
     let mut stored_bytes_opt: Option<Vec<u8>> = None;
     for (idx, placement) in placements.iter().enumerate() {
         let Some(storage_node) = storage_nodes
             .iter()
-            .find(|n| n.node_id == placement.storage_node_id)
+            .find(|n| n.client.node_id == placement.storage_node_id)
         else {
             continue;
         };
 
         info!(
-            "Reading object: idx={idx} node={} host={}",
-            storage_node.node_id, storage_node.host_id
+            "Reading object: idx={idx} node={}",
+            storage_node.to_string(),
         );
-        let Some(bytes) = storage_node.get(&placement.storage_key).await? else {
+        let Some(bytes) = storage_node.client.get(&placement.storage_key).await? else {
             error!(
                 node_id = %placement.storage_node_id,
                 storage_key = %placement.storage_key,
@@ -567,7 +618,10 @@ async fn delete_object(
         .await?
         .ok_or_else(|| AntArchiveError::ObjectNotFound(key.clone()))?;
 
-    let storage_nodes = resolve_storage_nodes(&state).await?;
+    let storage_nodes = resolve_storage_nodes(&state)
+        .await?
+        .into_iter()
+        .collect::<Vec<_>>();
     let placements = state.db.get_placements(&object.object_id).await?;
     for placement in &placements {
         let storage_node = storage_nodes
@@ -582,7 +636,8 @@ async fn delete_object(
                     )),
                 )
             })?;
-        storage_node.delete(&placement.storage_key).await?;
+
+        storage_node.client.delete(&placement.storage_key).await?;
     }
 
     state.db.soft_delete_object(&bucket_id, &key).await?;
