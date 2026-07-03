@@ -33,7 +33,7 @@ version_tag="typesofants/ant-archive-storage:$arch-$(project_version)"
 latest_tag="typesofants/ant-archive-storage:$arch-latest"
 
 # Build the project binary
-ah build ant-archive-storage --arch "$arch" --no-deploy
+ah build ant-archive-storage --arch "$arch"
 
 # Build the container and copy the binary
 docker build \
