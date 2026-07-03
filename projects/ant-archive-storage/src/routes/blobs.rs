@@ -115,6 +115,12 @@ fn parse_range(range_header: &str, size: u64) -> Option<(u64, u64)> {
     Some((start, end))
 }
 
+async fn tmp_dir(state: &AntArchiveStorageState) -> Result<PathBuf, tokio::io::Error> {
+    let dir = state.root.join("_tmpdir");
+    tokio::fs::create_dir_all(&dir).await?;
+    return Ok(dir);
+}
+
 async fn put_blob(
     BasicAuth(auth): BasicAuth,
     State(state): State<AntArchiveStorageState>,
@@ -169,7 +175,8 @@ async fn put_blob(
         Err(e) => return Err(e.into()),
     };
 
-    let tmp = tempfile::NamedTempFile::new().context("Failed to create tmp file")?;
+    let tmp_dir = tmp_dir(&state).await.context("failed to create tmp dir")?;
+    let tmp = tempfile::NamedTempFile::new_in(&tmp_dir).context("Failed to create tmp file")?;
     let tmp_path = tmp.path().to_path_buf();
 
     // On error, tmp drops and auto-deletes the file.
