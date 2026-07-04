@@ -1,3 +1,4 @@
+use ant_archive_storage_client::AntArchiveStorageError;
 use ant_library::secret::SecretError;
 use axum::response::{IntoResponse, Response};
 use http::StatusCode;
@@ -51,6 +52,12 @@ impl From<anyhow::Error> for AntArchiveError {
 impl From<SecretError> for AntArchiveError {
     fn from(value: SecretError) -> Self {
         Self::InternalServerError("ANT-ERR-128", Some(value.into()))
+    }
+}
+
+impl From<AntArchiveStorageError> for AntArchiveError {
+    fn from(value: AntArchiveStorageError) -> Self {
+        Self::InternalServerError("ANT-ERR-133", Some(value.into()))
     }
 }
 

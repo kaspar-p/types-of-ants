@@ -1,9 +1,10 @@
 use std::{collections::HashMap, hash::Hash};
 
+use ant_archive_storage_client::AntArchiveStorageNodeClient;
 use hashring::HashRing;
 use tracing::{info, warn};
 
-use crate::{storage_client::AntArchiveStorageNodeClient, AntArchiveError, AntArchiveState};
+use crate::{AntArchiveError, AntArchiveState};
 
 /// Expects a file that's newline delimited lines that look like:
 ///     {hostname}:{username}:{password}

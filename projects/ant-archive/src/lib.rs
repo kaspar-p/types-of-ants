@@ -4,7 +4,6 @@ pub mod headers;
 mod placement;
 mod routes;
 pub mod state;
-mod storage_client;
 
 pub use ant_archive_db::AntArchiveDb;
 pub use auth::BearerClaims;

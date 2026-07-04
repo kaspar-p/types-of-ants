@@ -1,7 +1,7 @@
 ARG TARGET
 ARG ARCH
 
-FROM --platform=${TARGET} debian:bullseye-slim
+FROM --platform=${TARGET} debian:bookworm-slim
 WORKDIR /app
 
 ARG ARCH

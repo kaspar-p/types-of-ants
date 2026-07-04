@@ -19,5 +19,5 @@ members = [
   "projects/ant-printing-press",
   "projects/ant-archive-storage",
   "projects/ant-archive-db",
-  "projects/ant-archive",
+  "projects/ant-archive", "projects/ant-archive-storage-client",
 ]

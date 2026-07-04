@@ -16,7 +16,7 @@ clean:
 
 $(BUILD_OUTPUT_DIR)/$(PROJECT): | $(BUILD_OUTPUT_DIR)
 	@echo "BUILDING BINARY" >> /dev/stderr
-	@cross build --target=$(RUST_TARGET) $(RUST_FLAGS) -p $(PROJECT)
+	@cross build --bin ant-archive-storage --target=$(RUST_TARGET) $(RUST_FLAGS) -p $(PROJECT)
 	@cp ../../target/$(RUST_TARGET)/$(BUILD_MODE)/$(PROJECT) $(BUILD_OUTPUT_DIR)/$(PROJECT)
 
 .PHONY: all release debug binary
