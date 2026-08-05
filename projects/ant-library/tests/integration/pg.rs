@@ -1,20 +1,15 @@
 use std::sync::Arc;
 
 use ant_library::sd::{
-    pg::{make_connection_string, PostgresManager},
-    reader::ServiceDiscovery,
-    writer::ServiceDiscoveryWriter,
+    pg::PostgresManager, reader::ServiceDiscovery, writer::ServiceDiscoveryWriter,
 };
 use ant_library_test::{consul_fixture::ConsulFixture, db::TestDatabase};
 use postgresql_embedded::Settings;
-use tokio_postgres::NoTls;
 use tracing_test::traced_test;
 
 #[tokio::test]
 #[traced_test]
 async fn pool_recycles_on_endpoint_change() {
-    let ip = local_ip_address::local_ip().unwrap().to_string();
-
     let db1 = TestDatabase::with_settings(
         "ant-data-farm",
         Settings {
@@ -43,7 +38,7 @@ async fn pool_recycles_on_endpoint_change() {
 
     {
         ServiceDiscoveryWriter::new(consul.port())
-            .register_remote_service("ant-data-farm", "127.0.0.1", db1.config.port)
+            .register_remote_service("ant-data-farm", "test-node1", "127.0.0.1", db1.config.port)
             .await
             .unwrap();
     }
@@ -76,7 +71,7 @@ async fn pool_recycles_on_endpoint_change() {
     // Switch endpoint to db2
     {
         ServiceDiscoveryWriter::new(consul.port())
-            .register_remote_service("ant-data-farm", "127.0.0.1", db2.config.port)
+            .register_remote_service("ant-data-farm", "test-node1", "127.0.0.1", db2.config.port)
             .await
             .unwrap();
     }

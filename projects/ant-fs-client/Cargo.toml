@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }
 anyhow = "1.0.100"
+bytes = "1.12.0"
 reqwest = { version = "0.12.23", features = ["rustls-tls"] }
 serde = "1.0.228"
 tracing = "0.1.41"

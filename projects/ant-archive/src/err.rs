@@ -4,13 +4,24 @@ use axum::response::{IntoResponse, Response};
 use http::StatusCode;
 use tracing::error;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum AntArchiveError {
+    #[error("Internal server error")]
     InternalServerError(&'static str, Option<anyhow::Error>),
+
+    #[error("Unauthorized")]
     Unauthorized(Option<anyhow::Error>),
+
+    #[error("Bucket not found: {0}")]
     BucketNotFound(String),
+
+    #[error("Object not found: {0}")]
     ObjectNotFound(String),
+
+    #[error("Malformed request: {0}")]
     BadRequest(String),
+
+    #[error("Insufficient storage, contact the operator")]
     InsufficientStorage,
 }
 

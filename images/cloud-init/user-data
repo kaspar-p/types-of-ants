@@ -1,0 +1,56 @@
+#cloud-config
+autoinstall:
+  version: 1
+
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+
+  shutdown: poweroff
+
+  # Matches the login your SOP already expects: ubuntu / ubuntu
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    # This is a SHA-512 hash of the password "ubuntu" — change it if you want
+    # a different temp password. Generate your own with:
+    #   python3 -c "import crypt; print(crypt.crypt('yourpassword', crypt.mksalt(crypt.METHOD_SHA512)))"
+    password: "$6$gNaiG6My7326YVwR$ET88BKsrGmnafjf69Cqm8oiuL0QWqnroOlj4aSybwSZNk2.HY6dfF17wfGauqiLh92IQ.Nb3nXZvps3P2YRGo0"
+
+  # Installs and enables OpenSSH so the box is reachable the moment it
+  # finishes rebooting — this is the piece the preinstalled arm64 image
+  # gave you for free, and the plain ISO doesn't.
+  ssh:
+    install-server: true
+    allow-pw: true
+
+  # Wipes and uses the whole 256GB SSD with a single default LVM layout.
+  # If there's more than one disk in the Dell, you may need to point this
+  # at a specific one (see note below).
+  storage:
+    layout:
+      name: direct
+    match:
+      size: smallest
+
+  packages:
+    - openssh-server
+    - net-tools
+
+  # Skip the "hit enter to reboot" prompt so it's genuinely hands-off
+  late-commands:
+    - echo 'Autoinstall complete' > /target/var/log/autoinstall-done.log
+
+  # Prevents subiquity from waiting on network config prompts if DHCP
+  # doesn't come up instantly
+  network:
+    version: 2
+    ethernets:
+      all-en:
+        match:
+          name: "en*"
+        dhcp4: true
+      all-eth:
+        match:
+          name: "eth*"
+        dhcp4: true

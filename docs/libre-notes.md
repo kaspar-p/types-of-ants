@@ -21,7 +21,7 @@ flash it.
 Plug in Ethernet _before_ power, to initialize on the network. Find it with:
 
 ```bash
-nmap -sL 192.168.2.0/24 | grep ubuntu
+nmap -sL 192.168.1.0/24 | grep ubuntu
 ```
 
 Note that the `.2` is specific to houze, some networks have a different 3rd
@@ -190,7 +190,7 @@ To get cmd+left, opt+left, and other keybinds to work remotely, from the local
 computer run:
 
 ```bash
-infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@antworker<num>.hosts.typesofants.org -- tic -x -
+infocmp -x xterm-ghostty | ssh -i ~/.ssh/id_typesofants_ed25519 ant@$ANTWORKER.hosts.typesofants.org -- tic -x -
 ```
 
 And set it to be globally available (on the host):
@@ -255,10 +255,34 @@ installations and deployments. However, since it's the first run, it's not
 available and needs to be done manually.
 
 ```bash
-./scripts/build.sh ant-host-agent dest-environment ant-host-num
+ah build ant-host-agent
 ```
 
-And on the host:
+which should output a path for each architecture built.
+
+And, run:
+
+```bash
+export DEPL_PATH=<path>
+export ANTWORKER=antworker009
+```
+
+and
+
+```bash
+ssh2ant $ANTWORKER "mkdir -p ~/persist/ant-host-agent/fs/archives"
+scp $DEPL_PATH $ANTWORKER.hosts.typesofants.org:~/persist/ant-host-agent/fs/archives/deployment.ant-host-agent.bootstrap.tar.gz
+ssh2ant $ANTWORKER "mkdir -p ~/service/ant-host-agent/bootstrap"
+ssh2ant $ANTWORKER "tar -C ~/service/ant-host-agent/bootstrap/ -xvf ~/persist/ant-host-agent/fs/archives/deployment.ant-host-agent.bootstrap.tar.gz"
+```
+
+Then log into the box and copy-paste the systemd contents into
+`/etc/systemd/system/ant-host-agent.service`. Then run:
+
+```bash
+sudo systemctl enable ant-host-agent
+ln -s ~/service/ant-host-agent/bootstrap ~/service/ant-host-agent/current
+```
 
 ```bash
 $ cd ~/persist/ant-host-agent/fs/archives

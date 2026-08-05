@@ -56,6 +56,8 @@ create table archive_object (
   key varchar(4096) not null,
   
   size_bytes bigint not null,
+  
+  -- Since migration 010, one of 'replication', 'erasure', or 'replication+chunked'
   codec varchar(20) not null default 'replication'
     check (codec in ('replication', 'erasure')),
   encrypted_dek bytea not null,

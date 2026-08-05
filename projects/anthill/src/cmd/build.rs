@@ -37,11 +37,18 @@ pub struct BuildCmd {
 
     #[arg(short, long, value_parser = HostArchitecture::from_str)]
     arch: Option<HostArchitecture>,
+
+    #[arg(long, default_value_t = true)]
+    persist: bool,
 }
 
 impl BuildCmd {
-    pub fn new(project: String, arch: Option<HostArchitecture>) -> Self {
-        Self { project, arch }
+    pub fn new(project: String, arch: Option<HostArchitecture>, persist: bool) -> Self {
+        Self {
+            project,
+            arch,
+            persist,
+        }
     }
 }
 
@@ -80,7 +87,7 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
         cmd.project
     ));
 
-    match manifest.build_parallelism {
+    let files = match manifest.build_parallelism {
         AnthillBuildParallelism::Serial => {
             let mut files = vec![];
             for arch in arches {
@@ -95,7 +102,7 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
                 )
             }
 
-            return files;
+            files
         }
 
         AnthillBuildParallelism::Parallel => {
@@ -129,7 +136,23 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
 
             files
         }
+    };
+
+    if cmd.persist {
+        for file in files {
+            println!("path: \t{}", file.file.file_path().display());
+            println!("arch: \t{}", file.arch.as_str());
+            println!("version: \t{}", file.version);
+            println!();
+
+            let path = file.file.file_path().clone();
+            file.file.persist(&path).await.unwrap();
+        }
+
+        return vec![];
     }
+
+    return files;
 }
 
 #[tracing::instrument(skip(cmd, git))]

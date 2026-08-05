@@ -32,6 +32,7 @@ tempfile = "3"
 axum-prometheus = "0.10.0"
 subtle = "2.6"
 metrics-exporter-prometheus = "0.18"
+std-ext = "0.4.0"
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }

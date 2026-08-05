@@ -13,6 +13,7 @@
     "ant_backing_it_up_db_user",
     "ant_backing_it_up_db_password",
     "ant_backing_it_up_key",
-    "ant_fs_client_creds"
+    "ant_fs_client_creds",
+    "ant_archive_token"
   ]
 }

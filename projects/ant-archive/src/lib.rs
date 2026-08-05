@@ -1,7 +1,10 @@
 pub mod auth;
+mod chunker;
+mod crypto;
 pub mod err;
 pub mod headers;
 mod placement;
+mod redundancy;
 mod routes;
 pub mod state;
 

@@ -104,7 +104,7 @@ impl AntFsClient {
         }
     }
 
-    pub async fn put_file(&mut self, path: &str, bytes: Vec<u8>) -> Result<(), anyhow::Error> {
+    pub async fn put_file(&mut self, path: &str, bytes: bytes::Bytes) -> Result<(), anyhow::Error> {
         let response = self
             .client
             .put(self.url(path).await?)

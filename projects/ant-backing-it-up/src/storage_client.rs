@@ -154,7 +154,7 @@ impl AntBackingItUpStorageClient {
         &mut self,
         project: &str,
         source: &DatabaseParams,
-        encryption_nonce: &Vec<u8>,
+        encryption_nonce: &Option<Vec<u8>>,
         destination_filepath: &str,
     ) -> Result<DateTime<Utc>, anyhow::Error> {
         let created_at: DateTime<Utc> = self

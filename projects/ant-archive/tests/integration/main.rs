@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use http::StatusCode;
 use stdext::function_name;
 use tracing_test::traced_test;
@@ -416,44 +418,6 @@ async fn put_object_returns_507_when_no_nodes_have_capacity() {
 
 #[tokio::test]
 #[traced_test]
-async fn upsert_placement_stores_all_replicas() {
-    let fixture = Fixture::new(function_name!()).await;
-    let ids = fixture.bucket_ids().await;
-
-    let res = fixture
-        .client
-        .put(&format!("/o/{}/placement-test", ids.private_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .body(b"data".as_slice())
-        .send()
-        .await;
-    assert_eq!(res.status(), StatusCode::CREATED);
-
-    let obj = fixture
-        .db
-        .get_object(&ids.private_id, "placement-test")
-        .await
-        .unwrap()
-        .unwrap();
-
-    fixture
-        .db
-        .upsert_placement(
-            &obj.object_id,
-            "sn-test",
-            &obj.object_id,
-            "dummy-checksum",
-            1,
-        )
-        .await
-        .unwrap();
-
-    let placements = fixture.db.get_placements(&obj.object_id).await.unwrap();
-    assert_eq!(placements.len(), 2);
-}
-
-#[tokio::test]
-#[traced_test]
 async fn put_object_capacity_check_uses_consistent_size_units() {
     let fixture = Fixture::new_with_capacity(function_name!(), 120).await;
     let ids = fixture.bucket_ids().await;
@@ -491,45 +455,53 @@ async fn bytes_stored_excludes_soft_deleted_objects() {
     let fixture = Fixture::new_with_capacity(function_name!(), 55).await;
     let ids = fixture.bucket_ids().await;
 
-    let res1 = fixture
-        .client
-        .put(&format!("/o/{}/obj-to-delete", ids.private_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .body(b"12345678901234567890123456789012345678901234567890".as_slice())
-        .send()
-        .await;
-    assert_eq!(res1.status(), StatusCode::CREATED);
+    {
+        let res1 = fixture
+            .client
+            .put(&format!("/o/{}/obj-to-delete", ids.private_id))
+            .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+            .body("x".repeat(40))
+            .send()
+            .await;
+        assert_eq!(res1.status(), StatusCode::CREATED);
+    }
 
-    let del = fixture
-        .client
-        .delete(&format!("/o/{}/obj-to-delete", ids.private_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .send()
-        .await;
-    assert_eq!(del.status(), StatusCode::OK);
+    {
+        let del = fixture
+            .client
+            .delete(&format!("/o/{}/obj-to-delete", ids.private_id))
+            .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+            .send()
+            .await;
+        assert_eq!(del.status(), StatusCode::OK);
+    }
 
-    let res2 = fixture
-        .client
-        .put(&format!("/o/{}/new-obj", ids.private_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .body(b"0123456789".as_slice())
-        .send()
-        .await;
-    assert_eq!(res2.status(), StatusCode::CREATED);
+    {
+        let res = fixture
+            .client
+            .put(&format!("/o/{}/new-obj", ids.private_id))
+            .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+            .body("y".repeat(40))
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+    }
 
-    let get_res = fixture
-        .client
-        .get(&format!("/o/{}/new-obj", ids.private_id))
-        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .send()
-        .await;
-    assert_eq!(get_res.status(), StatusCode::OK);
-    assert_eq!(get_res.bytes().await.as_ref(), b"0123456789");
+    {
+        let get_res = fixture
+            .client
+            .get(&format!("/o/{}/new-obj", ids.private_id))
+            .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+            .send()
+            .await;
+        assert_eq!(get_res.status(), StatusCode::OK, "{}", get_res.text().await);
+        assert_eq!(get_res.text().await, "y".repeat(40));
+    }
 }
 
 #[tokio::test]
 #[traced_test]
-async fn delete_object_returns_500_when_storage_node_unreachable() {
+async fn delete_object_returns_200_even_when_storage_node_unreachable() {
     let fixture = Fixture::new(function_name!()).await;
     let ids = fixture.bucket_ids().await;
 
@@ -542,12 +514,18 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
         .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    fixture.sd.stop_refreshing("ant-archive-storage").await;
+    // Remote the service from discovery
+    {
+        let endpoints = fixture.sd.resolve_all("ant-archive-storage").await;
+        fixture.sd.stop_refreshing("ant-archive-storage").await;
 
-    ServiceDiscoveryWriter::new(fixture.consul_port)
-        .deregister_local_service("ant-archive-storage")
-        .await
-        .unwrap();
+        for e in endpoints {
+            ServiceDiscoveryWriter::new(fixture.consul_port)
+                .deregister_remote_service(&e.node, "ant-archive-storage")
+                .await
+                .unwrap();
+        }
+    }
 
     let del = fixture
         .client
@@ -556,7 +534,7 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
         .send()
         .await;
 
-    assert_eq!(del.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(del.status(), StatusCode::OK);
 }
 
 #[tokio::test]
@@ -564,7 +542,7 @@ async fn delete_object_returns_500_when_storage_node_unreachable() {
 async fn get_object_returns_200_with_replica_failover() {
     let fixture = Fixture::new(function_name!()).await;
     let ids = fixture.bucket_ids().await;
-    let payload = b"failover-payload";
+    let payload = b"failover";
 
     let res = fixture
         .client
@@ -577,28 +555,39 @@ async fn get_object_returns_200_with_replica_failover() {
 
     let obj = fixture
         .db
-        .get_object(&ids.private_id, "failover-key")
+        .get_current_object(&ids.private_id, "failover-key")
         .await
         .unwrap()
         .unwrap();
+    let chunks = fixture
+        .db
+        .list_chunks_for_object(&obj.object_id)
+        .await
+        .unwrap();
+    let chunk = chunks.first().unwrap();
 
     // Retrieve the real storage key and checksum written by the PUT.
-    let placements = fixture.db.get_placements(&obj.object_id).await.unwrap();
-    let real_key = &placements[0].storage_key;
-    let real_checksum = &placements[0].object_checksum;
+    let placements = fixture
+        .db
+        .list_chunk_shard_placements(&chunk.chunk_id)
+        .await
+        .unwrap();
 
-    // Add idx=1 with the real checksum, then corrupt idx=0's checksum.
-    // get_object must skip idx=0 (checksum mismatch) and fall back to idx=1.
-    fixture
-        .db
-        .upsert_placement(&obj.object_id, "sn-test", real_key, real_checksum, 1)
-        .await
-        .unwrap();
-    fixture
-        .db
-        .upsert_placement(&obj.object_id, "sn-test", real_key, "BAD-CHECKSUM", 0)
-        .await
-        .unwrap();
+    {
+        // Corrupt a placement's checksum, it should fallback to other nodes
+        fixture
+            .db
+            .upsert_shard_placement(
+                &chunk.chunk_id,
+                placements[0].shard_idx,
+                &placements[0].storage_node_id,
+                &placements[0].storage_key,
+                payload.len() as i64,
+                "BAD-CHECKSUM".as_bytes(),
+            )
+            .await
+            .unwrap();
+    }
 
     let res = fixture
         .client
@@ -612,27 +601,51 @@ async fn get_object_returns_200_with_replica_failover() {
 
 #[tokio::test]
 #[traced_test]
-async fn put_object_returns_200_when_required_node_unknown_with_valid_fallbacks() {
-    let fixture = Fixture::new(function_name!()).await;
+async fn put_object_returns_200_and_places_on_requested_node() {
+    // It still chooses forced to choose that one if the header is supplied
+    let mut map = HashMap::new();
+    map.insert("sn-test1".to_string(), 0);
+    map.insert("sn-test2".to_string(), 100);
+    map.insert("sn-test3".to_string(), 100);
+    let fixture = Fixture::new_with_capacities(function_name!(), map).await;
     let ids = fixture.bucket_ids().await;
 
     let res = fixture
         .client
-        .put(&format!("/o/{}/any-key", ids.private_id))
+        .put(&format!("/o/{}/pinned-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .header(
-            "X-Ant-Capability-Can-Select-Storage-Node",
-            "nonexistent-node",
-        )
+        .header("X-Ant-Capability-Can-Select-Storage-Node", "sn-test1")
         .body(b"data".as_slice())
         .send()
         .await;
-    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(res.status(), StatusCode::CREATED, "{}", res.text().await);
+
+    let obj = fixture
+        .db
+        .get_current_object(&ids.private_id, "pinned-key")
+        .await
+        .unwrap()
+        .unwrap();
+
+    let chunks = fixture
+        .db
+        .list_chunks_for_object(&obj.object_id)
+        .await
+        .unwrap();
+    let chunk = chunks.first().unwrap();
+
+    let placements = fixture
+        .db
+        .list_chunk_shard_placements(&chunk.chunk_id)
+        .await
+        .unwrap();
+
+    assert!(placements.iter().any(|p| p.storage_node_id == "sn-test1"));
 }
 
 #[tokio::test]
 #[traced_test]
-async fn put_object_places_on_requested_node() {
+async fn put_object_returns_400_if_no_such_requested_node() {
     // It still chooses forced to choose that one if the header is supplied
     let fixture = Fixture::new_with_capacity(function_name!(), 0).await;
     let ids = fixture.bucket_ids().await;
@@ -641,20 +654,11 @@ async fn put_object_places_on_requested_node() {
         .client
         .put(&format!("/o/{}/pinned-key", ids.private_id))
         .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
-        .header("X-Ant-Capability-Can-Select-Storage-Node", "sn-test")
+        .header("X-Ant-Capability-Can-Select-Storage-Node", "blah-blah")
         .body(b"data".as_slice())
         .send()
         .await;
-    assert_eq!(res.status(), StatusCode::CREATED);
-
-    let obj = fixture
-        .db
-        .get_object(&ids.private_id, "pinned-key")
-        .await
-        .unwrap()
-        .unwrap();
-    let placements = fixture.db.get_placements(&obj.object_id).await.unwrap();
-    assert!(placements.iter().any(|p| p.storage_node_id == "sn-test"));
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

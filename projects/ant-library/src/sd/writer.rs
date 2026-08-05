@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use reqwest::Client;
 
+use rs_consul::{DeregisterEntityPayload, RegisterEntityPayload, RegisterEntityService};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error};
 
@@ -67,16 +70,75 @@ impl ServiceDiscoveryWriter {
     pub async fn register_remote_service(
         &self,
         service: &str,
+        node_name: &str,
         host: &str,
         port: u16,
     ) -> Result<(), anyhow::Error> {
-        self.register_service(RegisterServiceRequest {
-            name: service.to_string(),
-            address: Some(host.to_string()),
-            tags: vec!["typesofants:service".to_string()],
-            port,
-        })
-        .await
+        let req = RegisterEntityPayload {
+            Node: node_name.to_string(),
+            Address: host.to_string(),
+            NodeMeta: HashMap::new(),
+            ID: None,
+            Service: Some(RegisterEntityService {
+                Namespace: None,
+                Service: service.to_string(),
+                ID: None,
+                TaggedAddresses: HashMap::new(),
+                Tags: vec![],
+                Meta: HashMap::new(),
+                Port: Some(port),
+            }),
+            TaggedAddresses: HashMap::new(),
+            Checks: vec![],
+            SkipNodeUpdate: None,
+            Datacenter: None,
+        };
+        debug!(
+            "[consul catalog register request] {}",
+            serde_json::to_string(&req)?
+        );
+        let res = self
+            .client
+            .put(format!("{}/v1/catalog/register", self.consul_endpoint))
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let raw: String = res.text().await?;
+        debug!("[consul catalog register response] {}", raw);
+
+        return Ok(());
+    }
+
+    pub async fn deregister_remote_service(
+        &self,
+        service: &str,
+        node_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        let req = DeregisterEntityPayload {
+            Namespace: None,
+            Node: Some(node_name.to_string()),
+            ServiceID: Some(service.to_string()),
+            CheckID: None,
+            Datacenter: None,
+        };
+        debug!(
+            "[consul catalog deregister request] {}",
+            serde_json::to_string(&req)?
+        );
+        let res = self
+            .client
+            .put(format!("{}/v1/catalog/deregister", self.consul_endpoint))
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let raw: String = res.text().await?;
+        debug!("[consul catalog deregister response] {}", raw);
+
+        return Ok(());
     }
 
     pub async fn register_local_service(

@@ -1,12 +1,14 @@
 use std::io::{Read, Write};
 
 use ant_library::routes::Routes;
+use anyhow::Context;
 use axum::{
     extract::State,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use bytes::Bytes;
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use http::{header, Method, StatusCode};
 use postgresql_commands::{pg_dump::PgDumpBuilder, traits::CommandToString, CommandBuilder};
@@ -66,6 +68,7 @@ async fn post_backup(
         root_dir,
         mut db,
         mut ant_fs,
+        ant_archive,
         ..
     }): State<AntBackingItUpState>,
     Json(req): Json<BackupRequest>,
@@ -138,75 +141,106 @@ async fn post_backup(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    info!("Reading backup SQL: {}", local_sql_path.display());
-    let mut sql_plaintext: Vec<u8> = vec![];
-    std::fs::File::open(&local_sql_path)
-        .unwrap()
-        .read_to_end(&mut sql_plaintext)
-        .unwrap();
-    info!("Removing backup SQL: {}", local_sql_path.display());
-    std::fs::remove_file(&local_sql_path).expect(&format!(
-        "removing pg_dump output: {}",
-        local_sql_path.display()
-    ));
-
-    let local_zip_filename = format!("{local_sql_filename}.zip");
-    let local_zip_path = root_dir.join(&local_zip_filename);
-    let local_zip_file = std::fs::File::create(&local_zip_path).unwrap();
-    info!("Creating zip archive: {}", local_zip_path.display());
-    let mut zip = zip::ZipWriter::new(local_zip_file);
+    let md: std::fs::Metadata = std::fs::metadata(&local_sql_path).unwrap();
 
     info!(
-        "Writing {} bytes to zip archive: {}",
-        humansize::format_size(sql_plaintext.len(), humansize::DECIMAL),
-        local_zip_path.display()
+        "Reading {} backup SQL: {}",
+        humansize::format_size(md.len(), humansize::DECIMAL),
+        local_sql_path.display()
     );
-    zip.start_file(
-        local_sql_filename,
-        SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Xz)
-            .large_file(true),
-    )
-    .expect("zip create file");
-    zip.write_all(&sql_plaintext).expect("zip write");
-    zip.finish().expect("zip flush");
-    let mut plaintext_zip_file = std::fs::File::open(&local_zip_path).expect("open zip file");
+    let sql_plaintext = std::fs::read(&local_sql_path).unwrap();
 
-    info!("Reading zip archive: {}", local_zip_path.display());
-    let mut plaintext_zip_buf: Vec<u8> = vec![];
-    plaintext_zip_file
-        .read_to_end(&mut plaintext_zip_buf)
-        .expect("plaintext zip read");
+    // .read_to_end(&mut sql_plaintext)
+    // .unwrap();
 
-    info!("Deleting zip archive: {}", local_zip_path.display());
-    std::fs::remove_file(&local_zip_path)
-        .expect(&format!("removing zip file: {}", local_zip_path.display()));
+    info!("Removing backup SQL: {}", local_sql_path.display());
+    // std::fs::remove_file(&local_sql_path).expect(&format!(
+    //     "removing pg_dump output: {}",
+    //     local_sql_path.display()
+    // ));
 
-    info!("Encrypting zip archive...");
-    let encryption = crypto::encrypt_backup(&plaintext_zip_buf);
+    // let local_zip_filename = format!("{local_sql_filename}.zip");
+    // let local_zip_path = root_dir.join(&local_zip_filename);
+    // let local_zip_file = std::fs::File::create(&local_zip_path).unwrap();
+    // info!("Creating zip archive: {}", local_zip_path.display());
+    // let mut zip = zip::ZipWriter::new(local_zip_file);
+
+    // info!(
+    //     "Writing {} bytes to zip archive: {}",
+    //     humansize::format_size(sql_plaintext.len(), humansize::DECIMAL),
+    //     local_zip_path.display()
+    // );
+    // zip.start_file(
+    //     local_sql_filename,
+    //     SimpleFileOptions::default()
+    //         .compression_method(zip::CompressionMethod::Xz)
+    //         .large_file(true),
+    // )
+    // .expect("zip create file");
+    // zip.write_all(&sql_plaintext).expect("zip write");
+    // zip.finish().expect("zip flush");
+    // let mut plaintext_zip_file = std::fs::File::open(&local_zip_path).expect("open zip file");
+
+    // info!("Reading zip archive: {}", local_zip_path.display());
+    // let mut plaintext_zip_buf: Vec<u8> = vec![];
+    // plaintext_zip_file
+    // .read_to_end(&mut plaintext_zip_buf)
+    // .expect("plaintext zip read");
+
+    // info!("Deleting zip archive: {}", local_zip_path.display());
+    // std::fs::remove_file(&local_zip_path)
+    // .expect(&format!("removing zip file: {}", local_zip_path.display()));
+
+    // info!("Encrypting zip archive...");
+    // let encryption = crypto::encrypt_backup(&plaintext_zip_buf);
 
     // Then save that file to an ant-fs worker.
-    info!("Saving to ant-fs...");
-    let remote_filename = format!("{}.enc", &local_zip_filename);
+    // info!("Saving to ant-fs...");
+    // let remote_filename = format!("{}.enc", &local_zip_filename);
 
-    ant_fs
-        .put_file(&remote_filename, encryption.ciphertext)
-        .await
-        .unwrap();
+    // let bytes = Bytes::from(encryption.ciphertext);
+
+    // {
+    //     ant_fs
+    //         .put_file(&remote_filename, bytes.clone())
+    //         .await
+    //         .context("ant-fs operation")
+    //         .unwrap();
+    // }
+
+    let key = {
+        info!("Saving plaintext to ant-archive...");
+        let plaintext_bytes = Bytes::from(sql_plaintext);
+
+        let key = format!(
+            "ant-backing-it-up/backups/{}/pgdumpbackup.{}-{}-{}.{}-{}-{}.bak.sql.zip",
+            req.source_project,
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute(),
+            now.second()
+        );
+
+        ant_archive
+            .put_object("b-typesofants", &key, plaintext_bytes.clone())
+            .await
+            .context("ant-archive operation")
+            .unwrap();
+
+        key
+    };
 
     // Then save all of that in the database.
     info!("Recording backup job...");
-    db.record_backup(
-        &req.source_project,
-        &db_params,
-        &encryption.nonce,
-        &remote_filename,
-    )
-    .await
-    .map_err(|e| {
-        error!("ANT-ERR-012: db query failed: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    // db.record_backup(&req.source_project, &db_params, &encryption.nonce, &key)
+    // db.record_backup(&req.source_project, &db_params, &None, &key)
+    //     .await
+    //     .map_err(|e| {
+    //         error!("ANT-ERR-012: db query failed: {e}");
+    //         StatusCode::INTERNAL_SERVER_ERROR
+    //     })?;
 
     info!("Backup job successful.");
 

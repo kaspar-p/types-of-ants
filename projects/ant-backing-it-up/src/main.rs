@@ -1,10 +1,12 @@
 use std::{fs::create_dir_all, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
+use ant_archive_client::AntArchiveClient;
 use ant_backing_it_up::{
     state::AntBackingItUpState, storage_client::AntBackingItUpStorageClient, BackupRequest,
 };
 use ant_fs_client::{AntFsClient, AntFsHostPorts};
 use ant_library::sd::reader::ServiceDiscovery;
+use anyhow::Context;
 use futures::future::join_all;
 use stdext::prelude::DurationExt;
 use tokio::time::sleep;
@@ -23,12 +25,12 @@ async fn main() {
     let root_dir = PathBuf::from(persist_dir).join(root_path);
     create_dir_all(&root_dir).expect("failed to create root dir");
 
-    let sd = ServiceDiscovery::new(
+    let sd = Arc::new(ServiceDiscovery::new(
         dotenv::var("ANT_MATCHMAKER_HTTP_PORT")
             .expect("No ANT_MATCHMAKER_HTTP_PORT variable.")
             .parse::<u16>()
             .expect("port was not u16"),
-    );
+    ));
 
     let db = AntBackingItUpStorageClient::connect_discovered(&sd)
         .await
@@ -61,11 +63,17 @@ async fn main() {
         ant_fs_host_ports[0].tls,
     );
 
+    let token = ant_library::secret::load_secret("ant_archive_token")
+        .context("no ant_archive_token found")
+        .unwrap();
+    let ant_archive = AntArchiveClient::new(sd.clone(), token);
+
     let state = AntBackingItUpState {
-        sd: Arc::new(sd),
+        sd: sd.clone(),
         root_dir,
         db,
         ant_fs,
+        ant_archive,
     };
 
     let app = ant_backing_it_up::make_routes(state).expect("failed to init api");

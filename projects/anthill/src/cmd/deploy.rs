@@ -23,7 +23,7 @@ pub async fn deploy(cmd: DeployCmd) -> () {
         .await
         .unwrap();
 
-    let files = crate::cmd::build::build(BuildCmd::new(cmd.project.clone(), None)).await;
+    let files = crate::cmd::build::build(BuildCmd::new(cmd.project.clone(), None, false)).await;
 
     let handles = files
         .into_iter()

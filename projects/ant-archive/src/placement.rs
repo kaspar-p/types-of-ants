@@ -1,8 +1,11 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use ant_archive_storage_client::AntArchiveStorageNodeClient;
 use hashring::HashRing;
-use tracing::{info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{AntArchiveError, AntArchiveState};
 
@@ -71,7 +74,11 @@ pub async fn resolve_storage_nodes(
             "No credentials for node: {}",
             ep.node
         )))?;
-        if let Some((node_id, protocol)) = state.db.get_storage_node_by_node_name(&ep.node).await? {
+        if let Some((node_id, protocol)) = state
+            .db
+            .get_storage_node_by_node_name_or_id(&ep.node)
+            .await?
+        {
             ring.add(HashRingNode {
                 node_id: node_id.clone(),
                 host_id: ep.node.clone(),
@@ -97,37 +104,39 @@ pub async fn resolve_storage_nodes(
 #[derive(Clone)]
 pub(crate) struct Placement {
     pub node: AntArchiveStorageNodeClient,
-    pub role: PlacementRole,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum PlacementRole {
-    Replication,
-    ErrorCorrection(ErrorCorrectionRole),
-}
+// #[derive(Debug, Clone)]
+// pub(crate) enum PlacementRole {
+//     Replication,
+//     ErrorCorrection(ErrorCorrectionRole),
+// }
 
-#[derive(Debug, Clone)]
-pub(crate) enum ErrorCorrectionRole {
-    Data,
-    Parity,
-}
+// #[derive(Debug, Clone)]
+// pub(crate) enum ErrorCorrectionRole {
+//     Data,
+//     Parity,
+// }
 
+/// Return a vector of nodes to place onto, `num_placements_to_find` in length.
 #[tracing::instrument(skip(state))]
-async fn calculate_placement(
+async fn calculate_placements(
     state: &AntArchiveState,
 
-    object_key: &str,
-    num_placements_to_find: usize,
+    group_id: &str,
+    size: usize,
 
-    new_object_size_bytes: i64,
+    num_placements_to_find: i32,
+
     required_node: Option<&str>,
-    disqualified: &[String],
+    disqualified: &HashSet<String>,
 ) -> Result<Vec<Placement>, AntArchiveError> {
     let storage_nodes = resolve_storage_nodes(&state).await?;
+    let storage_nodes_len = storage_nodes.len();
 
     let mut placements = vec![];
 
-    let mut available_nodes = HashRing::new();
+    let mut available_nodes: HashRing<HashRingNode> = HashRing::new();
 
     for node in storage_nodes {
         let (_, capacity_bytes) = state
@@ -143,27 +152,49 @@ async fn calculate_placement(
 
         if let Some(req) = &required_node {
             if *req == node.host_id || *req == node.node_id {
-                info!("Forcing the use of {} {}", node.host_id, node.node_id);
-                placements.push(Placement {
-                    node: node.client,
-                    role: PlacementRole::Replication,
-                });
+                info!("Forcing the use of {} ({})", node.node_id, node.host_id);
+                placements.push(Placement { node: node.client });
                 continue;
             }
         }
 
-        if bytes_stored + new_object_size_bytes <= capacity_bytes {
+        if bytes_stored + size as i64 <= capacity_bytes {
+            debug!(
+                "qualified: {} because {} + {} is less than {}",
+                node.to_string(),
+                bytes_stored,
+                size,
+                capacity_bytes
+            );
             available_nodes.add(node);
+        } else {
+            debug!(
+                "disqualified: {} because {} + {} is more than {}",
+                node.to_string(),
+                bytes_stored,
+                size,
+                capacity_bytes
+            );
         }
     }
 
-    let mut ring_iter = match available_nodes.get_with_replicas(&object_key, NUM_REPLICATION - 1) {
+    if num_placements_to_find - placements.len() as i32 > available_nodes.len() as i32 {
+        error!(
+            "Asked for {num_placements_to_find} ({} forced), but only {}/{} available",
+            placements.len(),
+            available_nodes.len(),
+            storage_nodes_len
+        );
+        return Err(AntArchiveError::InsufficientStorage);
+    }
+
+    let mut ring_iter = match available_nodes.get_with_replicas(&group_id, NUM_REPLICATION - 1) {
         Some(ring) => ring,
         None => return Err(AntArchiveError::InsufficientStorage),
     }
     .into_iter();
 
-    while placements.len() < num_placements_to_find {
+    while (placements.len() as i32) < num_placements_to_find {
         info!("Choosing [idx={}] placement...", placements.len());
 
         let ring_node = ring_iter.next();
@@ -179,12 +210,19 @@ async fn calculate_placement(
 
                 placements.push(Placement {
                     node: ring_node.client.clone(),
-                    role: PlacementRole::Replication,
                 })
             }
+
             None => {
-                warn!("Ran out of ring nodes at idx={}", placements.len());
-                break;
+                return Err(AntArchiveError::InternalServerError(
+                    "ANT-ERR-134",
+                    Some(anyhow::Error::msg(format!(
+                        "failed to place object on placement ring (l={}) after \
+                        ensuring enough space (l={}) was available.",
+                        available_nodes.len(),
+                        placements.len()
+                    ))),
+                ));
             }
         }
     }
@@ -198,43 +236,42 @@ async fn calculate_placement(
 
 pub(crate) const NUM_REPLICATION: usize = 3;
 
-#[tracing::instrument(skip(state))]
-pub(crate) async fn place_new_object(
+/// Here, id means the object or chunk or whatever bytes need to be placed.
+/// It's compared to the hashed identities of the nodes to determine ring placement.
+pub(crate) async fn place_group(
     state: &AntArchiveState,
-    object_key: &str,
-    new_object_size_bytes: i64,
+
+    id: &str,
+    size: usize,
+
+    num_placements_to_find: i32,
+
     required_node: Option<&str>,
 ) -> Result<Vec<Placement>, AntArchiveError> {
-    return calculate_placement(
+    return calculate_placements(
         state,
-        object_key,
-        NUM_REPLICATION,
-        new_object_size_bytes,
+        id,
+        size,
+        num_placements_to_find,
         required_node,
-        &[],
+        &HashSet::new(),
     )
     .await;
 }
 
 /// If replication fails to a node, we want to find a replacement that excludes that node
-#[tracing::instrument(skip(state))]
 pub(crate) async fn find_replacement(
     state: &AntArchiveState,
-    object_key: &str,
-    new_object_size_bytes: i64,
-    disqualified: &[String],
+
+    id: &str,
+    size: usize,
+
+    disqualified: &HashSet<String>,
 ) -> Result<Placement, AntArchiveError> {
     info!("Finding replacement!");
-    let placement = calculate_placement(
-        state,
-        object_key,
-        1,
-        new_object_size_bytes,
-        None,
-        disqualified,
-    )
-    .await?
-    .remove(0);
+    let placement = calculate_placements(state, id, size, 1, None, disqualified)
+        .await?
+        .remove(0);
 
     return Ok(placement);
 }

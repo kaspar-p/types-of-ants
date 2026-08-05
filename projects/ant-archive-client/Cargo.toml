@@ -1,0 +1,10 @@
+[package]
+name = "ant-archive-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ant-library = { version = "1.0.0", path = "../ant-library" }
+bytes = "1.12.0"
+reqwest = "0.13.4"
+thiserror = "2.0.18"

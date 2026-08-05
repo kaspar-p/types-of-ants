@@ -1,5 +1,7 @@
 use reqwest::{Client, StatusCode};
 
+mod tek;
+
 #[derive(Debug, Clone)]
 pub struct AntArchiveStorageNodeClient {
     pub node_id: String,
@@ -10,7 +12,7 @@ pub struct AntArchiveStorageNodeClient {
     password: String,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum AntArchiveStorageError {
     #[error("Error: request failed to ant-archive-storage: {0}")]
     Connection(#[from] reqwest::Error),
@@ -22,6 +24,12 @@ pub enum AntArchiveStorageError {
         storage_key: String,
         body: String,
     },
+
+    #[error("TEK encryption failed for key {0}")]
+    Encryption(String),
+
+    #[error("TEK decryption failed for key {0}")]
+    Decryption(String),
 }
 
 impl AntArchiveStorageNodeClient {
@@ -42,19 +50,21 @@ impl AntArchiveStorageNodeClient {
         }
     }
 
-    pub async fn put<'a>(
+    pub async fn put(
         &self,
         storage_key: &str,
-        tek: &[u8],
+        tek: &[u8; 32],
         bytes: bytes::Bytes,
     ) -> Result<(), AntArchiveStorageError> {
         let tek_hex = base16ct::lower::encode_string(tek);
+        let wire_payload = tek::wrap(tek, bytes.as_ref())?;
+
         let res = self
             .client
             .put(format!("{}/{}", self.base_url, storage_key))
             .basic_auth(&self.username, Some(&self.password))
             .header("X-Ant-Tek", tek_hex)
-            .body(bytes)
+            .body(wire_payload)
             .send()
             .await?;
 
@@ -70,13 +80,17 @@ impl AntArchiveStorageNodeClient {
             Err(AntArchiveStorageError::Failed {
                 method: "PUT".to_string(),
                 storage_key: storage_key.to_string(),
-                status: status,
-                body: body,
+                status,
+                body,
             })
         }
     }
 
-    pub async fn get(&self, storage_key: &str) -> Result<Option<Vec<u8>>, AntArchiveStorageError> {
+    pub async fn get(
+        &self,
+        storage_key: &str,
+        tek: &[u8; 32],
+    ) -> Result<Option<Vec<u8>>, AntArchiveStorageError> {
         let res = self
             .client
             .get(format!("{}/{}", self.base_url, storage_key))
@@ -88,7 +102,7 @@ impl AntArchiveStorageNodeClient {
         let body = res.bytes().await?;
 
         match status {
-            StatusCode::OK => Ok(Some(body.to_vec())),
+            StatusCode::OK => Ok(Some(tek::unwrap(tek, storage_key, &body)?)),
             StatusCode::NOT_FOUND => Ok(None),
             s => Err(AntArchiveStorageError::Failed {
                 method: "GET".to_string(),

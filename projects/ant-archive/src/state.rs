@@ -8,4 +8,6 @@ pub struct AntArchiveState {
     pub db: AntArchiveDb,
     pub sd: Arc<ServiceDiscovery>,
     pub rng: Arc<dyn Rng>,
+
+    pub chunk_size: usize,
 }

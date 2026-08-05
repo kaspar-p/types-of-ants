@@ -103,7 +103,14 @@ impl ConsulFixture {
     }
 
     async fn check_health(port: u16) -> bool {
-        match reqwest::get(format!("http://localhost:{}/v1/agent/self", port))
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .expect("failed to build health-check client");
+
+        match client
+            .get(format!("http://localhost:{}/v1/agent/self", port))
+            .send()
             .await
             .and_then(|r| r.error_for_status())
         {

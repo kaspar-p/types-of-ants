@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use ant_backing_it_up::{
     crypto,
@@ -12,6 +12,36 @@ use tracing::info;
 #[command(about, long_about = None)]
 struct Args {
     project: String,
+
+    #[clap(long, default_value_t = Source::AntFs)]
+    source: Source,
+}
+
+#[derive(Debug, Clone)]
+enum Source {
+    AntFs,
+    AntArchive,
+}
+
+impl FromStr for Source {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ant-fs" => Ok(Self::AntFs),
+            "ant-archive" => Ok(Self::AntArchive),
+            _ => Err("failed to map string"),
+        }
+    }
+}
+
+impl ToString for Source {
+    fn to_string(&self) -> String {
+        match self {
+            Self::AntArchive => "ant-archive".to_string(),
+            Self::AntFs => "ant-fs".to_string(),
+        }
+    }
 }
 
 #[tokio::main]

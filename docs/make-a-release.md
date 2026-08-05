@@ -1,6 +1,6 @@
 # Making a release
 
-Just run `./run-dev.sh ant-releasing-ants-into-the-wild`. It does everything.
+Just run `ah dev ant-releasing-ants-into-the-wild`. It does everything.
 
 ## Sending the emails
 

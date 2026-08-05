@@ -1,5 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
+use ant_archive_client::AntArchiveClient;
 use ant_fs_client::AntFsClient;
 use ant_library::sd::reader::ServiceDiscovery;
 
@@ -10,5 +11,6 @@ pub struct AntBackingItUpState {
     pub sd: Arc<ServiceDiscovery>,
     pub root_dir: PathBuf,
     pub ant_fs: AntFsClient,
+    pub ant_archive: AntArchiveClient,
     pub db: AntBackingItUpStorageClient,
 }

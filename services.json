@@ -402,6 +402,78 @@
         }
       ]
     },
+    "antworker008": {
+      "auto_deployable": true,
+      "architecture": "x86",
+      "services": [
+        {
+          "env": "prod",
+          "project": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
+        },
+        {
+          "env": "prod",
+          "project": "ant-worker-node-metrics-exporter"
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        }
+      ]
+    },
+    "antworker009": {
+      "auto_deployable": true,
+      "architecture": "x86",
+      "services": [
+        {
+          "env": "prod",
+          "project": "ant-host-agent"
+        },
+        {
+          "env": "prod",
+          "project": "ant-measuring-the-database"
+        },
+        {
+          "env": "prod",
+          "project": "ant-lumberjack"
+        },
+        {
+          "env": "prod",
+          "project": "ant-worker-node-metrics-exporter"
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker",
+          "additional_vars": {
+            "ANT_MATCHMAKER_SERVER_FLAGS": ""
+          }
+        },
+        {
+          "env": "prod",
+          "project": "ant-matchmaker-infra",
+          "additional_vars": {
+            "ANT_MATCHMAKER_INFRA_SERVER_FLAGS": "-server -bootstrap-expect=3"
+          }
+        }
+      ]
+    },
     "hisbaan01": {
       "auto_deployable": false,
       "architecture": "x86",

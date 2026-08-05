@@ -1,0 +1,4 @@
+{
+  "project": "ant-releasing-ants-into-the-wild",
+  "build": "makefile"
+}

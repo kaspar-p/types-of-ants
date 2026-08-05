@@ -27,6 +27,7 @@ async fn main() {
         .expect("failed to connect to ant-archive-db");
 
     let state = ant_archive::AntArchiveState {
+        chunk_size: 1024 * 1024 * 4, // 4mb
         db,
         sd,
         rng: Arc::new(SystemRng),
