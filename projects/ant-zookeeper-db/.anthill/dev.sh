@@ -24,7 +24,8 @@ fi
 cd "${repository_root}"
 mo "projects/ant-zookeeper/dev-fs/dev-fs/envs/docker-compose.yml" > compose.dev.ant-zookeeper-db.yaml
 
-podman compose \
+docker-compose \
+  --project-directory "${repository_root}" \
   --file compose.dev.ant-zookeeper-db.yaml \
   up \
   --build \

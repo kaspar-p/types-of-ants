@@ -9,7 +9,6 @@ repository_root="$(git rev-parse --show-toplevel)"
 NODE_VARIANT="${1:-single}"
 
 export BIN="consul"
-export TYPESOFANTS_SECRET_DIR="$repository_root/secrets/dev"
 export PERSIST_DIR="$repository_root/projects/ant-matchmaker/dev-fs/consul-data"
 
 if [[ "$NODE_VARIANT" == "single" || "$NODE_VARIANT" == "node:1/1" ]]; then

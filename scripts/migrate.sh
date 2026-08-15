@@ -25,6 +25,7 @@ set -o allexport
 
 secrets_dir="$(find_secrets_dir "$deploy_env")"
 
+# Local "ah run ant-matchmaker client"
 consul_res="$(curl "http://localhost:9990/v1/catalog/service/$project")"
 
 echo "$consul_res" | jq

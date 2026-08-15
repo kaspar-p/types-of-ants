@@ -35,6 +35,7 @@ ant-archive-storage-client = { version = "0.1.0", path = "../ant-archive-storage
 futures = "0.3.32"
 thiserror = "2.0.18"
 tokio-util = { version = "0.7.19", features = ["io"] }
+chrono = "0.4.45"
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }

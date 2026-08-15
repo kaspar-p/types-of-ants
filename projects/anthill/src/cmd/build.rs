@@ -67,6 +67,12 @@ pub async fn build(cmd: BuildCmd) -> Vec<DeploymentFile> {
     let arches: HashSet<HostArchitecture> = if let Some(arch) = cmd.arch.as_ref() {
         [arch.clone()].into()
     } else {
+        // [
+        //     HostArchitecture::Aarch64,
+        //     HostArchitecture::ArmV7,
+        //     HostArchitecture::X86_64,
+        // ]
+        // .into()
         services
             .hosts
             .values()

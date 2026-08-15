@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Sub};
 
 use anyhow::Context;
 use axum::{
@@ -158,14 +158,11 @@ pub(super) async fn put_object(
 
             // Loop until we successfully place onto the node, without needing a replacement
             loop {
+                let start = chrono::Utc::now();
                 let placement = &placements[i];
                 info!(
-                    "[inpr] Placing {chunk_id}[{}] shard {} (l={}) onto {} ({})",
-                    chunk.index,
-                    shard.index,
-                    shard_size,
-                    placement.node.host_id,
-                    placement.node.node_id
+                    "[inpr] [c idx={}] Placing {chunk_id} sh={} (s={shard_size}) onto {} ({})",
+                    chunk.index, shard.index, placement.node.host_id, placement.node.node_id
                 );
 
                 let res = placement
@@ -182,6 +179,7 @@ pub(super) async fn put_object(
                             shard_size
                         )
                     });
+                let end = chrono::Utc::now();
 
                 match res {
                     Ok(()) => {
@@ -197,12 +195,12 @@ pub(super) async fn put_object(
                             )
                             .await?;
                         info!(
-                            "[done] Placing {chunk_id}[{}] shard {} (l={}) onto {} ({})",
+                            "[done] [c idx={}] Placing {chunk_id} sh={} (s={shard_size}) onto {} ({}) [t={}ms]",
                             chunk.index,
                             shard.index,
-                            shard_size,
                             placement.node.host_id,
-                            placement.node.node_id
+                            placement.node.node_id,
+                            end.sub(start).num_milliseconds()
                         );
                         break;
                     }

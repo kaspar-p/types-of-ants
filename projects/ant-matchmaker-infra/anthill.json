@@ -2,7 +2,7 @@
   "project": "ant-matchmaker-infra",
   "description": "the typesofants infrastructure service discovery mechanism",
   "build": "makefile",
-  "cluster": "daemon_set",
+  "cluster": "global_infrastructure",
   "ports": {
     "primary": 3258,
     "metrics": {

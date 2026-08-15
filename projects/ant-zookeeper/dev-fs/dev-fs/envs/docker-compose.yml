@@ -139,6 +139,7 @@ services:
       VERSION: "{{VERSION}}"
     ports:
       - "{{PORT}}:3000"
+    user: "0:0"
     volumes:
       - "{{PERSIST_DIR}}/grafana_storage:/var/lib/grafana"
 

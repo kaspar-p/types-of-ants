@@ -69,7 +69,8 @@ pub fn set_global_logs(project: &str) -> () {
                 .add_directive("tower_http=debug".parse().unwrap())
                 .add_directive("axum::rejection=trace".parse().unwrap())
                 .add_directive("tokio_cron_scheduler=debug".parse().unwrap())
-                .add_directive("hyper=off".parse().unwrap()),
+                .add_directive("hyper=warn".parse().unwrap())
+                .add_directive("h2=warn".parse().unwrap()),
         )
         .with_ansi(false)
         .with_writer(Tee::new(
