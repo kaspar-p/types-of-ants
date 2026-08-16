@@ -160,20 +160,20 @@ async fn calculate_placements(
 
         if bytes_stored + size as i64 <= capacity_bytes {
             debug!(
-                "qualified: {} because {} + {} is less than {}",
+                "qualified: {} because {bytes_stored} ({}) + {size} ({}) is less than {capacity_bytes} ({})",
                 node.to_string(),
-                bytes_stored,
-                size,
-                capacity_bytes
+                humansize::format_size_i(bytes_stored, humansize::DECIMAL),
+                humansize::format_size_i(size, humansize::DECIMAL),
+                humansize::format_size_i(capacity_bytes, humansize::DECIMAL)
             );
             available_nodes.add(node);
         } else {
             debug!(
-                "disqualified: {} because {} + {} is more than {}",
+                "disqualified: {} because {bytes_stored} ({}) + {size} ({}) is more than {capacity_bytes} ({})",
                 node.to_string(),
-                bytes_stored,
-                size,
-                capacity_bytes
+                humansize::format_size_i(bytes_stored, humansize::DECIMAL),
+                humansize::format_size_i(size, humansize::DECIMAL),
+                humansize::format_size_i(capacity_bytes, humansize::DECIMAL)
             );
         }
     }

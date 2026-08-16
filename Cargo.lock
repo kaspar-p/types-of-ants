@@ -191,6 +191,7 @@ dependencies = [
  "hkdf",
  "http 1.4.0",
  "http-body-util",
+ "humansize",
  "rand 0.8.6",
  "reqwest 0.12.28",
  "serde",
