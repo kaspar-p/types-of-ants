@@ -153,12 +153,6 @@ async fn post_backup(
     // .read_to_end(&mut sql_plaintext)
     // .unwrap();
 
-    info!("Removing backup SQL: {}", local_sql_path.display());
-    // std::fs::remove_file(&local_sql_path).expect(&format!(
-    //     "removing pg_dump output: {}",
-    //     local_sql_path.display()
-    // ));
-
     // let local_zip_filename = format!("{local_sql_filename}.zip");
     // let local_zip_path = root_dir.join(&local_zip_filename);
     // let local_zip_file = std::fs::File::create(&local_zip_path).unwrap();
@@ -241,6 +235,12 @@ async fn post_backup(
     //         error!("ANT-ERR-012: db query failed: {e}");
     //         StatusCode::INTERNAL_SERVER_ERROR
     //     })?;
+
+    info!("Removing backup SQL: {}", local_sql_path.display());
+    std::fs::remove_file(&local_sql_path).expect(&format!(
+        "removing pg_dump output: {}",
+        local_sql_path.display()
+    ));
 
     info!("Backup job successful.");
 
