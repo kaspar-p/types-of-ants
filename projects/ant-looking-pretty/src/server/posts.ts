@@ -221,13 +221,18 @@ export const favorite = async (
   inputData: z.infer<typeof posts.favorite.inputDataSchema>,
 ) => {
   const res = await constructPost(posts.favorite, inputData);
-  if (res.__status === 200) {
-    res.favoritedAt =
+  if (res.__status !== 200) {
+    return res;
+  }
+
+  // A new object rather than assigning in place, so the type narrows to a number too.
+  return {
+    ...res,
+    favoritedAt:
       typeof res.favoritedAt === "number"
         ? res.favoritedAt
-        : Math.floor(new Date(res.favoritedAt).getTime() / 1000);
-  }
-  return res;
+        : Math.floor(new Date(res.favoritedAt).getTime() / 1000),
+  };
 };
 export const unfavorite = async (
   inputData: z.infer<typeof posts.unfavorite.inputDataSchema>,
