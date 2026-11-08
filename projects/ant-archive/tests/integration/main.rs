@@ -1171,3 +1171,40 @@ async fn vacuum_returns_200_skipped_on_another_instance() {
         "the last vacuum's result is shared through the database"
     );
 }
+
+#[tokio::test]
+#[traced_test]
+async fn get_object_returns_200_storage_node_unreachable() {
+    let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
+
+    put_object(&fixture, &ids.private_id, "resilient", b"abc").await;
+
+    // Reads try shards in index order, so stop the node holding shard 0.
+    let object = fixture
+        .db
+        .get_current_object(&ids.private_id, "resilient")
+        .await
+        .unwrap()
+        .unwrap();
+    let chunks = fixture
+        .db
+        .list_chunks_for_object(&object.object_id)
+        .await
+        .unwrap();
+    let placements = fixture
+        .db
+        .list_chunk_shard_placements(&chunks[0].chunk_id)
+        .await
+        .unwrap();
+    fixture.stop_storage_node(&placements[0].storage_node_id);
+
+    let res = fixture
+        .client
+        .get(&format!("/o/{}/resilient", ids.private_id))
+        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.bytes().await.as_ref(), b"abc");
+}

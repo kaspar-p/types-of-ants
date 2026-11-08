@@ -224,6 +224,17 @@ impl Fixture {
         .await
     }
 
+    /// Shuts down a storage node's server, so requests to it fail to connect. It stays in
+    /// service discovery, like a node that has gone offline.
+    pub fn stop_storage_node(&self, storage_node_id: &str) {
+        // seed_db registers sn-test1..3 for the sn1..3 nodes, in order.
+        let index: usize = storage_node_id
+            .strip_prefix("sn-test")
+            .and_then(|n| n.parse().ok())
+            .expect("storage node id like sn-test1");
+        self._storages[index - 1]._handle.abort();
+    }
+
     /// Every blob file on every storage node.
     pub fn stored_blobs(&self) -> Vec<PathBuf> {
         fn walk(dir: &std::path::Path, out: &mut Vec<PathBuf>) {

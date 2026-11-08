@@ -132,13 +132,25 @@ pub(super) async fn get_object(
                     continue;
                 };
 
-                let Some(bytes) = node.client.get(&p.storage_key, &tek).await? else {
-                    error!(
-                        node_id = %p.storage_node_id, storage_key = %p.storage_key,
-                        "ANT-ERR-002: blob missing from storage node: \
-                        placement record exists but data does not"
-                    );
-                    continue;
+                // Nodes can go offline at any time, so an error is just another reason to try
+                // the next shard.
+                let bytes = match node.client.get(&p.storage_key, &tek).await {
+                    Ok(Some(bytes)) => bytes,
+                    Ok(None) => {
+                        error!(
+                            node_id = %p.storage_node_id, storage_key = %p.storage_key,
+                            "ANT-ERR-002: blob missing from storage node: \
+                            placement record exists but data does not"
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        error!(
+                            node_id = %p.storage_node_id, storage_key = %p.storage_key,
+                            "ANT-ERR-150: reading shard from storage node failed: {e}"
+                        );
+                        continue;
+                    }
                 };
                 let checksum = compute_checksum(&bytes);
                 if checksum != p.checksum {

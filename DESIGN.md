@@ -191,10 +191,10 @@ cleans those up.
 
 For each chunk, ant-archive fetches shards (data shards first) until it has
 `min_shards_to_reconstruct` good ones. A shard is skipped, and the next node
-tried, when the node is not in service discovery, when the node has no blob for
-it, or when its SHA-256 doesn't match the checksum recorded at upload. The chunk
-is then decrypted with AES-GCM, which also rejects tampered or truncated data. An
-error response from a node (rather than a missing blob) fails the read.
+tried, when the node is not in service discovery, when a request to the node
+fails, when the node has no blob for it, or when its SHA-256 doesn't match the
+checksum recorded at upload. The chunk is then decrypted with AES-GCM, which also
+rejects tampered or truncated data.
 
 ### Vacuum
 
