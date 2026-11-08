@@ -8,10 +8,10 @@ use std::{
 
 use serde::Deserialize;
 
-use ant_archive::{make_routes, AntArchiveDb, AntArchiveState};
+use ant_archive::{AntArchiveDb, AntArchiveState, make_routes};
 use ant_archive_db::ClientCapabilities;
 use ant_archive_storage::{
-    build_metric_layer, make_routes as make_storage_routes, AntArchiveStorageState,
+    AntArchiveStorageState, build_metric_layer, make_routes as make_storage_routes,
 };
 use ant_library::{
     db::TypesOfAntsDatabase as _,
@@ -198,12 +198,7 @@ impl Fixture {
         seed_db(&archive_db, capacities).await;
 
         let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-        let app = make_routes(make_state(
-            &archive_db,
-            &sd,
-            vacuum_grace,
-            "test-instance",
-        ));
+        let app = make_routes(make_state(&archive_db, &sd, vacuum_grace, "test-instance"));
 
         Fixture {
             client: TestClient::new(app).await,

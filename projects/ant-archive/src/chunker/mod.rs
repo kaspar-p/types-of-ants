@@ -1,6 +1,6 @@
 use crate::{
-    chunker::{chunker::Chunker, fixed_size::FixedSize, no_chunk::NoChunk},
     AntArchiveError, AntArchiveState,
+    chunker::{chunker::Chunker, fixed_size::FixedSize, no_chunk::NoChunk},
 };
 
 pub mod chunker;
@@ -23,7 +23,7 @@ pub fn from_id(
                 Some(anyhow::anyhow!(
                     "No valid chunk strategy for chunk strategy: {other}"
                 )),
-            ))
+            ));
         }
     };
 

@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 
 use crate::chunker::{
     chunker::{ChunkError, Chunker, EncryptedChunk},

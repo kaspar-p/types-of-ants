@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{Json, Router, extract::State, routing::post};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -17,9 +17,9 @@ use tower_http::catch_panic::CatchPanicLayer;
 use tracing::{info, warn};
 
 use crate::{
-    auth::BearerClaims,
-    placement::{resolve_storage_node_clients, HashRingNode},
     AntArchiveError, AntArchiveState,
+    auth::BearerClaims,
+    placement::{HashRingNode, resolve_storage_node_clients},
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]

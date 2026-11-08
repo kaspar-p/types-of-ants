@@ -1,6 +1,6 @@
 use crate::{
-    redundancy::{replication::Replication, scheme::RedundancyScheme},
     AntArchiveError,
+    redundancy::{replication::Replication, scheme::RedundancyScheme},
 };
 
 pub mod replication;
@@ -13,7 +13,7 @@ pub fn from_id(redundancy_strategy: &str) -> Result<Box<dyn RedundancyScheme>, A
             return Err(AntArchiveError::InternalServerError(
                 "ANT-ERR-136",
                 Some(anyhow::anyhow!("Invalid redundancy strategy: {other}")),
-            ))
+            ));
         }
     };
 

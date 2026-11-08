@@ -6,9 +6,9 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
 };
-use axum_extra::{headers::ContentLength, TypedHeader};
+use axum_extra::{TypedHeader, headers::ContentLength};
 use bytes::Bytes;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use http::StatusCode;
 use tracing::{info, warn};
 
@@ -87,7 +87,7 @@ pub(super) async fn put_object(
     })?;
 
     // CHOOSE PARAMETERS
-    let content_length = content_length.map(|h| h.0 .0).unwrap_or(0);
+    let content_length = content_length.map(|h| h.0.0).unwrap_or(0);
 
     let chunker: Box<dyn Chunker> = Box::new(chunker::fixed_size::FixedSize::new(state.chunk_size));
     let redundancy: Box<dyn RedundancyScheme> =

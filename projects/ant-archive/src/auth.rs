@@ -1,7 +1,7 @@
 use axum::extract::{FromRef, FromRequestParts, OptionalFromRequestParts};
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use http::request::Parts;
 
@@ -115,7 +115,7 @@ pub async fn access_bucket_object(
             return Err(AntArchiveError::InternalServerError(
                 "ANT-ERR-107",
                 Some(anyhow::anyhow!("unknown read policy")),
-            ))
+            ));
         }
     }
 

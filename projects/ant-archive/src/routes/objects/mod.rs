@@ -1,7 +1,7 @@
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
     routing::{delete, get, put},
-    Router,
 };
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};

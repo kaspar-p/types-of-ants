@@ -1166,5 +1166,8 @@ async fn vacuum_returns_200_skipped_on_another_instance() {
         .await;
     assert_eq!(res.status(), StatusCode::OK);
     let report: VacuumReport = res.json().await;
-    assert!(report.skipped, "the last vacuum's result is shared through the database");
+    assert!(
+        report.skipped,
+        "the last vacuum's result is shared through the database"
+    );
 }

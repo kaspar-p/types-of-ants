@@ -1,4 +1,4 @@
-use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit, Nonce};
+use aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use base64ct::{Base64, Encoding};
 use rand::rngs::OsRng;
 

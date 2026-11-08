@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;
 

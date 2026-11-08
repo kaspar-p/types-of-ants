@@ -189,12 +189,12 @@ async fn calculate_placements(
     }
 
     // Every available node in ring order; the loop below takes as many as are needed.
-    let mut ring_iter = match available_nodes.get_with_replicas(&group_id, available_nodes.len() - 1)
-    {
-        Some(ring) => ring,
-        None => return Err(AntArchiveError::InsufficientStorage),
-    }
-    .into_iter();
+    let mut ring_iter =
+        match available_nodes.get_with_replicas(&group_id, available_nodes.len() - 1) {
+            Some(ring) => ring,
+            None => return Err(AntArchiveError::InsufficientStorage),
+        }
+        .into_iter();
 
     while (placements.len() as i32) < num_placements_to_find {
         info!("Choosing [idx={}] placement...", placements.len());

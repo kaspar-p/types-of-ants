@@ -75,7 +75,9 @@ mod test {
         let replication = Replication::new(3);
 
         for chunk_size in [0, 1, 26] {
-            let shards = replication.shard(&Bytes::from(vec![7u8; chunk_size])).unwrap();
+            let shards = replication
+                .shard(&Bytes::from(vec![7u8; chunk_size]))
+                .unwrap();
 
             for shard in shards {
                 assert_eq!(replication.shard_size(chunk_size), shard.data.len());
