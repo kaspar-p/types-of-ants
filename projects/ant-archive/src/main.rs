@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use ant_archive_db::AntArchiveDb;
 use ant_library::{rng::SystemRng, sd::reader::ServiceDiscovery};
 use futures::future::join_all;
-use tokio::{sync::Mutex, time::sleep};
+use tokio::time::sleep;
 use tracing::{debug, error, info};
 
 #[tokio::main]
@@ -34,7 +34,10 @@ async fn main() {
         sd,
         rng: Arc::new(SystemRng),
         vacuum_grace: chrono::Duration::hours(1),
-        last_vacuum: Arc::new(Mutex::new(None)),
+        instance_id: format!(
+            "ant-archive-{}",
+            base16ct::lower::encode_string(&rand::random::<[u8; 8]>())
+        ),
     };
 
     let vacuum_state = state.clone();

@@ -21,7 +21,7 @@ use ant_library::{
 use ant_library_test::{
     axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
-use tokio::{net::TcpListener, sync::Mutex, task::JoinHandle};
+use tokio::{net::TcpListener, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
 const TEST_BUCKET_ID: &str = "b-testbucket";
@@ -104,6 +104,7 @@ pub struct Fixture {
     pub db: AntArchiveDb,
     pub sd: Arc<ServiceDiscovery>,
     pub consul_port: u16,
+    vacuum_grace: chrono::Duration,
     _db: TestDatabase,
     _storages: Vec<StorageNode>,
     _consul: ConsulFixture,
@@ -197,15 +198,12 @@ impl Fixture {
         seed_db(&archive_db, capacities).await;
 
         let sd = Arc::new(ServiceDiscovery::new(consul.port()));
-        let state = AntArchiveState {
-            chunk_size: 10, // 10 bytes
-            db: archive_db.clone(),
-            sd: sd.clone(),
-            rng: Arc::new(TestSeededRng::new(42)),
+        let app = make_routes(make_state(
+            &archive_db,
+            &sd,
             vacuum_grace,
-            last_vacuum: Arc::new(Mutex::new(None)),
-        };
-        let app = make_routes(state);
+            "test-instance",
+        ));
 
         Fixture {
             client: TestClient::new(app).await,
@@ -213,10 +211,22 @@ impl Fixture {
             db: archive_db,
             sd,
             consul_port: consul.port(),
+            vacuum_grace,
             _db: db,
             _storages: storages,
             _consul: consul,
         }
+    }
+
+    /// Another ant-archive instance, sharing this one's database and storage nodes.
+    pub async fn new_instance(&self, instance_id: &str) -> TestClient {
+        TestClient::new(make_routes(make_state(
+            &self.db,
+            &self.sd,
+            self.vacuum_grace,
+            instance_id,
+        )))
+        .await
     }
 
     /// Every blob file on every storage node.
@@ -261,6 +271,22 @@ impl Fixture {
         map.insert("sn-test3".to_string(), capacity_bytes);
 
         Self::new_with_capacities(name, map).await
+    }
+}
+
+fn make_state(
+    db: &AntArchiveDb,
+    sd: &Arc<ServiceDiscovery>,
+    vacuum_grace: chrono::Duration,
+    instance_id: &str,
+) -> AntArchiveState {
+    AntArchiveState {
+        chunk_size: 10, // 10 bytes
+        db: db.clone(),
+        sd: sd.clone(),
+        rng: Arc::new(TestSeededRng::new(42)),
+        vacuum_grace,
+        instance_id: instance_id.to_string(),
     }
 }
 

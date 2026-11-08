@@ -1091,3 +1091,80 @@ async fn put_object_returns_507_shard_one_byte_over_capacity() {
         .await;
     assert_eq!(res.status(), StatusCode::INSUFFICIENT_STORAGE);
 }
+
+#[tokio::test]
+#[traced_test]
+async fn vacuum_returns_200_already_running_on_another_instance() {
+    let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
+
+    put_object(&fixture, &ids.private_id, "gone", b"abc").await;
+    delete_object(&fixture, &ids.private_id, "gone").await;
+
+    fixture
+        .db
+        .acquire_job_lease("vacuum", "other-instance", 60 * 60)
+        .await
+        .unwrap()
+        .expect("lease should be free");
+
+    let report = vacuum(&fixture).await;
+    assert!(report.already_running);
+    assert_eq!(report.placements_purged, 0);
+    assert_eq!(fixture.stored_blobs().len(), 3);
+
+    fixture
+        .db
+        .release_job_lease("vacuum", "other-instance", None, false)
+        .await
+        .unwrap();
+
+    let report = vacuum(&fixture).await;
+    assert!(!report.already_running);
+    assert_eq!(report.placements_purged, 3);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn vacuum_returns_200_takes_over_expired_lease() {
+    let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
+
+    put_object(&fixture, &ids.private_id, "gone", b"abc").await;
+    delete_object(&fixture, &ids.private_id, "gone").await;
+
+    // An instance that died mid-vacuum, whose lease has run out.
+    fixture
+        .db
+        .acquire_job_lease("vacuum", "dead-instance", 0)
+        .await
+        .unwrap()
+        .expect("lease should be free");
+
+    let report = vacuum(&fixture).await;
+    assert!(!report.already_running);
+    assert_eq!(report.placements_purged, 3);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn vacuum_returns_200_skipped_on_another_instance() {
+    let fixture = Fixture::new(function_name!()).await;
+    let ids = fixture.bucket_ids().await;
+
+    put_object(&fixture, &ids.private_id, "gone", b"abc").await;
+    delete_object(&fixture, &ids.private_id, "gone").await;
+
+    let report = vacuum(&fixture).await;
+    assert_eq!(report.placements_purged, 3);
+
+    let other = fixture.new_instance("second-instance").await;
+    let res = other
+        .post("/vacuum")
+        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let report: VacuumReport = res.json().await;
+    assert!(report.skipped, "the last vacuum's result is shared through the database");
+}

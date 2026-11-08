@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 
 use axum::{extract::State, routing::post, Json, Router};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tower::ServiceBuilder;
@@ -22,16 +22,10 @@ use crate::{
     AntArchiveError, AntArchiveState,
 };
 
-/// What the previous vacuum saw, so the next one can skip when nothing has changed.
-pub struct LastVacuum {
-    /// The latest activity in the database when that vacuum started.
-    activity: Option<DateTime<Utc>>,
-    /// Whether it finished with nothing deferred and nothing failed.
-    clean: bool,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct VacuumReport {
+    /// Another instance holds the vacuum lease.
+    pub already_running: bool,
     /// Nothing changed since the last vacuum, and it left nothing to retry.
     pub skipped: bool,
     pub placements_purged: usize,
@@ -44,20 +38,50 @@ pub struct VacuumReport {
 
 const LIST_PAGE_SIZE: usize = 1000;
 
+const JOB_ID: &str = "vacuum";
+
+/// Long enough for a pass to finish. If an instance dies mid-pass, another takes over after
+/// this.
+const LEASE_SECONDS: i64 = 60 * 60;
+
 pub async fn vacuum(state: &AntArchiveState) -> Result<VacuumReport, AntArchiveError> {
-    let mut last_vacuum = state.last_vacuum.lock().await;
+    let Some(lease) = state
+        .db
+        .acquire_job_lease(JOB_ID, &state.instance_id, LEASE_SECONDS)
+        .await?
+    else {
+        return Ok(VacuumReport {
+            already_running: true,
+            ..Default::default()
+        });
+    };
 
     // Read before doing anything, so activity during this pass makes the next one run.
     let activity = state.db.last_activity().await?;
-    if let Some(last) = last_vacuum.as_ref() {
-        if last.clean && last.activity == activity {
-            return Ok(VacuumReport {
-                skipped: true,
-                ..Default::default()
-            });
-        }
+    if lease.last_run_clean && lease.last_activity == activity {
+        state
+            .db
+            .release_job_lease(JOB_ID, &state.instance_id, activity, true)
+            .await?;
+        return Ok(VacuumReport {
+            skipped: true,
+            ..Default::default()
+        });
     }
 
+    let result = run_pass(state).await;
+
+    // A pass that errored part-way isn't clean, so the next one doesn't skip.
+    let clean = matches!(&result, Ok(r) if r.deferred == 0 && r.failures.is_empty());
+    state
+        .db
+        .release_job_lease(JOB_ID, &state.instance_id, activity, clean)
+        .await?;
+
+    result
+}
+
+async fn run_pass(state: &AntArchiveState) -> Result<VacuumReport, AntArchiveError> {
     let mut report = VacuumReport::default();
     let nodes: HashMap<String, HashRingNode> = resolve_storage_node_clients(state)
         .await?
@@ -77,11 +101,6 @@ pub async fn vacuum(state: &AntArchiveState) -> Result<VacuumReport, AntArchiveE
         report.deferred,
         report.failures.len()
     );
-
-    *last_vacuum = Some(LastVacuum {
-        activity,
-        clean: report.deferred == 0 && report.failures.is_empty(),
-    });
 
     Ok(report)
 }

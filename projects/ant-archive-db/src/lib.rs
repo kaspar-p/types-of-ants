@@ -40,6 +40,13 @@ pub struct ArchiveBucket {
     pub read_policy: String,
 }
 
+/// What the last run of a job saw, handed to whoever acquires its lease.
+#[derive(Debug, Clone)]
+pub struct JobLease {
+    pub last_activity: Option<DateTime<Utc>>,
+    pub last_run_clean: bool,
+}
+
 /// A shard's copy on a storage node, belonging to an object that no key points to.
 #[derive(Debug, Clone)]
 pub struct UnreferencedPlacement {
@@ -1041,6 +1048,78 @@ impl AntArchiveDb {
                 due: r.get("due"),
             })
             .collect())
+    }
+
+    /// Returns None if another holder's lease hasn't expired. Re-acquiring a lease you already
+    /// hold extends it.
+    #[instrument(skip(self))]
+    pub async fn acquire_job_lease(
+        &self,
+        job_id: &str,
+        holder: &str,
+        lease_seconds: i64,
+    ) -> Result<Option<JobLease>, AntArchiveDbError> {
+        let row = self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                "
+                update archive_job
+                set
+                    lease_holder = $2,
+                    lease_expires_at = now() + ($3::bigint * interval '1 second'),
+                    updated_at = now()
+                where
+                    job_id = $1 and (
+                        lease_holder is null or
+                        lease_holder = $2 or
+                        lease_expires_at <= now()
+                    )
+                returning last_activity, last_run_clean
+                ",
+                &[&job_id, &holder, &lease_seconds],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(row.map(|r| JobLease {
+            last_activity: r.get("last_activity"),
+            last_run_clean: r.get("last_run_clean"),
+        }))
+    }
+
+    /// Records what this run saw and frees the lease. Does nothing if `holder` lost the lease.
+    #[instrument(skip(self))]
+    pub async fn release_job_lease(
+        &self,
+        job_id: &str,
+        holder: &str,
+        last_activity: Option<DateTime<Utc>>,
+        last_run_clean: bool,
+    ) -> Result<(), AntArchiveDbError> {
+        self.pool
+            .get()
+            .await?
+            .execute(
+                "
+                update archive_job
+                set
+                    lease_holder = null,
+                    lease_expires_at = null,
+                    last_activity = $3,
+                    last_run_clean = $4,
+                    updated_at = now()
+                where
+                    job_id = $1 and
+                    lease_holder = $2
+                ",
+                &[&job_id, &holder, &last_activity, &last_run_clean],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(())
     }
 
     /// After its blob is gone from the storage node.
