@@ -40,7 +40,7 @@ pub async fn curl(cmd: CurlCmd) -> Result<(), anyhow::Error> {
         .spawn()
         .context("failed to curl")?;
 
-    let handles = ant_library::process::prefix_log(&service, &mut child).context("logs")?;
+    let handles = ant_library_process::prefix_log(&service, &mut child).context("logs")?;
 
     let status = child.wait().await.context("curl failed")?;
     futures::future::join_all(handles).await;

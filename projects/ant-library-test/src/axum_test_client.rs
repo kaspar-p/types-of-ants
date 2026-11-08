@@ -37,7 +37,7 @@
 
 use bytes::Bytes;
 use http::StatusCode;
-use std::net::SocketAddr;
+use std::{format, net::SocketAddr};
 use tokio::net::TcpListener;
 
 #[derive(Clone)]

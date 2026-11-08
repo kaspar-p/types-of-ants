@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use tracing::error;
 
 use crate::{
-    auth::BearerClaims,
+    auth::{self, BearerClaims},
     chunker::{self, chunker::Chunker},
     err::AntArchiveError,
     placement::resolve_storage_nodes,
@@ -52,33 +52,7 @@ pub(super) async fn get_object(
     Path((bucket_id, key)): Path<(String, String)>,
     maybe_auth: Option<BearerClaims>,
 ) -> Result<Response, AntArchiveError> {
-    let bucket = state
-        .db
-        .get_bucket(&bucket_id)
-        .await?
-        .ok_or_else(|| AntArchiveError::BucketNotFound(bucket_id.clone()))?;
-
-    match bucket.read_policy.as_str() {
-        "public" => {}
-        "internal" => {
-            if maybe_auth.is_none() {
-                return Err(AntArchiveError::BucketNotFound(bucket_id.clone()));
-            }
-        }
-        "private" => {
-            let not_found = || AntArchiveError::ObjectNotFound(key.clone());
-            let auth = maybe_auth.ok_or_else(&not_found)?;
-            if bucket.client_id != auth.client_id {
-                return Err(not_found());
-            }
-        }
-        _ => {
-            return Err(AntArchiveError::InternalServerError(
-                "ANT-ERR-107",
-                Some(anyhow::anyhow!("unknown read policy")),
-            ))
-        }
-    }
+    auth::access_bucket_object(&state, maybe_auth, &bucket_id, &key).await?;
 
     // Resolve via the archive_key pointer, NOT a direct (bucket_id, key) -> object lookup
     let object = state

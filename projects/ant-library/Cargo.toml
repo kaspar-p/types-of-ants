@@ -53,6 +53,7 @@ tower-http = { version = "0.6.8", features = ["trace"] }
 tracing = { version = "0.1.41", features = ["max_level_debug"] }
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+ant-library-db = { version = "0.1.0", path = "../ant-library-db" }
 
 [dev-dependencies]
 ant-library-test = { path = "../ant-library-test" }

@@ -1,3 +1,4 @@
+use ant_archive_storage::ListBlobsResponse;
 use reqwest::{Client, StatusCode};
 
 mod tek;
@@ -134,6 +135,67 @@ impl AntArchiveStorageNodeClient {
             s => Err(AntArchiveStorageError::Failed {
                 method: "DELETE".to_string(),
                 storage_key: storage_key.to_string(),
+                status: s,
+                body,
+            }),
+        }
+    }
+
+    /// One page of the blobs on this node, sorted by hash. Pass the response's `next` as
+    /// `after` to get the following page.
+    pub async fn list_blobs(
+        &self,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<ListBlobsResponse, AntArchiveStorageError> {
+        let mut req = self
+            .client
+            .get(format!("{}/", self.base_url))
+            .basic_auth(&self.username, Some(&self.password))
+            .query(&[("limit", limit.to_string())]);
+        if let Some(after) = after {
+            req = req.query(&[("after", after)]);
+        }
+        let res = req.send().await?;
+
+        let status = res.status();
+        if status == StatusCode::OK {
+            return Ok(res.json().await?);
+        }
+
+        Err(AntArchiveStorageError::Failed {
+            method: "LIST".to_string(),
+            storage_key: after.unwrap_or_default().to_string(),
+            status,
+            body: res
+                .text()
+                .await
+                .unwrap_or("<error failed to deserialize response>".to_string()),
+        })
+    }
+
+    /// For blobs whose storage key isn't known, e.g. ones from `list_blobs` that no placement
+    /// points to. Returns false if there was no blob with that hash.
+    pub async fn delete_blob_by_hash(&self, hash: &str) -> Result<bool, AntArchiveStorageError> {
+        let res = self
+            .client
+            .delete(format!("{}/blobs/{}", self.base_url, hash))
+            .basic_auth(&self.username, Some(&self.password))
+            .send()
+            .await?;
+
+        let status = res.status();
+        let body = res
+            .text()
+            .await
+            .unwrap_or("<error failed to deserialize response>".to_string());
+
+        match status {
+            StatusCode::OK => Ok(true),
+            StatusCode::NOT_FOUND => Ok(false),
+            s => Err(AntArchiveStorageError::Failed {
+                method: "DELETE".to_string(),
+                storage_key: hash.to_string(),
                 status: s,
                 body,
             }),

@@ -22,4 +22,6 @@ members = [
   "projects/ant-archive",
   "projects/ant-archive-client",
   "projects/ant-archive-storage-client",
+  "projects/ant-library-db",
+  "projects/ant-library-process",
 ]

@@ -1,7 +1,7 @@
 [package]
 name = "ant-archive"
 version = "1.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 ant-library = { version = "1.0.0", path = "../ant-library" }
@@ -35,7 +35,7 @@ ant-archive-storage-client = { version = "0.1.0", path = "../ant-archive-storage
 futures = "0.3.32"
 thiserror = "2.0.18"
 tokio-util = { version = "0.7.19", features = ["io"] }
-chrono = "0.4.45"
+chrono = { version = "0.4.45", features = ["serde"] }
 humansize = "2.1.3"
 
 [dev-dependencies]

@@ -2,7 +2,7 @@ use std::{fs::exists, path::PathBuf};
 
 use postgresql_embedded::PostgreSQL;
 
-use ant_library::db::DatabaseConfig;
+use ant_library_db::DatabaseConfig;
 
 pub struct TestDatabase {
     _db: PostgreSQL,

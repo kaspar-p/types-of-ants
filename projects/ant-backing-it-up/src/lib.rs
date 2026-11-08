@@ -1,13 +1,8 @@
-use std::io::{Read, Write};
+use std::format;
 
 use ant_library::routes::Routes;
 use anyhow::Context;
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use http::{header, Method, StatusCode};
@@ -16,14 +11,16 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 use tracing::{debug, error, info, warn};
-use zip::write::SimpleFileOptions;
 
 use crate::{
+    rotation::{backup_key_prefix, RotationError},
     state::AntBackingItUpState,
-    storage_client::{Backup, DatabaseParams},
+    storage_client::DatabaseParams,
 };
 
 pub mod crypto;
+mod rotation;
+mod slots;
 pub mod state;
 pub mod storage_client;
 
@@ -33,22 +30,22 @@ pub struct ListBackupsRequest {
     pub page: i32,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListBackupsResponse {
-    pub backups: Vec<Backup>,
-}
+// #[derive(Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// pub struct ListBackupsResponse {
+//     pub backups: Vec<Backup>,
+// }
 
-async fn list_backups(
-    State(AntBackingItUpState { db, .. }): State<AntBackingItUpState>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let backups = db.get_all_backups().await.map_err(|e| {
-        error!("ANT-ERR-006: db: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+// async fn list_backups(
+//     State(AntBackingItUpState { db, .. }): State<AntBackingItUpState>,
+// ) -> Result<impl IntoResponse, StatusCode> {
+//     let backups = db.get_all_backups().await.map_err(|e| {
+//         error!("ANT-ERR-006: db: {e}");
+//         StatusCode::INTERNAL_SERVER_ERROR
+//     })?;
 
-    return Ok((StatusCode::OK, Json(ListBackupsResponse { backups })));
-}
+//     return Ok((StatusCode::OK, Json(ListBackupsResponse { backups })));
+// }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -207,8 +204,8 @@ async fn post_backup(
         let plaintext_bytes = Bytes::from(sql_plaintext);
 
         let key = format!(
-            "ant-backing-it-up/backups/{}/pgdumpbackup.{}-{}-{}.{}-{}-{}.bak.sql.zip",
-            req.source_project,
+            "{}pgdumpbackup.{}-{}-{}.{}-{}-{}.bak.sql.zip",
+            backup_key_prefix(&req.source_project),
             now.year(),
             now.month(),
             now.day(),
@@ -226,8 +223,6 @@ async fn post_backup(
         key
     };
 
-    // Then save all of that in the database.
-    info!("Recording backup job...");
     // db.record_backup(&req.source_project, &db_params, &encryption.nonce, &key)
     // db.record_backup(&req.source_project, &db_params, &None, &key)
     //     .await
@@ -242,7 +237,41 @@ async fn post_backup(
         local_sql_path.display()
     ));
 
+    rotation::rotate_backups(&ant_archive, "b-typesofants", &req.source_project)
+        .await
+        .map_err(|e| {
+            error!("ANT-ERR-138: backup saved, but rotation failed: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     info!("Backup job successful.");
+
+    return Ok(StatusCode::OK);
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanBackupsRequest {
+    /// The project, e.g. 'ant-data-farm'. This translates to sets of environment variables.
+    pub source_project: String,
+}
+
+async fn clean_backups(
+    State(AntBackingItUpState { ant_archive, .. }): State<AntBackingItUpState>,
+    Json(req): Json<CleanBackupsRequest>,
+) -> Result<StatusCode, StatusCode> {
+    rotation::rotate_backups(&ant_archive, "b-typesofants", &req.source_project)
+        .await
+        .map_err(|e| match e {
+            RotationError::UnsupportedProject(_) => {
+                warn!("ANT-ERR-139: {e}");
+                StatusCode::BAD_REQUEST
+            }
+            e => {
+                error!("ANT-ERR-140: rotation failed: {e}");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
 
     return Ok(StatusCode::OK);
 }
@@ -256,8 +285,9 @@ pub fn make_routes(s: AntBackingItUpState) -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Routes::new()
-        .get("/backups", get(list_backups))
+        // .get("/backups", get(list_backups))
         .post("/backup", post(post_backup))
+        .post("/clean", post(clean_backups))
         .build()
         .with_state(s)
         .layer(

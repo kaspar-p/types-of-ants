@@ -33,6 +33,8 @@ axum-prometheus = "0.10.0"
 subtle = "2.6"
 metrics-exporter-prometheus = "0.18"
 std-ext = "0.4.0"
+serde = { version = "1.0.219", features = ["derive"] }
+chrono = { version = "0.4.42", features = ["serde"] }
 
 [dev-dependencies]
 ant-library-test = { version = "1.0.0", path = "../ant-library-test" }

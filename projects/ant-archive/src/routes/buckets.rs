@@ -8,8 +8,11 @@ use crate::{auth::BearerClaims, err::AntArchiveError, state::AntArchiveState};
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
 enum Visibility {
+    /// World-readable, on the public internet?
     Public,
+    /// Internally-readable, ANY authenticated valid authenticated client can read. So anyone registered in the system.
     Internal,
+    /// Internally-readable, but the calling client has to match the owner of the bucket exactly.
     Private,
 }
 

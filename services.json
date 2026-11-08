@@ -82,10 +82,6 @@
         },
         {
           "env": "prod",
-          "project": "ant-backing-it-up"
-        },
-        {
-          "env": "prod",
           "project": "ant-gateway"
         },
         {
@@ -207,6 +203,10 @@
         {
           "env": "prod",
           "project": "ant-backing-it-up-db"
+        },
+        {
+          "env": "prod",
+          "project": "ant-backing-it-up"
         },
         {
           "env": "prod",

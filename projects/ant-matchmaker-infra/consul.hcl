@@ -4,6 +4,7 @@ bind_addr  = "{{ GetPrivateIP }}"
 
 leave_on_terminate = true
 rejoin_after_leave = true
+server_rejoin_age_max = "1440h"
 
 ports {
   dns      = -1

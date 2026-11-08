@@ -63,11 +63,23 @@ impl Hash for HashRingNode {
 pub async fn resolve_storage_nodes(
     state: &AntArchiveState,
 ) -> Result<HashRing<HashRingNode>, AntArchiveError> {
+    // Hash the IDs of each storage node into the ring.
+    let mut ring = HashRing::<HashRingNode>::new();
+    for node in resolve_storage_node_clients(state).await? {
+        ring.add(node);
+    }
+
+    Ok(ring)
+}
+
+/// Every storage node currently in service discovery that's registered in the database.
+pub async fn resolve_storage_node_clients(
+    state: &AntArchiveState,
+) -> Result<Vec<HashRingNode>, AntArchiveError> {
     let creds = get_client_credentials()?;
     let endpoints = state.sd.resolve_all("ant-archive-storage").await;
 
-    // Hash the IDs of each storage node into the ring.
-    let mut ring = HashRing::<HashRingNode>::new();
+    let mut nodes = vec![];
 
     for ep in &endpoints {
         let (username, password) = creds.get(&ep.node).ok_or(anyhow::Error::msg(format!(
@@ -79,7 +91,7 @@ pub async fn resolve_storage_nodes(
             .get_storage_node_by_node_name_or_id(&ep.node)
             .await?
         {
-            ring.add(HashRingNode {
+            nodes.push(HashRingNode {
                 node_id: node_id.clone(),
                 host_id: ep.node.clone(),
                 client: AntArchiveStorageNodeClient::new(
@@ -98,7 +110,7 @@ pub async fn resolve_storage_nodes(
         }
     }
 
-    Ok(ring)
+    Ok(nodes)
 }
 
 #[derive(Clone)]

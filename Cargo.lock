@@ -210,6 +210,7 @@ dependencies = [
 name = "ant-archive-client"
 version = "0.1.0"
 dependencies = [
+ "ant-archive",
  "ant-library",
  "bytes",
  "reqwest 0.13.4",
@@ -224,6 +225,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bb8",
+ "chrono",
  "stdext",
  "thiserror 2.0.18",
  "tokio-postgres",
@@ -244,12 +246,14 @@ dependencies = [
  "axum-prometheus",
  "base16ct 0.3.0",
  "base64ct",
+ "chrono",
  "dotenv",
  "futures",
  "http 1.4.0",
  "http-body-util",
  "metrics-exporter-prometheus",
  "num_enum",
+ "serde",
  "sha2 0.10.9",
  "std-ext",
  "stdext",
@@ -268,6 +272,7 @@ name = "ant-archive-storage-client"
 version = "0.1.0"
 dependencies = [
  "aes-gcm 0.11.0",
+ "ant-archive-storage",
  "anyhow",
  "base16ct 1.0.0",
  "bytes",
@@ -296,11 +301,13 @@ dependencies = [
  "http 1.4.0",
  "humansize",
  "postgresql_commands",
+ "pretty_assertions",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "stdext",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-postgres",
  "tower",
@@ -409,6 +416,7 @@ dependencies = [
 name = "ant-library"
 version = "1.0.0"
 dependencies = [
+ "ant-library-db",
  "ant-library-test",
  "anyhow",
  "argon2",
@@ -449,10 +457,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ant-library-db"
+version = "0.1.0"
+
+[[package]]
+name = "ant-library-process"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ant-library-test"
 version = "1.0.0"
 dependencies = [
- "ant-library",
+ "ant-library-db",
+ "ant-library-process",
  "anyhow",
  "axum",
  "bytes",
@@ -620,6 +642,7 @@ name = "anthill"
 version = "0.1.0"
 dependencies = [
  "ant-library",
+ "ant-library-process",
  "ant-zookeeper",
  "anthill-manifest",
  "anyhow",
@@ -2013,6 +2036,12 @@ dependencies = [
  "derive_builder_core",
  "syn 2.0.117",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "digest"
@@ -4869,6 +4898,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6895,9 +6934,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.3"
+version = "1.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
+checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
 dependencies = [
  "bytes",
  "libc",
@@ -8354,6 +8393,12 @@ dependencies = [
  "libc",
  "rustix",
 ]
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yoke"

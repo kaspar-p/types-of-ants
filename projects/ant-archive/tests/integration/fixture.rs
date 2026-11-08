@@ -21,7 +21,7 @@ use ant_library::{
 use ant_library_test::{
     axum_test_client::TestClient, consul_fixture::ConsulFixture, db::TestDatabase,
 };
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{net::TcpListener, sync::Mutex, task::JoinHandle};
 
 pub const TEST_BEARER_TOKEN: &str = "test-bearer-token-for-ant-archive";
 const TEST_BUCKET_ID: &str = "b-testbucket";
@@ -55,7 +55,7 @@ struct BucketList {
 
 pub struct StorageNode {
     pub port: u16,
-    root: PathBuf,
+    pub root: PathBuf,
     _handle: Arc<JoinHandle<()>>,
 }
 
@@ -140,6 +140,23 @@ impl Fixture {
     }
 
     pub async fn new_with_capacities(name: &str, capacities: HashMap<String, i64>) -> Self {
+        Self::build(name, capacities, chrono::Duration::zero()).await
+    }
+
+    pub async fn new_with_vacuum_grace(name: &str, vacuum_grace: chrono::Duration) -> Self {
+        let mut map = HashMap::new();
+        map.insert("sn-test1".to_string(), 1024 * 1024 * 1024);
+        map.insert("sn-test2".to_string(), 1024 * 1024 * 1024);
+        map.insert("sn-test3".to_string(), 1024 * 1024 * 1024);
+
+        Self::build(name, map, vacuum_grace).await
+    }
+
+    async fn build(
+        name: &str,
+        capacities: HashMap<String, i64>,
+        vacuum_grace: chrono::Duration,
+    ) -> Self {
         unsafe {
             set_var(
                 "TYPESOFANTS_SECRET_DIR",
@@ -185,6 +202,8 @@ impl Fixture {
             db: archive_db.clone(),
             sd: sd.clone(),
             rng: Arc::new(TestSeededRng::new(42)),
+            vacuum_grace,
+            last_vacuum: Arc::new(Mutex::new(None)),
         };
         let app = make_routes(state);
 
@@ -198,6 +217,41 @@ impl Fixture {
             _storages: storages,
             _consul: consul,
         }
+    }
+
+    /// Every blob file on every storage node.
+    pub fn stored_blobs(&self) -> Vec<PathBuf> {
+        fn walk(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.map(|e| e.unwrap()) {
+                if entry.file_type().unwrap().is_dir() {
+                    walk(&entry.path(), out);
+                } else {
+                    out.push(entry.path());
+                }
+            }
+        }
+
+        let mut blobs = vec![];
+        for storage in &self._storages {
+            walk(&storage.root.join("blobs"), &mut blobs);
+        }
+        blobs
+    }
+
+    /// Writes a blob straight onto the first storage node, with no placement pointing to it,
+    /// like a shard left behind by a failed upload.
+    pub fn plant_orphan(&self, storage_key: &str, age: std::time::Duration) -> PathBuf {
+        let path = ant_archive_storage::blob_path(&self._storages[0].root, storage_key);
+        create_dir_all(path.parent().unwrap()).unwrap();
+        let file = std::fs::File::create(&path).unwrap();
+        // The version byte of an empty v1 blob.
+        std::io::Write::write_all(&mut &file, &[1u8]).unwrap();
+        file.set_modified(std::time::SystemTime::now() - age)
+            .unwrap();
+        path
     }
 
     pub async fn new_with_capacity(name: &str, capacity_bytes: i64) -> Self {

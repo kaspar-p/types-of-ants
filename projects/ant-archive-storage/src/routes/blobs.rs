@@ -11,11 +11,11 @@ use ant_library::routes::Routes;
 use anyhow::Context;
 use axum::{
     body::Body,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, State},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, Query, State},
     http::HeaderMap,
     response::{IntoResponse, Response},
     routing::{delete, get, head, put},
-    Router,
+    Json, Router,
 };
 use axum_extra::{
     headers::{authorization::Basic, Authorization},
@@ -23,9 +23,11 @@ use axum_extra::{
 };
 use axum_prometheus::PrometheusMetricLayer;
 use base64ct::{Base64, Encoding};
+use chrono::{DateTime, Utc};
 use http::request::Parts;
 use http::{header, StatusCode};
 use http_body_util::BodyExt;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::io::ErrorKind;
 use std::{path::Path as FsPath, path::PathBuf};
@@ -36,12 +38,78 @@ use tower::ServiceBuilder;
 use tower_http::{catch_panic::CatchPanicLayer, limit::RequestBodyLimitLayer};
 use tracing::info;
 
+/// A blob on disk. The storage key isn't stored, only its hash, so callers that know the key
+/// can match it with `sha256(storage_key)`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Blob {
+    pub hash: String,
+    /// Logical size, as returned by HEAD.
+    pub size: u64,
+    pub modified: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListBlobsResponse {
+    /// Sorted by hash.
+    pub blobs: Vec<Blob>,
+    /// Pass as `after` to get the next page. None on the last page.
+    pub next: Option<String>,
+}
+
 /// Compute the sharded blob path for a given storage key:
 /// `{root}/blobs/{h[0..2]}/{h[2..4]}/{h}` where h = hex(sha256(key)).
 pub fn blob_path(root: &FsPath, storage_key: &str) -> PathBuf {
     let digest = Sha256::digest(storage_key.as_bytes());
     let h = base16ct::lower::encode_string(&digest);
-    root.join("blobs").join(&h[0..2]).join(&h[2..4]).join(&h)
+    hash_path(root, &h)
+}
+
+/// `hash` must satisfy `is_blob_hash`, so it can't escape the blobs directory.
+fn hash_path(root: &FsPath, hash: &str) -> PathBuf {
+    root.join("blobs")
+        .join(&hash[0..2])
+        .join(&hash[2..4])
+        .join(hash)
+}
+
+fn is_hex(s: &str) -> bool {
+    s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+fn is_blob_hash(s: &str) -> bool {
+    s.len() == 64 && is_hex(s)
+}
+
+/// Names in `dir` that satisfy `keep`, sorted. A missing directory has no names.
+async fn sorted_names(
+    dir: &FsPath,
+    keep: impl Fn(&str) -> bool,
+) -> Result<Vec<String>, AntArchiveStorageError> {
+    let mut entries = match tokio::fs::read_dir(dir).await {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => {
+            return Err(AntArchiveStorageError::InternalServerError(
+                "ANT-ERR-141",
+                Some(e.into()),
+            ));
+        }
+    };
+
+    let mut names = vec![];
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| AntArchiveStorageError::InternalServerError("ANT-ERR-142", Some(e.into())))?
+    {
+        if let Some(name) = entry.file_name().to_str() {
+            if keep(name) {
+                names.push(name.to_string());
+            }
+        }
+    }
+    names.sort();
+    Ok(names)
 }
 
 struct BasicAuth(Authorization<Basic>);
@@ -272,15 +340,40 @@ async fn delete_blob(
 ) -> Result<impl IntoResponse, AntArchiveStorageError> {
     authenticate(&auth)?;
 
-    let path = blob_path(&state.root, &storage_key);
     info!("DELETE blob: {storage_key}");
+    remove_blob(&state, &blob_path(&state.root, &storage_key), &storage_key).await
+}
 
-    let size = BlobHandle::size(&path).await?;
+/// For blobs whose storage key the caller doesn't know, e.g. ones found by `list_blobs` that no
+/// placement points to.
+async fn delete_blob_by_hash(
+    BasicAuth(auth): BasicAuth,
+    State(state): State<AntArchiveStorageState>,
+    Path(hash): Path<String>,
+) -> Result<impl IntoResponse, AntArchiveStorageError> {
+    authenticate(&auth)?;
 
-    tokio::fs::remove_file(&path)
+    if !is_blob_hash(&hash) {
+        return Err(AntArchiveStorageError::BadRequest(
+            "hash must be 64 lowercase hex characters".to_string(),
+        ));
+    }
+
+    info!("DELETE blob by hash: {hash}");
+    remove_blob(&state, &hash_path(&state.root, &hash), &hash).await
+}
+
+async fn remove_blob(
+    state: &AntArchiveStorageState,
+    path: &FsPath,
+    name: &str,
+) -> Result<StatusCode, AntArchiveStorageError> {
+    let size = BlobHandle::size(path).await?;
+
+    tokio::fs::remove_file(path)
         .await
         .map_err(|e| match e.kind() {
-            ErrorKind::NotFound => AntArchiveStorageError::NotFound(storage_key.clone()),
+            ErrorKind::NotFound => AntArchiveStorageError::NotFound(name.to_string()),
             _ => AntArchiveStorageError::InternalServerError("ANT-ERR-112", Some(e.into())),
         })?;
 
@@ -288,11 +381,114 @@ async fn delete_blob(
     Ok(StatusCode::OK)
 }
 
+const DEFAULT_LIST_LIMIT: usize = 1000;
+const MAX_LIST_LIMIT: usize = 100_000;
+
+#[derive(Deserialize)]
+struct ListBlobsQuery {
+    /// Only list blobs whose hash sorts after this one.
+    after: Option<String>,
+    limit: Option<usize>,
+}
+
+/// Walks the sharded blob directories in order, so pages are sorted by hash and `after` can
+/// skip whole directories instead of reading them.
+async fn list_blobs(
+    BasicAuth(auth): BasicAuth,
+    State(state): State<AntArchiveStorageState>,
+    Query(query): Query<ListBlobsQuery>,
+) -> Result<Json<ListBlobsResponse>, AntArchiveStorageError> {
+    authenticate(&auth)?;
+
+    let limit = query.limit.unwrap_or(DEFAULT_LIST_LIMIT);
+    if limit == 0 || limit > MAX_LIST_LIMIT {
+        return Err(AntArchiveStorageError::BadRequest(format!(
+            "limit must be between 1 and {MAX_LIST_LIMIT}"
+        )));
+    }
+    if let Some(after) = &query.after {
+        if !is_blob_hash(after) {
+            return Err(AntArchiveStorageError::BadRequest(
+                "after must be 64 lowercase hex characters".to_string(),
+            ));
+        }
+    }
+    let after = query.after.as_deref().unwrap_or("");
+
+    let blobs_dir = state.root.join("blobs");
+    let is_shard_dir = |name: &str| name.len() == 2 && is_hex(name);
+
+    // One extra, to know whether there's another page.
+    let mut blobs: Vec<Blob> = vec![];
+    'walk: for h2 in sorted_names(&blobs_dir, is_shard_dir).await? {
+        if h2.as_str() < &after[..after.len().min(2)] {
+            continue;
+        }
+
+        for h4 in sorted_names(&blobs_dir.join(&h2), is_shard_dir).await? {
+            if format!("{h2}{h4}").as_str() < &after[..after.len().min(4)] {
+                continue;
+            }
+
+            let dir = blobs_dir.join(&h2).join(&h4);
+            let prefix = format!("{h2}{h4}");
+            let hashes =
+                sorted_names(&dir, |name| is_blob_hash(name) && name.starts_with(&prefix)).await?;
+
+            for hash in hashes {
+                if hash.as_str() <= after {
+                    continue;
+                }
+
+                let path = dir.join(&hash);
+                // Skip blobs deleted since the directory was read.
+                let size = match BlobHandle::size(&path).await {
+                    Ok(size) => size,
+                    Err(CodecError::NotFound(_)) => continue,
+                    Err(e) => return Err(e.into()),
+                };
+                let modified = match tokio::fs::metadata(&path).await {
+                    Ok(metadata) => metadata.modified().map_err(|e| {
+                        AntArchiveStorageError::InternalServerError("ANT-ERR-143", Some(e.into()))
+                    })?,
+                    Err(e) if e.kind() == ErrorKind::NotFound => continue,
+                    Err(e) => {
+                        return Err(AntArchiveStorageError::InternalServerError(
+                            "ANT-ERR-144",
+                            Some(e.into()),
+                        ));
+                    }
+                };
+
+                blobs.push(Blob {
+                    hash,
+                    size,
+                    modified: DateTime::<Utc>::from(modified),
+                });
+                if blobs.len() > limit {
+                    break 'walk;
+                }
+            }
+        }
+    }
+
+    let next = if blobs.len() > limit {
+        blobs.truncate(limit);
+        blobs.last().map(|b| b.hash.clone())
+    } else {
+        None
+    };
+
+    Ok(Json(ListBlobsResponse { blobs, next }))
+}
+
 pub fn make_routes(
     state: AntArchiveStorageState,
     metric_layer: PrometheusMetricLayer<'static>,
 ) -> Result<Router, anyhow::Error> {
     let app = Routes::new()
+        .get("/", get(list_blobs))
+        .delete("/blobs/{hash}", delete(delete_blob_by_hash))
         .put("/{storage_key}", put(put_blob))
         .get("/{storage_key}", get(get_blob))
         .head("/{storage_key}", head(head_blob))

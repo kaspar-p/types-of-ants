@@ -84,3 +84,40 @@ where
         }))
     }
 }
+
+pub async fn access_bucket_object(
+    state: &AntArchiveState,
+    maybe_auth: Option<BearerClaims>,
+    bucket_id: &String,
+    key: &String,
+) -> Result<(), AntArchiveError> {
+    let bucket = state
+        .db
+        .get_bucket(&bucket_id)
+        .await?
+        .ok_or_else(|| AntArchiveError::BucketNotFound(bucket_id.clone()))?;
+
+    match bucket.read_policy.as_str() {
+        "public" => {}
+        "internal" => {
+            if maybe_auth.is_none() {
+                return Err(AntArchiveError::BucketNotFound(bucket_id.clone()));
+            }
+        }
+        "private" => {
+            let not_found = || AntArchiveError::ObjectNotFound(key.clone());
+            let auth = maybe_auth.ok_or_else(&not_found)?;
+            if bucket.client_id != auth.client_id {
+                return Err(not_found());
+            }
+        }
+        _ => {
+            return Err(AntArchiveError::InternalServerError(
+                "ANT-ERR-107",
+                Some(anyhow::anyhow!("unknown read policy")),
+            ))
+        }
+    }
+
+    Ok(())
+}

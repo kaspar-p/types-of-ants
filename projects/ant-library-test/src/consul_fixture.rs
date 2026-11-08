@@ -4,6 +4,8 @@ use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 
+use ant_library_process::prefix_log;
+
 pub struct ConsulFixture {
     _consul: tokio::process::Child,
     _data_dir: TempDir,
@@ -75,8 +77,7 @@ impl ConsulFixture {
 
         let mut consul = cmd.spawn().unwrap();
 
-        let handles = ant_library::process::prefix_log("consul", &mut consul)
-            .expect("failed to tail consul logs");
+        let handles = prefix_log("consul", &mut consul).expect("failed to tail consul logs");
 
         const MAX_ATTEMPTS: i32 = 250;
 

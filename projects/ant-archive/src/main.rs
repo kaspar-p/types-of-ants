@@ -1,8 +1,10 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use ant_archive_db::AntArchiveDb;
 use ant_library::{rng::SystemRng, sd::reader::ServiceDiscovery};
-use tracing::debug;
+use futures::future::join_all;
+use tokio::{sync::Mutex, time::sleep};
+use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +33,23 @@ async fn main() {
         db,
         sd,
         rng: Arc::new(SystemRng),
+        vacuum_grace: chrono::Duration::hours(1),
+        last_vacuum: Arc::new(Mutex::new(None)),
     };
+
+    let vacuum_state = state.clone();
+    let vacuum_handle = tokio::spawn(async move {
+        loop {
+            // Cheap when nothing has changed, since the vacuum skips itself.
+            match ant_archive::routes::vacuum::vacuum(&vacuum_state).await {
+                Ok(report) if report.skipped => debug!("Vacuum skipped, no new activity"),
+                Ok(report) => info!("Vacuumed: {report:?}"),
+                Err(e) => error!("ANT-ERR-149: vacuum failed: {e:?}"),
+            }
+
+            sleep(Duration::from_secs(10 * 60)).await;
+        }
+    });
 
     let app = ant_archive::make_routes(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -42,5 +60,9 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect(format!("failed to bind server to {port}").as_str());
-    axum::serve(listener, app).await.expect("server failed");
+    let api_handle = tokio::spawn(async {
+        axum::serve(listener, app).await.expect("server failed");
+    });
+
+    join_all(vec![api_handle, vacuum_handle]).await;
 }

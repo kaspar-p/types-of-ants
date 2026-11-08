@@ -7,6 +7,7 @@ use ant_library::db::{
 use ant_library::sd::{pg::PoolError, reader::ServiceDiscovery};
 use anyhow::Context;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use stdext::function_name;
 use tracing::{debug, instrument};
 
@@ -32,7 +33,21 @@ pub struct ClientCapabilities {
 pub struct ArchiveBucket {
     pub bucket_id: String,
     pub client_id: String,
+    /// One of:
+    ///     "public": world-readable, on the public internet!
+    ///     "internal": ""
+    ///     "private": ""
     pub read_policy: String,
+}
+
+/// A shard's copy on a storage node, belonging to an object that no key points to.
+#[derive(Debug, Clone)]
+pub struct UnreferencedPlacement {
+    pub placement_id: String,
+    pub storage_node_id: String,
+    pub storage_key: String,
+    /// Whether the object has been unreferenced for longer than the grace period.
+    pub due: bool,
 }
 
 pub struct ArchiveObject {
@@ -320,6 +335,40 @@ impl AntArchiveDb {
     }
 
     #[instrument(skip(self))]
+    pub async fn list_objects_with_prefix(
+        &self,
+        bucket_id: &str,
+        key_prefix: &str,
+    ) -> Result<Vec<(String, String, DateTime<Utc>)>, AntArchiveDbError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "
+                select
+                   obj.object_id,
+                   key.key,
+                   obj.created_at
+                from archive_key key
+                    join archive_object obj on key.current_object_id = obj.object_id
+                where
+                    key.bucket_id = $1 and
+                    key.key like ($2 || '%') escape '\\' and
+                    key.deleted_at is null
+                ",
+                &[&bucket_id, &escape_like(key_prefix)],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get("object_id"), r.get("key"), r.get("created_at")))
+            .collect())
+    }
+
+    #[instrument(skip(self))]
     pub async fn list_chunks_for_object(
         &self,
         object_id: &str,
@@ -385,6 +434,8 @@ impl AntArchiveDb {
             .collect())
     }
 
+    /// Everything on the node until the vacuum purges it: deleted and overwritten objects, and
+    /// uploads in progress, as well as current objects.
     #[instrument(skip(self))]
     pub async fn bytes_stored_on_node(
         &self,
@@ -399,14 +450,12 @@ impl AntArchiveDb {
                 "
                 select
                     coalesce(sum(c.chunk_size_bytes), 0)::bigint as bytes_stored
-                from archive_object o
-                    join archive_key k on k.current_object_id = o.object_id
-                    join archive_chunk c on c.object_id = o.object_id
-                    join archive_shard s on c.chunk_id = s.chunk_id
-                    join archive_placement p on s.shard_id = p.shard_id
+                from archive_placement p
+                    join archive_shard s on s.shard_id = p.shard_id
+                    join archive_chunk c on c.chunk_id = s.chunk_id
                 where
                     p.storage_node_id = $1 and
-                    o.deleted_at is null
+                    p.deleted_at is null
                 ",
                 &[&storage_node_id],
             )
@@ -576,10 +625,28 @@ impl AntArchiveDb {
         let mut con = self.pool.get().await?;
         let tx = con.transaction().await.context(function_name!())?;
 
+        // The version being replaced becomes deletable from now, which starts its grace period.
+        tx.execute(
+            "
+        update archive_object
+        set deleted_at = now()
+        where
+            object_id = (select current_object_id from archive_key where key_id = $2) and
+            object_id != $1 and
+            deleted_at is null
+        ",
+            &[&object_id, &key_id],
+        )
+        .await
+        .context(function_name!())?;
+
         tx.execute(
             "
         update archive_key
-        set current_object_id = $1
+        set
+            current_object_id = $1,
+            deleted_at = null,
+            updated_at = now()
         where key_id = $2
         ",
             &[&object_id, &key_id],
@@ -870,8 +937,162 @@ impl AntArchiveDb {
             )
             .await
             .context(function_name!())?
-            .map(|r| r.get("previous_object_id"));
+            .and_then(|r| r.get::<_, Option<String>>("previous_object_id"));
+
+        // The object becomes deletable from now, which starts its grace period.
+        if let Some(object_id) = &previous_object_id {
+            self.pool
+                .get()
+                .await?
+                .execute(
+                    "
+                    update archive_object
+                    set deleted_at = now()
+                    where object_id = $1 and deleted_at is null
+                    ",
+                    &[object_id],
+                )
+                .await
+                .context(function_name!())?;
+        }
 
         Ok(previous_object_id)
     }
+
+    /// The latest change made by clients: keys and objects created, overwritten or deleted.
+    /// Vacuuming only sets placements' `deleted_at`, so it doesn't count as activity.
+    #[instrument(skip(self))]
+    pub async fn last_activity(&self) -> Result<Option<DateTime<Utc>>, AntArchiveDbError> {
+        let row = self
+            .pool
+            .get()
+            .await?
+            .query_one(
+                "
+                select greatest(
+                    (select max(greatest(created_at, updated_at, deleted_at)) from archive_key),
+                    (select max(greatest(created_at, updated_at, deleted_at)) from archive_object),
+                    (select max(greatest(created_at, updated_at)) from archive_placement)
+                ) as last_activity
+                ",
+                &[],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(row.get("last_activity"))
+    }
+
+    /// Placements not yet purged, of objects that no key points to: deleted keys, overwritten
+    /// versions and abandoned uploads. An object's grace period runs from the last time it was
+    /// touched, so an upload in progress keeps pushing it back with each shard it places.
+    #[instrument(skip(self))]
+    pub async fn list_unreferenced_placements(
+        &self,
+        grace_seconds: i64,
+    ) -> Result<Vec<UnreferencedPlacement>, AntArchiveDbError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "
+                with unreferenced as (
+                    select
+                        o.object_id,
+                        greatest(
+                            o.created_at,
+                            o.updated_at,
+                            o.deleted_at,
+                            max(p.created_at),
+                            max(p.updated_at)
+                        ) as last_touched
+                    from archive_object o
+                        left join archive_chunk c on c.object_id = o.object_id
+                        left join archive_shard s on s.chunk_id = c.chunk_id
+                        left join archive_placement p on p.shard_id = s.shard_id
+                    where not exists (
+                        select 1 from archive_key k where k.current_object_id = o.object_id
+                    )
+                    group by o.object_id
+                )
+                select
+                    p.placement_id,
+                    p.storage_node_id,
+                    p.storage_key,
+                    u.last_touched < now() - ($1::bigint * interval '1 second') as due
+                from unreferenced u
+                    join archive_chunk c on c.object_id = u.object_id
+                    join archive_shard s on s.chunk_id = c.chunk_id
+                    join archive_placement p on p.shard_id = s.shard_id
+                where p.deleted_at is null
+                ",
+                &[&grace_seconds],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| UnreferencedPlacement {
+                placement_id: r.get("placement_id"),
+                storage_node_id: r.get("storage_node_id"),
+                storage_key: r.get("storage_key"),
+                due: r.get("due"),
+            })
+            .collect())
+    }
+
+    /// After its blob is gone from the storage node.
+    #[instrument(skip(self))]
+    pub async fn mark_placement_purged(&self, placement_id: &str) -> Result<(), AntArchiveDbError> {
+        self.pool
+            .get()
+            .await?
+            .execute(
+                "
+                update archive_placement
+                set deleted_at = now()
+                where placement_id = $1
+                ",
+                &[&placement_id],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(())
+    }
+
+    /// Storage keys of every placement on the node that hasn't been purged, referenced or not.
+    #[instrument(skip(self))]
+    pub async fn list_storage_keys_on_node(
+        &self,
+        storage_node_id: &str,
+    ) -> Result<Vec<String>, AntArchiveDbError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "
+                select storage_key
+                from archive_placement
+                where
+                    storage_node_id = $1 and
+                    deleted_at is null
+                ",
+                &[&storage_node_id],
+            )
+            .await
+            .context(function_name!())?;
+
+        Ok(rows.into_iter().map(|r| r.get("storage_key")).collect())
+    }
+}
+
+/// Escapes `LIKE`'s wildcards so that `s` only matches itself. Pair with `escape '\'`.
+fn escape_like(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }

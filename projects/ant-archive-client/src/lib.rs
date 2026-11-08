@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use ant_archive::routes::metadata::list_objects::ListObjectsResponse;
 use ant_library::sd::reader::ServiceDiscovery;
 use reqwest::{Client, StatusCode};
 
@@ -78,6 +79,28 @@ impl AntArchiveClient {
                 body: body,
             })
         }
+    }
+
+    pub async fn list_objects(
+        &self,
+        bucket: &str,
+        key_prefix: &str,
+    ) -> Result<ListObjectsResponse, AntArchiveClientError> {
+        let res = self
+            .client
+            .get(format!(
+                "{}/m/objects/{}/{}",
+                self.url().await?,
+                bucket,
+                key_prefix
+            ))
+            .bearer_auth(&self.token)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let body = res.json().await?;
+        Ok(body)
     }
 
     pub async fn get_object(

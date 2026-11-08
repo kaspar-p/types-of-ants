@@ -1,10 +1,10 @@
-use ant_archive_storage::make_metrics_routes;
+use ant_archive_storage::{make_metrics_routes, ListBlobsResponse};
 use ant_library_test::axum_test_client::TestClient;
 use http::StatusCode;
 use stdext::function_name;
 use tracing_test::traced_test;
 
-use crate::fixture::{test_router_auth, test_router_no_auth};
+use crate::fixture::{test_router_auth, test_router_no_auth, TestFixture};
 
 pub mod fixture;
 
@@ -696,5 +696,296 @@ async fn metrics_bytes_stored_adjusts_on_overwrite() {
             "ant_archive_storage_bytes_stored {expected_bytes}"
         )),
         "bytes gauge should be {expected_bytes} after overwrite: {body}"
+    );
+}
+
+fn key_hash(storage_key: &str) -> String {
+    use sha2::{Digest, Sha256};
+    base16ct::lower::encode_string(&Sha256::digest(storage_key.as_bytes()))
+}
+
+async fn put_blobs(fixture: &TestFixture, auth: &str, keys: &[&str]) {
+    for key in keys {
+        let (outer, tek) = fixture.make_outer_blob(key.as_bytes());
+        let res = fixture
+            .client
+            .put(&format!("/{key}"))
+            .header("Authorization", auth)
+            .header("X-Ant-Tek", &tek)
+            .body(outer)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_401_missing_auth_header() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture.client.get("/").send().await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_200_empty() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .get("/")
+        .header("Authorization", &auth)
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let body: ListBlobsResponse = res.json().await;
+    assert!(body.blobs.is_empty());
+    assert_eq!(body.next, None);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_200_hashes_in_order() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    let keys = ["list-a", "list-b", "list-c"];
+    put_blobs(&fixture, &auth, &keys).await;
+
+    let res = fixture
+        .client
+        .get("/")
+        .header("Authorization", &auth)
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let body: ListBlobsResponse = res.json().await;
+
+    let mut expected: Vec<String> = keys.iter().map(|k| key_hash(k)).collect();
+    expected.sort();
+    assert_eq!(
+        body.blobs
+            .iter()
+            .map(|b| b.hash.clone())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    assert_eq!(body.next, None);
+
+    for blob in &body.blobs {
+        let key = keys.iter().find(|k| key_hash(k) == blob.hash).unwrap();
+        let (outer, _) = fixture.make_outer_blob(key.as_bytes());
+        assert_eq!(blob.size, outer.len() as u64, "size of {key}");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_200_paginated() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    let keys = ["page-1", "page-2", "page-3", "page-4", "page-5"];
+    put_blobs(&fixture, &auth, &keys).await;
+
+    let mut seen: Vec<String> = vec![];
+    let mut after: Option<String> = None;
+    loop {
+        let url = match &after {
+            Some(after) => format!("/?limit=2&after={after}"),
+            None => "/?limit=2".to_string(),
+        };
+        let res = fixture
+            .client
+            .get(&url)
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body: ListBlobsResponse = res.json().await;
+        assert!(body.blobs.len() <= 2);
+        seen.extend(body.blobs.into_iter().map(|b| b.hash));
+
+        match body.next {
+            Some(next) => after = Some(next),
+            None => break,
+        }
+    }
+
+    let mut expected: Vec<String> = keys.iter().map(|k| key_hash(k)).collect();
+    expected.sort();
+    assert_eq!(seen, expected);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_400_malformed_query() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    for query in [
+        "after=..%2F..%2Fetc",
+        "after=ABCDEF",
+        "limit=0",
+        "limit=100001",
+    ] {
+        let res = fixture
+            .client
+            .get(&format!("/?{query}"))
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "query {query}");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn list_blobs_returns_200_ignores_temporary_files() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    put_blobs(&fixture, &auth, &["real-blob"]).await;
+
+    // A PUT interrupted before its rename leaves a file in the tmp dir.
+    std::fs::create_dir_all(fixture.root.join("_tmpdir")).unwrap();
+    std::fs::write(fixture.root.join("_tmpdir").join(".tmpAbC123"), b"partial").unwrap();
+
+    let res = fixture
+        .client
+        .get("/")
+        .header("Authorization", &auth)
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let body: ListBlobsResponse = res.json().await;
+    assert_eq!(
+        body.blobs
+            .iter()
+            .map(|b| b.hash.clone())
+            .collect::<Vec<_>>(),
+        vec![key_hash("real-blob")]
+    );
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_by_hash_returns_401_missing_auth_header() {
+    let fixture = test_router_no_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .delete(&format!("/blobs/{}", key_hash("some-key")))
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_by_hash_returns_200_success() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    put_blobs(&fixture, &auth, &["orphan", "survivor"]).await;
+
+    {
+        let res = fixture
+            .client
+            .delete(&format!("/blobs/{}", key_hash("orphan")))
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    {
+        let res = fixture
+            .client
+            .get("/orphan")
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    let res = fixture
+        .client
+        .get("/")
+        .header("Authorization", &auth)
+        .send()
+        .await;
+    let body: ListBlobsResponse = res.json().await;
+    assert_eq!(
+        body.blobs
+            .iter()
+            .map(|b| b.hash.clone())
+            .collect::<Vec<_>>(),
+        vec![key_hash("survivor")]
+    );
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_by_hash_returns_404_missing_hash() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    let res = fixture
+        .client
+        .delete(&format!("/blobs/{}", key_hash("never-written")))
+        .header("Authorization", &auth)
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+#[traced_test]
+async fn delete_blob_by_hash_returns_400_malformed_hash() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+
+    for hash in [
+        "..%2F..%2Fsecret".to_string(),
+        "abc".to_string(),
+        key_hash("upper").to_uppercase(),
+        format!("{}0", key_hash("too-long")),
+    ] {
+        let res = fixture
+            .client
+            .delete(&format!("/blobs/{hash}"))
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "hash {hash}");
+    }
+}
+
+#[tokio::test]
+#[traced_test]
+async fn metrics_bytes_stored_decreases_on_delete_by_hash() {
+    let (fixture, auth) = test_router_auth(function_name!()).await;
+    let metrics = TestClient::new(make_metrics_routes(fixture.state.clone())).await;
+
+    put_blobs(&fixture, &auth, &["counted"]).await;
+
+    {
+        let res = fixture
+            .client
+            .delete(&format!("/blobs/{}", key_hash("counted")))
+            .header("Authorization", &auth)
+            .send()
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    let body = {
+        let res = metrics.get("/metrics").send().await;
+        assert_eq!(res.status(), StatusCode::OK);
+        res.text().await
+    };
+    assert!(
+        body.contains("ant_archive_storage_bytes_stored 0"),
+        "bytes gauge should be 0 after delete: {body}"
     );
 }
