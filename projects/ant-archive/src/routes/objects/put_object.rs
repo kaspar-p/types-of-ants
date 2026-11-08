@@ -116,10 +116,17 @@ pub(super) async fn put_object(
         )
         .await?;
 
+    // What each node stores: one shard of every chunk.
+    let bytes_per_node: usize = chunker
+        .ciphertext_sizes(content_length as usize)
+        .into_iter()
+        .map(|chunk_size| redundancy.shard_size(chunk_size))
+        .sum();
+
     let mut placements: Vec<Placement> = placement::place_group(
         &state,
         &object_id,
-        content_length as usize,
+        bytes_per_node,
         redundancy.shard_count(),
         select_node.map(|n| n.0).as_deref(),
     )
@@ -210,7 +217,7 @@ pub(super) async fn put_object(
                         placements[i] = placement::find_replacement(
                             &state,
                             &object_id,
-                            content_length as usize,
+                            bytes_per_node,
                             &disqualified,
                         )
                         .await?;

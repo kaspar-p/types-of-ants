@@ -435,7 +435,8 @@ impl AntArchiveDb {
     }
 
     /// Everything on the node until the vacuum purges it: deleted and overwritten objects, and
-    /// uploads in progress, as well as current objects.
+    /// uploads in progress, as well as current objects. Counted in shard bytes, as the
+    /// redundancy scheme produced them.
     #[instrument(skip(self))]
     pub async fn bytes_stored_on_node(
         &self,
@@ -449,10 +450,9 @@ impl AntArchiveDb {
             .query_one(
                 "
                 select
-                    coalesce(sum(c.chunk_size_bytes), 0)::bigint as bytes_stored
+                    coalesce(sum(s.shard_size_bytes), 0)::bigint as bytes_stored
                 from archive_placement p
                     join archive_shard s on s.shard_id = p.shard_id
-                    join archive_chunk c on c.chunk_id = s.chunk_id
                 where
                     p.storage_node_id = $1 and
                     p.deleted_at is null

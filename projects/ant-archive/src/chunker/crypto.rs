@@ -4,6 +4,9 @@ use aes_gcm::{
 };
 use tokio::io::AsyncReadExt;
 
+/// AES-GCM appends a tag of this size to every ciphertext.
+pub(super) const TAG_SIZE: usize = 16;
+
 pub(super) fn chunk_nonce(prefix: &[u8; 4], index: u64) -> [u8; 12] {
     let mut n = [0u8; 12];
     n[..4].copy_from_slice(prefix);

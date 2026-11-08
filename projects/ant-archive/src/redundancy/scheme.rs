@@ -24,6 +24,13 @@ pub trait RedundancyScheme: Send + Sync + 'static {
     /// The size of the return value of .shard()
     fn shard_count(&self) -> i32;
 
+    /// The size of each shard that `.shard()` produces from `chunk_size` bytes, which is
+    /// what each node holding a shard stores for that chunk.
+    ///
+    /// Replication is `chunk_size`, a full copy.
+    /// ECC(k, m) is about `chunk_size / k`.
+    fn shard_size(&self, chunk_size: usize) -> usize;
+
     /// A signal for optimization for the read path, or health for the repair path.
     ///
     /// Replication has 1, since all copies are identical

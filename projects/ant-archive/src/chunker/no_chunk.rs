@@ -3,7 +3,7 @@ use futures::{stream::BoxStream, StreamExt};
 
 use crate::chunker::{
     chunker::{ChunkError, Chunker, EncryptedChunk},
-    crypto::{aead_decrypt, aead_encrypt, chunk_nonce},
+    crypto::{self, aead_decrypt, aead_encrypt, chunk_nonce},
 };
 
 pub struct NoChunk {}
@@ -15,6 +15,10 @@ impl Chunker for NoChunk {
 
     fn chunk_size(&self) -> usize {
         usize::MAX
+    }
+
+    fn ciphertext_sizes(&self, plaintext_len: usize) -> Vec<usize> {
+        vec![plaintext_len + crypto::TAG_SIZE]
     }
 
     fn encrypt_stream(

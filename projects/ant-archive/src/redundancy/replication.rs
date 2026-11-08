@@ -28,6 +28,10 @@ impl RedundancyScheme for Replication {
         self.n
     }
 
+    fn shard_size(&self, chunk_size: usize) -> usize {
+        chunk_size
+    }
+
     fn shard_kind(&self, _: i32) -> ShardKind {
         ShardKind::Data
     }
@@ -57,5 +61,25 @@ impl RedundancyScheme for Replication {
             .next()
             .map(|shard| shard.data.clone())
             .context("no shards available")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::Bytes;
+
+    use crate::redundancy::{replication::Replication, scheme::RedundancyScheme};
+
+    #[test]
+    fn shard_size_matches_shards() {
+        let replication = Replication::new(3);
+
+        for chunk_size in [0, 1, 26] {
+            let shards = replication.shard(&Bytes::from(vec![7u8; chunk_size])).unwrap();
+
+            for shard in shards {
+                assert_eq!(replication.shard_size(chunk_size), shard.data.len());
+            }
+        }
     }
 }

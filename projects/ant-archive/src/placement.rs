@@ -200,7 +200,9 @@ async fn calculate_placements(
         return Err(AntArchiveError::InsufficientStorage);
     }
 
-    let mut ring_iter = match available_nodes.get_with_replicas(&group_id, NUM_REPLICATION - 1) {
+    // Every available node in ring order; the loop below takes as many as are needed.
+    let mut ring_iter = match available_nodes.get_with_replicas(&group_id, available_nodes.len() - 1)
+    {
         Some(ring) => ring,
         None => return Err(AntArchiveError::InsufficientStorage),
     }
@@ -245,8 +247,6 @@ async fn calculate_placements(
 
     Ok(placements)
 }
-
-pub(crate) const NUM_REPLICATION: usize = 3;
 
 /// Here, id means the object or chunk or whatever bytes need to be placed.
 /// It's compared to the hashed identities of the nodes to determine ring placement.

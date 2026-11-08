@@ -36,6 +36,22 @@ impl Chunker for FixedSize {
         self.size
     }
 
+    fn ciphertext_sizes(&self, plaintext_len: usize) -> Vec<usize> {
+        // A zero-byte body is still one (empty) chunk.
+        if plaintext_len == 0 {
+            return vec![crypto::TAG_SIZE];
+        }
+
+        let full_chunks = plaintext_len / self.size;
+        let remainder = plaintext_len % self.size;
+
+        let mut sizes = vec![self.size + crypto::TAG_SIZE; full_chunks];
+        if remainder > 0 {
+            sizes.push(remainder + crypto::TAG_SIZE);
+        }
+        sizes
+    }
+
     fn encrypt_stream(
         &self,
         dek: [u8; 32],
@@ -133,5 +149,35 @@ impl Chunker for FixedSize {
         let nonce = crypto::chunk_nonce(nonce_prefix, chunk_idx);
         let aad: &[u8] = if is_last_chunk { b"last" } else { b"cont" };
         Ok(crypto::aead_decrypt(dek, &nonce, aad, &ciphertext)?.into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::Bytes;
+    use futures::StreamExt;
+
+    use crate::chunker::{chunker::Chunker, fixed_size::FixedSize};
+
+    #[tokio::test]
+    async fn ciphertext_sizes_match_encrypt_stream() {
+        let chunker = FixedSize::new(10);
+
+        for plaintext_len in [0, 1, 9, 10, 11, 20, 25] {
+            let plaintext = Bytes::from(vec![7u8; plaintext_len]);
+            let stream = futures::stream::once(async move { Ok(plaintext) }).boxed();
+
+            let actual: Vec<usize> = chunker
+                .encrypt_stream([1u8; 32], [2u8; 4], stream)
+                .map(|chunk| chunk.unwrap().ciphertext.len())
+                .collect()
+                .await;
+
+            assert_eq!(
+                chunker.ciphertext_sizes(plaintext_len),
+                actual,
+                "plaintext of {plaintext_len} bytes"
+            );
+        }
     }
 }

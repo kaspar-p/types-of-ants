@@ -420,7 +420,9 @@ async fn put_object_returns_507_when_no_nodes_have_capacity() {
 #[tokio::test]
 #[traced_test]
 async fn put_object_capacity_check_uses_consistent_size_units() {
-    let fixture = Fixture::new_with_capacity(function_name!(), 120).await;
+    // Each 50-byte object is five 10-byte chunks of 10 + 16 (AES-GCM tag) shard bytes, so
+    // the capacity holds exactly two.
+    let fixture = Fixture::new_with_capacity(function_name!(), 2 * 5 * (10 + 16)).await;
     let ids = fixture.bucket_ids().await;
 
     let res1 = fixture
@@ -453,7 +455,8 @@ async fn put_object_capacity_check_uses_consistent_size_units() {
 #[tokio::test]
 #[traced_test]
 async fn put_object_returns_507_deleted_object_not_yet_vacuumed() {
-    let fixture = Fixture::new_with_capacity(function_name!(), 55).await;
+    // Each 40-byte object is four chunks of 10 + 16 shard bytes: room for one, not two.
+    let fixture = Fixture::new_with_capacity(function_name!(), 2 * 4 * (10 + 16) - 1).await;
     let ids = fixture.bucket_ids().await;
 
     put_object(
@@ -1058,4 +1061,33 @@ async fn get_object_returns_200_reuploaded_after_delete() {
             vec!["phoenix"]
         );
     }
+}
+
+// A 3-byte object is one chunk of 3 + 16 (AES-GCM tag) bytes, and replication stores
+// that whole shard on each node.
+const ABC_SHARD_BYTES: i64 = 3 + 16;
+
+#[tokio::test]
+#[traced_test]
+async fn put_object_returns_201_shard_exactly_fills_capacity() {
+    let fixture = Fixture::new_with_capacity(function_name!(), ABC_SHARD_BYTES).await;
+    let ids = fixture.bucket_ids().await;
+
+    put_object(&fixture, &ids.private_id, "fits", b"abc").await;
+}
+
+#[tokio::test]
+#[traced_test]
+async fn put_object_returns_507_shard_one_byte_over_capacity() {
+    let fixture = Fixture::new_with_capacity(function_name!(), ABC_SHARD_BYTES - 1).await;
+    let ids = fixture.bucket_ids().await;
+
+    let res = fixture
+        .client
+        .put(&format!("/o/{}/too-big", ids.private_id))
+        .header("Authorization", &format!("Bearer {TEST_BEARER_TOKEN}"))
+        .body(b"abc".as_slice())
+        .send()
+        .await;
+    assert_eq!(res.status(), StatusCode::INSUFFICIENT_STORAGE);
 }

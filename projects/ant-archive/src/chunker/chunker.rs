@@ -26,6 +26,10 @@ pub trait Chunker: Send + Sync + 'static {
     /// (this is how v1 objects compose into the same trait, no special-casing).
     fn chunk_size(&self) -> usize;
 
+    /// The size of each chunk's ciphertext that `encrypt_stream` produces from
+    /// `plaintext_len` bytes, in order.
+    fn ciphertext_sizes(&self, plaintext_len: usize) -> Vec<usize>;
+
     /// Reads plaintext, encrypts it into a stream of chunks.
     /// Handles nonce derivation and last-chunk lookahead internally.
     fn encrypt_stream(
