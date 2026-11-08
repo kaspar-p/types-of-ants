@@ -26,29 +26,6 @@ pub mod storage_client;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ListBackupsRequest {
-    pub page: i32,
-}
-
-// #[derive(Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct ListBackupsResponse {
-//     pub backups: Vec<Backup>,
-// }
-
-// async fn list_backups(
-//     State(AntBackingItUpState { db, .. }): State<AntBackingItUpState>,
-// ) -> Result<impl IntoResponse, StatusCode> {
-//     let backups = db.get_all_backups().await.map_err(|e| {
-//         error!("ANT-ERR-006: db: {e}");
-//         StatusCode::INTERNAL_SERVER_ERROR
-//     })?;
-
-//     return Ok((StatusCode::OK, Json(ListBackupsResponse { backups })));
-// }
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct BackupRequest {
     /// The project, e.g. 'ant-data-farm'. This translates to sets of environment variables.
     pub source_project: String,
@@ -63,8 +40,6 @@ pub struct BackupResponse {
 async fn post_backup(
     State(AntBackingItUpState {
         root_dir,
-        mut db,
-        mut ant_fs,
         ant_archive,
         ..
     }): State<AntBackingItUpState>,
@@ -147,59 +122,7 @@ async fn post_backup(
     );
     let sql_plaintext = std::fs::read(&local_sql_path).unwrap();
 
-    // .read_to_end(&mut sql_plaintext)
-    // .unwrap();
-
-    // let local_zip_filename = format!("{local_sql_filename}.zip");
-    // let local_zip_path = root_dir.join(&local_zip_filename);
-    // let local_zip_file = std::fs::File::create(&local_zip_path).unwrap();
-    // info!("Creating zip archive: {}", local_zip_path.display());
-    // let mut zip = zip::ZipWriter::new(local_zip_file);
-
-    // info!(
-    //     "Writing {} bytes to zip archive: {}",
-    //     humansize::format_size(sql_plaintext.len(), humansize::DECIMAL),
-    //     local_zip_path.display()
-    // );
-    // zip.start_file(
-    //     local_sql_filename,
-    //     SimpleFileOptions::default()
-    //         .compression_method(zip::CompressionMethod::Xz)
-    //         .large_file(true),
-    // )
-    // .expect("zip create file");
-    // zip.write_all(&sql_plaintext).expect("zip write");
-    // zip.finish().expect("zip flush");
-    // let mut plaintext_zip_file = std::fs::File::open(&local_zip_path).expect("open zip file");
-
-    // info!("Reading zip archive: {}", local_zip_path.display());
-    // let mut plaintext_zip_buf: Vec<u8> = vec![];
-    // plaintext_zip_file
-    // .read_to_end(&mut plaintext_zip_buf)
-    // .expect("plaintext zip read");
-
-    // info!("Deleting zip archive: {}", local_zip_path.display());
-    // std::fs::remove_file(&local_zip_path)
-    // .expect(&format!("removing zip file: {}", local_zip_path.display()));
-
-    // info!("Encrypting zip archive...");
-    // let encryption = crypto::encrypt_backup(&plaintext_zip_buf);
-
-    // Then save that file to an ant-fs worker.
-    // info!("Saving to ant-fs...");
-    // let remote_filename = format!("{}.enc", &local_zip_filename);
-
-    // let bytes = Bytes::from(encryption.ciphertext);
-
-    // {
-    //     ant_fs
-    //         .put_file(&remote_filename, bytes.clone())
-    //         .await
-    //         .context("ant-fs operation")
-    //         .unwrap();
-    // }
-
-    let key = {
+    {
         info!("Saving plaintext to ant-archive...");
         let plaintext_bytes = Bytes::from(sql_plaintext);
 
@@ -219,17 +142,7 @@ async fn post_backup(
             .await
             .context("ant-archive operation")
             .unwrap();
-
-        key
-    };
-
-    // db.record_backup(&req.source_project, &db_params, &encryption.nonce, &key)
-    // db.record_backup(&req.source_project, &db_params, &None, &key)
-    //     .await
-    //     .map_err(|e| {
-    //         error!("ANT-ERR-012: db query failed: {e}");
-    //         StatusCode::INTERNAL_SERVER_ERROR
-    //     })?;
+    }
 
     info!("Removing backup SQL: {}", local_sql_path.display());
     std::fs::remove_file(&local_sql_path).expect(&format!(
@@ -285,7 +198,6 @@ pub fn make_routes(s: AntBackingItUpState) -> Result<Router, anyhow::Error> {
 
     debug!("Initializing site routes...");
     let app = Routes::new()
-        // .get("/backups", get(list_backups))
         .post("/backup", post(post_backup))
         .post("/clean", post(clean_backups))
         .build()

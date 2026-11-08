@@ -473,56 +473,6 @@ impl AntArchiveDb {
         Ok(bytes_stored)
     }
 
-    #[instrument(skip(self))]
-    pub async fn upsert_object(
-        &self,
-        bucket_id: &str,
-        kek_id: &str,
-        key: &str,
-        size_bytes: i64,
-        encrypted_dek: &[u8],
-        dek_nonce: &[u8],
-        tek_derivation_key: &[u8],
-    ) -> Result<String, AntArchiveDbError> {
-        let object_id = self
-            .pool
-            .get()
-            .await
-            .context(function_name!())?
-            .query_one(
-                "
-                insert into archive_object
-                   (bucket_id, kek_id, key, size_bytes, encrypted_dek, dek_nonce, tek_derivation_key)
-                values
-                    ($1, $2, $3, $4, $5, $6, $7)
-                on conflict (bucket_id, key)
-                do update set
-                    kek_id = EXCLUDED.kek_id,
-                    size_bytes = EXCLUDED.size_bytes,
-                    encrypted_dek = EXCLUDED.encrypted_dek,
-                    dek_nonce = EXCLUDED.dek_nonce,
-                    tek_derivation_key = EXCLUDED.tek_derivation_key,
-                    updated_at = NOW(),
-                    deleted_at = NULL
-                returning object_id
-                ",
-                &[
-                    &bucket_id,
-                    &kek_id,
-                    &key,
-                    &size_bytes,
-                    &encrypted_dek,
-                    &dek_nonce,
-                    &tek_derivation_key,
-                ],
-            )
-            .await
-            .context(function_name!())?
-            .get("object_id");
-
-        Ok(object_id)
-    }
-
     /// During the lifecycle of an object, it starts PENDING before the
     /// bytes of the object are on all required nodes, then it can be closed.
     ///

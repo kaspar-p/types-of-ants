@@ -118,18 +118,6 @@ pub(crate) struct Placement {
     pub node: AntArchiveStorageNodeClient,
 }
 
-// #[derive(Debug, Clone)]
-// pub(crate) enum PlacementRole {
-//     Replication,
-//     ErrorCorrection(ErrorCorrectionRole),
-// }
-
-// #[derive(Debug, Clone)]
-// pub(crate) enum ErrorCorrectionRole {
-//     Data,
-//     Parity,
-// }
-
 /// Return a vector of nodes to place onto, `num_placements_to_find` in length.
 #[tracing::instrument(skip(state))]
 async fn calculate_placements(
