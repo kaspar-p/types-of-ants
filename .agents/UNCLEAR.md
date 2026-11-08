@@ -1,7 +1,8 @@
 # Unclear items
 
-Data the agent can't reach from the repo. Each item is a candidate for an MCP
-tool or another way of getting access.
+Things the agent can't find out from the repo: production data (each a
+candidate for an MCP tool or another way of getting access), and open
+questions about the system. Facts go in `DESIGN.md` instead.
 
 ## Production state
 
@@ -18,6 +19,10 @@ tool or another way of getting access.
 
 ## Usage
 
-- [ ] Access logs for `GET /backups` on `ant-backing-it-up`: does anything still call it? It's commented out in the staged change.
+- [ ] Access logs for `GET /backups` on `ant-backing-it-up`: did anything still call it before it was removed?
 - [ ] Which clients call ant-archive, and which endpoints do they use?
 - [ ] Consul logs or incidents behind adding `server_rejoin_age_max = "1440h"`.
+
+## Open questions about the system
+
+- [ ] When is a trait with an in-memory fake enough, and when is a real-service integration test required?

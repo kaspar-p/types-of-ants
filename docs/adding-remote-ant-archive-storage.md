@@ -51,14 +51,14 @@ ah curl ant-matchmaker:prod/v1/catalog/services
 
 The dynamic set of nodes is not useful for the persistence layer, where we have
 to be certain which node an object is on, so there's the table
-`archive_storage_client` that holds this information.
+`archive_storage_node` that holds this information.
 
 If not already there, create a row:
 
 ```sql
 BEGIN;
 
-insert into archive_storage_client
+insert into archive_storage_node
   (host_id, is_active, capacity_bytes, protocol)
 values
   ('node-display-name-here', true, 0, 'https')
@@ -72,4 +72,29 @@ The capacity bytes initially being set to zero means that this node will not
 qualify for any object placement. Setting `is_active=false` would achieve the
 same thing.
 
+`capacity_bytes` is counted in shard bytes, what `ant-archive` sends to the
+node: each chunk's ciphertext (plaintext plus a 16-byte AES-GCM tag), split by
+the redundancy scheme. The files on disk are slightly larger, by the transport
+encryption and a version byte per blob.
+
 ## Step: Test with object-specific placement
+
+A client whose `can_select_storage_node` capability is set can force an upload
+onto a specific node with a header naming its `storage_node_id` or `host_id`:
+
+```bash
+curl -X PUT "$ANT_ARCHIVE/o/$BUCKET/test-key" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Ant-Capability-Can-Select-Storage-Node: node-display-name-here" \
+  --data 'hello'
+```
+
+The forced node is used even when its capacity is 0, so this works before
+the node is opened up for general placement. Without the capability, the header
+is ignored.
+
+## Step: Add it to `services.json`
+
+List the host with `"auto_deployable": false`, since the deployment system
+can't reach hosts outside typesofants infrastructure. Its services are updated
+by hand.
