@@ -242,7 +242,7 @@ pub enum AnthillArchetype {
         password_secret_name: String,
 
         /// The directory containing migration .sql and .sh files, will be applied to the database pre-deployment, for each environment.
-        /// Defaults to "migration"
+        /// Defaults to "migrations"
         #[serde(default = "default_migration_dir")]
         migration_dir: String,
     },
@@ -252,7 +252,7 @@ pub enum AnthillArchetype {
 }
 
 fn default_migration_dir() -> String {
-    "migration".to_string()
+    "migrations".to_string()
 }
 
 // impl FromStr for AnthillArchetype {
@@ -361,5 +361,38 @@ impl AnthillManifest {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::{AnthillArchetype, AnthillManifest};
+
+    #[test]
+    fn postgres_projects_have_their_migration_dir() {
+        let projects_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&projects_dir).unwrap() {
+            let project_dir = entry.unwrap().path();
+            let manifest_path = project_dir.join("anthill.json");
+            if !manifest_path.exists() {
+                continue;
+            }
+
+            let manifest = AnthillManifest::from_file(&manifest_path).unwrap();
+            if let Some(AnthillArchetype::Postgres { migration_dir, .. }) = manifest.archetype {
+                assert!(
+                    project_dir.join(&migration_dir).is_dir(),
+                    "{} has no migration dir {migration_dir}",
+                    project_dir.display()
+                );
+                checked += 1;
+            }
+        }
+
+        assert!(checked > 0, "no postgres projects found");
     }
 }
